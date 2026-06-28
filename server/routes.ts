@@ -2,8 +2,7 @@ import { randomBytes, randomUUID, scrypt as scryptCallback, createHash, timingSa
 import { promisify } from 'node:util';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
-import { CATEGORIES, DEFAULT_ITEM_TEMPLATES } from '../src/data.ts';
-import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem } from '../src/types.ts';
+import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from '../src/types.ts';
 import { getPool, Queryable } from './database.ts';
 
 const scrypt = promisify(scryptCallback);
@@ -15,6 +14,20 @@ interface DbUserRow {
   name: string;
   email: string;
   password_hash: string;
+}
+
+interface EnxovalRow {
+  id: string;
+  name: string;
+  owner_id: string;
+  role: 'owner' | 'editor';
+}
+
+interface MemberRow {
+  id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'editor';
 }
 
 interface CategoryRow {
@@ -31,6 +44,22 @@ interface ItemRow {
   checked: boolean;
   link: string;
   description: string;
+  sort_order: number;
+}
+
+interface TemplateRow {
+  id: string;
+}
+
+interface TemplateCategoryRow {
+  id: string;
+  name: string;
+  sort_order: number;
+}
+
+interface TemplateItemRow {
+  category_id: string;
+  name: string;
   sort_order: number;
 }
 
@@ -55,7 +84,7 @@ function normalizeEmail(email: unknown) {
 
 function requireText(value: unknown, fieldName: string) {
   if (typeof value !== 'string' || !value.trim()) {
-    throw new HttpError(400, `${fieldName} é obrigatório.`);
+    throw new HttpError(400, `${fieldName} e obrigatorio.`);
   }
 
   return value.trim();
@@ -109,6 +138,24 @@ function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'>): AuthUser {
   };
 }
 
+function mapEnxoval(row: EnxovalRow): EnxovalSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    ownerId: row.owner_id,
+    role: row.role
+  };
+}
+
+function mapMember(row: MemberRow): EnxovalMember {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role
+  };
+}
+
 function mapCategory(row: CategoryRow): EnxovalCategory {
   return {
     id: row.id,
@@ -146,18 +193,76 @@ async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) 
   }
 }
 
-async function fetchCategories(queryable: Queryable, userId: string) {
+async function fetchEnxovais(queryable: Queryable, userId: string) {
+  const result = await queryable.query<EnxovalRow>(`
+    SELECT e.id, e.name, e.owner_id, em.role
+    FROM enxovais e
+    INNER JOIN enxoval_members em ON em.enxoval_id = e.id
+    WHERE em.user_id = $1
+    ORDER BY CASE em.role WHEN 'owner' THEN 0 ELSE 1 END, e.created_at ASC, e.name ASC
+  `, [userId]);
+
+  return result.rows.map(mapEnxoval);
+}
+
+async function requireEnxovalMember(queryable: Queryable, userId: string, enxovalId: string) {
+  const result = await queryable.query<{ role: 'owner' | 'editor' }>(`
+    SELECT role
+    FROM enxoval_members
+    WHERE enxoval_id = $1 AND user_id = $2
+  `, [enxovalId, userId]);
+
+  if (!result.rows[0]) throw new HttpError(404, 'Enxoval nao encontrado.');
+  return result.rows[0].role;
+}
+async function requireEnxovalOwner(queryable: Queryable, userId: string, enxovalId: string) {
+  const role = await requireEnxovalMember(queryable, userId, enxovalId);
+  if (role !== 'owner') throw new HttpError(403, 'Apenas o dono pode alterar esse enxoval.');
+}
+
+async function fetchEnxoval(queryable: Queryable, userId: string, enxovalId: string) {
+  const result = await queryable.query<EnxovalRow>(`
+    SELECT e.id, e.name, e.owner_id, em.role
+    FROM enxovais e
+    INNER JOIN enxoval_members em ON em.enxoval_id = e.id
+    WHERE e.id = $1 AND em.user_id = $2
+    LIMIT 1
+  `, [enxovalId, userId]);
+
+  if (!result.rows[0]) throw new HttpError(404, 'Enxoval nao encontrado.');
+  return mapEnxoval(result.rows[0]);
+}
+
+async function fetchMembers(queryable: Queryable, userId: string, enxovalId: string) {
+  await requireEnxovalMember(queryable, userId, enxovalId);
+
+  const result = await queryable.query<MemberRow>(`
+    SELECT u.id, u.name, u.email, em.role
+    FROM enxoval_members em
+    INNER JOIN users u ON u.id = em.user_id
+    WHERE em.enxoval_id = $1
+    ORDER BY CASE em.role WHEN 'owner' THEN 0 ELSE 1 END, u.name ASC, u.email ASC
+  `, [enxovalId]);
+
+  return result.rows.map(mapMember);
+}
+
+async function fetchCategories(queryable: Queryable, userId: string, enxovalId: string) {
+  await requireEnxovalMember(queryable, userId, enxovalId);
+
   const result = await queryable.query<CategoryRow>(`
     SELECT id, name, sort_order
     FROM categories
-    WHERE user_id = $1
+    WHERE enxoval_id = $1
     ORDER BY sort_order ASC, name ASC
-  `, [userId]);
+  `, [enxovalId]);
 
   return result.rows.map(mapCategory);
 }
 
-async function fetchItems(queryable: Queryable, userId: string) {
+async function fetchItems(queryable: Queryable, userId: string, enxovalId: string) {
+  await requireEnxovalMember(queryable, userId, enxovalId);
+
   const result = await queryable.query<ItemRow>(`
     SELECT
       i.id,
@@ -170,73 +275,141 @@ async function fetchItems(queryable: Queryable, userId: string) {
       i.sort_order
     FROM items i
     INNER JOIN categories c ON c.id = i.category_id
-    WHERE i.user_id = $1
+    WHERE i.enxoval_id = $1
     ORDER BY c.sort_order ASC, i.sort_order ASC, i.created_at ASC
-  `, [userId]);
+  `, [enxovalId]);
 
   return result.rows.map(mapItem);
 }
 
-async function fetchBootstrap(user: AuthUser): Promise<BootstrapData> {
-  const pool = getPool();
-  const [categories, items] = await Promise.all([
-    fetchCategories(pool, user.id),
-    fetchItems(pool, user.id)
-  ]);
+async function fetchWorkspace(queryable: Queryable, userId: string, enxovalId: string): Promise<EnxovalWorkspace> {
+  const enxoval = await fetchEnxoval(queryable, userId, enxovalId);
+  const members = await fetchMembers(queryable, userId, enxovalId);
+  const categories = await fetchCategories(queryable, userId, enxovalId);
+  const items = await fetchItems(queryable, userId, enxovalId);
 
-  return { user, categories, items };
+  return { enxoval, members, categories, items };
 }
 
-async function findCategory(queryable: Queryable, userId: string, categoryId: string) {
+async function fetchBootstrap(user: AuthUser, requestedEnxovalId?: string): Promise<BootstrapData> {
+  let enxovais = await fetchEnxovais(getPool(), user.id);
+
+  if (enxovais.length === 0) {
+    const workspace = await createEnxovalForUser(user.id, 'Enxoval de Casa Nova');
+    enxovais = [workspace.enxoval];
+  }
+
+  const activeEnxovalId = requestedEnxovalId ?? enxovais[0]?.id;
+  const workspace = activeEnxovalId
+    ? await fetchWorkspace(getPool(), user.id, activeEnxovalId)
+    : null;
+
+  return {
+    user,
+    enxovais,
+    activeEnxoval: workspace?.enxoval ?? null,
+    members: workspace?.members ?? [],
+    categories: workspace?.categories ?? [],
+    items: workspace?.items ?? []
+  };
+}
+
+async function findCategory(queryable: Queryable, userId: string, enxovalId: string, categoryId: string) {
+  await requireEnxovalMember(queryable, userId, enxovalId);
+
   const result = await queryable.query<CategoryRow>(`
     SELECT id, name, sort_order
     FROM categories
-    WHERE id = $1 AND user_id = $2
-  `, [categoryId, userId]);
+    WHERE id = $1 AND enxoval_id = $2
+  `, [categoryId, enxovalId]);
 
   return result.rows[0] ? mapCategory(result.rows[0]) : null;
 }
 
-async function findOrCreateCategory(client: PoolClient, userId: string, name: string) {
+async function findOrCreateCategory(client: PoolClient, userId: string, enxovalId: string, name: string, preferredOrder?: number) {
+  await requireEnxovalMember(client, userId, enxovalId);
+
   const orderResult = await client.query<{ next_order: number }>(`
     SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
     FROM categories
-    WHERE user_id = $1
-  `, [userId]);
+    WHERE enxoval_id = $1
+  `, [enxovalId]);
 
   const result = await client.query<CategoryRow>(`
-    INSERT INTO categories (id, user_id, name, sort_order)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
+    INSERT INTO categories (id, user_id, enxoval_id, name, sort_order)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (enxoval_id, name) DO UPDATE SET name = EXCLUDED.name
     RETURNING id, name, sort_order
-  `, [randomUUID(), userId, name, orderResult.rows[0]?.next_order ?? 0]);
+  `, [randomUUID(), userId, enxovalId, name, preferredOrder ?? orderResult.rows[0]?.next_order ?? 0]);
 
   return mapCategory(result.rows[0]);
 }
 
-async function seedUserDefaults(client: PoolClient, userId: string) {
+async function seedEnxovalDefaults(client: PoolClient, userId: string, enxovalId: string) {
+  const templateResult = await client.query<TemplateRow>(`
+    SELECT id
+    FROM enxoval_templates
+    WHERE is_default = true
+    ORDER BY created_at ASC
+    LIMIT 1
+  `);
+
+  const templateId = templateResult.rows[0]?.id;
+  if (!templateId) return;
+
+  const templateCategories = await client.query<TemplateCategoryRow>(`
+    SELECT id, name, sort_order
+    FROM template_categories
+    WHERE template_id = $1
+    ORDER BY sort_order ASC, name ASC
+  `, [templateId]);
+
   const categoryIds = new Map<string, string>();
 
-  for (const [index, categoryName] of CATEGORIES.entries()) {
-    const result = await client.query<CategoryRow>(`
-      INSERT INTO categories (id, user_id, name, sort_order)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
-      RETURNING id, name, sort_order
-    `, [randomUUID(), userId, categoryName, index]);
-
-    categoryIds.set(categoryName, result.rows[0].id);
+  for (const templateCategory of templateCategories.rows) {
+    const category = await findOrCreateCategory(client, userId, enxovalId, templateCategory.name, templateCategory.sort_order);
+    categoryIds.set(templateCategory.id, category.id);
   }
 
-  for (const [index, item] of DEFAULT_ITEM_TEMPLATES.entries()) {
-    const categoryId = categoryIds.get(item.category);
+  const templateItems = await client.query<TemplateItemRow>(`
+    SELECT category_id, name, sort_order
+    FROM template_items
+    WHERE template_id = $1
+    ORDER BY sort_order ASC, name ASC
+  `, [templateId]);
+
+  for (const item of templateItems.rows) {
+    const categoryId = categoryIds.get(item.category_id);
     if (!categoryId) continue;
 
     await client.query(`
-      INSERT INTO items (id, user_id, category_id, name, sort_order)
-      VALUES ($1, $2, $3, $4, $5)
-    `, [randomUUID(), userId, categoryId, item.name, index]);
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [randomUUID(), userId, enxovalId, categoryId, item.name, item.sort_order]);
   }
+}
+
+async function createEnxovalForUser(userId: string, name: string, options: { useDefaultTemplate?: boolean } = {}) {
+  return withTransaction(async client => {
+    const enxovalId = randomUUID();
+
+    const enxovalResult = await client.query<EnxovalRow>(`
+      INSERT INTO enxovais (id, name, owner_id)
+      VALUES ($1, $2, $3)
+      RETURNING id, name, owner_id, 'owner'::text AS role
+    `, [enxovalId, name, userId]);
+
+    await client.query(`
+      INSERT INTO enxoval_members (enxoval_id, user_id, role)
+      VALUES ($1, $2, 'owner')
+    `, [enxovalId, userId]);
+
+    if (options.useDefaultTemplate !== false) {
+      await seedEnxovalDefaults(client, userId, enxovalId);
+    }
+
+    return fetchWorkspace(client, userId, enxovalResult.rows[0].id);
+  });
 }
 
 async function createSession(res: Response, userId: string) {
@@ -272,34 +445,36 @@ async function getCurrentUser(req: Request) {
 
 async function requireCurrentUser(req: Request) {
   const user = await getCurrentUser(req);
-  if (!user) throw new HttpError(401, 'Faça login para continuar.');
+  if (!user) throw new HttpError(401, 'Faca login para continuar.');
   return user;
 }
 
-async function createItemForUser(input: { userId: string; name: string; categoryId?: string; categoryName?: string }) {
+async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string }) {
   return withTransaction(async client => {
+    await requireEnxovalMember(client, input.userId, input.enxovalId);
+
     let category: EnxovalCategory | null = null;
 
     if (input.categoryId) {
-      category = await findCategory(client, input.userId, input.categoryId);
-      if (!category) throw new HttpError(404, 'Categoria não encontrada.');
+      category = await findCategory(client, input.userId, input.enxovalId, input.categoryId);
+      if (!category) throw new HttpError(404, 'Categoria nao encontrada.');
     } else if (input.categoryName) {
-      category = await findOrCreateCategory(client, input.userId, input.categoryName);
+      category = await findOrCreateCategory(client, input.userId, input.enxovalId, input.categoryName);
     } else {
-      throw new HttpError(400, 'Categoria é obrigatória.');
+      throw new HttpError(400, 'Categoria e obrigatoria.');
     }
 
     const orderResult = await client.query<{ next_order: number }>(`
       SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
       FROM items
-      WHERE user_id = $1 AND category_id = $2
-    `, [input.userId, category.id]);
+      WHERE enxoval_id = $1 AND category_id = $2
+    `, [input.enxovalId, category.id]);
 
     const itemId = randomUUID();
     await client.query(`
-      INSERT INTO items (id, user_id, category_id, name, sort_order)
-      VALUES ($1, $2, $3, $4, $5)
-    `, [itemId, input.userId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0]);
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0]);
 
     const itemResult = await client.query<ItemRow>(`
       SELECT
@@ -313,8 +488,8 @@ async function createItemForUser(input: { userId: string; name: string; category
         i.sort_order
       FROM items i
       INNER JOIN categories c ON c.id = i.category_id
-      WHERE i.id = $1 AND i.user_id = $2
-    `, [itemId, input.userId]);
+      WHERE i.id = $1 AND i.enxoval_id = $2
+    `, [itemId, input.enxovalId]);
 
     return {
       item: mapItem(itemResult.rows[0]),
@@ -325,9 +500,20 @@ async function createItemForUser(input: { userId: string; name: string; category
 
 async function updateItemForUser(userId: string, itemId: string, body: unknown) {
   if (!body || typeof body !== 'object') {
-    throw new HttpError(400, 'Dados inválidos.');
+    throw new HttpError(400, 'Dados invalidos.');
   }
 
+  const itemScope = await getPool().query<{ enxoval_id: string }>(`
+    SELECT i.enxoval_id
+    FROM items i
+    INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
+    WHERE i.id = $1 AND em.user_id = $2
+    LIMIT 1
+  `, [itemId, userId]);
+
+  if (!itemScope.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
+
+  const enxovalId = itemScope.rows[0].enxoval_id;
   const updates = body as Record<string, unknown>;
   const setClauses: string[] = [];
   const values: unknown[] = [];
@@ -337,30 +523,30 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     setClauses.push(`${column} = $${values.length}`);
   };
 
-  if (typeof updates.name === 'string') addUpdate('name', updates.name.trim());
+  if (typeof updates.name === 'string') {
+    const name = updates.name.trim();
+    if (!name) throw new HttpError(400, 'Nome do item e obrigatorio.');
+    addUpdate('name', name);
+  }
   if (typeof updates.checked === 'boolean') addUpdate('checked', updates.checked);
   if (typeof updates.link === 'string') addUpdate('link', updates.link.trim());
   if (typeof updates.description === 'string') addUpdate('description', updates.description.trim());
 
   if (typeof updates.categoryId === 'string') {
-    const category = await findCategory(getPool(), userId, updates.categoryId);
-    if (!category) throw new HttpError(404, 'Categoria não encontrada.');
+    const category = await findCategory(getPool(), userId, enxovalId, updates.categoryId);
+    if (!category) throw new HttpError(404, 'Categoria nao encontrada.');
     addUpdate('category_id', updates.categoryId);
   }
 
   if (setClauses.length === 0) {
-    throw new HttpError(400, 'Nenhuma alteração enviada.');
+    throw new HttpError(400, 'Nenhuma alteracao enviada.');
   }
 
-  if (updates.name === '') {
-    throw new HttpError(400, 'Nome do item é obrigatório.');
-  }
-
-  values.push(itemId, userId);
+  values.push(itemId, enxovalId);
   const result = await getPool().query<ItemRow>(`
     UPDATE items
     SET ${setClauses.join(', ')}, updated_at = now()
-    WHERE id = $${values.length - 1} AND user_id = $${values.length}
+    WHERE id = $${values.length - 1} AND enxoval_id = $${values.length}
     RETURNING
       id,
       name,
@@ -372,7 +558,7 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       sort_order
   `, values);
 
-  if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
+  if (!result.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
   return mapItem(result.rows[0]);
 }
 
@@ -385,7 +571,8 @@ export function registerApiRoutes(app: Express) {
 
   router.get('/bootstrap', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    res.json(await fetchBootstrap(user));
+    const requestedEnxovalId = typeof req.query.enxovalId === 'string' ? req.query.enxovalId : undefined;
+    res.json(await fetchBootstrap(user, requestedEnxovalId));
   }));
 
   router.post('/auth/register', asyncHandler(async (req, res) => {
@@ -395,7 +582,7 @@ export function registerApiRoutes(app: Express) {
       ? req.body.name.trim()
       : email.split('@')[0];
 
-    if (!email || !email.includes('@')) throw new HttpError(400, 'Email inválido.');
+    if (!email || !email.includes('@')) throw new HttpError(400, 'Email invalido.');
     if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
 
     const passwordHash = await hashPassword(password);
@@ -407,12 +594,12 @@ export function registerApiRoutes(app: Express) {
           INSERT INTO users (id, name, email, password_hash)
           VALUES ($1, $2, $3, $4)
         `, [userId, name, email, passwordHash]);
-
-        await seedUserDefaults(client, userId);
       });
+
+      await createEnxovalForUser(userId, 'Enxoval de Casa Nova');
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
-        throw new HttpError(409, 'Já existe uma conta com esse email.');
+        throw new HttpError(409, 'Ja existe uma conta com esse email.');
       }
       throw err;
     }
@@ -434,7 +621,7 @@ export function registerApiRoutes(app: Express) {
 
     const user = result.rows[0];
     if (!user || !(await verifyPassword(password, user.password_hash))) {
-      throw new HttpError(401, 'Email ou senha inválidos.');
+      throw new HttpError(401, 'Email ou senha invalidos.');
     }
 
     await getPool().query('DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()', [user.id]);
@@ -452,33 +639,110 @@ export function registerApiRoutes(app: Express) {
     res.status(204).end();
   }));
 
+  router.get('/enxovais/:id', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    res.json(await fetchWorkspace(getPool(), user.id, req.params.id));
+  }));
+
+  router.post('/enxovais', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const name = requireText(req.body?.name, 'Nome do enxoval');
+    const useDefaultTemplate = req.body?.useDefaultTemplate !== false;
+
+    const workspace = await createEnxovalForUser(user.id, name, { useDefaultTemplate });
+    res.status(201).json(workspace);
+  }));
+  router.patch('/enxovais/:id', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const name = requireText(req.body?.name, 'Nome do enxoval');
+
+    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+
+    const result = await getPool().query<EnxovalRow>(`
+      UPDATE enxovais
+      SET name = $1, updated_at = now()
+      WHERE id = $2
+      RETURNING id, name, owner_id, 'owner'::text AS role
+    `, [name, req.params.id]);
+
+    if (!result.rows[0]) throw new HttpError(404, 'Enxoval nao encontrado.');
+    res.json(mapEnxoval(result.rows[0]));
+  }));
+
+  router.delete('/enxovais/:id', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+
+    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+    await getPool().query('DELETE FROM enxovais WHERE id = $1', [req.params.id]);
+
+    res.status(204).end();
+  }));
+
+  router.post('/enxovais/:id/members', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const email = normalizeEmail(req.body?.email);
+
+    if (!email || !email.includes('@')) throw new HttpError(400, 'Email invalido.');
+    await requireEnxovalMember(getPool(), user.id, req.params.id);
+
+    const invitedUserResult = await getPool().query<DbUserRow>(`
+      SELECT id, name, email, password_hash
+      FROM users
+      WHERE email = $1
+      LIMIT 1
+    `, [email]);
+
+    const invitedUser = invitedUserResult.rows[0];
+    if (!invitedUser) throw new HttpError(404, 'Esse email ainda nao tem conta.');
+
+    await getPool().query(`
+      INSERT INTO enxoval_members (enxoval_id, user_id, role, invited_by)
+      VALUES ($1, $2, 'editor', $3)
+      ON CONFLICT (enxoval_id, user_id) DO NOTHING
+    `, [req.params.id, invitedUser.id, user.id]);
+
+    const memberResult = await getPool().query<MemberRow>(`
+      SELECT u.id, u.name, u.email, em.role
+      FROM enxoval_members em
+      INNER JOIN users u ON u.id = em.user_id
+      WHERE em.enxoval_id = $1 AND em.user_id = $2
+      LIMIT 1
+    `, [req.params.id, invitedUser.id]);
+
+    res.status(201).json(mapMember(memberResult.rows[0]));
+  }));
+
   router.get('/categories', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    res.json(await fetchCategories(getPool(), user.id));
+    const enxovalId = requireText(req.query.enxovalId, 'Enxoval');
+    res.json(await fetchCategories(getPool(), user.id, enxovalId));
   }));
 
   router.post('/categories', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     const name = requireText(req.body?.name, 'Nome da categoria');
+    const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
 
-    const category = await withTransaction(client => findOrCreateCategory(client, user.id, name));
+    const category = await withTransaction(client => findOrCreateCategory(client, user.id, enxovalId, name));
     res.status(201).json(category);
   }));
 
   router.get('/items', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    res.json(await fetchItems(getPool(), user.id));
+    const enxovalId = requireText(req.query.enxovalId, 'Enxoval');
+    res.json(await fetchItems(getPool(), user.id, enxovalId));
   }));
 
   router.post('/items', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     const name = requireText(req.body?.name, 'Nome do item');
+    const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
     const categoryId = typeof req.body?.categoryId === 'string' ? req.body.categoryId : undefined;
     const categoryName = typeof req.body?.categoryName === 'string' && req.body.categoryName.trim()
       ? req.body.categoryName.trim()
       : undefined;
 
-    const result = await createItemForUser({ userId: user.id, name, categoryId, categoryName });
+    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName });
     res.status(201).json(result);
   }));
 

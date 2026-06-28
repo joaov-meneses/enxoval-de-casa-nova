@@ -1,4 +1,4 @@
-import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem } from './types';
+import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalWorkspace } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -32,8 +32,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function fetchBootstrap() {
-  return request<BootstrapData>('/api/bootstrap');
+export function fetchBootstrap(enxovalId?: string) {
+  const suffix = enxovalId ? `?enxovalId=${encodeURIComponent(enxovalId)}` : '';
+  return request<BootstrapData>(`/api/bootstrap${suffix}`);
 }
 
 export function login(email: string, password: string) {
@@ -54,7 +55,35 @@ export function logout() {
   return request<void>('/api/auth/logout', { method: 'POST' });
 }
 
-export function createItem(input: { name: string; categoryId?: string; categoryName?: string }) {
+export function fetchEnxoval(enxovalId: string) {
+  return request<EnxovalWorkspace>(`/api/enxovais/${enxovalId}`);
+}
+
+export function createEnxoval(name: string, useDefaultTemplate: boolean) {
+  return request<EnxovalWorkspace>('/api/enxovais', {
+    method: 'POST',
+    body: JSON.stringify({ name, useDefaultTemplate })
+  });
+}
+export function updateEnxoval(enxovalId: string, name: string) {
+  return request<EnxovalWorkspace['enxoval']>(`/api/enxovais/${enxovalId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name })
+  });
+}
+
+export function deleteEnxoval(enxovalId: string) {
+  return request<void>(`/api/enxovais/${enxovalId}`, { method: 'DELETE' });
+}
+
+export function inviteMember(enxovalId: string, email: string) {
+  return request<EnxovalMember>(`/api/enxovais/${enxovalId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+}
+
+export function createItem(input: { enxovalId: string; name: string; categoryId?: string; categoryName?: string }) {
   return request<{ item: EnxovalItem; category: EnxovalCategory }>('/api/items', {
     method: 'POST',
     body: JSON.stringify(input)
@@ -68,4 +97,4 @@ export function updateItem(id: string, updates: Partial<Pick<EnxovalItem, 'name'
   });
 }
 
-export type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem };
+export type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalWorkspace };

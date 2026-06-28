@@ -1,14 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Home, Sparkles, LogOut, User } from 'lucide-react';
-import type { AuthUser, EnxovalCategory, EnxovalItem } from './types';
-import { ApiError, createItem as createItemRequest, fetchBootstrap, login as loginRequest, logout as logoutRequest, register as registerRequest, updateItem as updateItemRequest } from './api';
+import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2 } from 'lucide-react';
+import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
+import { ApiError, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
 import { AddItemModal } from './components/AddItemModal';
 
 type AuthMode = 'login' | 'register';
 
+const APP_NAME = 'Enxoval de Casa Nova';
+
+function makeTitle(context?: string) {
+  return context ? `${context} | ${APP_NAME}` : APP_NAME;
+}
+
 interface AuthScreenProps {
-  onAuthenticated: (data: { user: AuthUser; categories: EnxovalCategory[]; items: EnxovalItem[] }) => void;
+  onAuthenticated: (data: BootstrapData) => void;
 }
 
 function AuthScreen({ onAuthenticated }: AuthScreenProps) {
@@ -18,6 +24,10 @@ function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    document.title = makeTitle(mode === 'login' ? 'Entrar' : 'Criar conta');
+  }, [mode]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -126,20 +136,77 @@ function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   );
 }
 
+interface DialogProps {
+  title: string;
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+function Dialog({ title, isOpen, onClose, children }: DialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-stone-900/50 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] w-full overflow-y-auto bg-white rounded-t-2xl shadow-xl z-50 md:bottom-auto md:top-1/2 md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl">
+        <div className="flex items-center justify-between p-4 border-b border-stone-100">
+          <h3 className="font-serif text-xl text-stone-800">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-stone-400 hover:text-stone-600 bg-stone-100 rounded-full transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [enxovais, setEnxovais] = useState<EnxovalSummary[]>([]);
+  const [activeEnxoval, setActiveEnxoval] = useState<EnxovalSummary | null>(null);
+  const [members, setMembers] = useState<EnxovalMember[]>([]);
   const [items, setItems] = useState<EnxovalItem[]>([]);
   const [categories, setCategories] = useState<EnxovalCategory[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
+  const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
+  const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [newEnxovalName, setNewEnxovalName] = useState('');
+  const [newEnxovalUseDefaultTemplate, setNewEnxovalUseDefaultTemplate] = useState(true);
+  const [renameEnxovalName, setRenameEnxovalName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [dialogError, setDialogError] = useState('');
+  const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
+  const [headerProgress, setHeaderProgress] = useState(0);
+  const [isHeaderMobile, setIsHeaderMobile] = useState(false);
   const [error, setError] = useState('');
 
-  const applyBootstrap = (data: { user: AuthUser; categories: EnxovalCategory[]; items: EnxovalItem[] }) => {
+  const applyWorkspace = (workspace: EnxovalWorkspace) => {
+    setActiveEnxoval(workspace.enxoval);
+    setMembers(workspace.members);
+    setCategories(workspace.categories);
+    setItems(workspace.items);
+    setActiveCategoryId(workspace.categories[0]?.id || '');
+  };
+
+  const applyBootstrap = (data: BootstrapData) => {
     setUser(data.user);
+    setEnxovais(data.enxovais);
+    setActiveEnxoval(data.activeEnxoval);
+    setMembers(data.members);
     setCategories(data.categories);
     setItems(data.items);
-    setActiveCategoryId(current => current || data.categories[0]?.id || '');
+    setActiveCategoryId(data.categories[0]?.id || '');
   };
 
   useEffect(() => {
@@ -166,6 +233,68 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (isLoading) {
+      document.title = makeTitle('Carregando');
+      return;
+    }
+
+    if (!user) {
+      document.title = makeTitle('Entrar');
+      return;
+    }
+
+    if (isCreateEnxovalOpen) {
+      document.title = makeTitle('Novo enxoval');
+      return;
+    }
+
+    if (isRenameEnxovalOpen) {
+      document.title = makeTitle(activeEnxoval ? 'Editar ' + activeEnxoval.name : 'Editar enxoval');
+      return;
+    }
+
+    if (isDeleteEnxovalOpen) {
+      document.title = makeTitle(activeEnxoval ? 'Excluir ' + activeEnxoval.name : 'Excluir enxoval');
+      return;
+    }
+
+    if (isInviteOpen) {
+      document.title = makeTitle(activeEnxoval ? 'Convidar para ' + activeEnxoval.name : 'Convidar pessoa');
+      return;
+    }
+
+    if (activeEnxoval) {
+      document.title = makeTitle(isWorkspaceLoading ? 'Carregando ' + activeEnxoval.name : activeEnxoval.name);
+      return;
+    }
+
+    document.title = makeTitle('Meus enxovais');
+  }, [activeEnxoval, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isWorkspaceLoading, user]);
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateHeaderSize = () => {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(() => {
+        const isMobile = window.innerWidth < 640;
+        setIsHeaderMobile(isMobile);
+        setHeaderProgress(isMobile ? Math.min(Math.max(window.scrollY / 140, 0), 1) : 0);
+      });
+    };
+
+    updateHeaderSize();
+    window.addEventListener('scroll', updateHeaderSize, { passive: true });
+    window.addEventListener('resize', updateHeaderSize);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('scroll', updateHeaderSize);
+      window.removeEventListener('resize', updateHeaderSize);
+    };
+  }, []);
+
   const activeCategory = categories.find(category => category.id === activeCategoryId) ?? categories[0];
   const filteredItems = activeCategory ? items.filter(item => item.categoryId === activeCategory.id) : [];
 
@@ -175,6 +304,66 @@ export default function App() {
     const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
     return { total, completed, percentage };
   }, [items]);
+  const isOwner = activeEnxoval?.role === 'owner';
+  const visibleProgress = isHeaderMobile ? headerProgress : 0;
+  const headerStyle = isHeaderMobile ? {
+    paddingTop: `${32 - (20 * visibleProgress)}px`,
+    paddingBottom: `${16 - (4 * visibleProgress)}px`
+  } : undefined;
+  const eyebrowStyle: React.CSSProperties = {
+    maxHeight: `${20 * (1 - visibleProgress)}px`,
+    opacity: 1 - visibleProgress,
+    transform: `translateY(${-4 * visibleProgress}px)`,
+    pointerEvents: visibleProgress > 0.9 ? 'none' : 'auto'
+  };
+  const metaStyle: React.CSSProperties = {
+    marginTop: `${12 * (1 - visibleProgress)}px`,
+    maxHeight: `${24 * (1 - visibleProgress)}px`,
+    opacity: 1 - visibleProgress,
+    transform: `translateY(${-4 * visibleProgress}px)`,
+    pointerEvents: visibleProgress > 0.9 ? 'none' : 'auto'
+  };
+  const controlsStyle: React.CSSProperties = {
+    marginTop: `${12 * (1 - visibleProgress)}px`,
+    maxHeight: `${88 * (1 - visibleProgress)}px`,
+    opacity: 1 - visibleProgress,
+    transform: `translateY(${-4 * visibleProgress}px)`,
+    pointerEvents: visibleProgress > 0.9 ? 'none' : 'auto'
+  };
+  const titleStyle = isHeaderMobile ? {
+    fontSize: `${30 - (10 * visibleProgress)}px`
+  } : undefined;
+  const progressCircleStyle = isHeaderMobile ? {
+    width: `${64 - (16 * visibleProgress)}px`,
+    height: `${64 - (16 * visibleProgress)}px`,
+    borderWidth: `${4 - visibleProgress}px`
+  } : undefined;
+  const progressTextStyle = isHeaderMobile ? {
+    fontSize: `${18 - (4 * visibleProgress)}px`
+  } : undefined;
+  const categoryBarStyle = isHeaderMobile ? {
+    marginTop: `${18 - (6 * visibleProgress)}px`
+  } : undefined;
+  const categoryButtonStyle = isHeaderMobile ? {
+    paddingTop: `${8 - (2 * visibleProgress)}px`,
+    paddingBottom: `${8 - (2 * visibleProgress)}px`
+  } : undefined;
+
+  const handleEnxovalChange = async (enxovalId: string) => {
+    if (!enxovalId || enxovalId === activeEnxoval?.id) return;
+
+    setIsWorkspaceLoading(true);
+    setError('');
+
+    try {
+      const workspace = await fetchEnxovalRequest(enxovalId);
+      applyWorkspace(workspace);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível abrir o enxoval.');
+    } finally {
+      setIsWorkspaceLoading(false);
+    }
+  };
 
   const updateItem = (id: string, updates: Partial<EnxovalItem>) => {
     setItems(current =>
@@ -190,13 +379,19 @@ export default function App() {
 
     if (Object.keys(payload).length === 0) return;
 
-    void updateItemRequest(id, payload).catch(err => {
-      setError(err instanceof Error ? err.message : 'Não foi possível salvar a alteração.');
-    });
+    void updateItemRequest(id, payload)
+      .then(savedItem => {
+        setItems(current => current.map(item => item.id === id ? savedItem : item));
+      })
+      .catch(err => {
+        setError(err instanceof Error ? err.message : 'Não foi possível salvar a alteração.');
+      });
   };
 
   const addItem = async (name: string, categoryId?: string, categoryName?: string) => {
-    const result = await createItemRequest({ name, categoryId, categoryName });
+    if (!activeEnxoval) throw new Error('Selecione um enxoval antes de adicionar itens.');
+
+    const result = await createItemRequest({ enxovalId: activeEnxoval.id, name, categoryId, categoryName });
 
     setCategories(current => {
       if (current.some(category => category.id === result.category.id)) return current;
@@ -207,9 +402,138 @@ export default function App() {
     setActiveCategoryId(result.category.id);
   };
 
+  const handleCreateEnxoval = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = newEnxovalName.trim();
+    if (!name) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const workspace = await createEnxovalRequest(name, newEnxovalUseDefaultTemplate);
+      setEnxovais(current => [...current, workspace.enxoval]);
+      applyWorkspace(workspace);
+      setNewEnxovalName('');
+      setNewEnxovalUseDefaultTemplate(true);
+      setIsCreateEnxovalOpen(false);
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível criar o enxoval.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
+  const handleRenameEnxoval = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeEnxoval) return;
+
+    const name = renameEnxovalName.trim();
+    if (!name) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const updatedEnxoval = await updateEnxovalRequest(activeEnxoval.id, name);
+      setActiveEnxoval(updatedEnxoval);
+      setEnxovais(current => current.map(enxoval => enxoval.id === updatedEnxoval.id ? updatedEnxoval : enxoval));
+      setRenameEnxovalName('');
+      setIsRenameEnxovalOpen(false);
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível renomear o enxoval.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
+  const handleDeleteEnxoval = async () => {
+    if (!activeEnxoval) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const deletedId = activeEnxoval.id;
+      await deleteEnxovalRequest(deletedId);
+
+      const remainingEnxovais = enxovais.filter(enxoval => enxoval.id !== deletedId);
+      setEnxovais(remainingEnxovais);
+      setIsDeleteEnxovalOpen(false);
+
+      const nextEnxoval = remainingEnxovais[0];
+      if (nextEnxoval) {
+        const workspace = await fetchEnxovalRequest(nextEnxoval.id);
+        applyWorkspace(workspace);
+      } else {
+        setActiveEnxoval(null);
+        setMembers([]);
+        setCategories([]);
+        setItems([]);
+        setActiveCategoryId('');
+      }
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível excluir o enxoval.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+  const handleInviteMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeEnxoval) return;
+
+    const email = inviteEmail.trim();
+    if (!email) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const member = await inviteMemberRequest(activeEnxoval.id, email);
+      setMembers(current => current.some(existing => existing.id === member.id) ? current : [...current, member]);
+      setInviteEmail('');
+      setIsInviteOpen(false);
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível convidar essa pessoa.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
+  const openCreateEnxoval = () => {
+    setDialogError('');
+    setNewEnxovalName('');
+    setNewEnxovalUseDefaultTemplate(true);
+    setIsCreateEnxovalOpen(true);
+  };
+
+  const openRenameEnxoval = () => {
+    if (!activeEnxoval) return;
+    setDialogError('');
+    setRenameEnxovalName(activeEnxoval.name);
+    setIsRenameEnxovalOpen(true);
+  };
+
+  const openDeleteEnxoval = () => {
+    if (!activeEnxoval) return;
+    setDialogError('');
+    setIsDeleteEnxovalOpen(true);
+  };
+
+  const openInvite = () => {
+    setDialogError('');
+    setInviteEmail('');
+    setIsInviteOpen(true);
+  };
+
   const handleLogout = async () => {
     await logoutRequest().catch(() => undefined);
     setUser(null);
+    setEnxovais([]);
+    setActiveEnxoval(null);
+    setIsRenameEnxovalOpen(false);
+    setIsDeleteEnxovalOpen(false);
+    setMembers([]);
     setItems([]);
     setCategories([]);
     setActiveCategoryId('');
@@ -232,19 +556,35 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-50 pb-24 font-sans text-brand-dark">
-      <header className="bg-white px-6 pt-12 pb-6 shadow-sm sticky top-0 z-20">
-        <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-brand-wood mb-1">
+      <header
+        className="bg-white px-4 sm:px-6 pt-8 pb-4 sm:pt-12 sm:pb-6 shadow-sm sticky top-0 z-20 transition-[padding] duration-300 ease-out"
+        style={headerStyle}
+      >
+        <div className="max-w-2xl mx-auto flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div
+              className="flex items-center gap-2 text-brand-wood mb-1 overflow-hidden transition-[opacity,max-height,transform] duration-300 ease-out"
+              style={eyebrowStyle}
+            >
               <Home size={20} />
-              <span className="text-xs font-bold tracking-widest uppercase">Lista Completa</span>
+              <span className="text-xs font-bold tracking-widest uppercase">Enxoval Compartilhado</span>
             </div>
-            <h1 className="font-serif text-3xl font-bold text-stone-900 leading-tight">
-              Enxoval<br />de Casa Nova
+            <h1
+              className="font-serif font-bold text-stone-900 leading-tight truncate transition-[font-size] duration-300 ease-out sm:text-3xl"
+              style={titleStyle}
+            >
+              {activeEnxoval?.name ?? 'Enxoval'}
             </h1>
-            <div className="mt-3 flex items-center gap-2 text-xs text-stone-500">
+            <div
+              className="flex items-center gap-2 text-xs text-stone-500 overflow-hidden transition-[opacity,max-height,margin,transform] duration-300 ease-out"
+              style={metaStyle}
+            >
               <User size={14} />
               <span className="truncate max-w-[190px]">{user.email}</span>
+              <span className="inline-flex items-center gap-1 text-stone-400">
+                <Users size={14} />
+                {members.length}
+              </span>
               <button
                 type="button"
                 onClick={handleLogout}
@@ -256,8 +596,11 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center bg-stone-50 w-16 h-16 rounded-full border-4 border-brand-beige relative overflow-hidden shadow-inner shrink-0">
-             <span className="text-lg font-bold text-brand-wood z-10">{progressStats.percentage}%</span>
+          <div
+            className="flex flex-col items-center justify-center bg-stone-50 w-16 h-16 rounded-full border-4 border-brand-beige relative overflow-hidden shadow-inner shrink-0 transition-[width,height,border-width] duration-300 ease-out sm:w-16 sm:h-16 sm:border-4"
+            style={progressCircleStyle}
+          >
+             <span className="text-lg sm:text-lg font-bold text-brand-wood z-10 transition-[font-size] duration-300 ease-out" style={progressTextStyle}>{progressStats.percentage}%</span>
              <div
                className="absolute bottom-0 left-0 w-full bg-brand-beige/30 transition-all duration-500 ease-in-out"
                style={{ height: `${progressStats.percentage}%` }}
@@ -265,7 +608,70 @@ export default function App() {
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto mt-6 -mx-6 px-6 overflow-x-auto no-scrollbar">
+        <div
+          className="max-w-2xl mx-auto w-full min-w-0 flex items-center gap-2 overflow-hidden transition-[opacity,max-height,margin,transform] duration-300 ease-out"
+          style={controlsStyle}
+        >
+          <select
+            value={activeEnxoval?.id ?? ''}
+            onChange={(event) => void handleEnxovalChange(event.target.value)}
+            disabled={isWorkspaceLoading}
+            className="min-w-0 flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-wood/50 disabled:opacity-60"
+          >
+            {enxovais.map(enxoval => (
+              <option key={enxoval.id} value={enxoval.id}>{enxoval.name}</option>
+            ))}
+          </select>
+
+          <div className="inline-flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={openCreateEnxoval}
+              className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+            >
+              <ListPlus size={16} />
+              Novo
+            </button>
+            <button
+              type="button"
+              onClick={openInvite}
+              disabled={!activeEnxoval}
+              aria-label="Adicionar membro"
+              title="Adicionar membro"
+              className="inline-flex h-9 w-9 items-center justify-center text-white bg-brand-dark rounded-lg hover:bg-black transition-colors disabled:opacity-50"
+            >
+              <UserPlus size={18} />
+            </button>
+          </div>
+
+          {isOwner && activeEnxoval && (
+            <div className="inline-flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={openRenameEnxoval}
+                aria-label="Editar nome do enxoval"
+                title="Editar nome do enxoval"
+                className="inline-flex h-9 w-9 items-center justify-center text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+              >
+                <Pencil size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={openDeleteEnxoval}
+                aria-label="Excluir enxoval"
+                title="Excluir enxoval"
+                className="inline-flex h-9 w-9 items-center justify-center text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={17} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div
+          className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
+          style={categoryBarStyle}
+        >
           <div className="flex gap-2 min-w-max pb-2">
             {categories.map(cat => {
               const catItems = items.filter(i => i.categoryId === cat.id);
@@ -275,7 +681,8 @@ export default function App() {
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategoryId(cat.id)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                  style={categoryButtonStyle}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out flex items-center gap-2 ${
                     activeCategory?.id === cat.id
                       ? 'bg-brand-wood text-white shadow-md'
                       : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
@@ -296,6 +703,12 @@ export default function App() {
         {error && (
           <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
             {error}
+          </div>
+        )}
+
+        {isWorkspaceLoading && (
+          <div className="mb-4 text-sm text-stone-500 bg-white border border-stone-200 rounded-lg px-3 py-2">
+            Carregando enxoval...
           </div>
         )}
 
@@ -328,7 +741,8 @@ export default function App() {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="bg-brand-dark text-white rounded-full pl-4 pr-5 py-3 shadow-lg shadow-brand-dark/30 flex items-center gap-2 hover:bg-black transition-transform hover:scale-105 active:scale-95"
+          disabled={!activeEnxoval}
+          className="bg-brand-dark text-white rounded-full pl-4 pr-5 py-3 shadow-lg shadow-brand-dark/30 flex items-center gap-2 hover:bg-black transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="bg-white/20 rounded-full p-1">
             <Plus size={20} strokeWidth={2.5} />
@@ -344,6 +758,156 @@ export default function App() {
         defaultCategoryId={activeCategory?.id ?? ''}
         categories={categories}
       />
+
+      <Dialog title="Novo enxoval" isOpen={isCreateEnxovalOpen} onClose={() => setIsCreateEnxovalOpen(false)}>
+        <form onSubmit={handleCreateEnxoval} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Nome do enxoval</label>
+            <input
+              type="text"
+              value={newEnxovalName}
+              onChange={(event) => setNewEnxovalName(event.target.value)}
+              placeholder="Ex: Apartamento novo"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Modelo inicial</label>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1">
+              <button
+                type="button"
+                onClick={() => setNewEnxovalUseDefaultTemplate(true)}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${newEnxovalUseDefaultTemplate ? 'bg-white text-brand-dark shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+              >
+                Lista sugerida
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewEnxovalUseDefaultTemplate(false)}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${!newEnxovalUseDefaultTemplate ? 'bg-white text-brand-dark shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+              >
+                Vazio
+              </button>
+            </div>
+          </div>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={!newEnxovalName.trim() || isDialogSubmitting}
+            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDialogSubmitting ? 'Criando...' : 'Criar enxoval'}
+          </button>
+        </form>
+      </Dialog>
+
+      <Dialog title="Editar enxoval" isOpen={isRenameEnxovalOpen} onClose={() => setIsRenameEnxovalOpen(false)}>
+        <form onSubmit={handleRenameEnxoval} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Nome do enxoval</label>
+            <input
+              type="text"
+              value={renameEnxovalName}
+              onChange={(event) => setRenameEnxovalName(event.target.value)}
+              placeholder="Ex: Apartamento novo"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+          </div>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={!renameEnxovalName.trim() || isDialogSubmitting}
+            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDialogSubmitting ? 'Salvando...' : 'Salvar nome'}
+          </button>
+        </form>
+      </Dialog>
+
+      <Dialog title="Excluir enxoval" isOpen={isDeleteEnxovalOpen} onClose={() => setIsDeleteEnxovalOpen(false)}>
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <p className="text-sm text-stone-600">
+            Esta ação vai excluir o enxoval {activeEnxoval ? `"${activeEnxoval.name}"` : ''}, incluindo categorias, itens e colaboradores.
+          </p>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setIsDeleteEnxovalOpen(false)}
+              disabled={isDialogSubmitting}
+              className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDeleteEnxoval()}
+              disabled={isDialogSubmitting || !activeEnxoval}
+              className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDialogSubmitting ? 'Excluindo...' : 'Excluir'}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+      <Dialog title="Convidar pessoa" isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)}>
+        <form onSubmit={handleInviteMember} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Email da pessoa</label>
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              placeholder="pessoa@email.com"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+          </div>
+
+          {members.length > 0 && (
+            <div className="max-h-32 overflow-y-auto rounded-xl border border-stone-100 bg-stone-50">
+              {members.map(member => (
+                <div key={member.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm border-b border-stone-100 last:border-0">
+                  <span className="truncate text-stone-700">{member.email}</span>
+                  <span className="text-xs font-medium text-stone-400">{member.role === 'owner' ? 'dono' : 'editor'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={!inviteEmail.trim() || isDialogSubmitting || !activeEnxoval}
+            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDialogSubmitting ? 'Convidando...' : 'Convidar'}
+          </button>
+        </form>
+      </Dialog>
     </div>
   );
 }

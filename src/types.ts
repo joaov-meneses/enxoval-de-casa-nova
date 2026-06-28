@@ -1,4 +1,19 @@
 export type Category = string;
+export type EnxovalRole = 'owner' | 'editor';
+
+export interface EnxovalSummary {
+  id: string;
+  name: string;
+  ownerId: string;
+  role: EnxovalRole;
+}
+
+export interface EnxovalMember {
+  id: string;
+  name: string;
+  email: string;
+  role: EnxovalRole;
+}
 
 export interface EnxovalCategory {
   id: string;
@@ -23,8 +38,18 @@ export interface AuthUser {
   email: string;
 }
 
+export interface EnxovalWorkspace {
+  enxoval: EnxovalSummary;
+  members: EnxovalMember[];
+  categories: EnxovalCategory[];
+  items: EnxovalItem[];
+}
+
 export interface BootstrapData {
   user: AuthUser;
+  enxovais: EnxovalSummary[];
+  activeEnxoval: EnxovalSummary | null;
+  members: EnxovalMember[];
   categories: EnxovalCategory[];
   items: EnxovalItem[];
 }

@@ -73,7 +73,7 @@ export function AddItemModal({ isOpen, onClose, onAdd, defaultCategoryId, catego
             initial={{ opacity: 0, y: 100, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.95 }}
-            className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:left-1/2 md:-translate-x-1/2 md:max-w-md w-full bg-white rounded-t-2xl md:rounded-2xl shadow-xl z-50 overflow-hidden"
+            className="fixed inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] w-full overflow-y-auto bg-white rounded-t-2xl shadow-xl z-50 md:bottom-auto md:top-1/2 md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl"
           >
             <div className="flex items-center justify-between p-4 border-b border-stone-100">
               <h3 className="font-serif text-xl text-stone-800">Novo Item</h3>
@@ -86,14 +86,13 @@ export function AddItemModal({ isOpen, onClose, onAdd, defaultCategoryId, catego
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">
                   Nome do Produto
                 </label>
                 <input
                   type="text"
-                  autoFocus
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: Jogo de Taças"
