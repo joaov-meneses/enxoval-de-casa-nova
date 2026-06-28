@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
 import { ApiError, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
@@ -11,6 +11,14 @@ const APP_NAME = 'Enxoval de Casa Nova';
 
 function makeTitle(context?: string) {
   return context ? `${context} | ${APP_NAME}` : APP_NAME;
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 }
 
 interface AuthScreenProps {
@@ -175,6 +183,7 @@ export default function App() {
   const [items, setItems] = useState<EnxovalItem[]>([]);
   const [categories, setCategories] = useState<EnxovalCategory[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
@@ -189,9 +198,13 @@ export default function App() {
   const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
   const [headerProgress, setHeaderProgress] = useState(0);
   const [isHeaderMobile, setIsHeaderMobile] = useState(false);
   const [error, setError] = useState('');
+  const pullStartYRef = useRef<number | null>(null);
+  const pullLastDistanceRef = useRef(0);
 
   const applyWorkspace = (workspace: EnxovalWorkspace) => {
     setActiveEnxoval(workspace.enxoval);
@@ -309,8 +322,131 @@ export default function App() {
     };
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    setError('');
+
+    try {
+      const currentCategoryId = activeCategoryId;
+      const data = await fetchBootstrap(activeEnxoval?.id);
+      applyBootstrap(data);
+
+      if (currentCategoryId && data.categories.some(category => category.id === currentCategoryId)) {
+        setActiveCategoryId(currentCategoryId);
+      }
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setUser(null);
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar o enxoval.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [activeCategoryId, activeEnxoval?.id, isRefreshing]);
+
+  useEffect(() => {
+    if (!user || !isHeaderMobile) {
+      setPullDistance(0);
+      return;
+    }
+
+    const pullThreshold = 72;
+    let resetTimer: number | undefined;
+
+    const isInteractiveTarget = (target: EventTarget | null) => (
+      target instanceof HTMLElement && Boolean(target.closest('button, input, textarea, select, a, [role="button"]'))
+    );
+
+    const resetPull = () => {
+      pullStartYRef.current = null;
+      pullLastDistanceRef.current = 0;
+      setPullDistance(0);
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (isRefreshing || window.scrollY > 0 || event.touches.length !== 1 || isInteractiveTarget(event.target)) {
+        resetPull();
+        return;
+      }
+
+      pullStartYRef.current = event.touches[0].clientY;
+      pullLastDistanceRef.current = 0;
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const startY = pullStartYRef.current;
+      if (startY === null || event.touches.length !== 1) return;
+
+      const delta = event.touches[0].clientY - startY;
+      if (delta <= 0 || window.scrollY > 0) {
+        resetPull();
+        return;
+      }
+
+      const distance = Math.min(Math.round(delta * 0.55), 96);
+      pullLastDistanceRef.current = distance;
+      setPullDistance(distance);
+
+      if (distance > 4 && event.cancelable) {
+        event.preventDefault();
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (pullStartYRef.current === null) return;
+
+      const shouldRefresh = pullLastDistanceRef.current >= pullThreshold;
+      pullStartYRef.current = null;
+      pullLastDistanceRef.current = 0;
+
+      if (!shouldRefresh) {
+        setPullDistance(0);
+        return;
+      }
+
+      setPullDistance(pullThreshold);
+      void handleRefresh().finally(() => {
+        resetTimer = window.setTimeout(() => setPullDistance(0), 180);
+      });
+    };
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', resetPull);
+
+    return () => {
+      if (resetTimer) window.clearTimeout(resetTimer);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', resetPull);
+    };
+  }, [handleRefresh, isHeaderMobile, isRefreshing, user]);
   const activeCategory = categories.find(category => category.id === activeCategoryId) ?? categories[0];
-  const filteredItems = activeCategory ? items.filter(item => item.categoryId === activeCategory.id) : [];
+  const normalizedSearchQuery = normalizeSearchText(searchQuery);
+  const isSearching = normalizedSearchQuery.length > 0;
+  const categoryById = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories]);
+  const filteredItems = useMemo(() => {
+    if (!isSearching) {
+      return activeCategory ? items.filter(item => item.categoryId === activeCategory.id) : [];
+    }
+
+    return items.filter(item => {
+      const categoryName = categoryById.get(item.categoryId)?.name ?? item.category;
+      const searchableText = normalizeSearchText([
+        item.name,
+        item.description,
+        item.link,
+        categoryName
+      ].join(' '));
+
+      return searchableText.includes(normalizedSearchQuery);
+    });
+  }, [activeCategory, categoryById, isSearching, items, normalizedSearchQuery]);
 
   const progressStats = useMemo(() => {
     const total = items.length;
@@ -594,7 +730,23 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 pb-24 font-sans text-brand-dark">
+    <div className="min-h-screen bg-stone-50 pb-24 font-sans text-brand-dark overscroll-y-contain">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed left-1/2 top-3 z-50 sm:hidden transition-opacity duration-150"
+        style={{
+          opacity: pullDistance > 0 || isRefreshing ? 1 : 0,
+          transform: `translate(-50%, ${Math.max(0, pullDistance - 34)}px)`
+        }}
+      >
+        <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand-wood shadow-md ring-1 ring-stone-200">
+          <RefreshCw
+            size={17}
+            className={isRefreshing ? 'animate-spin' : ''}
+            style={isRefreshing ? undefined : { transform: `rotate(${pullDistance * 3}deg)` }}
+          />
+        </div>
+      </div>
       <header
         className="bg-white px-4 sm:px-6 pt-8 pb-4 sm:pt-12 sm:pb-6 shadow-sm sticky top-0 z-20 transition-[padding] duration-300 ease-out"
         style={headerStyle}
@@ -635,15 +787,28 @@ export default function App() {
             </div>
           </div>
 
-          <div
-            className="flex flex-col items-center justify-center bg-stone-50 w-16 h-16 rounded-full border-4 border-brand-beige relative overflow-hidden shadow-inner shrink-0 transition-[width,height,border-width] duration-300 ease-out sm:w-16 sm:h-16 sm:border-4"
-            style={progressCircleStyle}
-          >
-             <span className="text-lg sm:text-lg font-bold text-brand-wood z-10 transition-[font-size] duration-300 ease-out" style={progressTextStyle}>{progressStats.percentage}%</span>
-             <div
-               className="absolute bottom-0 left-0 w-full bg-brand-beige/30 transition-all duration-500 ease-in-out"
-               style={{ height: `${progressStats.percentage}%` }}
-             />
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              disabled={isRefreshing || isWorkspaceLoading}
+              aria-label="Atualizar enxoval"
+              title="Atualizar enxoval"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-brand-wood ring-1 ring-stone-200 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
+
+            <div
+              className="flex flex-col items-center justify-center bg-stone-50 w-16 h-16 rounded-full border-4 border-brand-beige relative overflow-hidden shadow-inner transition-[width,height,border-width] duration-300 ease-out sm:w-16 sm:h-16 sm:border-4"
+              style={progressCircleStyle}
+            >
+               <span className="text-lg sm:text-lg font-bold text-brand-wood z-10 transition-[font-size] duration-300 ease-out" style={progressTextStyle}>{progressStats.percentage}%</span>
+               <div
+                 className="absolute bottom-0 left-0 w-full bg-brand-beige/30 transition-all duration-500 ease-in-out"
+                 style={{ height: `${progressStats.percentage}%` }}
+               />
+            </div>
           </div>
         </div>
 
@@ -756,9 +921,33 @@ export default function App() {
 
         {hasEnxoval ? (
           <>
-            <div className="mb-4 flex items-center justify-between text-sm text-stone-500 font-medium px-1">
-              <span>Progresso de {activeCategory?.name ?? 'categoria'}</span>
-              <span>{filteredItems.filter(i => i.checked).length} de {filteredItems.length} itens</span>
+            <div className="mb-4">
+              <div className="relative">
+                <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Buscar em todas as categorias"
+                  className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-11 text-base text-stone-800 shadow-sm outline-none transition focus:border-brand-wood focus:ring-2 focus:ring-brand-wood/30"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Limpar busca"
+                    title="Limpar busca"
+                    className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1">
+              <span className="min-w-0 truncate">{isSearching ? 'Resultados da busca' : `Progresso de ${activeCategory?.name ?? 'categoria'}`}</span>
+              <span className="shrink-0">{isSearching ? `${filteredItems.length} ${filteredItems.length === 1 ? 'item' : 'itens'}` : `${filteredItems.filter(i => i.checked).length} de ${filteredItems.length} itens`}</span>
             </div>
 
             <div className="space-y-1">
@@ -767,6 +956,7 @@ export default function App() {
                   <ItemRow
                     key={item.id}
                     item={item}
+                    categoryName={isSearching ? categoryById.get(item.categoryId)?.name ?? item.category : undefined}
                     onUpdate={updateItem}
                     onDelete={openDeleteItem}
                   />
@@ -774,9 +964,11 @@ export default function App() {
               ) : (
                 <div className="text-center py-12 px-4">
                   <Sparkles className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-serif text-stone-600 mb-2">Nenhum item aqui</h3>
+                  <h3 className="text-lg font-serif text-stone-600 mb-2">{isSearching ? 'Nenhum resultado' : 'Nenhum item aqui'}</h3>
                   <p className="text-sm text-stone-400">
-                    Toque no botão abaixo para adicionar itens à categoria {activeCategory?.name ?? 'selecionada'}.
+                    {isSearching
+                      ? 'Tente buscar por outro nome, detalhe ou categoria.'
+                      : `Toque no botao abaixo para adicionar itens a categoria ${activeCategory?.name ?? 'selecionada'}.`}
                   </p>
                 </div>
               )}

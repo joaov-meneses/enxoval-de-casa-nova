@@ -6,11 +6,12 @@ import type { EnxovalItem } from '../types';
 interface ItemRowProps {
   key?: React.Key;
   item: EnxovalItem;
+  categoryName?: string;
   onUpdate: (id: string, updates: Partial<EnxovalItem>) => void;
   onDelete: (item: EnxovalItem) => void;
 }
 
-export function ItemRow({ item, onUpdate, onDelete }: ItemRowProps) {
+export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const toggleCheck = (e: React.MouseEvent) => {
@@ -48,6 +49,11 @@ export function ItemRow({ item, onUpdate, onDelete }: ItemRowProps) {
             <span className={`text-base font-medium transition-all ${item.checked ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
               {item.name}
             </span>
+            {categoryName && (
+              <span className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-wood">
+                {categoryName}
+              </span>
+            )}
             {hasExtraInfo && !isExpanded && (
               <div className="flex items-center gap-2 mt-1">
                 {item.link && <LinkIcon size={12} className="text-brand-wood" />}
