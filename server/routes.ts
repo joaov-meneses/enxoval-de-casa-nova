@@ -292,13 +292,7 @@ async function fetchWorkspace(queryable: Queryable, userId: string, enxovalId: s
 }
 
 async function fetchBootstrap(user: AuthUser, requestedEnxovalId?: string): Promise<BootstrapData> {
-  let enxovais = await fetchEnxovais(getPool(), user.id);
-
-  if (enxovais.length === 0) {
-    const workspace = await createEnxovalForUser(user.id, 'Enxoval de Casa Nova');
-    enxovais = [workspace.enxoval];
-  }
-
+  const enxovais = await fetchEnxovais(getPool(), user.id);
   const activeEnxovalId = requestedEnxovalId ?? enxovais[0]?.id;
   const workspace = activeEnxovalId
     ? await fetchWorkspace(getPool(), user.id, activeEnxovalId)
@@ -610,8 +604,6 @@ export function registerApiRoutes(app: Express) {
           VALUES ($1, $2, $3, $4)
         `, [userId, name, email, passwordHash]);
       });
-
-      await createEnxovalForUser(userId, 'Enxoval de Casa Nova');
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
         throw new HttpError(409, 'Ja existe uma conta com esse email.');

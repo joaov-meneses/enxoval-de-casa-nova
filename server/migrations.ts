@@ -204,7 +204,6 @@ export async function migrateDatabase() {
     FROM users u
     WHERE EXISTS (SELECT 1 FROM categories c WHERE c.user_id = u.id AND c.enxoval_id IS NULL)
        OR EXISTS (SELECT 1 FROM items i WHERE i.user_id = u.id AND i.enxoval_id IS NULL)
-       OR NOT EXISTS (SELECT 1 FROM enxoval_members em WHERE em.user_id = u.id)
   `);
 
   for (const user of usersResult.rows) {

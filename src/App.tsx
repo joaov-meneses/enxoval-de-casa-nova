@@ -14,7 +14,7 @@ function makeTitle(context?: string) {
 }
 
 interface AuthScreenProps {
-  onAuthenticated: (data: BootstrapData) => void;
+  onAuthenticated: (data: BootstrapData, options?: { promptCreateEnxoval?: boolean }) => void;
 }
 
 function AuthScreen({ onAuthenticated }: AuthScreenProps) {
@@ -35,10 +35,11 @@ function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     setError('');
 
     try {
-      const data = mode === 'login'
-        ? await loginRequest(email, password)
-        : await registerRequest(name, email, password);
-      onAuthenticated(data);
+      const isRegistering = mode === 'register';
+      const data = isRegistering
+        ? await registerRequest(name, email, password)
+        : await loginRequest(email, password);
+      onAuthenticated(data, { promptCreateEnxoval: isRegistering && data.enxovais.length === 0 });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível entrar.');
     } finally {
@@ -178,6 +179,7 @@ export default function App() {
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<EnxovalItem | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [newEnxovalName, setNewEnxovalName] = useState('');
   const [newEnxovalUseDefaultTemplate, setNewEnxovalUseDefaultTemplate] = useState(true);
@@ -199,7 +201,7 @@ export default function App() {
     setActiveCategoryId(workspace.categories[0]?.id || '');
   };
 
-  const applyBootstrap = (data: BootstrapData) => {
+  const applyBootstrap = (data: BootstrapData, options?: { promptCreateEnxoval?: boolean }) => {
     setUser(data.user);
     setEnxovais(data.enxovais);
     setActiveEnxoval(data.activeEnxoval);
@@ -207,6 +209,13 @@ export default function App() {
     setCategories(data.categories);
     setItems(data.items);
     setActiveCategoryId(data.categories[0]?.id || '');
+
+    if (options?.promptCreateEnxoval) {
+      setDialogError('');
+      setNewEnxovalName('');
+      setNewEnxovalUseDefaultTemplate(true);
+      setIsCreateEnxovalOpen(true);
+    }
   };
 
   useEffect(() => {
@@ -259,6 +268,11 @@ export default function App() {
       return;
     }
 
+    if (itemToDelete) {
+      document.title = makeTitle('Excluir ' + itemToDelete.name);
+      return;
+    }
+
     if (isInviteOpen) {
       document.title = makeTitle(activeEnxoval ? 'Convidar para ' + activeEnxoval.name : 'Convidar pessoa');
       return;
@@ -270,7 +284,7 @@ export default function App() {
     }
 
     document.title = makeTitle('Meus enxovais');
-  }, [activeEnxoval, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isWorkspaceLoading, user]);
+  }, [activeEnxoval, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isWorkspaceLoading, itemToDelete, user]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -304,6 +318,7 @@ export default function App() {
     const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
     return { total, completed, percentage };
   }, [items]);
+  const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === 'owner';
   const visibleProgress = isHeaderMobile ? headerProgress : 0;
   const headerStyle = isHeaderMobile ? {
@@ -402,13 +417,26 @@ export default function App() {
     setActiveCategoryId(result.category.id);
   };
 
-  const deleteItem = async (id: string) => {
+  const openDeleteItem = (item: EnxovalItem) => {
+    setDialogError('');
+    setItemToDelete(item);
+  };
+
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
     try {
-      await deleteItemRequest(id);
-      setItems(current => current.filter(item => item.id !== id));
+      const deletedId = itemToDelete.id;
+      await deleteItemRequest(deletedId);
+      setItems(current => current.filter(item => item.id !== deletedId));
+      setItemToDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível remover o item.');
-      throw err;
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível remover o item.');
+    } finally {
+      setIsDialogSubmitting(false);
     }
   };
 
@@ -543,6 +571,7 @@ export default function App() {
     setActiveEnxoval(null);
     setIsRenameEnxovalOpen(false);
     setIsDeleteEnxovalOpen(false);
+    setItemToDelete(null);
     setMembers([]);
     setItems([]);
     setCategories([]);
@@ -618,95 +647,98 @@ export default function App() {
           </div>
         </div>
 
-        <div
-          className="max-w-2xl mx-auto w-full min-w-0 flex items-center gap-2 overflow-hidden transition-[opacity,max-height,margin,transform] duration-300 ease-out"
-          style={controlsStyle}
-        >
-          <select
-            value={activeEnxoval?.id ?? ''}
-            onChange={(event) => void handleEnxovalChange(event.target.value)}
-            disabled={isWorkspaceLoading}
-            className="min-w-0 flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-wood/50 disabled:opacity-60"
-          >
-            {enxovais.map(enxoval => (
-              <option key={enxoval.id} value={enxoval.id}>{enxoval.name}</option>
-            ))}
-          </select>
-
-          <div className="inline-flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={openCreateEnxoval}
-              className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+        {hasEnxoval && (
+          <>
+            <div
+              className="max-w-2xl mx-auto w-full min-w-0 flex items-center gap-2 overflow-hidden transition-[opacity,max-height,margin,transform] duration-300 ease-out"
+              style={controlsStyle}
             >
-              <ListPlus size={16} />
-              Novo
-            </button>
-            <button
-              type="button"
-              onClick={openInvite}
-              disabled={!activeEnxoval}
-              aria-label="Adicionar membro"
-              title="Adicionar membro"
-              className="inline-flex h-9 w-9 items-center justify-center text-white bg-brand-dark rounded-lg hover:bg-black transition-colors disabled:opacity-50"
-            >
-              <UserPlus size={18} />
-            </button>
-          </div>
-
-          {isOwner && activeEnxoval && (
-            <div className="inline-flex shrink-0 items-center gap-1.5">
-              <button
-                type="button"
-                onClick={openRenameEnxoval}
-                aria-label="Editar nome do enxoval"
-                title="Editar nome do enxoval"
-                className="inline-flex h-9 w-9 items-center justify-center text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+              <select
+                value={activeEnxoval?.id ?? ''}
+                onChange={(event) => void handleEnxovalChange(event.target.value)}
+                disabled={isWorkspaceLoading}
+                className="min-w-0 flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-wood/50 disabled:opacity-60"
               >
-                <Pencil size={17} />
-              </button>
-              <button
-                type="button"
-                onClick={openDeleteEnxoval}
-                aria-label="Excluir enxoval"
-                title="Excluir enxoval"
-                className="inline-flex h-9 w-9 items-center justify-center text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
-              >
-                <Trash2 size={17} />
-              </button>
-            </div>
-          )}
-        </div>
+                {enxovais.map(enxoval => (
+                  <option key={enxoval.id} value={enxoval.id}>{enxoval.name}</option>
+                ))}
+              </select>
 
-        <div
-          className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
-          style={categoryBarStyle}
-        >
-          <div className="flex gap-2 min-w-max pb-2">
-            {categories.map(cat => {
-              const catItems = items.filter(i => i.categoryId === cat.id);
-              const catCompleted = catItems.filter(i => i.checked).length;
-
-              return (
+              <div className="inline-flex shrink-0 items-center gap-1.5">
                 <button
-                  key={cat.id}
-                  onClick={() => setActiveCategoryId(cat.id)}
-                  style={categoryButtonStyle}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out flex items-center gap-2 ${
-                    activeCategory?.id === cat.id
-                      ? 'bg-brand-wood text-white shadow-md'
-                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                  }`}
+                  type="button"
+                  onClick={openCreateEnxoval}
+                  className="inline-flex h-9 items-center gap-1.5 px-3 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
                 >
-                  {cat.name}
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeCategory?.id === cat.id ? 'bg-white/20' : 'bg-stone-200'}`}>
-                    {catCompleted}/{catItems.length}
-                  </span>
+                  <ListPlus size={16} />
+                  Novo
                 </button>
-              );
-            })}
-          </div>
-        </div>
+                <button
+                  type="button"
+                  onClick={openInvite}
+                  aria-label="Adicionar membro"
+                  title="Adicionar membro"
+                  className="inline-flex h-9 w-9 items-center justify-center text-white bg-brand-dark rounded-lg hover:bg-black transition-colors"
+                >
+                  <UserPlus size={18} />
+                </button>
+              </div>
+
+              {isOwner && (
+                <div className="inline-flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={openRenameEnxoval}
+                    aria-label="Editar nome do enxoval"
+                    title="Editar nome do enxoval"
+                    className="inline-flex h-9 w-9 items-center justify-center text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+                  >
+                    <Pencil size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openDeleteEnxoval}
+                    aria-label="Excluir enxoval"
+                    title="Excluir enxoval"
+                    className="inline-flex h-9 w-9 items-center justify-center text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div
+              className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
+              style={categoryBarStyle}
+            >
+              <div className="flex gap-2 min-w-max pb-2">
+                {categories.map(cat => {
+                  const catItems = items.filter(i => i.categoryId === cat.id);
+                  const catCompleted = catItems.filter(i => i.checked).length;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveCategoryId(cat.id)}
+                      style={categoryButtonStyle}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out flex items-center gap-2 ${
+                        activeCategory?.id === cat.id
+                          ? 'bg-brand-wood text-white shadow-md'
+                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                      }`}
+                    >
+                      {cat.name}
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeCategory?.id === cat.id ? 'bg-white/20' : 'bg-stone-200'}`}>
+                        {catCompleted}/{catItems.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
       </header>
 
       <main className="max-w-2xl mx-auto p-4 mt-2">
@@ -722,45 +754,68 @@ export default function App() {
           </div>
         )}
 
-        <div className="mb-4 flex items-center justify-between text-sm text-stone-500 font-medium px-1">
-          <span>Progresso de {activeCategory?.name ?? 'categoria'}</span>
-          <span>{filteredItems.filter(i => i.checked).length} de {filteredItems.length} itens</span>
-        </div>
-
-        <div className="space-y-1">
-          {filteredItems.length > 0 ? (
-            filteredItems.map(item => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                onUpdate={updateItem}
-                onDelete={deleteItem}
-              />
-            ))
-          ) : (
-            <div className="text-center py-12 px-4">
-              <Sparkles className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-              <h3 className="text-lg font-serif text-stone-600 mb-2">Nenhum item aqui</h3>
-              <p className="text-sm text-stone-400">
-                Toque no botão abaixo para adicionar itens à categoria {activeCategory?.name ?? 'selecionada'}.
-              </p>
+        {hasEnxoval ? (
+          <>
+            <div className="mb-4 flex items-center justify-between text-sm text-stone-500 font-medium px-1">
+              <span>Progresso de {activeCategory?.name ?? 'categoria'}</span>
+              <span>{filteredItems.filter(i => i.checked).length} de {filteredItems.length} itens</span>
             </div>
-          )}
-        </div>
+
+            <div className="space-y-1">
+              {filteredItems.length > 0 ? (
+                filteredItems.map(item => (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    onUpdate={updateItem}
+                    onDelete={openDeleteItem}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-12 px-4">
+                  <Sparkles className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-serif text-stone-600 mb-2">Nenhum item aqui</h3>
+                  <p className="text-sm text-stone-400">
+                    Toque no botão abaixo para adicionar itens à categoria {activeCategory?.name ?? 'selecionada'}.
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="min-h-[45vh] flex items-center justify-center px-2">
+            <div className="text-center max-w-sm">
+              <Home className="w-12 h-12 text-brand-wood mx-auto mb-4" />
+              <h2 className="font-serif text-2xl font-bold text-stone-900 mb-2">Crie seu primeiro enxoval</h2>
+              <p className="text-sm text-stone-500 mb-6">
+                Comece com a lista sugerida ou monte uma lista vazia.
+              </p>
+              <button
+                type="button"
+                onClick={openCreateEnxoval}
+                className="inline-flex items-center justify-center gap-2 bg-brand-dark text-white rounded-xl px-5 py-3 text-base font-medium hover:bg-black transition-colors"
+              >
+                <ListPlus size={18} />
+                Criar enxoval
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          disabled={!activeEnxoval}
-          className="bg-brand-dark text-white rounded-full pl-4 pr-5 py-3 shadow-lg shadow-brand-dark/30 flex items-center gap-2 hover:bg-black transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <div className="bg-white/20 rounded-full p-1">
-            <Plus size={20} strokeWidth={2.5} />
-          </div>
-          <span className="font-medium">Adicionar Item</span>
-        </button>
-      </div>
+      {hasEnxoval && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-brand-dark text-white rounded-full pl-4 pr-5 py-3 shadow-lg shadow-brand-dark/30 flex items-center gap-2 hover:bg-black transition-transform hover:scale-105 active:scale-95"
+          >
+            <div className="bg-white/20 rounded-full p-1">
+              <Plus size={20} strokeWidth={2.5} />
+            </div>
+            <span className="font-medium">Adicionar Item</span>
+          </button>
+        </div>
+      )}
 
       <AddItemModal
         isOpen={isAddModalOpen}
@@ -873,6 +928,38 @@ export default function App() {
               type="button"
               onClick={() => void handleDeleteEnxoval()}
               disabled={isDialogSubmitting || !activeEnxoval}
+              className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDialogSubmitting ? 'Excluindo...' : 'Excluir'}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+      <Dialog title="Excluir item" isOpen={Boolean(itemToDelete)} onClose={() => setItemToDelete(null)}>
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <p className="text-sm text-stone-600">
+            Esta ação vai remover o item {itemToDelete ? `"${itemToDelete.name}"` : ''} da lista.
+          </p>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setItemToDelete(null)}
+              disabled={isDialogSubmitting}
+              className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDeleteItem()}
+              disabled={isDialogSubmitting || !itemToDelete}
               className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDialogSubmitting ? 'Excluindo...' : 'Excluir'}

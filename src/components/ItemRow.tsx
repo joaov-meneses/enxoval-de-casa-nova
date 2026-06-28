@@ -7,31 +7,20 @@ interface ItemRowProps {
   key?: React.Key;
   item: EnxovalItem;
   onUpdate: (id: string, updates: Partial<EnxovalItem>) => void;
-  onDelete: (id: string) => Promise<void> | void;
+  onDelete: (item: EnxovalItem) => void;
 }
 
 export function ItemRow({ item, onUpdate, onDelete }: ItemRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const toggleCheck = (e: React.MouseEvent) => {
     e.stopPropagation();
     onUpdate(item.id, { checked: !item.checked });
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    const shouldDelete = window.confirm(`Remover "${item.name}" da lista?`);
-    if (!shouldDelete) return;
-
-    setIsDeleting(true);
-
-    try {
-      await onDelete(item.id);
-    } catch {
-      setIsDeleting(false);
-    }
+    onDelete(item);
   };
 
   const hasExtraInfo = item.link || item.description;
@@ -72,10 +61,9 @@ export function ItemRow({ item, onUpdate, onDelete }: ItemRowProps) {
           <button
             type="button"
             onClick={handleDelete}
-            disabled={isDeleting}
             aria-label="Remover item"
             title="Remover item"
-            className="p-1.5 rounded-full text-stone-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            className="p-1.5 rounded-full text-stone-300 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <Trash2 size={15} />
           </button>
