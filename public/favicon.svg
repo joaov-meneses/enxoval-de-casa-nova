@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="geometricPrecision">
-  <rect width="64" height="64" rx="14" fill="#ffffff" />
+  <rect width="64" height="64" fill="#ffffff" />
   <g transform="translate(32 32) scale(0.75) translate(-32 -35)">
     <path
       d="m10 30 22-18 22 18v24a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4Z"
