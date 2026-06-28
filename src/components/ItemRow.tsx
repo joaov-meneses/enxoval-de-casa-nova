@@ -63,7 +63,7 @@ export function ItemRow({ item, onUpdate, onDelete }: ItemRowProps) {
             onClick={handleDelete}
             aria-label="Remover item"
             title="Remover item"
-            className="p-1.5 rounded-full text-stone-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded-full text-stone-500 bg-stone-50 hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <Trash2 size={15} />
           </button>
