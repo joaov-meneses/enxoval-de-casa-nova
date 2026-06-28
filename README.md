@@ -1,20 +1,45 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Enxoval de Casa Nova
 
-# Run and deploy your AI Studio app
+Aplicação React + Express para organizar itens do enxoval por categoria, com login e persistência em PostgreSQL.
 
-This contains everything you need to run your app locally.
+## Requisitos
 
-View your app in AI Studio: https://ai.studio/apps/ddc9dc9b-2225-4139-af9e-e02760796947
+- Node.js
+- Banco PostgreSQL
 
-## Run Locally
+## Configuração local
 
-**Prerequisites:**  Node.js
+1. Instale as dependências:
 
+   ```bash
+   npm install
+   ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+2. Crie um `.env` com a conexão do banco:
+
+   ```bash
+   DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+   PORT=3000
+   ```
+
+3. Crie as tabelas no banco:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+4. Rode o projeto:
+
+   ```bash
+   npm run dev
+   ```
+
+A aplicação fica disponível em `http://localhost:3000`.
+
+## Scripts
+
+- `npm run dev`: inicia Express + Vite em desenvolvimento.
+- `npm run db:migrate`: cria/atualiza as tabelas necessárias.
+- `npm run build`: gera o frontend e o servidor em `dist/`.
+- `npm run start`: executa o build de produção.
+- `npm run lint`: executa o typecheck TypeScript.

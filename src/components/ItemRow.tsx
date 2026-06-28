@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Check, ChevronDown, ChevronUp, Link as LinkIcon, AlignLeft, ExternalLink } from 'lucide-react';
-import { EnxovalItem } from '../types';
+import type { EnxovalItem } from '../types';
 
 interface ItemRowProps {
+  key?: React.Key;
   item: EnxovalItem;
   onUpdate: (id: string, updates: Partial<EnxovalItem>) => void;
 }
@@ -20,22 +21,23 @@ export function ItemRow({ item, onUpdate }: ItemRowProps) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mb-3 transition-colors hover:border-brand-beige/50">
-      <div 
+      <div
         className="p-4 flex items-center justify-between cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-4 flex-1">
-          <button 
+          <button
+            type="button"
             onClick={toggleCheck}
             className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-              item.checked 
-                ? 'bg-brand-wood border-brand-wood text-white' 
+              item.checked
+                ? 'bg-brand-wood border-brand-wood text-white'
                 : 'border-stone-300 text-transparent hover:border-brand-wood'
             }`}
           >
             <Check size={14} strokeWidth={3} />
           </button>
-          
+
           <div className="flex flex-col flex-1">
             <span className={`text-base font-medium transition-all ${item.checked ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
               {item.name}
@@ -63,13 +65,12 @@ export function ItemRow({ item, onUpdate }: ItemRowProps) {
             className="overflow-hidden bg-stone-50 border-t border-stone-100"
           >
             <div className="p-4 space-y-4">
-              {/* Link Input */}
               <div>
                 <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
                   Link do Produto
                 </label>
                 <div className="flex items-center gap-2">
-                  <input 
+                  <input
                     type="url"
                     value={item.link}
                     onChange={(e) => onUpdate(item.id, { link: e.target.value })}
@@ -77,9 +78,9 @@ export function ItemRow({ item, onUpdate }: ItemRowProps) {
                     className="flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white"
                   />
                   {item.link && (
-                    <a 
-                      href={item.link.startsWith('http') ? item.link : `https://${item.link}`} 
-                      target="_blank" 
+                    <a
+                      href={item.link.startsWith('http') ? item.link : `https://${item.link}`}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 bg-brand-wood text-white rounded-lg hover:bg-brand-wood/90 transition-colors"
                     >
@@ -89,12 +90,11 @@ export function ItemRow({ item, onUpdate }: ItemRowProps) {
                 </div>
               </div>
 
-              {/* Description Input */}
               <div>
                 <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
                   Detalhes / Descrição
                 </label>
-                <textarea 
+                <textarea
                   value={item.description}
                   onChange={(e) => onUpdate(item.id, { description: e.target.value })}
                   placeholder="Ex: Comprar na cor branca, voltagem 110v..."
