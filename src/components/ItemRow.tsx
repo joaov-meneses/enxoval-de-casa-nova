@@ -1,20 +1,37 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronDown, ChevronUp, Link as LinkIcon, AlignLeft, ExternalLink } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Link as LinkIcon, AlignLeft, ExternalLink, Trash2 } from 'lucide-react';
 import type { EnxovalItem } from '../types';
 
 interface ItemRowProps {
   key?: React.Key;
   item: EnxovalItem;
   onUpdate: (id: string, updates: Partial<EnxovalItem>) => void;
+  onDelete: (id: string) => Promise<void> | void;
 }
 
-export function ItemRow({ item, onUpdate }: ItemRowProps) {
+export function ItemRow({ item, onUpdate, onDelete }: ItemRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const toggleCheck = (e: React.MouseEvent) => {
     e.stopPropagation();
     onUpdate(item.id, { checked: !item.checked });
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const shouldDelete = window.confirm(`Remover "${item.name}" da lista?`);
+    if (!shouldDelete) return;
+
+    setIsDeleting(true);
+
+    try {
+      await onDelete(item.id);
+    } catch {
+      setIsDeleting(false);
+    }
   };
 
   const hasExtraInfo = item.link || item.description;
@@ -51,7 +68,17 @@ export function ItemRow({ item, onUpdate }: ItemRowProps) {
           </div>
         </div>
 
-        <div className="text-stone-400">
+        <div className="flex items-center gap-1 text-stone-400">
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            aria-label="Remover item"
+            title="Remover item"
+            className="p-1.5 rounded-full text-stone-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            <Trash2 size={15} />
+          </button>
           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>
       </div>

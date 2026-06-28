@@ -561,6 +561,21 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
   if (!result.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
   return mapItem(result.rows[0]);
 }
+async function deleteItemForUser(userId: string, itemId: string) {
+  const result = await getPool().query<{ id: string }>(`
+    DELETE FROM items i
+    WHERE i.id = $1
+      AND EXISTS (
+        SELECT 1
+        FROM enxoval_members em
+        WHERE em.enxoval_id = i.enxoval_id
+          AND em.user_id = $2
+      )
+    RETURNING id
+  `, [itemId, userId]);
+
+  if (!result.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
+}
 
 export function registerApiRoutes(app: Express) {
   const router = express.Router();
@@ -750,6 +765,12 @@ export function registerApiRoutes(app: Express) {
     const user = await requireCurrentUser(req);
     const item = await updateItemForUser(user.id, req.params.id, req.body);
     res.json(item);
+  }));
+
+  router.delete('/items/:id', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    await deleteItemForUser(user.id, req.params.id);
+    res.status(204).end();
   }));
 
   app.use('/api', router);

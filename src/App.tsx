@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2 } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
-import { ApiError, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
+import { ApiError, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
 import { AddItemModal } from './components/AddItemModal';
 
@@ -402,6 +402,16 @@ export default function App() {
     setActiveCategoryId(result.category.id);
   };
 
+  const deleteItem = async (id: string) => {
+    try {
+      await deleteItemRequest(id);
+      setItems(current => current.filter(item => item.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível remover o item.');
+      throw err;
+    }
+  };
+
   const handleCreateEnxoval = async (event: React.FormEvent) => {
     event.preventDefault();
     const name = newEnxovalName.trim();
@@ -724,6 +734,7 @@ export default function App() {
                 key={item.id}
                 item={item}
                 onUpdate={updateItem}
+                onDelete={deleteItem}
               />
             ))
           ) : (

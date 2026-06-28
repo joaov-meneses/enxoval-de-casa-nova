@@ -97,4 +97,8 @@ export function updateItem(id: string, updates: Partial<Pick<EnxovalItem, 'name'
   });
 }
 
+export function deleteItem(id: string) {
+  return request<void>(`/api/items/${id}`, { method: 'DELETE' });
+}
+
 export type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalWorkspace };
