@@ -6,6 +6,7 @@ export interface EnxovalSummary {
   name: string;
   ownerId: string;
   role: EnxovalRole;
+  discountCents: number;
 }
 
 export interface EnxovalMember {

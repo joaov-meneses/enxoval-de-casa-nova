@@ -65,10 +65,11 @@ export function createEnxoval(name: string, useDefaultTemplate: boolean) {
     body: JSON.stringify({ name, useDefaultTemplate })
   });
 }
-export function updateEnxoval(enxovalId: string, name: string) {
+export function updateEnxoval(enxovalId: string, updates: string | Partial<Pick<EnxovalWorkspace['enxoval'], 'name' | 'discountCents'>>) {
+  const body = typeof updates === 'string' ? { name: updates } : updates;
   return request<EnxovalWorkspace['enxoval']>(`/api/enxovais/${enxovalId}`, {
     method: 'PATCH',
-    body: JSON.stringify({ name })
+    body: JSON.stringify(body)
   });
 }
 

@@ -21,6 +21,7 @@ interface EnxovalRow {
   name: string;
   owner_id: string;
   role: 'owner' | 'editor';
+  discount_cents: number;
 }
 
 interface MemberRow {
@@ -144,7 +145,8 @@ function mapEnxoval(row: EnxovalRow): EnxovalSummary {
     id: row.id,
     name: row.name,
     ownerId: row.owner_id,
-    role: row.role
+    role: row.role,
+    discountCents: Number(row.discount_cents ?? 0)
   };
 }
 
@@ -197,7 +199,7 @@ async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) 
 
 async function fetchEnxovais(queryable: Queryable, userId: string) {
   const result = await queryable.query<EnxovalRow>(`
-    SELECT e.id, e.name, e.owner_id, em.role
+    SELECT e.id, e.name, e.owner_id, e.discount_cents, em.role
     FROM enxovais e
     INNER JOIN enxoval_members em ON em.enxoval_id = e.id
     WHERE em.user_id = $1
@@ -224,7 +226,7 @@ async function requireEnxovalOwner(queryable: Queryable, userId: string, enxoval
 
 async function fetchEnxoval(queryable: Queryable, userId: string, enxovalId: string) {
   const result = await queryable.query<EnxovalRow>(`
-    SELECT e.id, e.name, e.owner_id, em.role
+    SELECT e.id, e.name, e.owner_id, e.discount_cents, em.role
     FROM enxovais e
     INNER JOIN enxoval_members em ON em.enxoval_id = e.id
     WHERE e.id = $1 AND em.user_id = $2
@@ -393,7 +395,7 @@ async function createEnxovalForUser(userId: string, name: string, options: { use
     const enxovalResult = await client.query<EnxovalRow>(`
       INSERT INTO enxovais (id, name, owner_id)
       VALUES ($1, $2, $3)
-      RETURNING id, name, owner_id, 'owner'::text AS role
+      RETURNING id, name, owner_id, discount_cents, 'owner'::text AS role
     `, [enxovalId, name, userId]);
 
     await client.query(`
@@ -717,16 +719,42 @@ export function registerApiRoutes(app: Express) {
   }));
   router.patch('/enxovais/:id', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    const name = requireText(req.body?.name, 'Nome do enxoval');
+    const role = await requireEnxovalMember(getPool(), user.id, req.params.id);
 
-    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+    if (!req.body || typeof req.body !== 'object') {
+      throw new HttpError(400, 'Dados inválidos.');
+    }
 
+    const updates = req.body as Record<string, unknown>;
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+
+    const addUpdate = (column: string, value: unknown) => {
+      values.push(value);
+      setClauses.push(`${column} = $${values.length}`);
+    };
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+      if (role !== 'owner') throw new HttpError(403, 'Apenas o dono pode alterar esse enxoval.');
+      addUpdate('name', requireText(updates.name, 'Nome do enxoval'));
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'discountCents')) {
+      if (typeof updates.discountCents !== 'number' || !Number.isInteger(updates.discountCents) || updates.discountCents < 0) {
+        throw new HttpError(400, 'Desconto inválido.');
+      }
+      addUpdate('discount_cents', updates.discountCents);
+    }
+
+    if (setClauses.length === 0) throw new HttpError(400, 'Nenhuma alteração enviada.');
+
+    values.push(req.params.id);
     const result = await getPool().query<EnxovalRow>(`
       UPDATE enxovais
-      SET name = $1, updated_at = now()
-      WHERE id = $2
-      RETURNING id, name, owner_id, 'owner'::text AS role
-    `, [name, req.params.id]);
+      SET ${setClauses.join(', ')}, updated_at = now()
+      WHERE id = $${values.length}
+      RETURNING id, name, owner_id, discount_cents, $${values.length + 1}::text AS role
+    `, [...values, role]);
 
     if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
     res.json(mapEnxoval(result.rows[0]));

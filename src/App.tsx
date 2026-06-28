@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder } from 'motion/react';
-import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical, ExternalLink } from 'lucide-react';
+import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical, ExternalLink, Percent } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
 import { ApiError, createCategory as createCategoryRequest, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, reorderCategories as reorderCategoriesRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
 import { AddItemModal } from './components/AddItemModal';
 
 type AuthMode = 'login' | 'register';
+type DiscountOperation = 'add' | 'subtract';
 
 const APP_NAME = 'Enxoval de Casa Nova';
 
@@ -232,6 +233,9 @@ export default function App() {
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
+  const [isDiscountsOpen, setIsDiscountsOpen] = useState(false);
+  const [discountOperation, setDiscountOperation] = useState<DiscountOperation>('add');
+  const [discountAdjustmentText, setDiscountAdjustmentText] = useState('');
   const [itemToDelete, setItemToDelete] = useState<EnxovalItem | null>(null);
   const [itemToEdit, setItemToEdit] = useState<EnxovalItem | null>(null);
   const [editItemName, setEditItemName] = useState('');
@@ -343,6 +347,11 @@ export default function App() {
       return;
     }
 
+    if (isDiscountsOpen) {
+      document.title = makeTitle('Descontos e cashback');
+      return;
+    }
+
     if (itemToDelete) {
       document.title = makeTitle('Excluir ' + itemToDelete.name);
       return;
@@ -364,7 +373,7 @@ export default function App() {
     }
 
     document.title = makeTitle('Meus enxovais');
-  }, [activeEnxoval, isCreateCategoryOpen, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isReorderCategoriesOpen, isWorkspaceLoading, itemToDelete, itemToEdit, user]);
+  }, [activeEnxoval, isCreateCategoryOpen, isCreateEnxovalOpen, isDeleteEnxovalOpen, isDiscountsOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isReorderCategoriesOpen, isWorkspaceLoading, itemToDelete, itemToEdit, user]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -525,13 +534,26 @@ export default function App() {
     const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
     return { total, completed, percentage };
   }, [items]);
-  const checkedTotalSpentCents = useMemo(() => items.reduce((total, item) => {
+  const checkedSubtotalSpentCents = useMemo(() => items.reduce((total, item) => {
     if (!item.checked) return total;
 
     const priceCents = normalizePriceCents(item.priceCents);
     return priceCents && priceCents > 0 ? total + priceCents : total;
   }, 0), [items]);
+  const enxovalDiscountCents = normalizePriceCents(activeEnxoval?.discountCents) ?? 0;
+  const discountAdjustmentCents = priceTextToCents(discountAdjustmentText) ?? 0;
+  const nextDiscountCents = discountOperation === 'add'
+    ? enxovalDiscountCents + discountAdjustmentCents
+    : Math.max(0, enxovalDiscountCents - discountAdjustmentCents);
+  const checkedTotalSpentCents = Math.max(0, checkedSubtotalSpentCents - enxovalDiscountCents);
+  const discountPreviewTotalCents = Math.max(0, checkedSubtotalSpentCents - nextDiscountCents);
+  const checkedSubtotalSpentText = formatCurrency(checkedSubtotalSpentCents);
+  const savedDiscountText = formatCurrency(enxovalDiscountCents);
+  const discountsButtonTitle = enxovalDiscountCents > 0 ? 'Descontos e cashback: - ' + savedDiscountText : 'Descontos e cashback';
+  const discountAdjustmentPreviewText = formatCurrency(discountAdjustmentCents);
+  const nextDiscountText = formatCurrency(nextDiscountCents);
   const checkedTotalSpentText = formatCurrency(checkedTotalSpentCents);
+  const discountPreviewTotalText = formatCurrency(discountPreviewTotalCents);
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === 'owner';
   const visibleProgress = isHeaderMobile ? headerProgress : 0;
@@ -922,6 +944,40 @@ export default function App() {
     setIsRenameEnxovalOpen(true);
   };
 
+  const openDiscounts = () => {
+    if (!activeEnxoval) return;
+    setDialogError('');
+    setDiscountOperation('add');
+    setDiscountAdjustmentText('');
+    setIsDiscountsOpen(true);
+  };
+
+  const handleDiscountAdjustmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setDiscountAdjustmentText(formatPriceInput(event.target.value));
+  };
+
+  const handleSaveDiscounts = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeEnxoval) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const updatedEnxoval = await updateEnxovalRequest(activeEnxoval.id, {
+        discountCents: nextDiscountCents
+      });
+      setActiveEnxoval(updatedEnxoval);
+      setEnxovais(current => current.map(enxoval => enxoval.id === updatedEnxoval.id ? updatedEnxoval : enxoval));
+      setDiscountAdjustmentText('');
+      setIsDiscountsOpen(false);
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível salvar os descontos.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
   const openDeleteEnxoval = () => {
     if (!activeEnxoval) return;
     setDialogError('');
@@ -941,6 +997,7 @@ export default function App() {
     setActiveEnxoval(null);
     setIsRenameEnxovalOpen(false);
     setIsDeleteEnxovalOpen(false);
+    setIsDiscountsOpen(false);
     setItemToDelete(null);
     closeEditItem();
     setMembers([]);
@@ -1005,7 +1062,7 @@ export default function App() {
               <div
                 className="w-fit overflow-hidden whitespace-nowrap rounded-full bg-stone-50 px-2.5 py-1 text-[11px] font-semibold leading-none text-stone-600 ring-1 ring-stone-200 shadow-sm transition-[opacity,max-height,margin,padding,transform] duration-300 ease-out sm:hidden"
                 style={totalSpentTitleStyle}
-                title="Soma dos itens marcados como concluídos"
+                title="Soma dos itens marcados como concluídos menos descontos e cashback"
               >
                 <span className="text-stone-400">Total gasto</span> {checkedTotalSpentText}
               </div>
@@ -1059,7 +1116,7 @@ export default function App() {
               <div
                 className="overflow-hidden whitespace-nowrap rounded-full bg-stone-50 px-2.5 py-1 text-[11px] font-semibold leading-none text-stone-600 ring-1 ring-stone-200 shadow-sm transition-[opacity,max-height,padding,transform] duration-300 ease-out sm:text-xs"
                 style={totalSpentSideStyle}
-                title="Soma dos itens marcados como concluídos"
+                title="Soma dos itens marcados como concluídos menos descontos e cashback"
               >
                 <span className="text-stone-400">Total gasto</span> {checkedTotalSpentText}
               </div>
@@ -1101,6 +1158,15 @@ export default function App() {
                   className="inline-flex h-9 w-9 items-center justify-center text-white bg-brand-dark rounded-lg hover:bg-black transition-colors"
                 >
                   <UserPlus size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={openDiscounts}
+                  aria-label={discountsButtonTitle}
+                  title={discountsButtonTitle}
+                  className="inline-flex h-9 w-9 items-center justify-center text-brand-wood bg-stone-100 rounded-lg hover:bg-brand-beige/20 transition-colors"
+                >
+                  <Percent size={17} />
                 </button>
               </div>
 
@@ -1422,6 +1488,80 @@ export default function App() {
         </form>
       </Dialog>
 
+      <Dialog title="Descontos e cashback" isOpen={isDiscountsOpen} onClose={() => setIsDiscountsOpen(false)}>
+        <form onSubmit={handleSaveDiscounts} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Operação</label>
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1">
+              <button
+                type="button"
+                onClick={() => setDiscountOperation('add')}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${discountOperation === 'add' ? 'bg-white text-brand-dark shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+              >
+                Somar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscountOperation('subtract')}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${discountOperation === 'subtract' ? 'bg-white text-brand-dark shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+              >
+                Subtrair
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Valor do ajuste</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={discountAdjustmentText}
+              onChange={handleDiscountAdjustmentChange}
+              placeholder="R$ 0,00"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+          </div>
+
+          <div className="rounded-xl bg-stone-50 p-3 text-sm text-stone-600 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span>Subtotal marcado</span>
+              <strong className="text-stone-800">{checkedSubtotalSpentText}</strong>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Desconto atual</span>
+              <strong className="text-brand-wood">- {savedDiscountText}</strong>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>{discountOperation === 'add' ? 'Somar ajuste' : 'Subtrair ajuste'}</span>
+              <strong className={discountOperation === 'add' ? 'text-brand-wood' : 'text-stone-700'}>
+                {discountOperation === 'add' ? '+ ' : '- '}{discountAdjustmentPreviewText}
+              </strong>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-stone-200 pt-2">
+              <span>Novo desconto total</span>
+              <strong className="text-brand-wood">- {nextDiscountText}</strong>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-stone-200 pt-2">
+              <span>Total gasto</span>
+              <strong className="text-stone-900">{discountPreviewTotalText}</strong>
+            </div>
+          </div>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isDialogSubmitting || !activeEnxoval || discountAdjustmentCents <= 0}
+            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDialogSubmitting ? 'Salvando...' : 'Salvar ajuste'}
+          </button>
+        </form>
+      </Dialog>
       <Dialog title="Editar enxoval" isOpen={isRenameEnxovalOpen} onClose={() => setIsRenameEnxovalOpen(false)}>
         <form onSubmit={handleRenameEnxoval} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
           <div>

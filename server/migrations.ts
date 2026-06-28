@@ -113,6 +113,7 @@ export async function migrateDatabase() {
       id uuid PRIMARY KEY,
       name text NOT NULL,
       owner_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      discount_cents integer NOT NULL DEFAULT 0,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
@@ -177,6 +178,9 @@ export async function migrateDatabase() {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
 
+    ALTER TABLE enxovais ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0;
+    ALTER TABLE enxovais DROP CONSTRAINT IF EXISTS enxovais_discount_cents_non_negative;
+    ALTER TABLE enxovais ADD CONSTRAINT enxovais_discount_cents_non_negative CHECK (discount_cents >= 0);
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS enxoval_id uuid REFERENCES enxovais(id) ON DELETE CASCADE;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS enxoval_id uuid REFERENCES enxovais(id) ON DELETE CASCADE;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_cents integer;
