@@ -174,7 +174,7 @@ function mapItem(row: ItemRow): EnxovalItem {
     checked: row.checked,
     link: row.link,
     description: row.description,
-    priceCents: row.price_cents,
+    priceCents: row.price_cents === null ? null : Number(row.price_cents),
     sortOrder: row.sort_order
   };
 }
@@ -586,6 +586,47 @@ async function deleteItemForUser(userId: string, itemId: string) {
   if (!result.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
 }
 
+async function reorderCategoriesForUser(userId: string, enxovalId: string, categoryIds: string[]) {
+  return withTransaction(async client => {
+    await requireEnxovalMember(client, userId, enxovalId);
+
+    const uniqueCategoryIds = new Set(categoryIds);
+    if (uniqueCategoryIds.size !== categoryIds.length) {
+      throw new HttpError(400, 'Categorias duplicadas na ordenacao.');
+    }
+
+    const existingResult = await client.query<{ id: string }>(`
+      SELECT id
+      FROM categories
+      WHERE enxoval_id = $1
+      ORDER BY sort_order ASC, name ASC
+    `, [enxovalId]);
+
+    const existingIds = new Set(existingResult.rows.map(category => category.id));
+    const invalidCategoryId = categoryIds.find(categoryId => !existingIds.has(categoryId));
+    if (invalidCategoryId) {
+      throw new HttpError(400, 'A ordenacao contem uma categoria invalida.');
+    }
+
+    const nextCategoryIds = [
+      ...categoryIds,
+      ...existingResult.rows
+        .map(category => category.id)
+        .filter(categoryId => !uniqueCategoryIds.has(categoryId))
+    ];
+
+    for (const [sortOrder, categoryId] of nextCategoryIds.entries()) {
+      await client.query(`
+        UPDATE categories
+        SET sort_order = $1, updated_at = now()
+        WHERE id = $2 AND enxoval_id = $3
+      `, [sortOrder, categoryId, enxovalId]);
+    }
+
+    return fetchCategories(client, userId, enxovalId);
+  });
+}
+
 export function registerApiRoutes(app: Express) {
   const router = express.Router();
 
@@ -747,6 +788,18 @@ export function registerApiRoutes(app: Express) {
 
     const category = await withTransaction(client => findOrCreateCategory(client, user.id, enxovalId, name));
     res.status(201).json(category);
+  }));
+
+  router.patch('/categories/order', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
+    const categoryIds = Array.isArray(req.body?.categoryIds) && req.body.categoryIds.every((categoryId: unknown) => typeof categoryId === 'string')
+      ? req.body.categoryIds
+      : null;
+
+    if (!categoryIds) throw new HttpError(400, 'Ordenacao invalida.');
+
+    res.json(await reorderCategoriesForUser(user.id, enxovalId, categoryIds));
   }));
 
   router.get('/items', asyncHandler(async (req, res) => {

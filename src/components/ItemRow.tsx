@@ -16,13 +16,24 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL'
 });
 
-function formatCurrency(priceCents: number | null | undefined) {
-  return typeof priceCents === 'number' ? currencyFormatter.format(priceCents / 100) : '';
+function normalizePriceCents(priceCents: number | string | null | undefined) {
+  if (typeof priceCents === 'number' && Number.isFinite(priceCents)) return Math.round(priceCents);
+  if (typeof priceCents === 'string' && priceCents.trim()) {
+    const parsed = Number(priceCents);
+    return Number.isFinite(parsed) ? Math.round(parsed) : null;
+  }
+  return null;
+}
+
+function formatCurrency(priceCents: number | string | null | undefined) {
+  const normalizedPriceCents = normalizePriceCents(priceCents);
+  return normalizedPriceCents !== null ? currencyFormatter.format(normalizedPriceCents / 100) : '';
 }
 
 function priceTextToCents(value: string) {
   const digits = value.replace(/\D/g, '');
-  return digits ? Number(digits) : null;
+  const cents = digits ? Number(digits) : 0;
+  return cents > 0 ? cents : null;
 }
 
 function formatPriceInput(value: string) {
@@ -92,7 +103,9 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
   };
 
   const productUrl = getProductUrl(linkDraft);
-  const hasExtraInfo = item.link || item.description || item.priceCents !== null;
+  const itemPriceCents = normalizePriceCents(item.priceCents);
+  const hasPrice = itemPriceCents !== null && itemPriceCents > 0;
+  const hasExtraInfo = item.link || item.description || hasPrice;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mb-3 transition-colors hover:border-brand-beige/50">
@@ -122,16 +135,16 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
                 {categoryName}
               </span>
             )}
-            {item.priceCents !== null && (
+            {hasPrice && (
               <span className="mt-1 text-sm font-semibold text-stone-700">
-                {formatCurrency(item.priceCents)}
+                {formatCurrency(itemPriceCents)}
               </span>
             )}
             {hasExtraInfo && !isExpanded && (
               <div className="flex items-center gap-2 mt-1">
                 {item.link && <LinkIcon size={12} className="text-brand-wood" />}
                 {item.description && <AlignLeft size={12} className="text-brand-wood" />}
-                {item.priceCents !== null && <DollarSign size={12} className="text-brand-wood" />}
+                {hasPrice && <DollarSign size={12} className="text-brand-wood" />}
               </div>
             )}
           </div>

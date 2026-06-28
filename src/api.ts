@@ -90,6 +90,13 @@ export function createCategory(enxovalId: string, name: string) {
   });
 }
 
+export function reorderCategories(enxovalId: string, categoryIds: string[]) {
+  return request<EnxovalCategory[]>('/api/categories/order', {
+    method: 'PATCH',
+    body: JSON.stringify({ enxovalId, categoryIds })
+  });
+}
+
 export function createItem(input: { enxovalId: string; name: string; categoryId?: string; categoryName?: string }) {
   return request<{ item: EnxovalItem; category: EnxovalCategory }>('/api/items', {
     method: 'POST',

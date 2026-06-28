@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search } from 'lucide-react';
+import { Reorder } from 'motion/react';
+import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
-import { ApiError, createCategory as createCategoryRequest, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
+import { ApiError, createCategory as createCategoryRequest, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, reorderCategories as reorderCategoriesRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
 import { AddItemModal } from './components/AddItemModal';
 
@@ -158,7 +159,7 @@ function Dialog({ title, isOpen, onClose, children }: DialogProps) {
   return (
     <>
       <div className="fixed inset-0 bg-stone-900/50 z-40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] w-full overflow-y-auto bg-white rounded-t-2xl shadow-xl z-50 md:bottom-auto md:top-1/2 md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl">
+      <div className="fixed inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-y-contain bg-white rounded-t-2xl shadow-xl z-50 md:bottom-auto md:top-1/2 md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl">
         <div className="flex items-center justify-between p-4 border-b border-stone-100">
           <h3 className="font-serif text-xl text-stone-800">{title}</h3>
           <button
@@ -186,6 +187,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
+  const [isReorderCategoriesOpen, setIsReorderCategoriesOpen] = useState(false);
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
@@ -193,6 +195,7 @@ export default function App() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [newEnxovalName, setNewEnxovalName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryOrder, setCategoryOrder] = useState<EnxovalCategory[]>([]);
   const [newEnxovalUseDefaultTemplate, setNewEnxovalUseDefaultTemplate] = useState(true);
   const [renameEnxovalName, setRenameEnxovalName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
@@ -278,6 +281,11 @@ export default function App() {
       return;
     }
 
+    if (isReorderCategoriesOpen) {
+      document.title = makeTitle('Reordenar categorias');
+      return;
+    }
+
     if (isRenameEnxovalOpen) {
       document.title = makeTitle(activeEnxoval ? 'Editar ' + activeEnxoval.name : 'Editar enxoval');
       return;
@@ -304,7 +312,7 @@ export default function App() {
     }
 
     document.title = makeTitle('Meus enxovais');
-  }, [activeEnxoval, isCreateCategoryOpen, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isWorkspaceLoading, itemToDelete, user]);
+  }, [activeEnxoval, isCreateCategoryOpen, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isReorderCategoriesOpen, isWorkspaceLoading, itemToDelete, user]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -355,7 +363,9 @@ export default function App() {
   }, [activeCategoryId, activeEnxoval?.id, isRefreshing]);
 
   useEffect(() => {
-    if (!user || !isHeaderMobile) {
+    if (!user || !isHeaderMobile || isReorderCategoriesOpen) {
+      pullStartYRef.current = null;
+      pullLastDistanceRef.current = 0;
       setPullDistance(0);
       return;
     }
@@ -432,7 +442,8 @@ export default function App() {
       window.removeEventListener('touchend', handleTouchEnd);
       window.removeEventListener('touchcancel', resetPull);
     };
-  }, [handleRefresh, isHeaderMobile, isRefreshing, user]);
+  }, [handleRefresh, isHeaderMobile, isRefreshing, isReorderCategoriesOpen, user]);
+
   const activeCategory = categories.find(category => category.id === activeCategoryId) ?? categories[0];
   const normalizedSearchQuery = normalizeSearchText(searchQuery);
   const isSearching = normalizedSearchQuery.length > 0;
@@ -593,6 +604,29 @@ export default function App() {
     }
   };
 
+  const handleSaveCategoryOrder = async () => {
+    if (!activeEnxoval) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const reorderedCategories = await reorderCategoriesRequest(activeEnxoval.id, categoryOrder.map(category => category.id));
+      setCategories(reorderedCategories);
+      setCategoryOrder(reorderedCategories);
+
+      if (!reorderedCategories.some(category => category.id === activeCategoryId)) {
+        setActiveCategoryId(reorderedCategories[0]?.id || '');
+      }
+
+      setIsReorderCategoriesOpen(false);
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Nao foi possivel reordenar as categorias.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
   const handleCreateCategory = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!activeEnxoval) return;
@@ -735,6 +769,12 @@ export default function App() {
     setIsCreateCategoryOpen(true);
   };
 
+  const openReorderCategories = () => {
+    setDialogError('');
+    setCategoryOrder(categories);
+    setIsReorderCategoriesOpen(true);
+  };
+
   const openRenameEnxoval = () => {
     if (!activeEnxoval) return;
     setDialogError('');
@@ -848,7 +888,7 @@ export default function App() {
               disabled={isRefreshing || isWorkspaceLoading}
               aria-label="Atualizar enxoval"
               title="Atualizar enxoval"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-brand-wood ring-1 ring-stone-200 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 w-9 items-center justify-center text-brand-wood transition-colors hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
@@ -931,18 +971,7 @@ export default function App() {
               className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
               style={categoryBarStyle}
             >
-              <div className="flex gap-2 min-w-max pb-2">
-                <button
-                  type="button"
-                  onClick={openCreateCategory}
-                  aria-label="Adicionar categoria"
-                  title="Adicionar categoria"
-                  className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out flex items-center gap-2 bg-white text-brand-wood border border-brand-beige hover:bg-brand-beige/20"
-                >
-                  <Plus size={16} />
-                  Categoria
-                </button>
-
+              <div className="flex w-max min-w-full items-center gap-2 pb-2">
                 {categories.map(cat => {
                   const catItems = items.filter(i => i.categoryId === cat.id);
                   const catCompleted = catItems.filter(i => i.checked).length;
@@ -965,6 +994,28 @@ export default function App() {
                     </button>
                   );
                 })}
+
+                <div className="ml-auto shrink-0 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={openReorderCategories}
+                    disabled={categories.length < 2}
+                    className="px-3 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out inline-flex items-center gap-1.5 bg-stone-100 text-stone-700 hover:bg-stone-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Pencil size={15} />
+                    Reordenar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCreateCategory}
+                    aria-label="Adicionar categoria"
+                    title="Adicionar categoria"
+                    className="px-3 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out inline-flex items-center gap-1.5 bg-white text-brand-wood border border-brand-beige hover:bg-brand-beige/20"
+                  >
+                    <Plus size={16} />
+                    Categoria
+                  </button>
+                </div>
               </div>
             </div>
           </>
@@ -1082,6 +1133,55 @@ export default function App() {
         categories={categories}
       />
 
+      <Dialog title="Reordenar categorias" isOpen={isReorderCategoriesOpen} onClose={() => setIsReorderCategoriesOpen(false)}>
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <Reorder.Group axis="y" values={categoryOrder} onReorder={setCategoryOrder} className="space-y-2">
+            {categoryOrder.map(category => {
+              const categoryItems = items.filter(item => item.categoryId === category.id);
+
+              return (
+                <Reorder.Item
+                  key={category.id}
+                  value={category}
+                  className="flex cursor-grab items-center gap-3 rounded-xl border border-stone-200 bg-white px-3 py-3 text-stone-800 shadow-sm active:cursor-grabbing"
+                  style={{ touchAction: 'none' }}
+                >
+                  <GripVertical size={18} className="shrink-0 text-stone-400" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{category.name}</span>
+                  <span className="shrink-0 rounded-full bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-500">
+                    {categoryItems.length}
+                  </span>
+                </Reorder.Item>
+              );
+            })}
+          </Reorder.Group>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setIsReorderCategoriesOpen(false)}
+              disabled={isDialogSubmitting}
+              className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSaveCategoryOrder()}
+              disabled={isDialogSubmitting || !activeEnxoval}
+              className="py-4 bg-brand-dark text-white rounded-xl font-medium text-base hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDialogSubmitting ? 'Salvando...' : 'Salvar ordem'}
+            </button>
+          </div>
+        </div>
+      </Dialog>
       <Dialog title="Nova categoria" isOpen={isCreateCategoryOpen} onClose={() => setIsCreateCategoryOpen(false)}>
         <form onSubmit={handleCreateCategory} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
           <div>
