@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder } from 'motion/react';
-import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical, ExternalLink, Percent } from 'lucide-react';
+import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical, ExternalLink, Percent, Minus } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
 import { ApiError, createCategory as createCategoryRequest, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, reorderCategories as reorderCategoriesRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
@@ -236,6 +236,7 @@ export default function App() {
   const [isDiscountsOpen, setIsDiscountsOpen] = useState(false);
   const [discountOperation, setDiscountOperation] = useState<DiscountOperation>('add');
   const [discountAdjustmentText, setDiscountAdjustmentText] = useState('');
+  const [discountWorkingCents, setDiscountWorkingCents] = useState(0);
   const [itemToDelete, setItemToDelete] = useState<EnxovalItem | null>(null);
   const [itemToEdit, setItemToEdit] = useState<EnxovalItem | null>(null);
   const [editItemName, setEditItemName] = useState('');
@@ -542,16 +543,13 @@ export default function App() {
   }, 0), [items]);
   const enxovalDiscountCents = normalizePriceCents(activeEnxoval?.discountCents) ?? 0;
   const discountAdjustmentCents = priceTextToCents(discountAdjustmentText) ?? 0;
-  const nextDiscountCents = discountOperation === 'add'
-    ? enxovalDiscountCents + discountAdjustmentCents
-    : Math.max(0, enxovalDiscountCents - discountAdjustmentCents);
   const checkedTotalSpentCents = Math.max(0, checkedSubtotalSpentCents - enxovalDiscountCents);
-  const discountPreviewTotalCents = Math.max(0, checkedSubtotalSpentCents - nextDiscountCents);
+  const discountPreviewTotalCents = Math.max(0, checkedSubtotalSpentCents - discountWorkingCents);
   const checkedSubtotalSpentText = formatCurrency(checkedSubtotalSpentCents);
   const savedDiscountText = formatCurrency(enxovalDiscountCents);
   const discountsButtonTitle = enxovalDiscountCents > 0 ? 'Descontos e cashback: - ' + savedDiscountText : 'Descontos e cashback';
   const discountAdjustmentPreviewText = formatCurrency(discountAdjustmentCents);
-  const nextDiscountText = formatCurrency(nextDiscountCents);
+  const workingDiscountText = formatCurrency(discountWorkingCents);
   const checkedTotalSpentText = formatCurrency(checkedTotalSpentCents);
   const discountPreviewTotalText = formatCurrency(discountPreviewTotalCents);
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
@@ -949,11 +947,22 @@ export default function App() {
     setDialogError('');
     setDiscountOperation('add');
     setDiscountAdjustmentText('');
+    setDiscountWorkingCents(normalizePriceCents(activeEnxoval.discountCents) ?? 0);
     setIsDiscountsOpen(true);
   };
 
   const handleDiscountAdjustmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setDiscountAdjustmentText(formatPriceInput(event.target.value));
+  };
+
+  const handleApplyDiscountAdjustment = () => {
+    if (discountAdjustmentCents <= 0) return;
+
+    setDiscountWorkingCents(current => (
+      discountOperation === 'add'
+        ? current + discountAdjustmentCents
+        : Math.max(0, current - discountAdjustmentCents)
+    ));
   };
 
   const handleSaveDiscounts = async (event: React.FormEvent) => {
@@ -965,7 +974,7 @@ export default function App() {
 
     try {
       const updatedEnxoval = await updateEnxovalRequest(activeEnxoval.id, {
-        discountCents: nextDiscountCents
+        discountCents: discountWorkingCents
       });
       setActiveEnxoval(updatedEnxoval);
       setEnxovais(current => current.map(enxoval => enxoval.id === updatedEnxoval.id ? updatedEnxoval : enxoval));
@@ -1512,14 +1521,26 @@ export default function App() {
 
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-1">Valor do ajuste</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={discountAdjustmentText}
-              onChange={handleDiscountAdjustmentChange}
-              placeholder="R$ 0,00"
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={discountAdjustmentText}
+                onChange={handleDiscountAdjustmentChange}
+                placeholder="R$ 0,00"
+                className="min-w-0 flex-1 px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+              />
+              <button
+                type="button"
+                onClick={handleApplyDiscountAdjustment}
+                disabled={discountAdjustmentCents <= 0}
+                aria-label={discountOperation === 'add' ? 'Somar ajuste na prévia' : 'Subtrair ajuste da prévia'}
+                title={discountOperation === 'add' ? 'Somar ajuste na prévia' : 'Subtrair ajuste da prévia'}
+                className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${discountOperation === 'add' ? 'bg-brand-wood hover:bg-brand-wood/90' : 'bg-stone-700 hover:bg-stone-800'}`}
+              >
+                {discountOperation === 'add' ? <Plus size={20} /> : <Minus size={20} />}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-xl bg-stone-50 p-3 text-sm text-stone-600 space-y-2">
@@ -1532,14 +1553,14 @@ export default function App() {
               <strong className="text-brand-wood">- {savedDiscountText}</strong>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span>{discountOperation === 'add' ? 'Somar ajuste' : 'Subtrair ajuste'}</span>
+              <span>{discountOperation === 'add' ? 'Ajuste para somar' : 'Ajuste para subtrair'}</span>
               <strong className={discountOperation === 'add' ? 'text-brand-wood' : 'text-stone-700'}>
                 {discountOperation === 'add' ? '+ ' : '- '}{discountAdjustmentPreviewText}
               </strong>
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-stone-200 pt-2">
               <span>Novo desconto total</span>
-              <strong className="text-brand-wood">- {nextDiscountText}</strong>
+              <strong className="text-brand-wood">- {workingDiscountText}</strong>
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-stone-200 pt-2">
               <span>Total gasto</span>
@@ -1555,7 +1576,7 @@ export default function App() {
 
           <button
             type="submit"
-            disabled={isDialogSubmitting || !activeEnxoval || discountAdjustmentCents <= 0}
+            disabled={isDialogSubmitting || !activeEnxoval || discountWorkingCents === enxovalDiscountCents}
             className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDialogSubmitting ? 'Salvando...' : 'Salvar ajuste'}
