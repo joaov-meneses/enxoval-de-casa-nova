@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronDown, ChevronUp, Link as LinkIcon, AlignLeft, ExternalLink, Trash2, DollarSign } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Link as LinkIcon, AlignLeft, ExternalLink, Trash2 } from 'lucide-react';
 import type { EnxovalItem } from '../types';
 
 interface ItemRowProps {
@@ -105,7 +105,7 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
   const productUrl = getProductUrl(linkDraft);
   const itemPriceCents = normalizePriceCents(item.priceCents);
   const hasPrice = itemPriceCents !== null && itemPriceCents > 0;
-  const hasExtraInfo = item.link || item.description || hasPrice;
+  const hasExtraInfo = Boolean(item.link || item.description);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mb-3 transition-colors hover:border-brand-beige/50">
@@ -136,7 +136,7 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
               </span>
             )}
             {hasPrice && (
-              <span className="mt-1 text-sm font-semibold text-stone-700">
+              <span className="mt-1 text-sm font-semibold text-brand-wood">
                 {formatCurrency(itemPriceCents)}
               </span>
             )}
@@ -144,7 +144,6 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
               <div className="flex items-center gap-2 mt-1">
                 {item.link && <LinkIcon size={12} className="text-brand-wood" />}
                 {item.description && <AlignLeft size={12} className="text-brand-wood" />}
-                {hasPrice && <DollarSign size={12} className="text-brand-wood" />}
               </div>
             )}
           </div>

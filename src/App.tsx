@@ -22,6 +22,25 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
+const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+});
+
+function normalizePriceCents(priceCents: number | string | null | undefined) {
+  if (typeof priceCents === 'number' && Number.isFinite(priceCents)) return Math.round(priceCents);
+  if (typeof priceCents === 'string' && priceCents.trim()) {
+    const parsed = Number(priceCents);
+    return Number.isFinite(parsed) ? Math.round(parsed) : null;
+  }
+  return null;
+}
+
+function formatCurrency(priceCents: number | string | null | undefined) {
+  const normalizedPriceCents = normalizePriceCents(priceCents);
+  return normalizedPriceCents !== null ? currencyFormatter.format(normalizedPriceCents / 100) : currencyFormatter.format(0);
+}
+
 interface AuthScreenProps {
   onAuthenticated: (data: BootstrapData, options?: { promptCreateEnxoval?: boolean }) => void;
 }
@@ -473,6 +492,13 @@ export default function App() {
     const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
     return { total, completed, percentage };
   }, [items]);
+  const checkedTotalSpentCents = useMemo(() => items.reduce((total, item) => {
+    if (!item.checked) return total;
+
+    const priceCents = normalizePriceCents(item.priceCents);
+    return priceCents && priceCents > 0 ? total + priceCents : total;
+  }, 0), [items]);
+  const checkedTotalSpentText = formatCurrency(checkedTotalSpentCents);
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === 'owner';
   const visibleProgress = isHeaderMobile ? headerProgress : 0;
@@ -481,7 +507,7 @@ export default function App() {
     paddingBottom: `${16 - (4 * visibleProgress)}px`
   } : undefined;
   const eyebrowStyle: React.CSSProperties = {
-    maxHeight: `${20 * (1 - visibleProgress)}px`,
+    maxHeight: `${24 * (1 - visibleProgress)}px`,
     opacity: 1 - visibleProgress,
     transform: `translateY(${-4 * visibleProgress}px)`,
     pointerEvents: visibleProgress > 0.9 ? 'none' : 'auto'
@@ -510,6 +536,26 @@ export default function App() {
   } : undefined;
   const progressTextStyle = isHeaderMobile ? {
     fontSize: `${18 - (4 * visibleProgress)}px`
+  } : undefined;
+  const totalSpentTitleStyle: React.CSSProperties = isHeaderMobile ? {
+    marginTop: `${4 * visibleProgress}px`,
+    maxHeight: `${24 * visibleProgress}px`,
+    opacity: visibleProgress,
+    paddingTop: `${4 * visibleProgress}px`,
+    paddingBottom: `${4 * visibleProgress}px`,
+    transform: `translateY(${-4 * (1 - visibleProgress)}px)`,
+    pointerEvents: visibleProgress > 0.45 ? 'auto' : 'none'
+  } : { display: 'none' };
+  const totalSpentSideStyle: React.CSSProperties | undefined = isHeaderMobile ? {
+    maxHeight: `${24 * (1 - visibleProgress)}px`,
+    opacity: 1 - visibleProgress,
+    paddingTop: `${4 * (1 - visibleProgress)}px`,
+    paddingBottom: `${4 * (1 - visibleProgress)}px`,
+    transform: `translateY(${-4 * visibleProgress}px)`,
+    pointerEvents: visibleProgress > 0.45 ? 'none' : 'auto'
+  } : undefined;
+  const headerMetricsStyle: React.CSSProperties | undefined = isHeaderMobile ? {
+    gap: `${6 * (1 - visibleProgress)}px`
   } : undefined;
   const categoryBarStyle = isHeaderMobile ? {
     marginTop: `${18 - (6 * visibleProgress)}px`
@@ -851,8 +897,8 @@ export default function App() {
               className="flex items-center gap-2 text-brand-wood mb-1 overflow-hidden transition-[opacity,max-height,transform] duration-300 ease-out"
               style={eyebrowStyle}
             >
-              <Home size={20} />
-              <span className="text-xs font-bold tracking-widest uppercase">Enxoval Compartilhado</span>
+              <Home size={20} className="shrink-0" />
+              <span className="text-xs font-bold leading-none tracking-widest uppercase">Enxoval Compartilhado</span>
             </div>
             <h1
               className="font-serif font-bold text-stone-900 leading-tight truncate transition-[font-size] duration-300 ease-out sm:text-3xl"
@@ -860,6 +906,15 @@ export default function App() {
             >
               {activeEnxoval?.name ?? 'Enxoval'}
             </h1>
+            {hasEnxoval && (
+              <div
+                className="w-fit overflow-hidden whitespace-nowrap rounded-full bg-stone-50 px-2.5 py-1 text-[11px] font-semibold leading-none text-stone-600 ring-1 ring-stone-200 shadow-sm transition-[opacity,max-height,margin,padding,transform] duration-300 ease-out sm:hidden"
+                style={totalSpentTitleStyle}
+                title="Soma dos itens marcados como concluídos"
+              >
+                <span className="text-stone-400">Total gasto</span> {checkedTotalSpentText}
+              </div>
+            )}
             <div
               className="flex items-center gap-2 text-xs text-stone-500 overflow-hidden transition-[opacity,max-height,margin,transform] duration-300 ease-out"
               style={metaStyle}
@@ -881,28 +936,39 @@ export default function App() {
             </div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleRefresh()}
-              disabled={isRefreshing || isWorkspaceLoading}
-              aria-label="Atualizar enxoval"
-              title="Atualizar enxoval"
-              className="inline-flex h-9 w-9 items-center justify-center text-brand-wood transition-colors hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
-            </button>
+          <div className="shrink-0 flex flex-col items-end gap-1.5" style={headerMetricsStyle}>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing || isWorkspaceLoading}
+                aria-label="Atualizar enxoval"
+                title="Atualizar enxoval"
+                className="inline-flex h-9 w-9 items-center justify-center text-brand-wood transition-colors hover:text-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+              </button>
 
-            <div
-              className="flex flex-col items-center justify-center bg-stone-50 w-16 h-16 rounded-full border-4 border-brand-beige relative overflow-hidden shadow-inner transition-[width,height,border-width] duration-300 ease-out sm:w-16 sm:h-16 sm:border-4"
-              style={progressCircleStyle}
-            >
-               <span className="text-lg sm:text-lg font-bold text-brand-wood z-10 transition-[font-size] duration-300 ease-out" style={progressTextStyle}>{progressStats.percentage}%</span>
-               <div
-                 className="absolute bottom-0 left-0 w-full bg-brand-beige/30 transition-all duration-500 ease-in-out"
-                 style={{ height: `${progressStats.percentage}%` }}
-               />
+              <div
+                className="flex flex-col items-center justify-center bg-stone-50 w-16 h-16 rounded-full border-4 border-brand-beige relative overflow-hidden shadow-inner transition-[width,height,border-width] duration-300 ease-out sm:w-16 sm:h-16 sm:border-4"
+                style={progressCircleStyle}
+              >
+                <span className="text-lg sm:text-lg font-bold text-brand-wood z-10 transition-[font-size] duration-300 ease-out" style={progressTextStyle}>{progressStats.percentage}%</span>
+                <div
+                  className="absolute bottom-0 left-0 w-full bg-brand-beige/30 transition-all duration-500 ease-in-out"
+                  style={{ height: `${progressStats.percentage}%` }}
+                />
+              </div>
             </div>
+            {hasEnxoval && (
+              <div
+                className="overflow-hidden whitespace-nowrap rounded-full bg-stone-50 px-2.5 py-1 text-[11px] font-semibold leading-none text-stone-600 ring-1 ring-stone-200 shadow-sm transition-[opacity,max-height,padding,transform] duration-300 ease-out sm:text-xs"
+                style={totalSpentSideStyle}
+                title="Soma dos itens marcados como concluídos"
+              >
+                <span className="text-stone-400">Total gasto</span> {checkedTotalSpentText}
+              </div>
+            )}
           </div>
         </div>
 
