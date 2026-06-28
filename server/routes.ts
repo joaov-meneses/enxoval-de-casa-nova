@@ -44,6 +44,7 @@ interface ItemRow {
   checked: boolean;
   link: string;
   description: string;
+  price_cents: number | null;
   sort_order: number;
 }
 
@@ -173,6 +174,7 @@ function mapItem(row: ItemRow): EnxovalItem {
     checked: row.checked,
     link: row.link,
     description: row.description,
+    priceCents: row.price_cents,
     sortOrder: row.sort_order
   };
 }
@@ -272,6 +274,7 @@ async function fetchItems(queryable: Queryable, userId: string, enxovalId: strin
       i.checked,
       i.link,
       i.description,
+      i.price_cents,
       i.sort_order
     FROM items i
     INNER JOIN categories c ON c.id = i.category_id
@@ -479,6 +482,7 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
         i.checked,
         i.link,
         i.description,
+        i.price_cents,
         i.sort_order
       FROM items i
       INNER JOIN categories c ON c.id = i.category_id
@@ -526,6 +530,16 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
   if (typeof updates.link === 'string') addUpdate('link', updates.link.trim());
   if (typeof updates.description === 'string') addUpdate('description', updates.description.trim());
 
+  if (Object.prototype.hasOwnProperty.call(updates, 'priceCents')) {
+    if (updates.priceCents === null) {
+      addUpdate('price_cents', null);
+    } else if (typeof updates.priceCents === 'number' && Number.isInteger(updates.priceCents) && updates.priceCents >= 0) {
+      addUpdate('price_cents', updates.priceCents);
+    } else {
+      throw new HttpError(400, 'Preco invalido.');
+    }
+  }
+
   if (typeof updates.categoryId === 'string') {
     const category = await findCategory(getPool(), userId, enxovalId, updates.categoryId);
     if (!category) throw new HttpError(404, 'Categoria nao encontrada.');
@@ -549,6 +563,7 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       checked,
       link,
       description,
+      price_cents,
       sort_order
   `, values);
 

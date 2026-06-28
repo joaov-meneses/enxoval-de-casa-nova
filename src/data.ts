@@ -225,5 +225,6 @@ export const defaultItems: EnxovalItem[] = DEFAULT_TEMPLATE_ITEMS.map((item, ind
   checked: false,
   link: '',
   description: '',
+  priceCents: null,
   sortOrder: index
 }));

@@ -29,6 +29,7 @@ export interface EnxovalItem {
   checked: boolean;
   link: string;
   description: string;
+  priceCents: number | null;
   sortOrder: number;
 }
 

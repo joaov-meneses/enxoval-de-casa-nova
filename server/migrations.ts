@@ -143,6 +143,7 @@ export async function migrateDatabase() {
       checked boolean NOT NULL DEFAULT false,
       link text NOT NULL DEFAULT '',
       description text NOT NULL DEFAULT '',
+      price_cents integer,
       sort_order integer NOT NULL DEFAULT 0,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
@@ -178,6 +179,9 @@ export async function migrateDatabase() {
 
     ALTER TABLE categories ADD COLUMN IF NOT EXISTS enxoval_id uuid REFERENCES enxovais(id) ON DELETE CASCADE;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS enxoval_id uuid REFERENCES enxovais(id) ON DELETE CASCADE;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS price_cents integer;
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_price_cents_non_negative;
+    ALTER TABLE items ADD CONSTRAINT items_price_cents_non_negative CHECK (price_cents IS NULL OR price_cents >= 0);
 
     ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_user_name_unique;
 

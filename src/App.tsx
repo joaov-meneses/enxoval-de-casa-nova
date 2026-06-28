@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
-import { ApiError, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
+import { ApiError, createCategory as createCategoryRequest, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
 import { AddItemModal } from './components/AddItemModal';
 
@@ -185,12 +185,14 @@ export default function App() {
   const [activeCategoryId, setActiveCategoryId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<EnxovalItem | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [newEnxovalName, setNewEnxovalName] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [newEnxovalUseDefaultTemplate, setNewEnxovalUseDefaultTemplate] = useState(true);
   const [renameEnxovalName, setRenameEnxovalName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
@@ -271,6 +273,11 @@ export default function App() {
       return;
     }
 
+    if (isCreateCategoryOpen) {
+      document.title = makeTitle('Nova categoria');
+      return;
+    }
+
     if (isRenameEnxovalOpen) {
       document.title = makeTitle(activeEnxoval ? 'Editar ' + activeEnxoval.name : 'Editar enxoval');
       return;
@@ -297,7 +304,7 @@ export default function App() {
     }
 
     document.title = makeTitle('Meus enxovais');
-  }, [activeEnxoval, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isWorkspaceLoading, itemToDelete, user]);
+  }, [activeEnxoval, isCreateCategoryOpen, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isWorkspaceLoading, itemToDelete, user]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -441,6 +448,7 @@ export default function App() {
         item.name,
         item.description,
         item.link,
+        item.priceCents === null ? '' : String(item.priceCents / 100),
         categoryName
       ].join(' '));
 
@@ -516,27 +524,36 @@ export default function App() {
     }
   };
 
-  const updateItem = (id: string, updates: Partial<EnxovalItem>) => {
-    setItems(current =>
-      current.map(item => item.id === id ? { ...item, ...updates } : item)
-    );
+  const updateItem = async (id: string, updates: Partial<EnxovalItem>) => {
+    const shouldOptimisticallyUpdate = Object.keys(updates).length === 1 && typeof updates.checked === 'boolean';
+    const previousItem = shouldOptimisticallyUpdate ? items.find(item => item.id === id) : undefined;
+
+    if (shouldOptimisticallyUpdate) {
+      setItems(current =>
+        current.map(item => item.id === id ? { ...item, ...updates } : item)
+      );
+    }
 
     const payload: Parameters<typeof updateItemRequest>[1] = {};
     if (typeof updates.name === 'string') payload.name = updates.name;
     if (typeof updates.checked === 'boolean') payload.checked = updates.checked;
     if (typeof updates.link === 'string') payload.link = updates.link;
     if (typeof updates.description === 'string') payload.description = updates.description;
+    if (typeof updates.priceCents === 'number' || updates.priceCents === null) payload.priceCents = updates.priceCents;
     if (typeof updates.categoryId === 'string') payload.categoryId = updates.categoryId;
 
     if (Object.keys(payload).length === 0) return;
 
-    void updateItemRequest(id, payload)
-      .then(savedItem => {
-        setItems(current => current.map(item => item.id === id ? savedItem : item));
-      })
-      .catch(err => {
-        setError(err instanceof Error ? err.message : 'Não foi possível salvar a alteração.');
-      });
+    try {
+      const savedItem = await updateItemRequest(id, payload);
+      setItems(current => current.map(item => item.id === id ? savedItem : item));
+    } catch (err) {
+      if (previousItem) {
+        setItems(current => current.map(item => item.id === id ? previousItem : item));
+      }
+      setError(err instanceof Error ? err.message : 'Nao foi possivel salvar a alteracao.');
+      throw err;
+    }
   };
 
   const addItem = async (name: string, categoryId?: string, categoryName?: string) => {
@@ -571,6 +588,37 @@ export default function App() {
       setItemToDelete(null);
     } catch (err) {
       setDialogError(err instanceof Error ? err.message : 'Não foi possível remover o item.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
+  const handleCreateCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeEnxoval) return;
+
+    const name = newCategoryName.trim();
+    if (!name) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const category = await createCategoryRequest(activeEnxoval.id, name);
+      setCategories(current => {
+        const alreadyExists = current.some(existing => existing.id === category.id);
+        const nextCategories = alreadyExists
+          ? current.map(existing => existing.id === category.id ? category : existing)
+          : [...current, category];
+
+        return nextCategories.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+      });
+      setActiveCategoryId(category.id);
+      setSearchQuery('');
+      setNewCategoryName('');
+      setIsCreateCategoryOpen(false);
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Nao foi possivel criar a categoria.');
     } finally {
       setIsDialogSubmitting(false);
     }
@@ -679,6 +727,12 @@ export default function App() {
     setNewEnxovalName('');
     setNewEnxovalUseDefaultTemplate(true);
     setIsCreateEnxovalOpen(true);
+  };
+
+  const openCreateCategory = () => {
+    setDialogError('');
+    setNewCategoryName('');
+    setIsCreateCategoryOpen(true);
   };
 
   const openRenameEnxoval = () => {
@@ -878,6 +932,17 @@ export default function App() {
               style={categoryBarStyle}
             >
               <div className="flex gap-2 min-w-max pb-2">
+                <button
+                  type="button"
+                  onClick={openCreateCategory}
+                  aria-label="Adicionar categoria"
+                  title="Adicionar categoria"
+                  className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ease-out flex items-center gap-2 bg-white text-brand-wood border border-brand-beige hover:bg-brand-beige/20"
+                >
+                  <Plus size={16} />
+                  Categoria
+                </button>
+
                 {categories.map(cat => {
                   const catItems = items.filter(i => i.categoryId === cat.id);
                   const catCompleted = catItems.filter(i => i.checked).length;
@@ -1016,6 +1081,35 @@ export default function App() {
         defaultCategoryId={activeCategory?.id ?? ''}
         categories={categories}
       />
+
+      <Dialog title="Nova categoria" isOpen={isCreateCategoryOpen} onClose={() => setIsCreateCategoryOpen(false)}>
+        <form onSubmit={handleCreateCategory} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Nome da categoria</label>
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(event) => setNewCategoryName(event.target.value)}
+              placeholder="Ex: Escritorio"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+          </div>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={!newCategoryName.trim() || isDialogSubmitting || !activeEnxoval}
+            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDialogSubmitting ? 'Criando...' : 'Criar categoria'}
+          </button>
+        </form>
+      </Dialog>
 
       <Dialog title="Novo enxoval" isOpen={isCreateEnxovalOpen} onClose={() => setIsCreateEnxovalOpen(false)}>
         <form onSubmit={handleCreateEnxoval} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">

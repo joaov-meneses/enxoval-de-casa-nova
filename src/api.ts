@@ -83,6 +83,13 @@ export function inviteMember(enxovalId: string, email: string) {
   });
 }
 
+export function createCategory(enxovalId: string, name: string) {
+  return request<EnxovalCategory>('/api/categories', {
+    method: 'POST',
+    body: JSON.stringify({ enxovalId, name })
+  });
+}
+
 export function createItem(input: { enxovalId: string; name: string; categoryId?: string; categoryName?: string }) {
   return request<{ item: EnxovalItem; category: EnxovalCategory }>('/api/items', {
     method: 'POST',
@@ -90,7 +97,7 @@ export function createItem(input: { enxovalId: string; name: string; categoryId?
   });
 }
 
-export function updateItem(id: string, updates: Partial<Pick<EnxovalItem, 'name' | 'checked' | 'link' | 'description' | 'categoryId'>>) {
+export function updateItem(id: string, updates: Partial<Pick<EnxovalItem, 'name' | 'checked' | 'link' | 'description' | 'priceCents' | 'categoryId'>>) {
   return request<EnxovalItem>(`/api/items/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(updates)
