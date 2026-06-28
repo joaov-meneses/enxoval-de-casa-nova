@@ -96,7 +96,7 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
       setPriceText(formatCurrency(nextPriceCents));
       setIsExpanded(false);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Nao foi possivel salvar os detalhes.');
+      setSaveError(err instanceof Error ? err.message : 'Não foi possível salvar os detalhes.');
     } finally {
       setIsSavingDetails(false);
     }
@@ -175,7 +175,7 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
             <div className="p-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
-                  Link do Produto
+                  Link do produto
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -200,7 +200,7 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
 
               <div>
                 <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
-                  Preco
+                  Preço
                 </label>
                 <input
                   type="text"
@@ -214,12 +214,12 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
 
               <div>
                 <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
-                  Detalhes / Descricao
+                  Detalhes / Descrição
                 </label>
                 <textarea
                   value={descriptionDraft}
                   onChange={(e) => setDescriptionDraft(e.target.value)}
-                  placeholder="Ex: Comprar na cor branca, voltagem 110v..."
+                  placeholder="Ex: Comprar na cor branca, voltagem 110 V..."
                   rows={2}
                   className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white resize-none"
                 />

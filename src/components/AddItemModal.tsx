@@ -76,7 +76,7 @@ export function AddItemModal({ isOpen, onClose, onAdd, defaultCategoryId, catego
             className="fixed inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] w-full overflow-y-auto bg-white rounded-t-2xl shadow-xl z-50 md:bottom-auto md:top-1/2 md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl"
           >
             <div className="flex items-center justify-between p-4 border-b border-stone-100">
-              <h3 className="font-serif text-xl text-stone-800">Novo Item</h3>
+              <h3 className="font-serif text-xl text-stone-800">Novo item</h3>
               <button
                 type="button"
                 onClick={onClose}
@@ -89,7 +89,7 @@ export function AddItemModal({ isOpen, onClose, onAdd, defaultCategoryId, catego
             <form onSubmit={handleSubmit} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">
-                  Nome do Produto
+                  Nome do produto
                 </label>
                 <input
                   type="text"
@@ -119,7 +119,7 @@ export function AddItemModal({ isOpen, onClose, onAdd, defaultCategoryId, catego
               {categoryId === NEW_CATEGORY_VALUE && (
                 <div>
                   <label className="block text-sm font-medium text-stone-700 mb-1">
-                    Nome da Categoria
+                    Nome da categoria
                   </label>
                   <input
                     type="text"
@@ -143,7 +143,7 @@ export function AddItemModal({ isOpen, onClose, onAdd, defaultCategoryId, catego
                   disabled={!name.trim() || isSubmitting}
                   className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Salvando...' : 'Adicionar à Lista'}
+                  {isSubmitting ? 'Salvando...' : 'Adicionar à lista'}
                 </button>
               </div>
             </form>

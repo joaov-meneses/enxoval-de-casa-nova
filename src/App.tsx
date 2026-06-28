@@ -102,13 +102,13 @@ function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-stone-700 mb-1">E-mail</label>
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-              placeholder="voce@email.com"
+              placeholder="você@email.com"
               autoComplete="email"
               required
             />
@@ -356,7 +356,7 @@ export default function App() {
         setUser(null);
         return;
       }
-      setError(err instanceof Error ? err.message : 'Nao foi possivel atualizar o enxoval.');
+      setError(err instanceof Error ? err.message : 'Não foi possível atualizar o enxoval.');
     } finally {
       setIsRefreshing(false);
     }
@@ -562,7 +562,7 @@ export default function App() {
       if (previousItem) {
         setItems(current => current.map(item => item.id === id ? previousItem : item));
       }
-      setError(err instanceof Error ? err.message : 'Nao foi possivel salvar a alteracao.');
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar a alteração.');
       throw err;
     }
   };
@@ -621,7 +621,7 @@ export default function App() {
 
       setIsReorderCategoriesOpen(false);
     } catch (err) {
-      setDialogError(err instanceof Error ? err.message : 'Nao foi possivel reordenar as categorias.');
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível reordenar as categorias.');
     } finally {
       setIsDialogSubmitting(false);
     }
@@ -652,7 +652,7 @@ export default function App() {
       setNewCategoryName('');
       setIsCreateCategoryOpen(false);
     } catch (err) {
-      setDialogError(err instanceof Error ? err.message : 'Nao foi possivel criar a categoria.');
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível criar a categoria.');
     } finally {
       setIsDialogSubmitting(false);
     }
@@ -1084,7 +1084,7 @@ export default function App() {
                   <p className="text-sm text-stone-400">
                     {isSearching
                       ? 'Tente buscar por outro nome, detalhe ou categoria.'
-                      : `Toque no botao abaixo para adicionar itens a categoria ${activeCategory?.name ?? 'selecionada'}.`}
+                      : `Toque no botão abaixo para adicionar itens à categoria ${activeCategory?.name ?? 'selecionada'}.`}
                   </p>
                 </div>
               )}
@@ -1120,7 +1120,7 @@ export default function App() {
             <div className="bg-white/20 rounded-full p-1">
               <Plus size={20} strokeWidth={2.5} />
             </div>
-            <span className="font-medium">Adicionar Item</span>
+            <span className="font-medium">Adicionar item</span>
           </button>
         </div>
       )}
@@ -1190,7 +1190,7 @@ export default function App() {
               type="text"
               value={newCategoryName}
               onChange={(event) => setNewCategoryName(event.target.value)}
-              placeholder="Ex: Escritorio"
+              placeholder="Ex: Escritório"
               className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
             />
           </div>
@@ -1356,7 +1356,7 @@ export default function App() {
       <Dialog title="Convidar pessoa" isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)}>
         <form onSubmit={handleInviteMember} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">Email da pessoa</label>
+            <label className="block text-sm font-medium text-stone-700 mb-1">E-mail da pessoa</label>
             <input
               type="email"
               value={inviteEmail}

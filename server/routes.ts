@@ -85,7 +85,7 @@ function normalizeEmail(email: unknown) {
 
 function requireText(value: unknown, fieldName: string) {
   if (typeof value !== 'string' || !value.trim()) {
-    throw new HttpError(400, `${fieldName} e obrigatorio.`);
+    throw new HttpError(400, `${fieldName} é obrigatório.`);
   }
 
   return value.trim();
@@ -214,7 +214,7 @@ async function requireEnxovalMember(queryable: Queryable, userId: string, enxova
     WHERE enxoval_id = $1 AND user_id = $2
   `, [enxovalId, userId]);
 
-  if (!result.rows[0]) throw new HttpError(404, 'Enxoval nao encontrado.');
+  if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
   return result.rows[0].role;
 }
 async function requireEnxovalOwner(queryable: Queryable, userId: string, enxovalId: string) {
@@ -231,7 +231,7 @@ async function fetchEnxoval(queryable: Queryable, userId: string, enxovalId: str
     LIMIT 1
   `, [enxovalId, userId]);
 
-  if (!result.rows[0]) throw new HttpError(404, 'Enxoval nao encontrado.');
+  if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
   return mapEnxoval(result.rows[0]);
 }
 
@@ -442,7 +442,7 @@ async function getCurrentUser(req: Request) {
 
 async function requireCurrentUser(req: Request) {
   const user = await getCurrentUser(req);
-  if (!user) throw new HttpError(401, 'Faca login para continuar.');
+  if (!user) throw new HttpError(401, 'Faça login para continuar.');
   return user;
 }
 
@@ -454,11 +454,11 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
 
     if (input.categoryId) {
       category = await findCategory(client, input.userId, input.enxovalId, input.categoryId);
-      if (!category) throw new HttpError(404, 'Categoria nao encontrada.');
+      if (!category) throw new HttpError(404, 'Categoria não encontrada.');
     } else if (input.categoryName) {
       category = await findOrCreateCategory(client, input.userId, input.enxovalId, input.categoryName);
     } else {
-      throw new HttpError(400, 'Categoria e obrigatoria.');
+      throw new HttpError(400, 'Categoria é obrigatória.');
     }
 
     const orderResult = await client.query<{ next_order: number }>(`
@@ -498,7 +498,7 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
 
 async function updateItemForUser(userId: string, itemId: string, body: unknown) {
   if (!body || typeof body !== 'object') {
-    throw new HttpError(400, 'Dados invalidos.');
+    throw new HttpError(400, 'Dados inválidos.');
   }
 
   const itemScope = await getPool().query<{ enxoval_id: string }>(`
@@ -509,7 +509,7 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     LIMIT 1
   `, [itemId, userId]);
 
-  if (!itemScope.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
+  if (!itemScope.rows[0]) throw new HttpError(404, 'Item não encontrado.');
 
   const enxovalId = itemScope.rows[0].enxoval_id;
   const updates = body as Record<string, unknown>;
@@ -523,7 +523,7 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
   if (typeof updates.name === 'string') {
     const name = updates.name.trim();
-    if (!name) throw new HttpError(400, 'Nome do item e obrigatorio.');
+    if (!name) throw new HttpError(400, 'Nome do item é obrigatório.');
     addUpdate('name', name);
   }
   if (typeof updates.checked === 'boolean') addUpdate('checked', updates.checked);
@@ -536,18 +536,18 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     } else if (typeof updates.priceCents === 'number' && Number.isInteger(updates.priceCents) && updates.priceCents >= 0) {
       addUpdate('price_cents', updates.priceCents);
     } else {
-      throw new HttpError(400, 'Preco invalido.');
+      throw new HttpError(400, 'Preço inválido.');
     }
   }
 
   if (typeof updates.categoryId === 'string') {
     const category = await findCategory(getPool(), userId, enxovalId, updates.categoryId);
-    if (!category) throw new HttpError(404, 'Categoria nao encontrada.');
+    if (!category) throw new HttpError(404, 'Categoria não encontrada.');
     addUpdate('category_id', updates.categoryId);
   }
 
   if (setClauses.length === 0) {
-    throw new HttpError(400, 'Nenhuma alteracao enviada.');
+    throw new HttpError(400, 'Nenhuma alteração enviada.');
   }
 
   values.push(itemId, enxovalId);
@@ -567,7 +567,7 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       sort_order
   `, values);
 
-  if (!result.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
+  if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
   return mapItem(result.rows[0]);
 }
 async function deleteItemForUser(userId: string, itemId: string) {
@@ -583,7 +583,7 @@ async function deleteItemForUser(userId: string, itemId: string) {
     RETURNING id
   `, [itemId, userId]);
 
-  if (!result.rows[0]) throw new HttpError(404, 'Item nao encontrado.');
+  if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
 }
 
 async function reorderCategoriesForUser(userId: string, enxovalId: string, categoryIds: string[]) {
@@ -592,7 +592,7 @@ async function reorderCategoriesForUser(userId: string, enxovalId: string, categ
 
     const uniqueCategoryIds = new Set(categoryIds);
     if (uniqueCategoryIds.size !== categoryIds.length) {
-      throw new HttpError(400, 'Categorias duplicadas na ordenacao.');
+      throw new HttpError(400, 'Categorias duplicadas na ordenação.');
     }
 
     const existingResult = await client.query<{ id: string }>(`
@@ -605,7 +605,7 @@ async function reorderCategoriesForUser(userId: string, enxovalId: string, categ
     const existingIds = new Set(existingResult.rows.map(category => category.id));
     const invalidCategoryId = categoryIds.find(categoryId => !existingIds.has(categoryId));
     if (invalidCategoryId) {
-      throw new HttpError(400, 'A ordenacao contem uma categoria invalida.');
+      throw new HttpError(400, 'A ordenação contém uma categoria inválida.');
     }
 
     const nextCategoryIds = [
@@ -647,7 +647,7 @@ export function registerApiRoutes(app: Express) {
       ? req.body.name.trim()
       : email.split('@')[0];
 
-    if (!email || !email.includes('@')) throw new HttpError(400, 'Email invalido.');
+    if (!email || !email.includes('@')) throw new HttpError(400, 'E-mail inválido.');
     if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
 
     const passwordHash = await hashPassword(password);
@@ -662,7 +662,7 @@ export function registerApiRoutes(app: Express) {
       });
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
-        throw new HttpError(409, 'Ja existe uma conta com esse email.');
+        throw new HttpError(409, 'Já existe uma conta com esse e-mail.');
       }
       throw err;
     }
@@ -684,7 +684,7 @@ export function registerApiRoutes(app: Express) {
 
     const user = result.rows[0];
     if (!user || !(await verifyPassword(password, user.password_hash))) {
-      throw new HttpError(401, 'Email ou senha invalidos.');
+      throw new HttpError(401, 'E-mail ou senha inválidos.');
     }
 
     await getPool().query('DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()', [user.id]);
@@ -728,7 +728,7 @@ export function registerApiRoutes(app: Express) {
       RETURNING id, name, owner_id, 'owner'::text AS role
     `, [name, req.params.id]);
 
-    if (!result.rows[0]) throw new HttpError(404, 'Enxoval nao encontrado.');
+    if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
     res.json(mapEnxoval(result.rows[0]));
   }));
 
@@ -745,7 +745,7 @@ export function registerApiRoutes(app: Express) {
     const user = await requireCurrentUser(req);
     const email = normalizeEmail(req.body?.email);
 
-    if (!email || !email.includes('@')) throw new HttpError(400, 'Email invalido.');
+    if (!email || !email.includes('@')) throw new HttpError(400, 'E-mail inválido.');
     await requireEnxovalMember(getPool(), user.id, req.params.id);
 
     const invitedUserResult = await getPool().query<DbUserRow>(`
@@ -756,7 +756,7 @@ export function registerApiRoutes(app: Express) {
     `, [email]);
 
     const invitedUser = invitedUserResult.rows[0];
-    if (!invitedUser) throw new HttpError(404, 'Esse email ainda nao tem conta.');
+    if (!invitedUser) throw new HttpError(404, 'Esse e-mail ainda não tem conta.');
 
     await getPool().query(`
       INSERT INTO enxoval_members (enxoval_id, user_id, role, invited_by)
@@ -797,7 +797,7 @@ export function registerApiRoutes(app: Express) {
       ? req.body.categoryIds
       : null;
 
-    if (!categoryIds) throw new HttpError(400, 'Ordenacao invalida.');
+    if (!categoryIds) throw new HttpError(400, 'Ordenação inválida.');
 
     res.json(await reorderCategoriesForUser(user.id, enxovalId, categoryIds));
   }));
