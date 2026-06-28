@@ -262,6 +262,7 @@ export default function App() {
   const [error, setError] = useState('');
   const pullStartYRef = useRef<number | null>(null);
   const pullLastDistanceRef = useRef(0);
+  const discountAdjustmentInputRef = useRef<HTMLInputElement | null>(null);
 
   const applyWorkspace = (workspace: EnxovalWorkspace) => {
     setActiveEnxoval(workspace.enxoval);
@@ -963,6 +964,8 @@ export default function App() {
         ? current + discountAdjustmentCents
         : Math.max(0, current - discountAdjustmentCents)
     ));
+    setDiscountAdjustmentText('');
+    discountAdjustmentInputRef.current?.focus({ preventScroll: true });
   };
 
   const handleSaveDiscounts = async (event: React.FormEvent) => {
@@ -1523,6 +1526,7 @@ export default function App() {
             <label className="block text-sm font-medium text-stone-700 mb-1">Valor do ajuste</label>
             <div className="flex items-center gap-2">
               <input
+                ref={discountAdjustmentInputRef}
                 type="text"
                 inputMode="numeric"
                 value={discountAdjustmentText}
@@ -1532,6 +1536,8 @@ export default function App() {
               />
               <button
                 type="button"
+                onPointerDown={(event) => event.preventDefault()}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={handleApplyDiscountAdjustment}
                 disabled={discountAdjustmentCents <= 0}
                 aria-label={discountOperation === 'add' ? 'Somar ajuste na prévia' : 'Subtrair ajuste da prévia'}
