@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder } from 'motion/react';
-import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical } from 'lucide-react';
+import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical, ExternalLink } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
 import { ApiError, createCategory as createCategoryRequest, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, reorderCategories as reorderCategoriesRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
@@ -39,6 +39,28 @@ function normalizePriceCents(priceCents: number | string | null | undefined) {
 function formatCurrency(priceCents: number | string | null | undefined) {
   const normalizedPriceCents = normalizePriceCents(priceCents);
   return normalizedPriceCents !== null ? currencyFormatter.format(normalizedPriceCents / 100) : currencyFormatter.format(0);
+}
+
+function formatOptionalCurrency(priceCents: number | string | null | undefined) {
+  const normalizedPriceCents = normalizePriceCents(priceCents);
+  return normalizedPriceCents !== null && normalizedPriceCents > 0 ? currencyFormatter.format(normalizedPriceCents / 100) : '';
+}
+
+function priceTextToCents(value: string) {
+  const digits = value.replace(/\D/g, '');
+  const cents = digits ? Number(digits) : 0;
+  return cents > 0 ? cents : null;
+}
+
+function formatPriceInput(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 12);
+  return digits ? currencyFormatter.format(Number(digits) / 100) : '';
+}
+
+function getProductUrl(link: string) {
+  const trimmedLink = link.trim();
+  if (!trimmedLink) return '';
+  return trimmedLink.startsWith('http') ? trimmedLink : `https://${trimmedLink}`;
 }
 
 interface AuthScreenProps {
@@ -211,6 +233,12 @@ export default function App() {
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<EnxovalItem | null>(null);
+  const [itemToEdit, setItemToEdit] = useState<EnxovalItem | null>(null);
+  const [editItemName, setEditItemName] = useState('');
+  const [editItemLink, setEditItemLink] = useState('');
+  const [editItemDescription, setEditItemDescription] = useState('');
+  const [editItemPriceText, setEditItemPriceText] = useState('');
+  const [editItemCategoryId, setEditItemCategoryId] = useState('');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [newEnxovalName, setNewEnxovalName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -320,6 +348,11 @@ export default function App() {
       return;
     }
 
+    if (itemToEdit) {
+      document.title = makeTitle('Editar ' + itemToEdit.name);
+      return;
+    }
+
     if (isInviteOpen) {
       document.title = makeTitle(activeEnxoval ? 'Convidar para ' + activeEnxoval.name : 'Convidar pessoa');
       return;
@@ -331,7 +364,7 @@ export default function App() {
     }
 
     document.title = makeTitle('Meus enxovais');
-  }, [activeEnxoval, isCreateCategoryOpen, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isReorderCategoriesOpen, isWorkspaceLoading, itemToDelete, user]);
+  }, [activeEnxoval, isCreateCategoryOpen, isCreateEnxovalOpen, isDeleteEnxovalOpen, isInviteOpen, isLoading, isRenameEnxovalOpen, isReorderCategoriesOpen, isWorkspaceLoading, itemToDelete, itemToEdit, user]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -564,6 +597,7 @@ export default function App() {
     paddingTop: `${8 - (2 * visibleProgress)}px`,
     paddingBottom: `${8 - (2 * visibleProgress)}px`
   } : undefined;
+  const editItemProductUrl = getProductUrl(editItemLink);
 
   const handleEnxovalChange = async (enxovalId: string) => {
     if (!enxovalId || enxovalId === activeEnxoval?.id) return;
@@ -630,6 +664,66 @@ export default function App() {
   const openDeleteItem = (item: EnxovalItem) => {
     setDialogError('');
     setItemToDelete(item);
+  };
+
+  const openEditItem = (item: EnxovalItem) => {
+    const nextCategoryId = categories.some(category => category.id === item.categoryId)
+      ? item.categoryId
+      : categories[0]?.id || '';
+
+    setDialogError('');
+    setItemToEdit(item);
+    setEditItemName(item.name);
+    setEditItemLink(item.link);
+    setEditItemDescription(item.description);
+    setEditItemPriceText(formatOptionalCurrency(item.priceCents));
+    setEditItemCategoryId(nextCategoryId);
+  };
+
+  const closeEditItem = () => {
+    setDialogError('');
+    setItemToEdit(null);
+    setEditItemName('');
+    setEditItemLink('');
+    setEditItemDescription('');
+    setEditItemPriceText('');
+    setEditItemCategoryId('');
+  };
+
+  const handleEditItemPriceChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setEditItemPriceText(formatPriceInput(event.target.value));
+  };
+
+  const handleSaveItemDetails = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!itemToEdit) return;
+
+    setIsDialogSubmitting(true);
+    setDialogError('');
+
+    try {
+      const nextName = editItemName.trim();
+      if (!nextName) return;
+
+      const nextLink = editItemLink.trim();
+      const nextDescription = editItemDescription.trim();
+      const nextPriceCents = priceTextToCents(editItemPriceText);
+      const nextCategoryId = editItemCategoryId || itemToEdit.categoryId;
+
+      await updateItem(itemToEdit.id, {
+        name: nextName,
+        link: nextLink,
+        description: nextDescription,
+        priceCents: nextPriceCents,
+        categoryId: nextCategoryId
+      });
+
+      closeEditItem();
+    } catch (err) {
+      setDialogError(err instanceof Error ? err.message : 'Não foi possível salvar os detalhes.');
+    } finally {
+      setIsDialogSubmitting(false);
+    }
   };
 
   const handleDeleteItem = async () => {
@@ -848,6 +942,7 @@ export default function App() {
     setIsRenameEnxovalOpen(false);
     setIsDeleteEnxovalOpen(false);
     setItemToDelete(null);
+    closeEditItem();
     setMembers([]);
     setItems([]);
     setCategories([]);
@@ -1141,6 +1236,7 @@ export default function App() {
                     categoryName={isSearching ? categoryById.get(item.categoryId)?.name ?? item.category : undefined}
                     onUpdate={updateItem}
                     onDelete={openDeleteItem}
+                    onEdit={openEditItem}
                   />
                 ))
               ) : (
@@ -1386,6 +1482,96 @@ export default function App() {
             </button>
           </div>
         </div>
+      </Dialog>
+      <Dialog title="Editar item" isOpen={Boolean(itemToEdit)} onClose={closeEditItem}>
+        <form onSubmit={handleSaveItemDetails} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Nome do item</label>
+            <input
+              type="text"
+              value={editItemName}
+              onChange={(event) => setEditItemName(event.target.value)}
+              placeholder="Ex: Jogo de Taças"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Categoria</label>
+            <select
+              value={editItemCategoryId}
+              onChange={(event) => setEditItemCategoryId(event.target.value)}
+              disabled={categories.length === 0}
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white disabled:bg-stone-100 disabled:text-stone-400"
+            >
+              {categories.map(category => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Link do produto</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                value={editItemLink}
+                onChange={(event) => setEditItemLink(event.target.value)}
+                placeholder="https://..."
+                className="flex-1 min-w-0 px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+              />
+              {editItemProductUrl && (
+                <a
+                  href={editItemProductUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-wood text-white transition-colors hover:bg-brand-wood/90"
+                  aria-label="Abrir link do produto"
+                  title="Abrir link do produto"
+                >
+                  <ExternalLink size={18} />
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Preço</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={editItemPriceText}
+              onChange={handleEditItemPriceChange}
+              placeholder="R$ 0,00"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Detalhes / Descrição</label>
+            <textarea
+              value={editItemDescription}
+              onChange={(event) => setEditItemDescription(event.target.value)}
+              placeholder="Ex: Comprar na cor branca, voltagem 110 V..."
+              rows={3}
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood resize-none"
+            />
+          </div>
+
+          {dialogError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              {dialogError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isDialogSubmitting || !itemToEdit || !editItemName.trim() || !editItemCategoryId}
+            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDialogSubmitting ? 'Salvando...' : 'Salvar detalhes'}
+          </button>
+        </form>
       </Dialog>
       <Dialog title="Excluir item" isOpen={Boolean(itemToDelete)} onClose={() => setItemToDelete(null)}>
         <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">

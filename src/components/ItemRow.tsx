@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronDown, ChevronUp, Link as LinkIcon, AlignLeft, ExternalLink, Trash2 } from 'lucide-react';
+import React from 'react';
+import { Check, Link as LinkIcon, AlignLeft, Trash2, Pencil } from 'lucide-react';
 import type { EnxovalItem } from '../types';
 
 interface ItemRowProps {
@@ -9,6 +8,7 @@ interface ItemRowProps {
   categoryName?: string;
   onUpdate: (id: string, updates: Partial<EnxovalItem>) => Promise<void> | void;
   onDelete: (item: EnxovalItem) => void;
+  onEdit: (item: EnxovalItem) => void;
 }
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -30,38 +30,7 @@ function formatCurrency(priceCents: number | string | null | undefined) {
   return normalizedPriceCents !== null ? currencyFormatter.format(normalizedPriceCents / 100) : '';
 }
 
-function priceTextToCents(value: string) {
-  const digits = value.replace(/\D/g, '');
-  const cents = digits ? Number(digits) : 0;
-  return cents > 0 ? cents : null;
-}
-
-function formatPriceInput(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 12);
-  return digits ? currencyFormatter.format(Number(digits) / 100) : '';
-}
-
-function getProductUrl(link: string) {
-  const trimmedLink = link.trim();
-  if (!trimmedLink) return '';
-  return trimmedLink.startsWith('http') ? trimmedLink : `https://${trimmedLink}`;
-}
-
-export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [linkDraft, setLinkDraft] = useState(item.link);
-  const [descriptionDraft, setDescriptionDraft] = useState(item.description);
-  const [priceText, setPriceText] = useState(formatCurrency(item.priceCents));
-  const [isSavingDetails, setIsSavingDetails] = useState(false);
-  const [saveError, setSaveError] = useState('');
-
-  useEffect(() => {
-    setLinkDraft(item.link);
-    setDescriptionDraft(item.description);
-    setPriceText(formatCurrency(item.priceCents));
-    setSaveError('');
-  }, [item.id, item.link, item.description, item.priceCents]);
-
+export function ItemRow({ item, categoryName, onUpdate, onDelete, onEdit }: ItemRowProps) {
   const toggleCheck = (e: React.MouseEvent) => {
     e.stopPropagation();
     void Promise.resolve(onUpdate(item.id, { checked: !item.checked })).catch(() => undefined);
@@ -72,47 +41,18 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
     onDelete(item);
   };
 
-  const handlePriceChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setPriceText(formatPriceInput(event.target.value));
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(item);
   };
 
-  const handleSaveDetails = async () => {
-    setIsSavingDetails(true);
-    setSaveError('');
-
-    try {
-      const nextLink = linkDraft.trim();
-      const nextDescription = descriptionDraft.trim();
-      const nextPriceCents = priceTextToCents(priceText);
-
-      await onUpdate(item.id, {
-        link: nextLink,
-        description: nextDescription,
-        priceCents: nextPriceCents
-      });
-
-      setLinkDraft(nextLink);
-      setDescriptionDraft(nextDescription);
-      setPriceText(formatCurrency(nextPriceCents));
-      setIsExpanded(false);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Não foi possível salvar os detalhes.');
-    } finally {
-      setIsSavingDetails(false);
-    }
-  };
-
-  const productUrl = getProductUrl(linkDraft);
   const itemPriceCents = normalizePriceCents(item.priceCents);
   const hasPrice = itemPriceCents !== null && itemPriceCents > 0;
   const hasExtraInfo = Boolean(item.link || item.description);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden mb-3 transition-colors hover:border-brand-beige/50">
-      <div
-        className="p-4 flex items-center justify-between cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
+      <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <button
             type="button"
@@ -140,7 +80,7 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
                 {formatCurrency(itemPriceCents)}
               </span>
             )}
-            {hasExtraInfo && !isExpanded && (
+            {hasExtraInfo && (
               <div className="flex items-center gap-2 mt-1">
                 {item.link && <LinkIcon size={12} className="text-brand-wood" />}
                 {item.description && <AlignLeft size={12} className="text-brand-wood" />}
@@ -152,6 +92,15 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
         <div className="flex items-center gap-1 text-stone-400 shrink-0">
           <button
             type="button"
+            onClick={handleEdit}
+            aria-label="Editar item"
+            title="Editar item"
+            className="p-1.5 rounded-full text-stone-500 bg-stone-50 hover:text-brand-dark hover:bg-brand-beige/20 transition-colors"
+          >
+            <Pencil size={15} />
+          </button>
+          <button
+            type="button"
             onClick={handleDelete}
             aria-label="Remover item"
             title="Remover item"
@@ -159,89 +108,8 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete }: ItemRowProps
           >
             <Trash2 size={15} />
           </button>
-          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </div>
       </div>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden bg-stone-50 border-t border-stone-100"
-          >
-            <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
-                  Link do produto
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    value={linkDraft}
-                    onChange={(e) => setLinkDraft(e.target.value)}
-                    placeholder="https://..."
-                    className="flex-1 min-w-0 px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white"
-                  />
-                  {productUrl && (
-                    <a
-                      href={productUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 bg-brand-wood text-white rounded-lg hover:bg-brand-wood/90 transition-colors shrink-0"
-                    >
-                      <ExternalLink size={16} />
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
-                  Preço
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={priceText}
-                  onChange={handlePriceChange}
-                  placeholder="R$ 0,00"
-                  className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">
-                  Detalhes / Descrição
-                </label>
-                <textarea
-                  value={descriptionDraft}
-                  onChange={(e) => setDescriptionDraft(e.target.value)}
-                  placeholder="Ex: Comprar na cor branca, voltagem 110 V..."
-                  rows={2}
-                  className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood bg-white resize-none"
-                />
-              </div>
-
-              {saveError && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                  {saveError}
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={() => void handleSaveDetails()}
-                disabled={isSavingDetails}
-                className="w-full py-3 bg-brand-dark text-white rounded-xl font-medium text-base hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingDetails ? 'Salvando...' : 'Salvar detalhes'}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
