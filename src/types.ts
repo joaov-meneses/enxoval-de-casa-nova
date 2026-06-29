@@ -32,6 +32,7 @@ export interface EnxovalItem {
   description: string;
   priceCents: number | null;
   sortOrder: number;
+  updatedAt: string;
 }
 
 export interface AuthUser {

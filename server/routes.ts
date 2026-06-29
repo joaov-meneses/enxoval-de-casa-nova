@@ -47,6 +47,7 @@ interface ItemRow {
   description: string;
   price_cents: number | null;
   sort_order: number;
+  updated_at: string | Date;
 }
 
 interface TemplateRow {
@@ -159,6 +160,10 @@ function mapMember(row: MemberRow): EnxovalMember {
   };
 }
 
+function serializeTimestamp(value: string | Date) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
 function mapCategory(row: CategoryRow): EnxovalCategory {
   return {
     id: row.id,
@@ -177,7 +182,8 @@ function mapItem(row: ItemRow): EnxovalItem {
     link: row.link,
     description: row.description,
     priceCents: row.price_cents === null ? null : Number(row.price_cents),
-    sortOrder: row.sort_order
+    sortOrder: row.sort_order,
+    updatedAt: serializeTimestamp(row.updated_at)
   };
 }
 
@@ -277,7 +283,8 @@ async function fetchItems(queryable: Queryable, userId: string, enxovalId: strin
       i.link,
       i.description,
       i.price_cents,
-      i.sort_order
+      i.sort_order,
+      i.updated_at
     FROM items i
     INNER JOIN categories c ON c.id = i.category_id
     WHERE i.enxoval_id = $1
@@ -485,7 +492,8 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
         i.link,
         i.description,
         i.price_cents,
-        i.sort_order
+        i.sort_order,
+        i.updated_at
       FROM items i
       INNER JOIN categories c ON c.id = i.category_id
       WHERE i.id = $1 AND i.enxoval_id = $2
@@ -566,7 +574,8 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       link,
       description,
       price_cents,
-      sort_order
+      sort_order,
+      updated_at
   `, values);
 
   if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');

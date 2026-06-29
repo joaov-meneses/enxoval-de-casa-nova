@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Reorder } from 'motion/react';
-import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical, ExternalLink, Percent, Minus } from 'lucide-react';
+import { Plus, Home, Sparkles, LogOut, User, Users, UserPlus, ListPlus, X, Pencil, Trash2, RefreshCw, Search, GripVertical, ExternalLink, Percent, Minus, SlidersHorizontal } from 'lucide-react';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from './types';
 import { ApiError, createCategory as createCategoryRequest, createEnxoval as createEnxovalRequest, createItem as createItemRequest, deleteEnxoval as deleteEnxovalRequest, deleteItem as deleteItemRequest, fetchBootstrap, fetchEnxoval as fetchEnxovalRequest, inviteMember as inviteMemberRequest, login as loginRequest, logout as logoutRequest, register as registerRequest, reorderCategories as reorderCategoriesRequest, updateEnxoval as updateEnxovalRequest, updateItem as updateItemRequest } from './api';
 import { ItemRow } from './components/ItemRow';
@@ -8,6 +8,7 @@ import { AddItemModal } from './components/AddItemModal';
 
 type AuthMode = 'login' | 'register';
 type DiscountOperation = 'add' | 'subtract';
+type ItemSortMode = 'name' | 'updated';
 
 const APP_NAME = 'Enxoval de Casa Nova';
 
@@ -26,6 +27,14 @@ function normalizeSearchText(value: string) {
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL'
+});
+
+const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit'
 });
 
 function normalizePriceCents(priceCents: number | string | null | undefined) {
@@ -56,6 +65,17 @@ function priceTextToCents(value: string) {
 function formatPriceInput(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 12);
   return digits ? currencyFormatter.format(Number(digits) / 100) : '';
+}
+
+function getUpdatedAtTime(item: Pick<EnxovalItem, 'updatedAt'>) {
+  const time = new Date(item.updatedAt).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function formatUpdatedAt(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return dateTimeFormatter.format(date);
 }
 
 function getProductUrl(link: string) {
@@ -227,6 +247,10 @@ export default function App() {
   const [categories, setCategories] = useState<EnxovalCategory[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [showOnlyPricedItems, setShowOnlyPricedItems] = useState(false);
+  const [showOnlyCheckedItems, setShowOnlyCheckedItems] = useState(false);
+  const [itemSortMode, setItemSortMode] = useState<ItemSortMode>('name');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
   const [isReorderCategoriesOpen, setIsReorderCategoriesOpen] = useState(false);
@@ -510,25 +534,65 @@ export default function App() {
   const activeCategory = categories.find(category => category.id === activeCategoryId) ?? categories[0];
   const normalizedSearchQuery = normalizeSearchText(searchQuery);
   const isSearching = normalizedSearchQuery.length > 0;
+  const isShowingLatestChanges = itemSortMode === 'updated';
+  const hasItemFilters = showOnlyPricedItems || showOnlyCheckedItems;
+  const activeFilterCount = (showOnlyPricedItems ? 1 : 0) + (showOnlyCheckedItems ? 1 : 0) + (itemSortMode !== 'name' ? 1 : 0);
   const categoryById = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories]);
   const filteredItems = useMemo(() => {
-    if (!isSearching) {
-      return activeCategory ? items.filter(item => item.categoryId === activeCategory.id) : [];
-    }
+    const baseItems = isSearching || isShowingLatestChanges
+      ? items
+      : activeCategory
+        ? items.filter(item => item.categoryId === activeCategory.id)
+        : [];
 
-    return items.filter(item => {
-      const categoryName = categoryById.get(item.categoryId)?.name ?? item.category;
-      const searchableText = normalizeSearchText([
-        item.name,
-        item.description,
-        item.link,
-        item.priceCents === null ? '' : String(item.priceCents / 100),
-        categoryName
-      ].join(' '));
+    const searchedItems = isSearching
+      ? baseItems.filter(item => {
+        const categoryName = categoryById.get(item.categoryId)?.name ?? item.category;
+        const searchableText = normalizeSearchText([
+          item.name,
+          item.description,
+          item.link,
+          item.priceCents === null ? '' : String(item.priceCents / 100),
+          categoryName
+        ].join(' '));
 
-      return searchableText.includes(normalizedSearchQuery);
+        return searchableText.includes(normalizedSearchQuery);
+      })
+      : baseItems;
+
+    const narrowedItems = searchedItems.filter(item => {
+      if (showOnlyPricedItems) {
+        const priceCents = normalizePriceCents(item.priceCents);
+        if (priceCents === null || priceCents <= 0) return false;
+      }
+
+      if (showOnlyCheckedItems && !item.checked) return false;
+      return true;
     });
-  }, [activeCategory, categoryById, isSearching, items, normalizedSearchQuery]);
+
+    return [...narrowedItems].sort((firstItem, secondItem) => {
+      if (itemSortMode === 'updated') {
+        const updatedDifference = getUpdatedAtTime(secondItem) - getUpdatedAtTime(firstItem);
+        if (updatedDifference !== 0) return updatedDifference;
+      }
+
+      return firstItem.name.localeCompare(secondItem.name, 'pt-BR', { sensitivity: 'base' })
+        || firstItem.category.localeCompare(secondItem.category, 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [activeCategory, categoryById, isSearching, isShowingLatestChanges, itemSortMode, items, normalizedSearchQuery, showOnlyCheckedItems, showOnlyPricedItems]);
+  const filteredCheckedCount = filteredItems.filter(item => item.checked).length;
+  const itemCountText = `${filteredItems.length} ${filteredItems.length === 1 ? 'item' : 'itens'}`;
+  const listTitle = isSearching
+    ? 'Resultados da busca'
+    : isShowingLatestChanges
+      ? 'Últimas alterações'
+      : hasItemFilters
+        ? `Itens filtrados em ${activeCategory?.name ?? 'categoria'}`
+        : `Progresso de ${activeCategory?.name ?? 'categoria'}`;
+  const listCounterText = !isSearching && !isShowingLatestChanges && !hasItemFilters
+    ? `${filteredCheckedCount} de ${filteredItems.length} itens`
+    : itemCountText;
+  const showItemCategory = isSearching || isShowingLatestChanges;
 
   const progressStats = useMemo(() => {
     const total = items.length;
@@ -1276,8 +1340,8 @@ export default function App() {
 
         {hasEnxoval ? (
           <>
-            <div className="mb-4">
-              <div className="relative">
+            <div className="mb-4 flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
                 <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
                   type="search"
@@ -1298,11 +1362,25 @@ export default function App() {
                   </button>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterOpen(true)}
+                aria-label="Abrir filtros"
+                title="Filtros"
+                className={`relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border text-stone-600 shadow-sm transition-colors ${activeFilterCount > 0 ? 'border-brand-beige bg-brand-beige/20 text-brand-dark' : 'border-stone-200 bg-white hover:bg-stone-50'}`}
+              >
+                <SlidersHorizontal size={18} />
+                {activeFilterCount > 0 && (
+                  <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-wood px-1 text-[11px] font-bold leading-none text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
             </div>
 
             <div className="mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1">
-              <span className="min-w-0 truncate">{isSearching ? 'Resultados da busca' : `Progresso de ${activeCategory?.name ?? 'categoria'}`}</span>
-              <span className="shrink-0">{isSearching ? `${filteredItems.length} ${filteredItems.length === 1 ? 'item' : 'itens'}` : `${filteredItems.filter(i => i.checked).length} de ${filteredItems.length} itens`}</span>
+              <span className="min-w-0 truncate">{listTitle}</span>
+              <span className="shrink-0">{listCounterText}</span>
             </div>
 
             <div className="space-y-1">
@@ -1311,7 +1389,9 @@ export default function App() {
                   <ItemRow
                     key={item.id}
                     item={item}
-                    categoryName={isSearching ? categoryById.get(item.categoryId)?.name ?? item.category : undefined}
+                    categoryName={showItemCategory ? categoryById.get(item.categoryId)?.name ?? item.category : undefined}
+                    showUpdatedAt={isShowingLatestChanges}
+                    updatedAtLabel={formatUpdatedAt(item.updatedAt)}
                     onUpdate={updateItem}
                     onDelete={openDeleteItem}
                     onEdit={openEditItem}
@@ -1320,11 +1400,13 @@ export default function App() {
               ) : (
                 <div className="text-center py-12 px-4">
                   <Sparkles className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-serif text-stone-600 mb-2">{isSearching ? 'Nenhum resultado' : 'Nenhum item aqui'}</h3>
+                  <h3 className="text-lg font-serif text-stone-600 mb-2">{isSearching ? 'Nenhum resultado' : activeFilterCount > 0 ? 'Nenhum item encontrado' : 'Nenhum item aqui'}</h3>
                   <p className="text-sm text-stone-400">
                     {isSearching
                       ? 'Tente buscar por outro nome, detalhe ou categoria.'
-                      : `Toque no botão abaixo para adicionar itens à categoria ${activeCategory?.name ?? 'selecionada'}.`}
+                      : activeFilterCount > 0
+                        ? 'Ajuste os filtros para ver mais itens.'
+                        : `Toque no botão abaixo para adicionar itens à categoria ${activeCategory?.name ?? 'selecionada'}.`}
                   </p>
                 </div>
               )}
@@ -1373,6 +1455,81 @@ export default function App() {
         categories={categories}
       />
 
+      <Dialog title="Filtros da lista" isOpen={isFilterOpen} onClose={() => setIsFilterOpen(false)}>
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-5">
+          <div>
+            <h4 className="mb-2 text-sm font-semibold text-stone-700">Mostrar</h4>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOnlyPricedItems(false);
+                  setShowOnlyCheckedItems(false);
+                }}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${!hasItemFilters ? 'border-brand-wood bg-brand-beige/20 text-brand-dark' : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'}`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowOnlyPricedItems(current => !current)}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${showOnlyPricedItems ? 'border-brand-wood bg-brand-beige/20 text-brand-dark' : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'}`}
+              >
+                Com preço
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowOnlyCheckedItems(current => !current)}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${showOnlyCheckedItems ? 'border-brand-wood bg-brand-beige/20 text-brand-dark' : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'}`}
+              >
+                Checados
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="mb-2 text-sm font-semibold text-stone-700">Ordenar</h4>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setItemSortMode('name')}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${itemSortMode === 'name' ? 'border-brand-wood bg-brand-beige/20 text-brand-dark' : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'}`}
+              >
+                Nome A-Z
+              </button>
+              <button
+                type="button"
+                onClick={() => setItemSortMode('updated')}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${itemSortMode === 'updated' ? 'border-brand-wood bg-brand-beige/20 text-brand-dark' : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'}`}
+              >
+                Últimas alterações
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-stone-100 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowOnlyPricedItems(false);
+                setShowOnlyCheckedItems(false);
+                setItemSortMode('name');
+              }}
+              disabled={activeFilterCount === 0}
+              className="rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Limpar
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFilterOpen(false)}
+              className="rounded-xl bg-brand-dark px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-black"
+            >
+              Concluir
+            </button>
+          </div>
+        </div>
+      </Dialog>
       <Dialog title="Reordenar categorias" isOpen={isReorderCategoriesOpen} onClose={() => setIsReorderCategoriesOpen(false)}>
         <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
           <Reorder.Group axis="y" values={categoryOrder} onReorder={setCategoryOrder} className="space-y-2">

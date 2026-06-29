@@ -1,11 +1,13 @@
 import React from 'react';
-import { Check, Link as LinkIcon, AlignLeft, Trash2, Pencil } from 'lucide-react';
+import { Check, Link as LinkIcon, AlignLeft, Trash2, Pencil, Clock3 } from 'lucide-react';
 import type { EnxovalItem } from '../types';
 
 interface ItemRowProps {
   key?: React.Key;
   item: EnxovalItem;
   categoryName?: string;
+  showUpdatedAt?: boolean;
+  updatedAtLabel?: string;
   onUpdate: (id: string, updates: Partial<EnxovalItem>) => Promise<void> | void;
   onDelete: (item: EnxovalItem) => void;
   onEdit: (item: EnxovalItem) => void;
@@ -30,7 +32,7 @@ function formatCurrency(priceCents: number | string | null | undefined) {
   return normalizedPriceCents !== null ? currencyFormatter.format(normalizedPriceCents / 100) : '';
 }
 
-export function ItemRow({ item, categoryName, onUpdate, onDelete, onEdit }: ItemRowProps) {
+export function ItemRow({ item, categoryName, showUpdatedAt, updatedAtLabel, onUpdate, onDelete, onEdit }: ItemRowProps) {
   const toggleCheck = (e: React.MouseEvent) => {
     e.stopPropagation();
     void Promise.resolve(onUpdate(item.id, { checked: !item.checked })).catch(() => undefined);
@@ -73,6 +75,12 @@ export function ItemRow({ item, categoryName, onUpdate, onDelete, onEdit }: Item
             {categoryName && (
               <span className="mt-1 text-xs font-semibold uppercase tracking-wide text-brand-wood truncate">
                 {categoryName}
+              </span>
+            )}
+            {showUpdatedAt && updatedAtLabel && (
+              <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-stone-500">
+                <Clock3 size={12} className="text-stone-400" />
+                Atualizado em {updatedAtLabel}
               </span>
             )}
             {hasPrice && (

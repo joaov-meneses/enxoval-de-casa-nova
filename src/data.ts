@@ -216,6 +216,7 @@ export const DEFAULT_TEMPLATE_ITEMS: Array<{ name: string; category: Category }>
 
 const generateId = () => Math.random().toString(36).slice(2, 11);
 const fallbackCategoryId = (category: Category) => category.toLowerCase().replace(/\s+/g, '-');
+const fallbackUpdatedAt = new Date(0).toISOString();
 
 export const defaultItems: EnxovalItem[] = DEFAULT_TEMPLATE_ITEMS.map((item, index) => ({
   id: generateId(),
@@ -226,5 +227,6 @@ export const defaultItems: EnxovalItem[] = DEFAULT_TEMPLATE_ITEMS.map((item, ind
   link: '',
   description: '',
   priceCents: null,
-  sortOrder: index
+  sortOrder: index,
+  updatedAt: fallbackUpdatedAt
 }));
