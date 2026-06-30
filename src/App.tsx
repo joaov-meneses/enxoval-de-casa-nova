@@ -9,6 +9,7 @@ import { AddItemModal } from './components/AddItemModal';
 type AuthMode = 'login' | 'register';
 type DiscountOperation = 'add' | 'subtract';
 type ItemSortMode = 'name' | 'updated';
+type CategorySwipeDirection = 'next' | 'previous';
 
 const APP_NAME = 'Enxoval de Casa Nova';
 
@@ -251,6 +252,8 @@ export default function App() {
   const [showOnlyPricedItems, setShowOnlyPricedItems] = useState(false);
   const [showOnlyCheckedItems, setShowOnlyCheckedItems] = useState(false);
   const [itemSortMode, setItemSortMode] = useState<ItemSortMode>('name');
+  const [categorySwipeOffset, setCategorySwipeOffset] = useState(0);
+  const [categorySwipeDirection, setCategorySwipeDirection] = useState<CategorySwipeDirection | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
   const [isReorderCategoriesOpen, setIsReorderCategoriesOpen] = useState(false);
@@ -287,7 +290,14 @@ export default function App() {
   const pullStartYRef = useRef<number | null>(null);
   const pullLastDistanceRef = useRef(0);
   const discountAdjustmentInputRef = useRef<HTMLInputElement | null>(null);
+  const categorySwipeRef = useRef<{ pointerId: number; startX: number; startY: number; isSwiping: boolean; isCanceled: boolean } | null>(null);
+  const categorySwipeAnimationTimerRef = useRef<number | null>(null);
 
+  useEffect(() => () => {
+    if (categorySwipeAnimationTimerRef.current !== null) {
+      window.clearTimeout(categorySwipeAnimationTimerRef.current);
+    }
+  }, []);
   const applyWorkspace = (workspace: EnxovalWorkspace) => {
     setActiveEnxoval(workspace.enxoval);
     setMembers(workspace.members);
@@ -593,6 +603,17 @@ export default function App() {
     ? `${filteredCheckedCount} de ${filteredItems.length} itens`
     : itemCountText;
   const showItemCategory = isSearching || isShowingLatestChanges;
+  const canSwipeCategories = categories.length > 1 && !isSearching && !isShowingLatestChanges;
+  const categorySwipeAnimationClass = categorySwipeDirection === 'next'
+    ? 'category-list-enter-next'
+    : categorySwipeDirection === 'previous'
+      ? 'category-list-enter-previous'
+      : '';
+  const categorySwipeStyle: React.CSSProperties | undefined = categorySwipeOffset !== 0 ? {
+    opacity: 1 - Math.min(Math.abs(categorySwipeOffset) / 360, 0.16),
+    transform: `translateX(${categorySwipeOffset}px)`,
+    transition: 'none'
+  } : undefined;
 
   const progressStats = useMemo(() => {
     const total = items.length;
@@ -683,6 +704,106 @@ export default function App() {
     paddingBottom: `${8 - (2 * visibleProgress)}px`
   } : undefined;
   const editItemProductUrl = getProductUrl(editItemLink);
+
+  const startCategorySwipeAnimation = useCallback((direction: CategorySwipeDirection) => {
+    if (categorySwipeAnimationTimerRef.current !== null) {
+      window.clearTimeout(categorySwipeAnimationTimerRef.current);
+    }
+
+    setCategorySwipeDirection(direction);
+    categorySwipeAnimationTimerRef.current = window.setTimeout(() => {
+      setCategorySwipeDirection(null);
+      categorySwipeAnimationTimerRef.current = null;
+    }, 220);
+  }, []);
+
+  const changeCategoryBySwipe = useCallback((direction: CategorySwipeDirection) => {
+    if (!canSwipeCategories || !activeCategory) return false;
+
+    const currentCategoryIndex = categories.findIndex(category => category.id === activeCategory.id);
+    if (currentCategoryIndex < 0) return false;
+
+    const nextCategoryIndex = direction === 'next' ? currentCategoryIndex + 1 : currentCategoryIndex - 1;
+    const nextCategory = categories[nextCategoryIndex];
+    if (!nextCategory) return false;
+
+    startCategorySwipeAnimation(direction);
+    setActiveCategoryId(nextCategory.id);
+    return true;
+  }, [activeCategory, canSwipeCategories, categories, startCategorySwipeAnimation]);
+
+  const resetCategorySwipe = useCallback(() => {
+    categorySwipeRef.current = null;
+    setCategorySwipeOffset(0);
+  }, []);
+
+  const handleCategoryListPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!canSwipeCategories || (event.pointerType === 'mouse' && event.button !== 0)) return;
+
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest('button, input, textarea, select, a, [role="button"]')) return;
+
+    categorySwipeRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      isSwiping: false,
+      isCanceled: false
+    };
+    setCategorySwipeOffset(0);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [canSwipeCategories]);
+
+  const handleCategoryListPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const swipe = categorySwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId || swipe.isCanceled) return;
+
+    const deltaX = event.clientX - swipe.startX;
+    const deltaY = event.clientY - swipe.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (!swipe.isSwiping) {
+      if (absY > 12 && absY > absX) {
+        swipe.isCanceled = true;
+        setCategorySwipeOffset(0);
+        return;
+      }
+
+      if (absX < 16 || absX < absY * 1.2) return;
+      swipe.isSwiping = true;
+    }
+
+    event.preventDefault();
+    setCategorySwipeOffset(Math.max(-72, Math.min(72, deltaX * 0.45)));
+  }, []);
+
+  const handleCategoryListPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const swipe = categorySwipeRef.current;
+    if (!swipe || swipe.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    const deltaX = event.clientX - swipe.startX;
+    const deltaY = event.clientY - swipe.startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (!swipe.isCanceled && swipe.isSwiping && absX >= 56 && absX > absY * 1.1) {
+      void changeCategoryBySwipe(deltaX < 0 ? 'next' : 'previous');
+    }
+
+    resetCategorySwipe();
+  }, [changeCategoryBySwipe, resetCategorySwipe]);
+
+  const handleCategoryListPointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resetCategorySwipe();
+  }, [resetCategorySwipe]);
 
   const handleEnxovalChange = async (enxovalId: string) => {
     if (!enxovalId || enxovalId === activeEnxoval?.id) return;
@@ -1378,38 +1499,49 @@ export default function App() {
               </button>
             </div>
 
-            <div className="mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1">
-              <span className="min-w-0 truncate">{listTitle}</span>
-              <span className="shrink-0">{listCounterText}</span>
-            </div>
-
-            <div className="space-y-1">
-              {filteredItems.length > 0 ? (
-                filteredItems.map(item => (
-                  <ItemRow
-                    key={item.id}
-                    item={item}
-                    categoryName={showItemCategory ? categoryById.get(item.categoryId)?.name ?? item.category : undefined}
-                    showUpdatedAt={isShowingLatestChanges}
-                    updatedAtLabel={formatUpdatedAt(item.updatedAt)}
-                    onUpdate={updateItem}
-                    onDelete={openDeleteItem}
-                    onEdit={openEditItem}
-                  />
-                ))
-              ) : (
-                <div className="text-center py-12 px-4">
-                  <Sparkles className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-serif text-stone-600 mb-2">{isSearching ? 'Nenhum resultado' : activeFilterCount > 0 ? 'Nenhum item encontrado' : 'Nenhum item aqui'}</h3>
-                  <p className="text-sm text-stone-400">
-                    {isSearching
-                      ? 'Tente buscar por outro nome, detalhe ou categoria.'
-                      : activeFilterCount > 0
-                        ? 'Ajuste os filtros para ver mais itens.'
-                        : `Toque no botão abaixo para adicionar itens à categoria ${activeCategory?.name ?? 'selecionada'}.`}
-                  </p>
+            <div
+              onPointerDown={handleCategoryListPointerDown}
+              onPointerMove={handleCategoryListPointerMove}
+              onPointerUp={handleCategoryListPointerEnd}
+              onPointerCancel={handleCategoryListPointerCancel}
+              className={canSwipeCategories ? 'cursor-grab active:cursor-grabbing' : undefined}
+              style={{ touchAction: canSwipeCategories ? 'pan-y' : undefined }}
+            >
+              <div className={`category-list-swipe ${categorySwipeAnimationClass}`} style={categorySwipeStyle}>
+                <div className="mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1">
+                  <span className="min-w-0 truncate">{listTitle}</span>
+                  <span className="shrink-0">{listCounterText}</span>
                 </div>
-              )}
+
+                <div className="space-y-1">
+                  {filteredItems.length > 0 ? (
+                    filteredItems.map(item => (
+                      <ItemRow
+                        key={item.id}
+                        item={item}
+                        categoryName={showItemCategory ? categoryById.get(item.categoryId)?.name ?? item.category : undefined}
+                        showUpdatedAt={isShowingLatestChanges}
+                        updatedAtLabel={formatUpdatedAt(item.updatedAt)}
+                        onUpdate={updateItem}
+                        onDelete={openDeleteItem}
+                        onEdit={openEditItem}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-12 px-4">
+                      <Sparkles className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-serif text-stone-600 mb-2">{isSearching ? 'Nenhum resultado' : activeFilterCount > 0 ? 'Nenhum item encontrado' : 'Nenhum item aqui'}</h3>
+                      <p className="text-sm text-stone-400">
+                        {isSearching
+                          ? 'Tente buscar por outro nome, detalhe ou categoria.'
+                          : activeFilterCount > 0
+                            ? 'Ajuste os filtros para ver mais itens.'
+                            : `Toque no botão abaixo para adicionar itens à categoria ${activeCategory?.name ?? 'selecionada'}.`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </>
         ) : (

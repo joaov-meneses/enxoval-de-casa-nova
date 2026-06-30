@@ -24,5 +24,45 @@ body {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+.category-list-swipe {
+  will-change: transform, opacity;
+}
 
+.category-list-enter-next {
+  animation: category-list-enter-next 220ms ease-out;
+}
 
+.category-list-enter-previous {
+  animation: category-list-enter-previous 220ms ease-out;
+}
+
+@keyframes category-list-enter-next {
+  from {
+    opacity: 0.76;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes category-list-enter-previous {
+  from {
+    opacity: 0.76;
+    transform: translateX(-24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-list-enter-next,
+  .category-list-enter-previous {
+    animation: none;
+  }
+}
