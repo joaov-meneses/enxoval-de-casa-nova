@@ -5,15 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server/index.ts",
+    "dev:full": "npm run db:up && npm run dev",
     "dev:preview": "tsx server/index.ts --preview",
     "build": "vite build && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/server.js",
     "start": "node dist/server.js --production",
     "db:migrate": "tsx server/migrate.ts",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f db",
+    "db:psql": "docker compose exec db psql",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test:admin-api": "node --import tsx tests/admin-api.mjs"
+    "test:admin-api": "node --import tsx tests/admin-api.mjs",
+    "test:onboarding-db": "node --import tsx tests/onboarding-register-db.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

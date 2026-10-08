@@ -20,7 +20,6 @@ import {
   Trash2,
   RefreshCw,
   Search,
-  ExternalLink,
   Minus,
   SlidersHorizontal,
   LayoutDashboard,
@@ -28,7 +27,6 @@ import {
   ArrowUpRight,
   ChevronRight,
   Menu,
-  Download,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -52,6 +50,7 @@ import {
   logout as logoutRequest,
   reorderCategories as reorderCategoriesRequest,
   renameCategory as renameCategoryRequest,
+  deleteCategory as deleteCategoryRequest,
   reorderItems as reorderItemsRequest,
   updateEnxoval as updateEnxovalRequest,
   updateItem as updateItemRequest,
@@ -60,7 +59,8 @@ import { ItemRow } from "./components/ItemRow";
 import { Select } from "./components/Select";
 import { SortableList } from "./components/SortableList";
 import { EnvironmentList } from "./components/EnvironmentList";
-import { exportItems } from "./utils/export";
+import { ExportMenu } from "./components/ExportMenu";
+import { MAX_ENVIRONMENT_NAME_LENGTH } from "./data";
 import { AddItemModal } from "./components/AddItemModal";
 import { LandingPage } from "./components/LandingPage";
 import { AuthPage } from "./components/AuthPage";
@@ -119,15 +119,6 @@ function formatCurrency(priceCents: number | string | null | undefined) {
     : currencyFormatter.format(0);
 }
 
-function formatOptionalCurrency(
-  priceCents: number | string | null | undefined,
-) {
-  const normalizedPriceCents = normalizePriceCents(priceCents);
-  return normalizedPriceCents !== null && normalizedPriceCents > 0
-    ? currencyFormatter.format(normalizedPriceCents / 100)
-    : "";
-}
-
 function priceTextToCents(value: string) {
   const digits = value.replace(/\D/g, "");
   const cents = digits ? Number(digits) : 0;
@@ -148,14 +139,6 @@ function formatUpdatedAt(value: string) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "";
   return dateTimeFormatter.format(date);
-}
-
-function getProductUrl(link: string) {
-  const trimmedLink = link.trim();
-  if (!trimmedLink) return "";
-  return trimmedLink.startsWith("http")
-    ? trimmedLink
-    : `https://${trimmedLink}`;
 }
 
 export default function App() {
@@ -196,18 +179,14 @@ export default function App() {
   const [discountAdjustmentText, setDiscountAdjustmentText] = useState("");
   const [discountWorkingCents, setDiscountWorkingCents] = useState(0);
   const [itemToDelete, setItemToDelete] = useState<EnxovalItem | null>(null);
-  const [itemToEdit, setItemToEdit] = useState<EnxovalItem | null>(null);
-  const [editItemName, setEditItemName] = useState("");
-  const [editItemLink, setEditItemLink] = useState("");
-  const [editItemDescription, setEditItemDescription] = useState("");
-  const [editItemPriceText, setEditItemPriceText] = useState("");
-  const [editItemCategoryId, setEditItemCategoryId] = useState("");
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [newEnxovalName, setNewEnxovalName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categoryToRename, setCategoryToRename] =
     useState<EnxovalCategory | null>(null);
   const [renameCategoryName, setRenameCategoryName] = useState("");
+  const [categoryToDelete, setCategoryToDelete] =
+    useState<EnxovalCategory | null>(null);
   const [isOrdering, setIsOrdering] = useState(false);
   const [newEnxovalUseDefaultTemplate, setNewEnxovalUseDefaultTemplate] =
     useState(true);
@@ -247,7 +226,7 @@ export default function App() {
     setMembers(workspace.members);
     setCategories(workspace.categories);
     setItems(workspace.items);
-    setActiveCategoryId(workspace.categories[0]?.id || "");
+    setActiveCategoryId("");
   };
 
   const applyBootstrap = (
@@ -260,7 +239,7 @@ export default function App() {
     setMembers(data.members);
     setCategories(data.categories);
     setItems(data.items);
-    setActiveCategoryId(data.categories[0]?.id || "");
+    setActiveCategoryId("");
 
     if (options?.promptCreateEnxoval) {
       setDialogError("");
@@ -350,8 +329,8 @@ export default function App() {
       return;
     }
 
-    if (itemToEdit) {
-      document.title = makeTitle("Editar " + itemToEdit.name);
+    if (categoryToDelete) {
+      document.title = makeTitle("Excluir " + categoryToDelete.name);
       return;
     }
 
@@ -385,7 +364,7 @@ export default function App() {
     isRenameEnxovalOpen,
     isWorkspaceLoading,
     itemToDelete,
-    itemToEdit,
+    categoryToDelete,
     user,
   ]);
 
@@ -535,9 +514,11 @@ export default function App() {
     };
   }, [handleRefresh, isWorkspaceMenuOpen, isHeaderMobile, isRefreshing, user]);
 
-  const activeCategory =
-    categories.find((category) => category.id === activeCategoryId) ??
-    categories[0];
+  // Sem ambiente selecionado (activeCategoryId vazio) a lista mostra todos os itens.
+  const activeCategory = categories.find(
+    (category) => category.id === activeCategoryId,
+  );
+  const isAllEnvironments = !activeCategory;
   const normalizedSearchQuery = normalizeSearchText(searchQuery);
   const isSearching = normalizedSearchQuery.length > 0;
   const isShowingLatestChanges = itemSortMode === "updated";
@@ -552,7 +533,7 @@ export default function App() {
   );
   const filteredItems = useMemo(() => {
     const baseItems =
-      isSearching || isShowingLatestChanges
+      isShowingLatestChanges || isAllEnvironments
         ? items
         : activeCategory
           ? items.filter((item) => item.categoryId === activeCategory.id)
@@ -586,9 +567,16 @@ export default function App() {
       return true;
     });
 
+    const categoryPosition = new Map(
+      categories.map((category, index) => [category.id, index]),
+    );
     return [...narrowedItems].sort((firstItem, secondItem) => {
       if (itemSortMode === "manual")
         return (
+          (isAllEnvironments
+            ? (categoryPosition.get(firstItem.categoryId) ?? 0) -
+              (categoryPosition.get(secondItem.categoryId) ?? 0)
+            : 0) ||
           firstItem.sortOrder - secondItem.sortOrder ||
           firstItem.name.localeCompare(secondItem.name, "pt-BR")
         );
@@ -609,7 +597,9 @@ export default function App() {
     });
   }, [
     activeCategory,
+    categories,
     categoryById,
+    isAllEnvironments,
     isSearching,
     isShowingLatestChanges,
     itemSortMode,
@@ -627,15 +617,22 @@ export default function App() {
     : isShowingLatestChanges
       ? "Últimas alterações"
       : hasItemFilters
-        ? `Itens filtrados em ${activeCategory?.name ?? "ambiente"}`
-        : `Progresso de ${activeCategory?.name ?? "ambiente"}`;
+        ? activeCategory
+          ? `Itens filtrados em ${activeCategory.name}`
+          : "Itens filtrados"
+        : activeCategory
+          ? `Progresso de ${activeCategory.name}`
+          : "Progresso do enxoval";
   const listCounterText =
     !isSearching && !isShowingLatestChanges && !hasItemFilters
       ? `${filteredCheckedCount} de ${filteredItems.length} itens`
       : itemCountText;
-  const showItemCategory = isSearching || isShowingLatestChanges;
+  const showItemCategory = isAllEnvironments || isShowingLatestChanges;
+  const searchScopeLabel = activeCategory
+    ? `Buscar em ${activeCategory.name}`
+    : "Buscar em todos os ambientes";
   const canSwipeCategories =
-    categories.length > 1 && !isSearching && !isShowingLatestChanges;
+    categories.length > 0 && !isSearching && !isShowingLatestChanges;
   const categorySwipeAnimationClass =
     categorySwipeDirection === "next"
       ? "category-list-enter-next"
@@ -651,12 +648,21 @@ export default function App() {
         }
       : undefined;
 
+  // Na lista de um ambiente, os totais (progresso e gastos) são só daquele ambiente.
+  const scopeItems = useMemo(
+    () =>
+      workspaceView === "list" && activeCategory
+        ? items.filter((item) => item.categoryId === activeCategory.id)
+        : null,
+    [activeCategory, items, workspaceView],
+  );
   const progressStats = useMemo(() => {
-    const total = items.length;
-    const completed = items.filter((i) => i.checked).length;
+    const scoped = scopeItems ?? items;
+    const total = scoped.length;
+    const completed = scoped.filter((i) => i.checked).length;
     const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
     return { total, completed, percentage };
-  }, [items]);
+  }, [items, scopeItems]);
   const checkedSubtotalSpentCents = useMemo(
     () =>
       items.reduce((total, item) => {
@@ -686,7 +692,16 @@ export default function App() {
       : "Descontos e cashback";
   const discountAdjustmentPreviewText = formatCurrency(discountAdjustmentCents);
   const workingDiscountText = formatCurrency(discountWorkingCents);
-  const checkedTotalSpentText = formatCurrency(checkedTotalSpentCents);
+  const checkedTotalSpentText = formatCurrency(
+    scopeItems
+      ? scopeItems.reduce((total, item) => {
+          const priceCents = normalizePriceCents(item.priceCents);
+          return item.checked && priceCents && priceCents > 0
+            ? total + priceCents
+            : total;
+        }, 0)
+      : checkedTotalSpentCents,
+  );
   const discountPreviewTotalText = formatCurrency(discountPreviewTotalCents);
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === "owner";
@@ -731,7 +746,6 @@ export default function App() {
         marginTop: `${18 - 6 * visibleProgress}px`,
       }
     : undefined;
-  const editItemProductUrl = getProductUrl(editItemLink);
 
   const startCategorySwipeAnimation = useCallback(
     (direction: CategorySwipeDirection) => {
@@ -750,22 +764,23 @@ export default function App() {
 
   const changeCategoryBySwipe = useCallback(
     (direction: CategorySwipeDirection) => {
-      if (!canSwipeCategories || !activeCategory) return false;
+      if (!canSwipeCategories) return false;
 
-      const currentCategoryIndex = categories.findIndex(
-        (category) => category.id === activeCategory.id,
-      );
-      if (currentCategoryIndex < 0) return false;
-
+      // -1 representa "todos os ambientes", antes do primeiro ambiente.
+      const currentCategoryIndex = activeCategory
+        ? categories.findIndex((category) => category.id === activeCategory.id)
+        : -1;
       const nextCategoryIndex =
         direction === "next"
           ? currentCategoryIndex + 1
           : currentCategoryIndex - 1;
-      const nextCategory = categories[nextCategoryIndex];
-      if (!nextCategory) return false;
+      if (nextCategoryIndex < -1 || nextCategoryIndex >= categories.length)
+        return false;
 
       startCategorySwipeAnimation(direction);
-      setActiveCategoryId(nextCategory.id);
+      setActiveCategoryId(
+        nextCategoryIndex === -1 ? "" : categories[nextCategoryIndex].id,
+      );
       return true;
     },
     [
@@ -951,6 +966,11 @@ export default function App() {
     name: string,
     categoryId?: string,
     categoryName?: string,
+    details: Pick<EnxovalItem, "priceCents" | "link" | "description"> = {
+      priceCents: null,
+      link: "",
+      description: "",
+    },
   ) => {
     if (!activeEnxoval)
       throw new Error("Selecione um enxoval antes de adicionar itens.");
@@ -960,6 +980,7 @@ export default function App() {
       name,
       categoryId,
       categoryName,
+      ...details,
     });
 
     setCategories((current) => {
@@ -971,80 +992,13 @@ export default function App() {
     });
 
     setItems((current) => [...current, result.item]);
-    setActiveCategoryId(result.category.id);
+    // Na lista de todos os ambientes continua nela; a categoria só muda quando já havia uma ativa.
+    setActiveCategoryId((current) => (current ? result.category.id : ""));
   };
 
   const openDeleteItem = (item: EnxovalItem) => {
     setDialogError("");
     setItemToDelete(item);
-  };
-
-  const openEditItem = (item: EnxovalItem) => {
-    const nextCategoryId = categories.some(
-      (category) => category.id === item.categoryId,
-    )
-      ? item.categoryId
-      : categories[0]?.id || "";
-
-    setDialogError("");
-    setItemToEdit(item);
-    setEditItemName(item.name);
-    setEditItemLink(item.link);
-    setEditItemDescription(item.description);
-    setEditItemPriceText(formatOptionalCurrency(item.priceCents));
-    setEditItemCategoryId(nextCategoryId);
-  };
-
-  const closeEditItem = () => {
-    setDialogError("");
-    setItemToEdit(null);
-    setEditItemName("");
-    setEditItemLink("");
-    setEditItemDescription("");
-    setEditItemPriceText("");
-    setEditItemCategoryId("");
-  };
-
-  const handleEditItemPriceChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setEditItemPriceText(formatPriceInput(event.target.value));
-  };
-
-  const handleSaveItemDetails = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!itemToEdit) return;
-
-    setIsDialogSubmitting(true);
-    setDialogError("");
-
-    try {
-      const nextName = editItemName.trim();
-      if (!nextName) return;
-
-      const nextLink = editItemLink.trim();
-      const nextDescription = editItemDescription.trim();
-      const nextPriceCents = priceTextToCents(editItemPriceText);
-      const nextCategoryId = editItemCategoryId || itemToEdit.categoryId;
-
-      await updateItem(itemToEdit.id, {
-        name: nextName,
-        link: nextLink,
-        description: nextDescription,
-        priceCents: nextPriceCents,
-        categoryId: nextCategoryId,
-      });
-
-      closeEditItem();
-    } catch (err) {
-      setDialogError(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível salvar os detalhes.",
-      );
-    } finally {
-      setIsDialogSubmitting(false);
-    }
   };
 
   const handleDeleteItem = async () => {
@@ -1326,6 +1280,12 @@ export default function App() {
     setIsInviteOpen(true);
   };
 
+  const showAllItems = () => {
+    setActiveCategoryId("");
+    setWorkspaceView("list");
+    setSearchQuery("");
+    setItemSortMode("manual");
+  };
   const selectEnvironment = (id: string) => {
     setActiveCategoryId(id);
     setWorkspaceView("list");
@@ -1413,6 +1373,42 @@ export default function App() {
       setIsDialogSubmitting(false);
     }
   };
+  const deleteCategoryItemCount = categoryToDelete
+    ? items.filter((item) => item.categoryId === categoryToDelete.id).length
+    : 0;
+  const openDeleteCategory = (category: EnxovalCategory) => {
+    setCategoryToDelete(category);
+    setDialogError("");
+  };
+  const handleDeleteCategory = async () => {
+    if (!activeEnxoval || !categoryToDelete) return;
+    setIsDialogSubmitting(true);
+    setDialogError("");
+    try {
+      const deletedId = categoryToDelete.id;
+      await deleteCategoryRequest(activeEnxoval.id, deletedId);
+      const index = categories.findIndex(
+        (category) => category.id === deletedId,
+      );
+      const remaining = categories.filter(
+        (category) => category.id !== deletedId,
+      );
+      setCategories(remaining);
+      setItems((current) =>
+        current.filter((item) => item.categoryId !== deletedId),
+      );
+      if (activeCategory?.id === deletedId) setActiveCategoryId("");
+      setCategoryToDelete(null);
+    } catch (err) {
+      setDialogError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível excluir o ambiente.",
+      );
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
   const renderItem = (item: EnxovalItem, dragHandle?: React.ReactNode) => (
     <ItemRow
       key={item.id}
@@ -1428,7 +1424,6 @@ export default function App() {
       updatedAtLabel={formatUpdatedAt(item.updatedAt)}
       onUpdate={updateItem}
       onDelete={openDeleteItem}
-      onEdit={openEditItem}
     />
   );
   const canReorderItems =
@@ -1447,7 +1442,7 @@ export default function App() {
     setIsDeleteEnxovalOpen(false);
     setIsDiscountsOpen(false);
     setItemToDelete(null);
-    closeEditItem();
+    setCategoryToDelete(null);
     setMembers([]);
     setItems([]);
     setCategories([]);
@@ -1480,14 +1475,7 @@ export default function App() {
   }
 
   if (!user) {
-    return (
-      <AuthPage
-        onAuthenticated={applyBootstrap}
-        initialMode={
-          window.location.pathname === "/signup" ? "register" : "login"
-        }
-      />
-    );
+    return <AuthPage onAuthenticated={applyBootstrap} />;
   }
 
   return (
@@ -1530,8 +1518,15 @@ export default function App() {
               <LayoutDashboard size={18} /> Visão geral
             </button>
             <button
-              className={workspaceView === "list" ? "active" : ""}
-              onClick={() => setWorkspaceView("list")}
+              className={
+                workspaceView === "list" && isAllEnvironments ? "active" : ""
+              }
+              aria-current={
+                workspaceView === "list" && isAllEnvironments
+                  ? "page"
+                  : undefined
+              }
+              onClick={showAllItems}
             >
               <ListChecks size={18} /> Meu enxoval <span>{items.length}</span>
             </button>
@@ -1556,6 +1551,7 @@ export default function App() {
               activeId={workspaceView === "list" ? activeCategoryId : undefined}
               onSelect={selectEnvironment}
               onRename={openRenameCategory}
+              onDelete={openDeleteCategory}
               onReorder={commitEnvironmentOrder}
               disabled={isWorkspaceLoading || isOrdering}
             />
@@ -1646,7 +1642,7 @@ export default function App() {
               <strong>Você está na demonstração.</strong>{" "}
               <span>Explore à vontade. Os dados ficam neste navegador.</span>
             </span>
-            <a href="/signup">
+            <a href="/comecar">
               Criar minha conta <ArrowUpRight size={14} />
             </a>
           </div>
@@ -1742,6 +1738,12 @@ export default function App() {
                   onRename={openRenameCategory}
                   onReorder={commitEnvironmentOrder}
                   disabled={isWorkspaceLoading || isOrdering}
+                  allOption={{
+                    active: isAllEnvironments,
+                    onSelect: showAllItems,
+                    done: items.filter((item) => item.checked).length,
+                    total: items.length,
+                  }}
                   horizontal
                 />
               </motion.div>
@@ -1769,6 +1771,11 @@ export default function App() {
               name={activeEnxoval!.name}
               discountCents={enxovalDiscountCents}
               view={workspaceView}
+              scope={
+                scopeItems && activeCategory
+                  ? { name: activeCategory.name, items: scopeItems }
+                  : undefined
+              }
               onCategory={(id) => {
                 setActiveCategoryId(id);
                 setWorkspaceView("list");
@@ -1782,7 +1789,11 @@ export default function App() {
             <>
               <div className="list-section-heading">
                 <div>
-                  <RoomIcon name={activeCategory?.name ?? ""} size={24} />
+                  {activeCategory ? (
+                    <RoomIcon name={activeCategory.name} size={24} />
+                  ) : (
+                    <ListChecks size={24} strokeWidth={1.6} />
+                  )}
                   <h2>
                     {isSearching
                       ? "Sua busca"
@@ -1790,7 +1801,10 @@ export default function App() {
                         ? "Últimas alterações"
                         : (activeCategory?.name ?? "Meu enxoval")}
                   </h2>
-                  <span>{filteredItems.length} itens</span>
+                  <span>
+                    {filteredItems.length}{" "}
+                    {filteredItems.length === 1 ? "item" : "itens"}
+                  </span>
                   {!isSearching &&
                     !isShowingLatestChanges &&
                     activeCategory && (
@@ -1802,25 +1816,25 @@ export default function App() {
                         <Pencil size={16} />
                       </button>
                     )}
+                  {!isSearching &&
+                    !isShowingLatestChanges &&
+                    activeCategory && (
+                      <button
+                        className="title-edit-button title-delete-button"
+                        aria-label={`Excluir ambiente ${activeCategory.name}`}
+                        onClick={() => openDeleteCategory(activeCategory)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                 </div>
                 <div className="list-heading-actions">
-                  {activeCategory && (
-                    <button
-                      className="environment-export button button-outline button-small"
-                      aria-label={`Exportar ambiente ${activeCategory.name}`}
-                      onClick={() =>
-                        exportItems(
-                          items.filter(
-                            (item) => item.categoryId === activeCategory.id,
-                          ),
-                          `${activeEnxoval!.name}-${activeCategory.name}`,
-                        )
-                      }
-                    >
-                      <Download size={17} />
-                      <span>Exportar ambiente</span>
-                    </button>
-                  )}
+                  <ExportMenu
+                    categories={categories}
+                    items={items}
+                    enxovalName={activeEnxoval!.name}
+                    activeCategoryId={activeCategory?.id}
+                  />
                   <button
                     className="button button-dark button-small desktop-add-item"
                     onClick={() => setIsAddModalOpen(true)}
@@ -1837,10 +1851,10 @@ export default function App() {
                   />
                   <input
                     type="search"
-                    aria-label="Buscar em todos os ambientes"
+                    aria-label={searchScopeLabel}
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Buscar em todos os ambientes"
+                    placeholder={searchScopeLabel}
                     className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-11 text-base text-stone-800 shadow-sm outline-none transition focus:border-brand-wood focus:ring-2 focus:ring-brand-wood/30"
                   />
                   {searchQuery && (
@@ -1864,7 +1878,7 @@ export default function App() {
                 >
                   <SlidersHorizontal size={18} />
                   {activeFilterCount > 0 && (
-                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-wood px-1 text-[11px] font-bold leading-none text-white">
+                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-wood px-1 text-xs font-bold leading-none text-white">
                       {activeFilterCount}
                     </span>
                   )}
@@ -1923,7 +1937,9 @@ export default function App() {
                             ? "Tente buscar por outro nome, detalhe ou ambiente."
                             : activeFilterCount > 0
                               ? "Ajuste os filtros para ver mais itens."
-                              : `Toque no botão abaixo para adicionar itens ao ambiente ${activeCategory?.name ?? "selecionado"}.`}
+                              : activeCategory
+                                ? `Toque no botão abaixo para adicionar itens ao ambiente ${activeCategory.name}.`
+                                : "Toque no botão abaixo para adicionar o primeiro item ao seu enxoval."}
                         </p>
                       </div>
                     )}
@@ -1991,7 +2007,7 @@ export default function App() {
             aria-current={
               !isInviteOpen && workspaceView === "list" ? "page" : undefined
             }
-            onClick={() => setWorkspaceView("list")}
+            onClick={showAllItems}
           >
             <ListChecks size={19} />
             Meu enxoval
@@ -2021,6 +2037,7 @@ export default function App() {
         activeCategoryId={activeCategoryId}
         onSelectCategory={selectEnvironment}
         onRenameCategory={openRenameCategory}
+        onDeleteCategory={openDeleteCategory}
         onReorderCategories={commitEnvironmentOrder}
         busy={isWorkspaceLoading || isOrdering}
         onSwitch={(id) => void handleEnxovalChange(id)}
@@ -2048,7 +2065,7 @@ export default function App() {
             value={renameCategoryName}
             onChange={(event) => setRenameCategoryName(event.target.value)}
             required
-            maxLength={100}
+            maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
             disabled={isDialogSubmitting}
           />
           {dialogError && (
@@ -2190,6 +2207,7 @@ export default function App() {
             <input
               type="text"
               aria-label="Nome do ambiente"
+              maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
               value={newCategoryName}
               onChange={(event) => setNewCategoryName(event.target.value)}
               placeholder="Ex: Escritório"
@@ -2509,101 +2527,24 @@ export default function App() {
         </div>
       </Dialog>
       <Dialog
-        title="Editar item"
+        title="Excluir ambiente"
         busy={isDialogSubmitting}
-        isOpen={Boolean(itemToEdit)}
-        onClose={closeEditItem}
+        tone="danger"
+        isOpen={Boolean(categoryToDelete)}
+        onClose={() => setCategoryToDelete(null)}
       >
-        <form
-          onSubmit={handleSaveItemDetails}
-          className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4"
-        >
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Nome do item
-            </label>
-            <input
-              type="text"
-              aria-label="Nome do item"
-              value={editItemName}
-              onChange={(event) => setEditItemName(event.target.value)}
-              placeholder="Ex: Jogo de Taças"
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Ambiente
-            </label>
-            <Select
-              ariaLabel="Ambiente"
-              value={editItemCategoryId}
-              onChange={setEditItemCategoryId}
-              disabled={isDialogSubmitting || categories.length === 0}
-              options={categories.map((category) => ({
-                value: category.id,
-                label: category.name,
-              }))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Link do produto
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="url"
-                aria-label="Link do produto"
-                value={editItemLink}
-                onChange={(event) => setEditItemLink(event.target.value)}
-                placeholder="https://..."
-                className="flex-1 min-w-0 px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-              />
-              {editItemProductUrl && (
-                <a
-                  href={editItemProductUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-wood text-white transition-colors hover:bg-brand-wood/90"
-                  aria-label="Abrir link do produto"
-                  title="Abrir link do produto"
-                >
-                  <ExternalLink size={18} />
-                </a>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Preço
-            </label>
-            <input
-              type="text"
-              inputMode="numeric"
-              aria-label="Preço"
-              value={editItemPriceText}
-              onChange={handleEditItemPriceChange}
-              placeholder="R$ 0,00"
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Detalhes / Descrição
-            </label>
-            <textarea
-              aria-label="Detalhes / Descrição"
-              value={editItemDescription}
-              onChange={(event) => setEditItemDescription(event.target.value)}
-              placeholder="Ex: Comprar na cor branca, voltagem 110 V..."
-              rows={3}
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood resize-none"
-            />
-          </div>
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <p className="text-sm text-stone-600">
+            {categoryToDelete
+              ? `Esta ação vai excluir o ambiente "${categoryToDelete.name}" e ${
+                  deleteCategoryItemCount === 0
+                    ? "não há itens nele"
+                    : deleteCategoryItemCount === 1
+                      ? "o 1 item que está nele"
+                      : `os ${deleteCategoryItemCount} itens que estão nele`
+                }. Não é possível desfazer.`
+              : ""}
+          </p>
 
           {dialogError && (
             <p
@@ -2614,19 +2555,26 @@ export default function App() {
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={
-              isDialogSubmitting ||
-              !itemToEdit ||
-              !editItemName.trim() ||
-              !editItemCategoryId
-            }
-            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isDialogSubmitting ? "Salvando..." : "Salvar detalhes"}
-          </button>
-        </form>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setCategoryToDelete(null)}
+              data-dialog-autofocus
+              disabled={isDialogSubmitting}
+              className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleDeleteCategory()}
+              disabled={isDialogSubmitting || !categoryToDelete}
+              className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDialogSubmitting ? "Excluindo..." : "Excluir ambiente"}
+            </button>
+          </div>
+        </div>
       </Dialog>
       <Dialog
         title="Excluir item"

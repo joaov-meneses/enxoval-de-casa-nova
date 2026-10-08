@@ -8,6 +8,7 @@ import type {
   EnxovalWorkspace,
 } from "./types";
 import { demoRequest, isDemoMode } from "./demo";
+import type { Answers, PlanPayload } from "./onboarding/types";
 
 export class ApiError extends Error {
   status: number;
@@ -59,10 +60,16 @@ export function login(email: string, password: string) {
   });
 }
 
-export function register(name: string, email: string, password: string) {
+/** `onboarding` vem do funil /comecar: cria a conta já com o primeiro enxoval pronto. */
+export function register(
+  name: string,
+  email: string,
+  password: string,
+  onboarding?: { enxovalName: string; plan: PlanPayload; profile?: Answers },
+) {
   return request<BootstrapData>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, password, ...onboarding }),
   });
 }
 
@@ -148,6 +155,12 @@ export function renameCategory(
     },
   );
 }
+export function deleteCategory(enxovalId: string, categoryId: string) {
+  return request<void>(
+    `/api/categories/${encodeURIComponent(categoryId)}?enxovalId=${encodeURIComponent(enxovalId)}`,
+    { method: "DELETE" },
+  );
+}
 export function reorderItems(
   enxovalId: string,
   categoryId: string,
@@ -164,6 +177,9 @@ export function createItem(input: {
   name: string;
   categoryId?: string;
   categoryName?: string;
+  priceCents?: number | null;
+  link?: string;
+  description?: string;
 }) {
   return request<{ item: EnxovalItem; category: EnxovalCategory }>(
     "/api/items",

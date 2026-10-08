@@ -82,7 +82,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <a className="login-link" href={signedIn ? "/app" : "/login"}>
             {signedIn ? "Meu enxoval" : "Entrar"}
           </a>
-          <a className="button button-dark button-small" href="/signup">
+          <a className="button button-dark button-small" href={signedIn ? "/app" : "/comecar"}>
             Começar meu enxoval <ArrowUpRight size={16} />
           </a>
           <button
@@ -120,7 +120,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
               próximo lar.
             </p>
             <div className="hero-actions">
-              <a href="/signup" className="button button-dark">
+              <a href={signedIn ? "/app" : "/comecar"} className="button button-dark">
                 Começar meu enxoval <ArrowRight size={18} />
               </a>
               <a href="/demo" className="button button-text">
@@ -449,7 +449,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
                 <div className="price">
                   Grátis<span>para dar o primeiro passo</span>
                 </div>
-                <a href="/signup" className="button button-outline">
+                <a href={signedIn ? "/app" : "/comecar"} className="button button-outline">
                   Começar meu enxoval <ArrowRight size={17} />
                 </a>
                 <ul>
@@ -542,7 +542,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
             ao seu novo começo?
           </h2>
           <p>Uma lista hoje. Um lar com a sua cara amanhã.</p>
-          <a href="/signup" className="button button-dark">
+          <a href={signedIn ? "/app" : "/comecar"} className="button button-dark">
             Criar meu enxoval <ArrowRight size={18} />
           </a>
           <span className="cta-footnote">
@@ -561,6 +561,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <a href="#como-funciona">Como funciona</a>
           <a href="#planos">Planos</a>
           <a href="/demo">Demonstração</a>
+          <a href="/privacidade">Privacidade</a>
         </div>
         <span>
           Feito com cuidado, para novos começos.

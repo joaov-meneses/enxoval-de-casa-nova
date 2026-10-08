@@ -62,19 +62,21 @@ test("items can be created, edited, bought, exported, persisted and removed", as
     .click();
   await page.getByLabel("Nome do produto").fill("Kit de café de teste");
   await page.getByRole("button", { name: "Adicionar à lista" }).click();
-  await page
-    .getByRole("button", { name: "Editar Kit de café de teste", exact: true })
-    .click();
-  const dialog = page.getByRole("dialog", { name: "Editar item" });
-  await dialog.getByLabel("Preço", { exact: true }).fill("12990");
-  await dialog
-    .getByLabel("Link do produto")
-    .fill("https://example.com/produto");
-  await dialog.getByLabel("Detalhes / Descrição").fill("=Teste de escape CSV");
-  await dialog.getByRole("button", { name: "Salvar detalhes" }).click();
   const row = page
     .locator(".item-row")
     .filter({ hasText: "Kit de café de teste" });
+  await expect(
+    row.getByRole("button", { name: /^Editar Kit de café de teste/ }),
+  ).toHaveCount(0);
+  // Tocar em qualquer ponto da linha (longe do título) abre a edição.
+  await row.scrollIntoViewIfNeeded();
+  const box = (await row.locator(".item-row-inner").boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.55, box.y + box.height - 4);
+  const form = row.getByRole("form");
+  await form.getByLabel("Preço", { exact: true }).fill("12990");
+  await form.getByLabel("Link do produto").fill("https://example.com/produto");
+  await form.getByLabel("Observações").fill("=Teste de escape CSV");
+  await form.getByRole("button", { name: "Salvar alterações" }).click();
   await expect(row.getByRole("link", { name: "Ver na loja" })).toHaveAttribute(
     "href",
     "https://example.com/produto",
@@ -85,7 +87,10 @@ test("items can be created, edited, bought, exported, persisted and removed", as
   await page.reload();
   await expect(row.getByRole("checkbox")).toBeChecked();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Exportar lista" }).click();
+  await page.getByRole("button", { name: "Exportar", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: /Baixar todos os ambientes/ })
+    .click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/larume-.+\.csv$/);
   const stream = await download.createReadStream();
@@ -112,6 +117,10 @@ test("search ignores accents, filters purchases and overview navigates rooms", a
   await page.getByRole("searchbox").fill("ceramica");
   await expect(page.locator(".item-row")).toHaveCount(1);
   await page.getByRole("button", { name: "Limpar busca" }).click();
+  await page
+    .locator(".sidebar-rooms .environment-select")
+    .filter({ hasText: "Cozinha" })
+    .click();
   await page.getByRole("button", { name: "Abrir filtros" }).click();
   await page.getByRole("button", { name: "Checados", exact: true }).click();
   await page.getByRole("button", { name: "Concluir", exact: true }).click();
@@ -158,9 +167,13 @@ test("workspaces and categories can be created and safely removed in demo", asyn
   await page.getByLabel("Nome do produto").fill("Mesa de trabalho");
   await page.getByLabel("Nome do ambiente").fill("Escritório");
   await page.getByRole("button", { name: "Adicionar à lista" }).click();
+  // Em "Meu enxoval" a lista continua com todos os itens, agora com o novo ambiente no card.
   await expect(
-    page.getByRole("heading", { name: "Escritório", exact: true }),
-  ).toBeVisible();
+    page
+      .locator(".item-row")
+      .filter({ hasText: "Mesa de trabalho" })
+      .locator(".item-category-tag"),
+  ).toHaveText("Escritório");
   await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
   await page
     .getByRole("button", { name: "Excluir enxoval", exact: true })
@@ -211,11 +224,22 @@ test("mobile menu, swipe, refresh and bottom navigation remain usable", async ({
     page.getByRole("button", { name: "Abrir menu" }),
   ).toHaveAttribute("aria-expanded", "false");
   await page.goto("/demo");
-  const box = await page.locator(".item-name").first().boundingBox();
-  await page.mouse.move(box!.x + box!.width - 5, box!.y + 5);
-  await page.mouse.down();
-  await page.mouse.move(Math.max(10, box!.x - 80), box!.y + 5, { steps: 8 });
-  await page.mouse.up();
+  const swipeLeft = async () => {
+    const box = await page.locator(".item-name").first().boundingBox();
+    await page.mouse.move(box!.x + box!.width - 5, box!.y + 5);
+    await page.mouse.down();
+    await page.mouse.move(Math.max(10, box!.x - 80), box!.y + 5, { steps: 8 });
+    await page.mouse.up();
+  };
+  // Começa em "Meu enxoval" (todos os itens): o primeiro gesto abre o primeiro ambiente.
+  await expect(
+    page.getByRole("heading", { name: "Meu enxoval", exact: true }),
+  ).toBeVisible();
+  await swipeLeft();
+  await expect(
+    page.getByRole("heading", { name: "Cozinha", exact: true }),
+  ).toBeVisible();
+  await swipeLeft();
   await expect(
     page.getByRole("heading", { name: "Quarto", exact: true }),
   ).toBeVisible();
@@ -256,7 +280,7 @@ test("mobile menu, swipe, refresh and bottom navigation remain usable", async ({
   await page.getByRole("button", { name: "Meu enxoval", exact: true }).click();
   await expect(header).toContainText("Quarto");
   await expect(
-    page.getByRole("heading", { name: "Quarto", exact: true }),
+    page.getByRole("heading", { name: "Meu enxoval", exact: true }),
   ).toBeVisible();
 });
 
@@ -298,26 +322,6 @@ test("login handles API errors and success; registration opens onboarding (mock 
   await expect(page.locator(".workspace-sidebar")).toContainText(
     "Pessoa Teste",
   );
-  await page.goto("/signup");
-  await page.route("**/api/auth/register", (route) =>
-    route.fulfill({
-      json: {
-        ...bootstrap,
-        enxovais: [],
-        activeEnxoval: null,
-        members: [],
-        categories: [],
-        items: [],
-      },
-    }),
-  );
-  await page.getByLabel("Como podemos te chamar?").fill("Pessoa Teste");
-  await page.getByLabel("Seu e-mail").fill("teste@example.com");
-  await page.getByLabel("Sua senha", { exact: true }).fill("senha-de-teste");
-  await page.getByRole("button", { name: "Criar minha conta" }).click();
-  await expect(
-    page.getByRole("dialog", { name: "Novo enxoval" }),
-  ).toBeVisible();
 });
 
 for (const width of [390, 1440]) {

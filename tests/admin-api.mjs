@@ -74,6 +74,43 @@ try {
       },
     };
   }
+  /** O cadastro só existe pelo funil: plano e respostas válidos. */
+  const funnelProfile = {
+    moment: "casal",
+    moveDate: null,
+    moveDateAnswered: true,
+    state: "SP",
+    housing: "apartamento",
+    people: 2,
+    rooms: ["cozinha", "banheiro"],
+    owned: "nada",
+    style: "full",
+    budget: "unknown",
+    worries: [],
+    usage: [],
+    source: "",
+  };
+  const funnelBody = (name, email, password, overrides = {}) => ({
+    name,
+    email,
+    password,
+    enxovalName: "Nossa casa nova",
+    plan: {
+      categories: [
+        { name: "Cozinha", items: [{ name: "Panela", description: "Essencial" }] },
+      ],
+    },
+    profile: funnelProfile,
+    ...overrides,
+  });
+  // Registra pelo funil e remove o enxoval inicial, para não alterar as contagens dos testes seguintes.
+  const registerViaFunnel = async (who, name, email, password) => {
+    const result = await who.call("/auth/register", "POST", funnelBody(name, email, password));
+    if (result.status === 201) {
+      await getPool().query("DELETE FROM enxovais WHERE owner_id = $1", [result.data.user.id]);
+    }
+    return result;
+  };
   const admin = agent();
   const customer = agent();
   const outsider = agent();
@@ -110,13 +147,91 @@ try {
   assert.equal((await admin.call("/admin/session")).status, 200);
   const originalPassword = randomBytes(16).toString("base64url");
   const email = "cliente@example.invalid";
-  const signup = await customer.call("/auth/register", "POST", {
-    name: "Cliente Teste",
-    email,
-    password: originalPassword,
-  });
+  const signup = await registerViaFunnel(customer, "Cliente Teste", email, originalPassword);
   assert.equal(signup.status, 201);
   const id = signup.data.user.id;
+  {
+    // O cadastro só existe pelo funil: respostas validadas por completo e gravadas em enxovais.onboarding_profile.
+    const funnel = agent();
+    const good = {
+      ...funnelProfile,
+      moveDate: "2026-12-01",
+      state: "SP",
+      rooms: ["cozinha", "sala", "banheiro"],
+      owned: "algumas",
+      style: "min",
+      budget: "10-25",
+      worries: ["budget", "budget"],
+      usage: ["buy", "share"],
+      source: "instagram",
+    };
+    const registered = await funnel.call(
+      "/auth/register",
+      "POST",
+      funnelBody("Funil Teste", "funil@example.invalid", randomBytes(16).toString("base64url"), {
+        enxovalName: "Casa de Funil",
+        // O nome vai para users.name; campos fora do perfil (como cpf) são ignorados.
+        profile: { ...good, name: "Funil Teste", cpf: "000.000.000-00" },
+      }),
+    );
+    assert.equal(registered.status, 201);
+    const stored = (
+      await getPool().query(
+        "SELECT onboarding_profile FROM enxovais WHERE owner_id = $1",
+        [registered.data.user.id],
+      )
+    ).rows[0].onboarding_profile;
+    assert.deepEqual(stored, {
+      v: 1,
+      moment: "casal",
+      moveDate: "2026-12-01",
+      moveDateAnswered: true,
+      state: "SP",
+      housing: "apartamento",
+      people: 2,
+      rooms: ["cozinha", "sala", "banheiro"],
+      owned: "algumas",
+      style: "min",
+      budget: "10-25",
+      worries: ["budget"],
+      usage: ["buy", "share"],
+      source: "instagram",
+    });
+    assert.ok(!JSON.stringify(registered.data).includes("onboarding_profile"));
+
+    // Sem funil, ou com qualquer resposta ou plano inválido, o cadastro é recusado e nada é criado.
+    const count = async () =>
+      (await getPool().query("SELECT (SELECT count(*) FROM users)::int AS users, (SELECT count(*) FROM enxovais)::int AS enxovais, (SELECT count(*) FROM items)::int AS items")).rows[0];
+    const before = await count();
+    const base = () =>
+      funnelBody("Rejeitado", "rejeitado@example.invalid", randomBytes(16).toString("base64url"));
+    const rejections = [
+      ["cadastro direto, sem o funil", () => {
+        const { plan, profile, enxovalName, ...direct } = base();
+        return direct;
+      }],
+      ["sem respostas", () => ({ ...base(), profile: undefined })],
+      ["sem plano", () => ({ ...base(), plan: undefined })],
+      ["plano sem itens", () => ({ ...base(), plan: { categories: [{ name: "Sala", items: [] }] } })],
+      ["momento inválido", () => ({ ...base(), profile: { ...funnelProfile, moment: "marte" } })],
+      ["estado inválido", () => ({ ...base(), profile: { ...funnelProfile, state: "ZZ" } })],
+      ["moradores demais", () => ({ ...base(), profile: { ...funnelProfile, people: 99 } })],
+      ["data inexistente", () => ({ ...base(), profile: { ...funnelProfile, moveDate: "2026-02-31" } })],
+      ["data não respondida", () => ({ ...base(), profile: { ...funnelProfile, moveDateAnswered: false } })],
+      ["espaço inexistente", () => ({ ...base(), profile: { ...funnelProfile, rooms: ["cozinha", "inexistente"] } })],
+      ["nenhum espaço", () => ({ ...base(), profile: { ...funnelProfile, rooms: [] } })],
+      ["preocupação inválida", () => ({ ...base(), profile: { ...funnelProfile, worries: ["budget", "nao-existe"] } })],
+      ["estilo ausente", () => ({ ...base(), profile: { ...funnelProfile, style: undefined } })],
+    ];
+    for (const [label, build] of rejections) {
+      const result = await agent().call("/auth/register", "POST", build());
+      assert.equal(result.status, 400, label);
+    }
+    assert.deepEqual(await count(), before, "nenhum cadastro recusado deixa rastro");
+
+    // Remove a conta do bloco para não alterar as contagens dos testes seguintes.
+    await getPool().query("DELETE FROM users WHERE id = $1", [registered.data.user.id]);
+  }
   const workspace = (
     await customer.call("/enxovais", "POST", {
       name: "Lista preservada",
@@ -272,11 +387,7 @@ try {
   );
   assert.equal(
     (
-      await outsider.call("/auth/register", "POST", {
-        name: "Outro usuário",
-        email: "outro@example.invalid",
-        password: originalPassword,
-      })
+      await registerViaFunnel(outsider, "Outro usuário", "outro@example.invalid", originalPassword)
     ).status,
     201,
   );

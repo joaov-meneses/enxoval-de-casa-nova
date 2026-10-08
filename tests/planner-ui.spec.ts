@@ -185,28 +185,13 @@ for (const width of [320, 390, 768, 1024, 1440]) {
       .locator(".item-row")
       .filter({ hasText: "=Kit de pratos personalizado" });
     await expect(edited).toContainText("R$ 199,90");
-    await edited
-      .getByRole("button", {
-        name: "Editar =Kit de pratos personalizado",
-        exact: true,
-      })
-      .click();
     await expect(
-      page.getByRole("dialog", { name: "Editar item", exact: true }),
-    ).toBeVisible();
-    const modalCombo = page
-      .getByRole("dialog")
-      .getByRole("combobox", { name: "Ambiente", exact: true });
-    await modalCombo.click();
-    await modalCombo.press("Escape");
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await page.keyboard.press("Escape");
+      edited.getByRole("button", { name: /^Editar =Kit/ }),
+    ).toHaveCount(0);
     const downloadEvent = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Exportar", exact: true }).click();
     await page
-      .getByRole("button", {
-        name: "Exportar ambiente Cozinha planejada",
-        exact: true,
-      })
+      .getByRole("menuitem", { name: /Baixar Cozinha planejada/ })
       .click();
     const download = await downloadEvent;
     const csv = await fs.readFile((await download.path())!, "utf8");
@@ -230,6 +215,11 @@ test("mouse dragging items and rooms persists; filtering preserves manual order"
   page,
 }) => {
   await page.goto("/demo");
+  // "Meu enxoval" mostra todos os itens; arrastar itens só vale dentro de um ambiente.
+  await page
+    .locator(".sidebar-rooms .environment-select")
+    .filter({ hasText: "Cozinha" })
+    .click();
   const rows = page.locator(".sortable-items .item-row");
   const originalNames = await rows.locator(".item-name").allTextContents();
   const firstHandle = page.locator(".sortable-items").getByRole("button", {
@@ -240,6 +230,10 @@ test("mouse dragging items and rooms persists; filtering preserves manual order"
   await expect(rows.nth(1).locator(".item-name")).toHaveText(originalNames[0]);
   await expect(firstHandle).toBeEnabled();
   await page.reload();
+  await page
+    .locator(".sidebar-rooms .environment-select")
+    .filter({ hasText: "Cozinha" })
+    .click();
   await expect(rows.nth(1).locator(".item-name")).toHaveText(originalNames[0]);
   const rooms = page.locator(".sidebar-rooms .environment-row");
   await dragBetween(
@@ -363,6 +357,7 @@ test("dropdown keyboard selection and touch drag do not open dialogs or swipe ro
   await expect(chips.first().locator(".environment-select")).toContainText(
     "Cozinha",
   );
+  await chips.first().locator(".environment-select").click();
   await expect(items.nth(1).locator(".item-name")).toHaveText(firstName);
 });
 
@@ -405,6 +400,7 @@ test("failed saves keep inline drafts and roll back manual ordering", async ({
         }),
   );
   await page.goto("/app");
+  await page.locator(".sidebar-rooms .environment-select").first().click();
   const rows = page.locator(".sortable-items .item-row");
   const name = await rows.first().locator(".item-name").innerText();
   const handle = page

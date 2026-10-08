@@ -1,10 +1,28 @@
 import type { BootstrapData, EnxovalWorkspace } from "./types";
-import { DEFAULT_TEMPLATE_CATEGORIES, DEFAULT_TEMPLATE_ITEMS } from "./data";
+import type { PlanPayload } from "./onboarding/types";
+import {
+  DEFAULT_TEMPLATE_CATEGORIES,
+  DEFAULT_TEMPLATE_ITEMS,
+  MAX_ENVIRONMENT_NAME_LENGTH,
+} from "./data";
 
 const STORAGE_KEY = "larume.demo.v1";
 const PREVIOUS_STORAGE_KEY = "larumi.demo.v1";
 const LEGACY_STORAGE_KEY = "morada.demo.v1";
-const demoUser = { id: "demo-user", name: "Ana", email: "ana@exemplo.com" };
+const PROFILE_KEY = "larume.demo.profile.v1";
+const PLAN_WORKSPACE_PREFIX = "demo-plan-";
+function savedProfileName() {
+  try {
+    return localStorage.getItem(PROFILE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+const demoUser = {
+  id: "demo-user",
+  name: savedProfileName() || "Ana",
+  email: "ana@exemplo.com",
+};
 export const isDemoMode = () => window.location.pathname === "/demo";
 type DemoStore = { workspaces: EnxovalWorkspace[]; activeId: string };
 const id = () => crypto.randomUUID();
@@ -128,6 +146,87 @@ function bootstrap(data: DemoStore): BootstrapData {
     members: workspace?.members ?? [],
   };
 }
+function buildPlanWorkspace(
+  name: string,
+  plan: PlanPayload,
+  workspaceId: string,
+): EnxovalWorkspace {
+  const now = new Date().toISOString();
+  const categories = plan.categories.map((category, sortOrder) => ({
+    id: id(),
+    name: category.name,
+    sortOrder,
+  }));
+  let sortOrder = 0;
+  return {
+    enxoval: {
+      id: workspaceId,
+      name,
+      ownerId: demoUser.id,
+      role: "owner",
+      discountCents: 0,
+    },
+    categories,
+    members: [{ ...demoUser, role: "owner" }],
+    items: plan.categories.flatMap((category, index) =>
+      category.items.map((item) => ({
+        id: id(),
+        name: item.name,
+        categoryId: categories[index].id,
+        category: category.name,
+        checked: false,
+        priceCents: null,
+        link: "",
+        description: item.description,
+        sortOrder: sortOrder++,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    ),
+  };
+}
+
+/**
+ * Coloca o plano gerado pelo funil de onboarding na demonstração, como enxoval
+ * ativo, e passa a usar o nome da pessoa no lugar de "Ana". Substitui o plano
+ * anterior, se houver, e mantém o enxoval de exemplo.
+ */
+export function applyPlanToDemo(
+  userName: string,
+  enxovalName: string,
+  plan: PlanPayload,
+) {
+  if (userName) {
+    demoUser.name = userName;
+    try {
+      localStorage.setItem(PROFILE_KEY, userName);
+    } catch {
+      /* Sem armazenamento, o nome vale só nesta visita. */
+    }
+  }
+  const data = structuredClone(read());
+  const workspace = buildPlanWorkspace(
+    enxovalName,
+    plan,
+    `${PLAN_WORKSPACE_PREFIX}${id()}`,
+  );
+  data.workspaces = [
+    workspace,
+    ...data.workspaces.filter(
+      (w) => !w.enxoval.id.startsWith(PLAN_WORKSPACE_PREFIX),
+    ),
+  ];
+  data.activeId = workspace.enxoval.id;
+  persist(data);
+}
+
+function checkEnvironmentName(name: string) {
+  if (name.length > MAX_ENVIRONMENT_NAME_LENGTH)
+    throw new Error(
+      `O nome do ambiente pode ter no máximo ${MAX_ENVIRONMENT_NAME_LENGTH} caracteres.`,
+    );
+}
+
 export async function demoRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -199,15 +298,27 @@ export async function demoRequest<T>(
     }
   } else if (url.pathname.startsWith("/api/categories")) {
     const workspace = data.workspaces.find(
-      (w) => w.enxoval.id === body.enxovalId,
+      (w) =>
+        w.enxoval.id === (body.enxovalId ?? url.searchParams.get("enxovalId")),
     );
     if (!workspace) throw new Error("Enxoval não encontrado.");
-    if (method === "PATCH" && url.pathname !== "/api/categories/order") {
+    if (method === "DELETE") {
+      const categoryId = url.pathname.split("/")[3];
+      if (!workspace.categories.some((c) => c.id === categoryId))
+        throw new Error("Ambiente não encontrado.");
+      workspace.categories = workspace.categories
+        .filter((c) => c.id !== categoryId)
+        .map((c, sortOrder) => ({ ...c, sortOrder }));
+      workspace.items = workspace.items.filter(
+        (item) => item.categoryId !== categoryId,
+      );
+    } else if (method === "PATCH" && url.pathname !== "/api/categories/order") {
       const categoryId = url.pathname.split("/")[3];
       const category = workspace.categories.find((c) => c.id === categoryId);
       const name = String(body.name ?? "").trim();
       if (!category || !name)
         throw new Error("Ambiente não encontrado ou nome inválido.");
+      checkEnvironmentName(name);
       if (
         workspace.categories.some((c) => c.id !== categoryId && c.name === name)
       )
@@ -226,9 +337,10 @@ export async function demoRequest<T>(
       );
       result = workspace.categories;
     } else {
+      checkEnvironmentName(String(body.name ?? "").trim());
       const category = {
         id: id(),
-        name: body.name,
+        name: String(body.name).trim(),
         sortOrder: workspace.categories.length,
       };
       workspace.categories.push(category);
@@ -262,6 +374,7 @@ export async function demoRequest<T>(
     if (!workspace) throw new Error("Enxoval não encontrado.");
     let category = workspace.categories.find((c) => c.id === body.categoryId);
     if (!category && body.categoryName) {
+      checkEnvironmentName(String(body.categoryName).trim());
       category = {
         id: id(),
         name: body.categoryName,
@@ -276,9 +389,9 @@ export async function demoRequest<T>(
       categoryId: category.id,
       category: category.name,
       checked: false,
-      priceCents: null,
-      link: "",
-      description: "",
+      priceCents: body.priceCents ?? null,
+      link: String(body.link ?? "").trim(),
+      description: String(body.description ?? "").trim(),
       sortOrder: workspace.items.length,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

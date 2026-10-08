@@ -34,6 +34,7 @@ interface WorkspaceMenuProps {
   activeCategoryId: string;
   onSelectCategory: (id: string) => void;
   onRenameCategory: (category: EnxovalCategory) => void;
+  onDeleteCategory: (category: EnxovalCategory) => void;
   onReorderCategories: (ids: string[]) => Promise<void>;
   busy: boolean;
   onSwitch: (id: string) => void;
@@ -157,6 +158,9 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 onSelect={(id) => run(() => props.onSelectCategory(id))}
                 onRename={(category) =>
                   run(() => props.onRenameCategory(category))
+                }
+                onDelete={(category) =>
+                  run(() => props.onDeleteCategory(category))
                 }
                 onReorder={props.onReorderCategories}
               />

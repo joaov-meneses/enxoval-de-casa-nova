@@ -10,14 +10,13 @@ import {
   Package,
   Wallet,
   Sparkles,
-  Download,
   Users,
   Plus,
   House,
   Heart,
 } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
-import { exportItems } from "../utils/export";
+import { ExportMenu } from "./ExportMenu";
 
 export function RoomIcon({ name, size = 18 }: { name: string; size?: number }) {
   const Icon = /cozinha/i.test(name)
@@ -41,6 +40,7 @@ export function WorkspaceOverview({
   onCategory,
   onInvite,
   view,
+  scope,
 }: {
   items: EnxovalItem[];
   categories: EnxovalCategory[];
@@ -49,17 +49,23 @@ export function WorkspaceOverview({
   onCategory: (id: string) => void;
   onInvite: () => void;
   view: "list" | "overview";
+  /** Quando há um ambiente aberto, os cartões resumem só os itens dele. */
+  scope?: { name: string; items: EnxovalItem[] };
 }) {
-  const done = items.filter((i) => i.checked);
+  // Descontos e cashback são do enxoval inteiro: não entram na conta de um ambiente.
+  const statsItems = scope ? scope.items : items;
+  const statsDiscountCents = scope ? 0 : discountCents;
+  const done = statsItems.filter((i) => i.checked);
   const spent = Math.max(
     0,
-    done.reduce((s, i) => s + (Number(i.priceCents) || 0), 0) - discountCents,
+    done.reduce((s, i) => s + (Number(i.priceCents) || 0), 0) -
+      statsDiscountCents,
   );
-  const pending = items.filter((i) => !i.checked);
+  const pending = statsItems.filter((i) => !i.checked);
   const planned = pending.reduce((s, i) => s + (Number(i.priceCents) || 0), 0);
   const unpriced = pending.filter((i) => !i.priceCents).length;
-  const percentage = items.length
-    ? Math.round((done.length / items.length) * 100)
+  const percentage = statsItems.length
+    ? Math.round((done.length / statsItems.length) * 100)
     : 0;
   const money = (c: number) =>
     new Intl.NumberFormat("pt-BR", {
@@ -84,13 +90,29 @@ export function WorkspaceOverview({
               : "Organize os desejos, acompanhe as compras e aproveite o caminho."}
           </p>
         </div>
-        <button
-          className="button button-outline export-button"
-          onClick={() => exportItems(items, name)}
-        >
-          <Download size={15} /> Exportar lista
-        </button>
+        {view === "overview" && (
+          <ExportMenu
+            categories={categories}
+            items={items}
+            enxovalName={name}
+          />
+        )}
       </div>
+      <p className="stats-scope">
+        {scope ? (
+          <>
+            Resumo de <strong>{scope.name}</strong>
+          </>
+        ) : view === "overview" ? (
+          <>
+            Resumo <strong>geral do enxoval</strong>
+          </>
+        ) : (
+          <>
+            Resumo <strong>de todos os ambientes</strong>
+          </>
+        )}
+      </p>
       <div className="workspace-stats">
         <article>
           <span className="stat-icon sage">
@@ -102,7 +124,10 @@ export function WorkspaceOverview({
             <small>%</small>
           </strong>
           <span className="stat-detail">
-            {done.length} de {items.length} itens conquistados
+            {done.length} de {statsItems.length}{" "}
+            {statsItems.length === 1
+              ? "item conquistado"
+              : "itens conquistados"}
           </span>
           <div className="progress-track">
             <span style={{ width: `${percentage}%` }} />
@@ -115,8 +140,8 @@ export function WorkspaceOverview({
           <span className="stat-label">Já investimos</span>
           <strong>{money(spent)}</strong>
           <span className="stat-detail">
-            {discountCents > 0
-              ? `${money(discountCents)} em descontos e cashback`
+            {statsDiscountCents > 0
+              ? `${money(statsDiscountCents)} em descontos e cashback`
               : "Soma dos itens comprados"}
           </span>
         </article>
@@ -127,7 +152,8 @@ export function WorkspaceOverview({
           <span className="stat-label">Próximas conquistas</span>
           <strong>{money(planned)}</strong>
           <span className="stat-detail">
-            {pending.length} itens pendentes
+            {pending.length}{" "}
+            {pending.length === 1 ? "item pendente" : "itens pendentes"}
             {unpriced > 0 ? ` · ${unpriced} sem preço` : ""}
           </span>
         </article>

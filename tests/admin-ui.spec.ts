@@ -154,7 +154,11 @@ for (const width of [320, 390, 1440]) {
     await expect(
       dialog.getByRole("button", { name: "Senha copiada" }),
     ).toBeVisible();
-    await dialog.evaluate(element => Promise.all(element.getAnimations().map(animation => animation.finished)));
+    await dialog.evaluate((element) =>
+      Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      ),
+    );
     await noOverflow(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({

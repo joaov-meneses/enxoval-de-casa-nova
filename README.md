@@ -12,7 +12,8 @@ npm run dev:preview
 Abra **http://localhost:3000**.
 
 - `/`: landing page com recursos, exemplos de planos e perguntas frequentes.
-- `/login` e `/signup`: entrada e cadastro com a nova identidade visual.
+- `/login`: entrada com a nova identidade visual. `/signup` redireciona para `/comecar`.
+- `/comecar`: única porta de cadastro. Faz perguntas curtas, monta o plano de enxoval e cria a conta já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md).
 - `/demo`: aplicativo interativo com um enxoval de exemplo. Permite criar, editar, concluir e remover itens, criar enxovais e ambientes, reordenar ambientes e itens, registrar descontos e exportar CSV.
 - `/app`: aplicativo conectado à conta.
 
@@ -20,9 +21,22 @@ O comando `dev:preview` **não conecta ao banco nem executa migrações**. A dem
 
 ## Executar com contas e persistência real
 
-1. Copie `.env.example` para `.env` e configure uma instância PostgreSQL de desenvolvimento.
-2. Ajuste `DATABASE_URL` e, para localhost sem HTTPS, `COOKIE_SECURE=false`.
+1. Copie `.env.example` para `.env` e troque `POSTGRES_PASSWORD` (e a mesma senha em `DATABASE_URL`).
+2. Suba o PostgreSQL local com Docker: `npm run db:up`. Para localhost sem HTTPS, use `COOKIE_SECURE=false`.
 3. Execute `npm run dev`. O servidor aplica as migrações existentes antes de iniciar.
+
+### PostgreSQL com Docker
+
+[docker-compose.yml](docker-compose.yml) define o serviço `db` (`postgres:16-alpine`, container `larume_db`), acessível só em `127.0.0.1` na porta **5433** (evita conflito com outros Postgres locais na 5432). Os dados ficam no volume `larume_larume_pgdata`.
+
+| Comando | O que faz |
+|---|---|
+| `npm run db:up` | Sobe o banco e espera ficar saudável |
+| `npm run db:migrate` | Aplica as migrações manualmente (o `npm run dev` já faz isso) |
+| `npm run db:psql` | Abre o `psql` no container (aceita argumentos: `npm run db:psql -- -c "\dt"`) |
+| `npm run db:logs` | Acompanha os logs |
+| `npm run db:down` | Para e remove o container, mantendo os dados |
+| `docker compose down -v` | Para e **apaga os dados** do volume |
 
 O fluxo de autenticação e a API PostgreSQL originais foram preservados. Compartilhar um enxoval adiciona como membro uma pessoa que já possui conta, usando seu e-mail; não há envio de e-mail implementado.
 

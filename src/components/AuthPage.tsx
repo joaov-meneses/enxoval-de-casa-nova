@@ -9,43 +9,39 @@ import {
   LoaderCircle,
   ShieldCheck,
 } from "lucide-react";
-import { login, register } from "../api";
+import { login } from "../api";
 import type { BootstrapData } from "../types";
 import { Brand } from "./Brand";
 
 export function AuthPage({
   onAuthenticated,
-  initialMode = "login",
 }: {
   onAuthenticated: (
     data: BootstrapData,
     options?: { promptCreateEnxoval?: boolean },
   ) => void;
-  initialMode?: "login" | "register";
 }) {
-  const [mode, setMode] = useState(initialMode);
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
-    document.title = `${mode === "login" ? "Entre, a casa é sua" : "Seu novo começo"} | Larume`;
-  }, [mode]);
+    document.title = "Entre, a casa é sua | Larume";
+  }, []);
   async function submit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError("");
     try {
-      const data =
-        mode === "login"
-          ? await login(email.trim(), password)
-          : await register(name.trim(), email.trim(), password);
-      window.history.replaceState({}, "", data.user.mustChangePassword ? "/change-password" : "/app");
-      onAuthenticated(data, {
-        promptCreateEnxoval: mode === "register" && data.enxovais.length === 0,
-      });
+      // A conta só nasce no fim do funil /comecar; aqui só se entra em uma existente.
+      const data = await login(email.trim(), password);
+      window.history.replaceState(
+        {},
+        "",
+        data.user.mustChangePassword ? "/change-password" : "/app",
+      );
+      onAuthenticated(data);
     } catch (err) {
       setError(
         err instanceof Error
@@ -102,51 +98,9 @@ export function AuthPage({
             <Brand />
           </a>
           <span className="eyebrow">UM CANTINHO PARA OS SEUS PLANOS</span>
-          <h1>
-            {mode === "login"
-              ? "Entre, a casa é sua."
-              : "Todo lar tem um começo."}
-          </h1>
-          <p>
-            {mode === "login"
-              ? "Seu próximo capítulo está esperando por você."
-              : "Crie sua conta e comece a dar forma ao seu novo lar."}
-          </p>
-          <div className="auth-tabs">
-            <button
-              className={mode === "login" ? "active" : ""}
-              onClick={() => {
-                setMode("login");
-                setError("");
-              }}
-            >
-              Entrar
-            </button>
-            <button
-              className={mode === "register" ? "active" : ""}
-              onClick={() => {
-                setMode("register");
-                setError("");
-              }}
-            >
-              Criar conta
-            </button>
-          </div>
+          <h1>Entre, a casa é sua.</h1>
+          <p>Seu próximo capítulo está esperando por você.</p>
           <form onSubmit={submit} className="auth-form">
-            {mode === "register" && (
-              <label htmlFor="auth-name">
-                Como podemos te chamar?
-                <input
-                  id="auth-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Seu nome"
-                  autoComplete="name"
-                  required
-                  maxLength={100}
-                />
-              </label>
-            )}
             <label htmlFor="auth-email">
               Seu e-mail
               <input
@@ -167,15 +121,8 @@ export function AuthPage({
                   id="auth-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={
-                    mode === "register"
-                      ? "Crie uma senha com 6 ou mais caracteres"
-                      : "Digite sua senha"
-                  }
-                  autoComplete={
-                    mode === "login" ? "current-password" : "new-password"
-                  }
-                  minLength={mode === "register" ? 6 : undefined}
+                  placeholder="Digite sua senha"
+                  autoComplete="current-password"
                   required
                 />
                 <button
@@ -199,14 +146,17 @@ export function AuthPage({
             >
               {submitting ? (
                 <LoaderCircle size={18} className="animate-spin" />
-              ) : mode === "login" ? (
-                "Entrar no meu enxoval"
               ) : (
-                "Criar minha conta"
+                "Entrar no meu enxoval"
               )}
               {!submitting && <ArrowRight size={18} />}
             </button>
           </form>
+          <p className="auth-switch">
+            Ainda não tem conta?{" "}
+            <a href="/comecar">Monte seu plano de casa nova</a> e crie a sua no
+            final.
+          </p>
           <div className="auth-divider">
             <span>ou conheça antes de começar</span>
           </div>
@@ -216,7 +166,6 @@ export function AuthPage({
           <p className="auth-note">
             <ShieldCheck size={15} /> Sem cartão de crédito. No seu tempo.
           </p>
-          <a className="auth-admin-link" href="/admin/login">Acesso administrativo</a>
         </div>
         <span className="auth-bottom">
           Pequenos planos. Grandes começos. <Heart size={12} />

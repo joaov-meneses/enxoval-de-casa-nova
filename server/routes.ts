@@ -1,10 +1,12 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
+import { MAX_ENVIRONMENT_NAME_LENGTH } from '../src/data.ts';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from '../src/types.ts';
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -80,6 +82,14 @@ function requireText(value: unknown, fieldName: string) {
   }
 
   return value.trim();
+}
+
+function requireEnvironmentName(value: unknown) {
+  const name = requireText(value, 'Nome do ambiente');
+  if (name.length > MAX_ENVIRONMENT_NAME_LENGTH) {
+    throw new HttpError(400, `O nome do ambiente pode ter no máximo ${MAX_ENVIRONMENT_NAME_LENGTH} caracteres.`);
+  }
+  return name;
 }
 
 function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password'>>): AuthUser {
@@ -332,26 +342,102 @@ async function seedEnxovalDefaults(client: PoolClient, userId: string, enxovalId
   }
 }
 
-async function createEnxovalForUser(userId: string, name: string, options: { useDefaultTemplate?: boolean } = {}) {
-  return withTransaction(async client => {
-    const enxovalId = randomUUID();
+interface EnxovalPlan {
+  categories: { name: string; items: { name: string; description: string }[] }[];
+}
 
-    const enxovalResult = await client.query<EnxovalRow>(`
-      INSERT INTO enxovais (id, name, owner_id)
-      VALUES ($1, $2, $3)
-      RETURNING id, name, owner_id, discount_cents, 'owner'::text AS role
-    `, [enxovalId, name, userId]);
+const MAX_PLAN_CATEGORIES = 15;
+const MAX_PLAN_ITEMS = 400;
+
+/** Plano gerado pelo funil de onboarding: ambientes e itens, com limites para não virar um vetor de abuso. */
+function parsePlan(value: unknown): EnxovalPlan | null {
+  if (value === undefined || value === null) return null;
+  const categories = (value as { categories?: unknown })?.categories;
+  if (!Array.isArray(categories) || categories.length === 0 || categories.length > MAX_PLAN_CATEGORIES) {
+    throw new HttpError(400, 'Plano inválido.');
+  }
+
+  let totalItems = 0;
+  const parsed = categories.map(category => {
+    const items = (category as { items?: unknown })?.items;
+    if (!Array.isArray(items)) throw new HttpError(400, 'Plano inválido.');
+    totalItems += items.length;
+    if (totalItems > MAX_PLAN_ITEMS) throw new HttpError(400, 'Plano com itens demais.');
+
+    return {
+      name: requireEnvironmentName((category as { name?: unknown }).name),
+      items: items.map(item => {
+        const rawName = (item as { name?: unknown })?.name;
+        const rawDescription = (item as { description?: unknown })?.description;
+        const name = requireText(rawName, 'Nome do item');
+        if (name.length > 120) throw new HttpError(400, 'Nome do item muito longo.');
+        const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
+        if (description.length > 200) throw new HttpError(400, 'Descrição do item muito longa.');
+        return { name, description };
+      })
+    };
+  });
+
+  if (new Set(parsed.map(category => category.name)).size !== parsed.length) {
+    throw new HttpError(400, 'Plano com ambientes repetidos.');
+  }
+  if (totalItems === 0) throw new HttpError(400, 'Plano sem itens.');
+
+  return { categories: parsed };
+}
+
+async function seedEnxovalPlan(client: PoolClient, userId: string, enxovalId: string, plan: EnxovalPlan) {
+  for (const [categoryIndex, planCategory] of plan.categories.entries()) {
+    const category = await findOrCreateCategory(client, userId, enxovalId, planCategory.name, categoryIndex);
+    if (planCategory.items.length === 0) continue;
 
     await client.query(`
-      INSERT INTO enxoval_members (enxoval_id, user_id, role)
-      VALUES ($1, $2, 'owner')
-    `, [enxovalId, userId]);
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, description, sort_order)
+      SELECT t.id, $1::uuid, $2::uuid, $3::uuid, t.name, t.description, t.sort_order
+      FROM unnest($4::uuid[], $5::text[], $6::text[], $7::int[]) AS t(id, name, description, sort_order)
+    `, [
+      userId,
+      enxovalId,
+      category.id,
+      planCategory.items.map(() => randomUUID()),
+      planCategory.items.map(item => item.name),
+      planCategory.items.map(item => item.description),
+      planCategory.items.map((_, index) => index)
+    ]);
+  }
+}
 
-    if (options.useDefaultTemplate !== false) {
-      await seedEnxovalDefaults(client, userId, enxovalId);
-    }
+async function insertEnxoval(
+  client: PoolClient,
+  userId: string,
+  name: string,
+  options: { useDefaultTemplate?: boolean; plan?: EnxovalPlan | null; profile?: OnboardingProfile | null } = {}
+) {
+  const enxovalId = randomUUID();
 
-    return fetchWorkspace(client, userId, enxovalResult.rows[0].id);
+  await client.query(`
+    INSERT INTO enxovais (id, name, owner_id, onboarding_profile)
+    VALUES ($1, $2, $3, $4::jsonb)
+  `, [enxovalId, name, userId, options.profile ? JSON.stringify(options.profile) : null]);
+
+  await client.query(`
+    INSERT INTO enxoval_members (enxoval_id, user_id, role)
+    VALUES ($1, $2, 'owner')
+  `, [enxovalId, userId]);
+
+  if (options.plan) {
+    await seedEnxovalPlan(client, userId, enxovalId, options.plan);
+  } else if (options.useDefaultTemplate !== false) {
+    await seedEnxovalDefaults(client, userId, enxovalId);
+  }
+
+  return enxovalId;
+}
+
+async function createEnxovalForUser(userId: string, name: string, options: { useDefaultTemplate?: boolean } = {}) {
+  return withTransaction(async client => {
+    const enxovalId = await insertEnxoval(client, userId, name, options);
+    return fetchWorkspace(client, userId, enxovalId);
   });
 }
 
@@ -394,7 +480,7 @@ async function requireCurrentUser(req: Request, allowPasswordChange = false) {
   return user;
 }
 
-async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string }) {
+async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string }) {
   return withTransaction(async client => {
     await requireEnxovalMember(client, input.userId, input.enxovalId);
 
@@ -417,9 +503,9 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
 
     const itemId = randomUUID();
     await client.query(`
-      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0]);
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order, price_cents, link, description)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, input.link ?? '', input.description ?? '']);
 
     const itemResult = await client.query<ItemRow>(`
       SELECT
@@ -606,6 +692,16 @@ export function registerApiRoutes(app: Express) {
     if (password.length > 128) throw new HttpError(400, 'A senha pode ter no máximo 128 caracteres.');
     if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
 
+    // O cadastro só existe pelo funil de onboarding (/comecar): exige o plano e as respostas,
+    // validados por completo antes de criar qualquer coisa.
+    const plan = parsePlan(req.body?.plan);
+    if (!plan) {
+      throw new HttpError(400, 'O cadastro é feito pelo funil de onboarding. Monte o seu plano em /comecar.');
+    }
+    const enxovalName = requireText(req.body?.enxovalName, 'Nome do enxoval');
+    if (enxovalName.length > 100) throw new HttpError(400, 'Nome do enxoval muito longo.');
+    const profile = parseOnboardingProfile(req.body?.profile);
+
     const passwordHash = await hashPassword(password);
     const userId = randomUUID();
 
@@ -615,6 +711,8 @@ export function registerApiRoutes(app: Express) {
           INSERT INTO users (id, name, email, password_hash, last_login_at)
           VALUES ($1, $2, $3, $4, now())
         `, [userId, name, email, passwordHash]);
+
+        await insertEnxoval(client, userId, enxovalName, { useDefaultTemplate: false, plan, profile });
       });
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
@@ -791,7 +889,7 @@ export function registerApiRoutes(app: Express) {
 
   router.post('/categories', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    const name = requireText(req.body?.name, 'Nome do ambiente');
+    const name = requireEnvironmentName(req.body?.name);
     const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
 
     const category = await withTransaction(client => findOrCreateCategory(client, user.id, enxovalId, name));
@@ -813,8 +911,7 @@ export function registerApiRoutes(app: Express) {
   router.patch('/categories/:id', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
-    const name = requireText(req.body?.name, 'Nome do ambiente');
-    if (name.length > 100) throw new HttpError(400, 'O nome pode ter no máximo 100 caracteres.');
+    const name = requireEnvironmentName(req.body?.name);
     await requireEnxovalMember(getPool(), user.id, enxovalId);
     try {
       const result = await getPool().query<CategoryRow>(
@@ -826,6 +923,18 @@ export function registerApiRoutes(app: Express) {
       if ((err as { code?: string }).code === '23505') throw new HttpError(409, 'Já existe um ambiente com esse nome.');
       throw err;
     }
+  }));
+
+  router.delete('/categories/:id', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const enxovalId = requireText(req.query.enxovalId, 'Enxoval');
+    await requireEnxovalMember(getPool(), user.id, enxovalId);
+    // Os itens do ambiente são removidos junto (ON DELETE CASCADE).
+    const result = await getPool().query<{ id: string }>(
+      'DELETE FROM categories WHERE id = $1 AND enxoval_id = $2 RETURNING id',
+      [req.params.id, enxovalId]);
+    if (!result.rows[0]) throw new HttpError(404, 'Ambiente não encontrado.');
+    res.status(204).end();
   }));
 
   router.patch('/items/order', asyncHandler(async (req, res) => {
@@ -861,10 +970,17 @@ export function registerApiRoutes(app: Express) {
     const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
     const categoryId = typeof req.body?.categoryId === 'string' ? req.body.categoryId : undefined;
     const categoryName = typeof req.body?.categoryName === 'string' && req.body.categoryName.trim()
-      ? req.body.categoryName.trim()
+      ? requireEnvironmentName(req.body.categoryName)
       : undefined;
 
-    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName });
+    const rawPrice = req.body?.priceCents;
+    if (rawPrice !== undefined && rawPrice !== null && !(typeof rawPrice === 'number' && Number.isInteger(rawPrice) && rawPrice >= 0)) {
+      throw new HttpError(400, 'Preço inválido.');
+    }
+    const link = typeof req.body?.link === 'string' ? req.body.link.trim() : undefined;
+    const description = typeof req.body?.description === 'string' ? req.body.description.trim() : undefined;
+
+    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName, priceCents: rawPrice, link, description });
     res.status(201).json(result);
   }));
 
