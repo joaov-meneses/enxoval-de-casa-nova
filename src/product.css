@@ -5576,3 +5576,46 @@ button.reorder-handle:disabled {
     display: none;
   }
 }
+
+/* Esqueci minha senha */
+.auth-form .auth-forgot {
+  align-self: flex-end;
+  margin-top: -8px;
+  padding: 6px 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #70533d;
+  text-decoration: underline;
+  text-decoration-color: #cdb8a3;
+  text-underline-offset: 3px;
+}
+.auth-form .auth-forgot:hover {
+  color: #4f3a29;
+  text-decoration-color: currentColor;
+}
+.account-access-card .account-cta {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 24px;
+}
+.account-access-card .account-resend {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+}
+.account-checking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 0;
+  font-size: 14px;
+  color: #6c7066;
+}
+
+.account-access-card > .account-password-hint {
+  margin-top: 14px;
+}
+.account-access-card > .account-identity {
+  font-weight: 500;
+}

@@ -38,9 +38,19 @@ O comando `dev:preview` **não conecta ao banco nem executa migrações**. A dem
 | `npm run db:down` | Para e remove o container, mantendo os dados |
 | `docker compose down -v` | Para e **apaga os dados** do volume |
 
-O fluxo de autenticação e a API PostgreSQL originais foram preservados. Compartilhar um enxoval adiciona como membro uma pessoa que já possui conta, usando seu e-mail; não há envio de e-mail implementado.
+O fluxo de autenticação e a API PostgreSQL originais foram preservados. Compartilhar um enxoval adiciona como membro uma pessoa que já possui conta, usando seu e-mail; convites não enviam e-mail (o e-mail só é usado na recuperação de senha).
 
-## Gestão de usuários e recuperação de senha
+## Esqueci minha senha (link por e-mail)
+
+Na tela de login, **Esqueci minha senha** leva a `/esqueci-senha`. A pessoa informa o e-mail e recebe um link para `/redefinir-senha`, onde cria uma nova senha (8 a 128 caracteres).
+
+- **Segurança:** o link vale 1 hora e serve uma única vez. Só o hash do token fica no banco (`password_reset_tokens`), e o token vai no fragmento da URL (`#token=…`), que o navegador não envia ao servidor nem a outros sites, e que é apagado da barra de endereço ao abrir a página. Um novo pedido invalida o link anterior, e um intervalo mínimo de 1 minuto por conta evita enxurrada de e-mails. A resposta do pedido é sempre a mesma, exista ou não conta com aquele e-mail, e contas inativas não recebem link. Ao redefinir, todas as sessões da conta são encerradas e a pessoa recebe um e-mail de aviso. Um reset feito pelo administrador também invalida links pendentes.
+- **Envio:** pelo [Resend](https://resend.com), via API HTTP, com `RESEND_API_KEY` e `MAIL_FROM` no servidor (veja `.env.example`). Sem essas variáveis, em desenvolvimento o e-mail aparece no console do servidor; em produção nada é enviado e o log traz um aviso (o link é um segredo e não vai para os logs). O remetente de teste `onboarding@resend.dev` só entrega para o e-mail dono da conta Resend; para enviar a qualquer pessoa, verifique um domínio no Resend e use um remetente desse domínio.
+- **`APP_URL`:** endereço público do app (ex.: `https://larume.up.railway.app`), usado para montar o link. É obrigatório em produção e nunca é lido do cabeçalho `Host`, para ninguém conseguir fazer o servidor enviar um link para outro domínio.
+- **Railway:** configure `APP_URL`, `RESEND_API_KEY` e `MAIL_FROM` como variáveis do serviço. A chave nunca deve ser commitada.
+- O teste `npm run test:password-reset-db` cobre o fluxo no PostgreSQL real, com o e-mail em memória (`MAIL_DRIVER=memory`), sem enviar nada.
+
+## Gestão de usuários e recuperação de senha pelo administrador
 
 No `.env` local e nas variáveis do serviço que hospeda o backend, configure:
 
@@ -88,6 +98,7 @@ npm run build
 npm run test:admin-api
 npm run test:onboarding-db
 npm run test:item-status-db
+npm run test:password-reset-db
 ```
 
 A suíte Playwright verifica os fluxos principais, persistência e exportação da demonstração, formulários de autenticação com API simulada, gestos e navegação mobile, foco dos diálogos e verificações automatizadas de acessibilidade com axe. As quatro telas principais são verificadas nas larguras 320, 390, 768, 1024 e 1440 px.
@@ -109,7 +120,7 @@ npm start
 
 ## Escopo comercial desta versão
 
-Os planos e preços da landing page são **ilustrativos**, conforme a proposta visual. Não existem cobrança, checkout, assinatura ou limites de plano aplicados. A recuperação de senha é assistida pelo administrador, sem envio de e-mail. Recuperação automática por e-mail, confirmação de e-mail e pagamentos não estão implementados.
+Os planos e preços da landing page são **ilustrativos**, conforme a proposta visual. Não existem cobrança, checkout, assinatura ou limites de plano aplicados. A recuperação de senha pode ser feita pela própria pessoa, por e-mail (veja “Esqueci minha senha”), ou assistida pelo administrador. Confirmação de e-mail no cadastro e pagamentos não estão implementados.
 
 ## Arquivos de identidade
 

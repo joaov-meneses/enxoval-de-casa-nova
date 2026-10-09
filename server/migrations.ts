@@ -183,6 +183,16 @@ export async function migrateDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at timestamptz;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
 
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash text NOT NULL UNIQUE,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS password_reset_tokens_user_id_idx ON password_reset_tokens(user_id);
+    CREATE INDEX IF NOT EXISTS password_reset_tokens_expires_at_idx ON password_reset_tokens(expires_at);
+
     CREATE TABLE IF NOT EXISTS admin_sessions (
       id uuid PRIMARY KEY,
       token_hash text NOT NULL UNIQUE,

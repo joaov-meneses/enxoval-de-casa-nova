@@ -58,8 +58,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const body = (await response.json().catch(() => null)) as {
       error?: string;
     } | null;
+    // Rota que o servidor não conhece (404 sem mensagem): em desenvolvimento quase sempre é um servidor que
+    // ainda roda o código antigo. A dica some do build de produção, que usa a mensagem genérica.
+    const staleServerHint =
+      import.meta.env.DEV && !body?.error && response.status === 404
+        ? "O servidor não reconheceu esta ação. Se você acabou de atualizar o código, reinicie o servidor (npm run dev)."
+        : null;
     throw new ApiError(
-      body?.error ?? "Não foi possível concluir a operação.",
+      body?.error ??
+        staleServerHint ??
+        "Não foi possível concluir a operação.",
       response.status,
     );
   }
@@ -104,6 +112,32 @@ export function changeRequiredPassword(password: string, confirmation: string) {
   return request<BootstrapData>("/api/auth/change-password", {
     method: "POST",
     body: JSON.stringify({ password, confirmation }),
+  });
+}
+
+/** Pede o link de redefinição. A resposta é a mesma exista ou não conta com o e-mail. */
+export function requestPasswordReset(email: string) {
+  return request<{ ok: boolean }>("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function checkPasswordResetToken(token: string) {
+  return request<{ valid: boolean }>("/api/auth/reset-password/check", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function resetPassword(
+  token: string,
+  password: string,
+  confirmation: string,
+) {
+  return request<{ ok: boolean }>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password, confirmation }),
   });
 }
 

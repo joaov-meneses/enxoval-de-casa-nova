@@ -8,10 +8,13 @@ import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMemb
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { appBaseUrl, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const RESET_TOKEN_TTL_MS = 60 * 60_000;
+const RESET_REQUEST_COOLDOWN_SECONDS = 60;
 
 interface DbUserRow {
   id: string;
@@ -469,6 +472,49 @@ async function createSession(res: Response, userId: string, queryable: Queryable
   });
 }
 
+/**
+ * Cria o link de redefinição e o envia por e-mail. Roda depois de a resposta já ter saído, então o tempo de resposta
+ * não revela se o e-mail tem conta. Só o hash do token vai para o banco.
+ */
+async function issuePasswordReset(email: string) {
+  const found = await getPool().query<{ id: string; name: string; email: string; is_active: boolean }>(
+    'SELECT id, name, email, is_active FROM users WHERE email = $1 LIMIT 1', [email]);
+  const user = found.rows[0];
+  if (!user || !user.is_active) return;
+
+  const base = appBaseUrl();
+  if (!base) {
+    console.error('Redefinição de senha: configure APP_URL (ex.: https://seu-dominio.com) para montar o link do e-mail.');
+    return;
+  }
+
+  const token = randomBytes(32).toString('base64url');
+  const created = await withTransaction(async client => {
+    await client.query('DELETE FROM password_reset_tokens WHERE expires_at <= now()');
+    // Trava a conta para duas solicitações simultâneas não gerarem dois links nem passarem do intervalo mínimo.
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [user.id]);
+    const recent = await client.query(
+      `SELECT 1 FROM password_reset_tokens WHERE user_id = $1 AND created_at > now() - make_interval(secs => $2) LIMIT 1`,
+      [user.id, RESET_REQUEST_COOLDOWN_SECONDS]);
+    if (recent.rowCount) return false;
+    // Um novo pedido invalida o link anterior.
+    await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
+    await client.query(
+      'INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at) VALUES ($1, $2, $3, $4)',
+      [randomUUID(), user.id, hashSessionToken(token), new Date(Date.now() + RESET_TOKEN_TTL_MS)]);
+    return true;
+  });
+  if (!created) return;
+
+  // O token vai no fragmento (#), que o navegador não envia ao servidor nem a outros sites pelo Referer.
+  await sendMail(passwordResetEmail({
+    to: user.email,
+    name: user.name,
+    link: `${base}/redefinir-senha#token=${token}`,
+    minutes: RESET_TOKEN_TTL_MS / 60_000
+  }));
+}
+
 async function getCurrentUser(req: Request) {
   const token = getCookie(req, SESSION_COOKIE);
   if (!token) return null;
@@ -829,6 +875,57 @@ export function registerApiRoutes(app: Express) {
       return mapUser({ ...row, must_change_password: false });
     });
     res.json(await fetchBootstrap(updatedUser));
+  }));
+
+  router.post('/auth/forgot-password', loginRateLimit(8), asyncHandler(async (req, res) => {
+    const email = normalizeEmail(req.body?.email);
+    if (!email || email.length > 254 || !email.includes('@')) throw new HttpError(400, 'Informe um e-mail válido.');
+    // A resposta é a mesma exista ou não uma conta com esse e-mail: ninguém descobre quem tem cadastro.
+    res.json({ ok: true });
+    void issuePasswordReset(email).catch(err =>
+      console.error('Falha ao preparar a redefinição de senha:', err instanceof Error ? err.message : err));
+  }));
+
+  router.post('/auth/reset-password/check', loginRateLimit(30), asyncHandler(async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    if (token.length < 20 || token.length > 200) {
+      res.json({ valid: false });
+      return;
+    }
+    const result = await getPool().query(
+      `SELECT 1 FROM password_reset_tokens t INNER JOIN users u ON u.id = t.user_id
+       WHERE t.token_hash = $1 AND t.expires_at > now() AND u.is_active`,
+      [hashSessionToken(token)]);
+    res.json({ valid: Boolean(result.rowCount) });
+  }));
+
+  router.post('/auth/reset-password', loginRateLimit(10), asyncHandler(async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const password = requireText(req.body?.password, 'Nova senha');
+    const confirmation = requireText(req.body?.confirmation, 'Confirmação da senha');
+    if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
+    if (password !== confirmation) throw new HttpError(400, 'As senhas não coincidem.');
+    if (token.length < 20 || token.length > 200) throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo link de redefinição.');
+
+    const user = await withTransaction(async client => {
+      const result = await client.query<{ id: string; name: string; email: string }>(
+        `SELECT u.id, u.name, u.email FROM password_reset_tokens t INNER JOIN users u ON u.id = t.user_id
+         WHERE t.token_hash = $1 AND t.expires_at > now() AND u.is_active
+         FOR UPDATE OF t, u`,
+        [hashSessionToken(token)]);
+      const row = result.rows[0];
+      if (!row) throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo link de redefinição.');
+      await client.query(
+        'UPDATE users SET password_hash = $2, must_change_password = false, password_reset_expires_at = NULL, updated_at = now() WHERE id = $1',
+        [row.id, await hashPassword(password)]);
+      // Quem tinha a sessão aberta (inclusive um invasor) é desconectado, e o link não serve de novo.
+      await client.query('DELETE FROM sessions WHERE user_id = $1', [row.id]);
+      await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [row.id]);
+      return row;
+    });
+    res.json({ ok: true });
+    void sendMail(passwordChangedEmail({ to: user.email, name: user.name })).catch(err =>
+      console.error('Falha ao enviar o aviso de senha alterada:', err instanceof Error ? err.message : err));
   }));
 
   router.post('/auth/logout', asyncHandler(async (req, res) => {

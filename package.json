@@ -20,7 +20,8 @@
     "test:e2e": "playwright test",
     "test:admin-api": "node --import tsx tests/admin-api.mjs",
     "test:onboarding-db": "node --import tsx tests/onboarding-register-db.mjs",
-    "test:item-status-db": "node --import tsx tests/item-status-db.mjs"
+    "test:item-status-db": "node --import tsx tests/item-status-db.mjs",
+    "test:password-reset-db": "node --import tsx tests/password-reset-db.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

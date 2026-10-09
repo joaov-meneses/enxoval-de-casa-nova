@@ -12,6 +12,7 @@ import {
 import { login } from "../api";
 import type { BootstrapData } from "../types";
 import { Brand } from "./Brand";
+import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
 
 export function AuthPage({
   onAuthenticated,
@@ -134,6 +135,21 @@ export function AuthPage({
                 </button>
               </span>
             </label>
+            <a
+              className="auth-forgot"
+              href="/esqueci-senha"
+              onClick={() => {
+                // Leva o e-mail já digitado para a próxima tela (fica só na sessão, nunca na URL).
+                try {
+                  if (email.trim())
+                    sessionStorage.setItem(FORGOT_EMAIL_KEY, email.trim());
+                } catch {
+                  /* Sem armazenamento, a pessoa digita o e-mail de novo. */
+                }
+              }}
+            >
+              Esqueci minha senha
+            </a>
             {error && (
               <div className="form-error" role="alert">
                 {error}
