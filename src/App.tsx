@@ -1582,7 +1582,9 @@ export default function App() {
         Pular para a lista
       </a>
       <div inert={isWorkspaceMenuOpen}>
-        <aside className="workspace-sidebar">
+        {/* Barra fixa e com rolagem própria: sem layoutRoot/layoutScroll, o motion lê a rolagem da página
+            como deslocamento dos ambientes e os anima "para baixo e de volta" ao trocar de ambiente. */}
+        <motion.aside layoutRoot layoutScroll className="workspace-sidebar">
           <a href="/" className="brand-link">
             <Brand />
           </a>
@@ -1673,7 +1675,7 @@ export default function App() {
               </span>
             </div>
           </div>
-        </aside>
+        </motion.aside>
         <div className="desktop-app-header">
           <span>
             Meu cantinho <ChevronRight size={14} />{" "}
