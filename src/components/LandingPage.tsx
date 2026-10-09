@@ -5,10 +5,8 @@ import {
   Check,
   ChevronDown,
   Heart,
-  LayoutGrid,
   ListChecks,
   Menu,
-  Play,
   Plus,
   ShieldCheck,
   Smartphone,
@@ -18,7 +16,6 @@ import {
   X,
   Coffee,
   BedDouble,
-  Sofa,
   Bath,
 } from "lucide-react";
 import { Brand } from "./Brand";
@@ -42,13 +39,60 @@ const faqs = [
   ],
   [
     "Os planos já estão disponíveis para compra?",
-    "Ainda não. Os valores desta página são uma demonstração da proposta do produto. Não há cobrança, assinatura ativa nem solicitação de cartão. Você pode explorar o aplicativo pela demonstração.",
+    "Ainda não. Os valores desta página são uma demonstração da proposta do produto. Não há cobrança, assinatura ativa nem solicitação de cartão.",
   ],
+];
+
+const MONTHLY_PRICE = 19.99;
+const ANNUAL_PRICE = 49.9;
+const brl = (value: number) =>
+  new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+/** Quanto o anual economiza em relação a 12 meses no plano mensal. */
+const ANNUAL_SAVING = Math.round(
+  (1 - ANNUAL_PRICE / (MONTHLY_PRICE * 12)) * 100,
+);
+
+type PlanId = "annual" | "monthly";
+
+const PLANS: {
+  id: PlanId;
+  name: string;
+  billing: string;
+  price: string;
+  badge?: string;
+}[] = [
+  {
+    id: "annual",
+    name: "Anual",
+    billing: `${brl(ANNUAL_PRICE)} cobrados por ano`,
+    price: brl(ANNUAL_PRICE / 12),
+    badge: `MELHOR VALOR · ECONOMIZE ${ANNUAL_SAVING}%`,
+  },
+  {
+    id: "monthly",
+    name: "Mensal",
+    billing: "Cobrado todo mês",
+    price: brl(MONTHLY_PRICE),
+  },
+];
+
+const PLAN_FEATURES = [
+  "Vários enxovais no mesmo lugar",
+  "Lista sugerida por ambiente",
+  "Links, preços e anotações",
+  "Organização compartilhada",
+  "Descontos e cashback",
+  "Importação e exportação em Excel e CSV",
+  "Acesso no celular e no computador",
 ];
 
 export function LandingPage({ signedIn }: { signedIn: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [faq, setFaq] = useState<number | null>(0);
+  const [plan, setPlan] = useState<PlanId>("annual");
   useEffect(() => {
     document.title = "Larume — seu lar começa com um plano";
   }, []);
@@ -65,9 +109,6 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           className={`site-nav ${menuOpen ? "is-open" : ""}`}
           aria-label="Navegação principal"
         >
-          <a href="#como-funciona" onClick={() => setMenuOpen(false)}>
-            Como funciona
-          </a>
           <a href="#recursos" onClick={() => setMenuOpen(false)}>
             Feito para você
           </a>
@@ -82,7 +123,10 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <a className="login-link" href={signedIn ? "/app" : "/login"}>
             {signedIn ? "Meu enxoval" : "Entrar"}
           </a>
-          <a className="button button-dark button-small" href={signedIn ? "/app" : "/comecar"}>
+          <a
+            className="button button-dark button-small"
+            href={signedIn ? "/app" : "/comecar"}
+          >
             Começar meu enxoval <ArrowUpRight size={16} />
           </a>
           <button
@@ -120,14 +164,11 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
               próximo lar.
             </p>
             <div className="hero-actions">
-              <a href={signedIn ? "/app" : "/comecar"} className="button button-dark">
+              <a
+                href={signedIn ? "/app" : "/comecar"}
+                className="button button-dark"
+              >
                 Começar meu enxoval <ArrowRight size={18} />
-              </a>
-              <a href="/demo" className="button button-text">
-                <span className="play-circle">
-                  <Play size={12} fill="currentColor" />
-                </span>{" "}
-                Explorar demonstração
               </a>
             </div>
             <div className="hero-reassurance">
@@ -203,55 +244,6 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
             </span>
           </div>
         </div>
-        <section
-          className="steps-section page-width section-space"
-          id="como-funciona"
-        >
-          <div className="section-heading">
-            <span className="eyebrow">
-              MENOS LISTAS PERDIDAS. MAIS CASA PRONTA.
-            </span>
-            <h2>
-              Um novo lar começa
-              <br />
-              com pequenos passos.
-            </h2>
-            <p>Você cuida dos sonhos. A gente ajuda a organizar o caminho.</p>
-          </div>
-          <div className="steps-grid">
-            {[
-              {
-                n: "01",
-                icon: LayoutGrid,
-                title: "Dê um lugar aos seus planos",
-                text: "Comece com uma lista sugerida ou crie a sua. Organize por ambiente e deixe tudo com a sua cara.",
-              },
-              {
-                n: "02",
-                icon: Heart,
-                title: "Reúna seus favoritos",
-                text: "Guarde links, preços e observações. Aquela panela que você amou nunca mais se perde em uma conversa.",
-              },
-              {
-                n: "03",
-                icon: Check,
-                title: "Celebre cada conquista",
-                text: "Marque o que já comprou, acompanhe os gastos e veja seu lar ganhar forma, um item de cada vez.",
-              },
-            ].map((s) => (
-              <article className="step" key={s.n}>
-                <div className="step-top">
-                  <span className="feature-icon">
-                    <s.icon size={24} strokeWidth={1.4} />
-                  </span>
-                  <span className="step-number">{s.n}</span>
-                </div>
-                <h3>{s.title}</h3>
-                <p>{s.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
         <section className="features-section section-space" id="recursos">
           <div className="page-width feature-layout">
             <div
@@ -376,59 +368,10 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
                   </span>
                 </div>
               </div>
-              <a className="text-link" href="/demo">
+              <a className="text-link" href={signedIn ? "/app" : "/comecar"}>
                 Conhecer meu futuro enxoval <ArrowRight size={17} />
               </a>
             </div>
-          </div>
-        </section>
-        <section className="rooms-section page-width section-space">
-          <div className="rooms-intro">
-            <span className="eyebrow">CADA CANTO CONTA UMA HISTÓRIA</span>
-            <h2>
-              Da cozinha ao seu
-              <br />
-              cantinho favorito.
-            </h2>
-            <p>
-              Listas sugeridas para você lembrar do essencial
-              <br />e abrir espaço para o que é só seu.
-            </p>
-          </div>
-          <div className="room-grid">
-            {[
-              {
-                icon: Coffee,
-                name: "Cozinha",
-                desc: "Receitas para novos começos",
-                color: "sand",
-              },
-              {
-                icon: BedDouble,
-                name: "Quarto",
-                desc: "Seu lugar de recarregar",
-                color: "sage",
-              },
-              {
-                icon: Bath,
-                name: "Banheiro",
-                desc: "Cuidado em cada detalhe",
-                color: "rose",
-              },
-              {
-                icon: Sofa,
-                name: "Sala de estar",
-                desc: "Espaço para boas histórias",
-                color: "cream",
-              },
-            ].map((r) => (
-              <a className={`room-card ${r.color}`} href="/demo" key={r.name}>
-                <r.icon size={34} strokeWidth={1.2} />
-                <strong>{r.name}</strong>
-                <span>{r.desc}</span>
-                <ArrowUpRight className="room-arrow" size={18} />
-              </a>
-            ))}
           </div>
         </section>
         <section className="pricing-section section-space" id="planos">
@@ -440,62 +383,70 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
                 <br />
                 <em>Planos descomplicados.</em>
               </h2>
-              <p>Uma proposta de planos para cada momento do seu lar.</p>
+              <p>
+                Dois planos, com os mesmos recursos. Escolha como prefere pagar.
+              </p>
             </div>
-            <div className="pricing-grid">
-              <article className="price-card">
-                <span className="plan-name">Primeiros passos</span>
-                <p>Para começar a tirar os sonhos do papel.</p>
-                <div className="price">
-                  Grátis<span>para dar o primeiro passo</span>
-                </div>
-                <a href={signedIn ? "/app" : "/comecar"} className="button button-outline">
+            <div className="plan-picker">
+              <div className="plan-includes">
+                <h3>Tudo incluído, em qualquer plano</h3>
+                <ul>
+                  {PLAN_FEATURES.map((t) => (
+                    <li key={t}>
+                      <Check size={16} />
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="plan-choice">
+                <fieldset className="plan-options">
+                  <legend className="sr-only">Escolha seu plano</legend>
+                  {PLANS.map((option) => (
+                    <label
+                      key={option.id}
+                      className={`plan-option${plan === option.id ? " is-selected" : ""}${option.badge ? " has-badge" : ""}`}
+                    >
+                      {option.badge && (
+                        <span className="plan-option-badge">
+                          {option.badge}
+                        </span>
+                      )}
+                      <input
+                        type="radio"
+                        name="plano"
+                        value={option.id}
+                        checked={plan === option.id}
+                        onChange={() => setPlan(option.id)}
+                      />
+                      <span className="plan-option-row">
+                        <span className="plan-option-check" aria-hidden="true">
+                          <Check size={14} strokeWidth={2.5} />
+                        </span>
+                        <span className="plan-option-text">
+                          <strong>{option.name}</strong>
+                          <small>{option.billing}</small>
+                        </span>
+                        <span className="plan-option-price">
+                          <strong>{option.price}</strong>
+                          <small>/mês</small>
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+                <a
+                  href={signedIn ? "/app" : "/comecar"}
+                  className="button button-dark plan-cta"
+                >
                   Começar meu enxoval <ArrowRight size={17} />
                 </a>
-                <ul>
-                  {[
-                    "Seu primeiro enxoval",
-                    "Lista sugerida por ambiente",
-                    "Links, preços e anotações",
-                    "Acesso no celular e computador",
-                  ].map((t) => (
-                    <li key={t}>
-                      <Check size={16} />
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-              <article className="price-card featured">
-                <span className="plan-badge">
-                  <Sparkles size={13} /> MAIS ESPAÇO PARA SONHAR
-                </span>
-                <span className="plan-name">Casa completa</span>
-                <p>Para cuidar de todos os detalhes, juntos.</p>
-                <div className="price">
-                  R$ 14
-                  <span>
-                    ,90 <small>/ mês</small>
-                  </span>
-                </div>
-                <a href="/demo" className="button button-dark">
-                  Experimentar a demonstração <ArrowRight size={17} />
-                </a>
-                <ul>
-                  {[
-                    "Tudo do Primeiros passos",
-                    "Vários enxovais no mesmo lugar",
-                    "Organização compartilhada",
-                    "Descontos e cashback",
-                    "Exportação da lista em CSV",
-                  ].map((t) => (
-                    <li key={t}>
-                      <Check size={16} />
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              </article>
+                <p className="plan-summary" aria-live="polite">
+                  {plan === "annual"
+                    ? `Plano anual: ${brl(ANNUAL_PRICE)} por ano, o equivalente a ${brl(ANNUAL_PRICE / 12)} por mês.`
+                    : `Plano mensal: ${brl(MONTHLY_PRICE)} por mês.`}
+                </p>
+              </div>
             </div>
             <p className="pricing-disclaimer">
               <ShieldCheck size={15} /> Planos e valores ilustrativos. Nenhuma
@@ -542,7 +493,10 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
             ao seu novo começo?
           </h2>
           <p>Uma lista hoje. Um lar com a sua cara amanhã.</p>
-          <a href={signedIn ? "/app" : "/comecar"} className="button button-dark">
+          <a
+            href={signedIn ? "/app" : "/comecar"}
+            className="button button-dark"
+          >
             Criar meu enxoval <ArrowRight size={18} />
           </a>
           <span className="cta-footnote">
@@ -558,9 +512,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <p>Seu lar começa com um plano.</p>
         </div>
         <div className="footer-links">
-          <a href="#como-funciona">Como funciona</a>
           <a href="#planos">Planos</a>
-          <a href="/demo">Demonstração</a>
           <a href="/privacidade">Privacidade</a>
         </div>
         <span>

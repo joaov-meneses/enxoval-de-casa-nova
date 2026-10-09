@@ -173,12 +173,6 @@ export function AuthPage({
             <a href="/comecar">Monte seu plano de casa nova</a> e crie a sua no
             final.
           </p>
-          <div className="auth-divider">
-            <span>ou conheça antes de começar</span>
-          </div>
-          <a href="/demo" className="button button-outline">
-            Explorar a demonstração <ArrowUpIcon />
-          </a>
           <p className="auth-note">
             <ShieldCheck size={15} /> Sem cartão de crédito. No seu tempo.
           </p>
@@ -189,7 +183,4 @@ export function AuthPage({
       </section>
     </main>
   );
-}
-function ArrowUpIcon() {
-  return <ArrowRight size={16} />;
 }

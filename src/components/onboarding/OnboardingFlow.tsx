@@ -21,7 +21,6 @@ import {
   BedDouble,
   Building2,
   CalendarClock,
-  CalendarDays,
   Check,
   ClipboardCheck,
   Clock,
@@ -64,7 +63,6 @@ import {
 } from "lucide-react";
 import { Brand } from "../Brand";
 import { fetchBootstrap, register } from "../../api";
-import { applyPlanToDemo } from "../../demo";
 import { track } from "../../onboarding/analytics";
 import { detectStateFromDevice } from "../../onboarding/location";
 import {
@@ -2093,12 +2091,6 @@ function SaveStep({
     }
   };
 
-  const openDemo = () => {
-    applyPlanToDemo(first, plan.enxovalName, payload);
-    track("demo_open");
-    window.location.assign("/demo");
-  };
-
   return (
     <>
       <div className="ob-save-head">
@@ -2188,12 +2180,6 @@ function SaveStep({
         .
       </p>
 
-      <div className="ob-divider">
-        <span>ou</span>
-      </div>
-      <button type="button" className="ob-outline" onClick={openDemo}>
-        <CalendarDays size={18} /> Explorar meu plano agora
-      </button>
       <p className="ob-trust">
         <ShieldCheck size={15} /> Sem cartão de crédito. Seus dados ficam só com você.
       </p>

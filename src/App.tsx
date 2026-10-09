@@ -23,7 +23,6 @@ import {
   SlidersHorizontal,
   LayoutDashboard,
   ListChecks,
-  ArrowUpRight,
   ChevronRight,
   Menu,
   Percent,
@@ -68,7 +67,6 @@ import { Brand } from "./components/Brand";
 import { WorkspaceMenu } from "./components/WorkspaceMenu";
 import { ImportItemsButton } from "./components/ImportItemsDialog";
 import { RoomIcon, WorkspaceOverview } from "./components/WorkspaceOverview";
-import { isDemoMode } from "./demo";
 import {
   activeItems,
   discountApplies,
@@ -1669,9 +1667,7 @@ export default function App() {
               </span>
               <span>
                 <strong>{user.name}</strong>
-                <small>
-                  {isDemoMode() ? "Explorando a Larume" : user.email}
-                </small>
+                <small>{user.email}</small>
               </span>
             </div>
           </div>
@@ -1741,18 +1737,6 @@ export default function App() {
           </a>
           <span>Seu lar, tomando forma.</span>
         </div>
-        {isDemoMode() && (
-          <div className="demo-banner">
-            <span>
-              <Sparkles size={14} />
-              <strong>Você está na demonstração.</strong>{" "}
-              <span>Explore à vontade. Os dados ficam neste navegador.</span>
-            </span>
-            <a href="/comecar">
-              Criar minha conta <ArrowUpRight size={14} />
-            </a>
-          </div>
-        )}
         <div
           aria-hidden="true"
           className="pointer-events-none fixed left-1/2 top-3 z-50 sm:hidden transition-opacity duration-150"

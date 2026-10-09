@@ -50,7 +50,7 @@ Barra de progresso entre "nome" e "plano pronto". O número de passos muda: "sem
 | 21 | `firstnight` | valor | "A primeira noite de {nome}, resolvida": os itens essenciais para dormir, tomar banho e comer no dia da mudança, por ambiente, com quantidades | — | — |
 | 22 | `schedule` | valor | "Seu cronograma de compras", com datas até a mudança (só se a data foi informada): móveis e eletros grandes, valor médio, resto do essencial, kit da primeira noite e o que fica para depois | — | — |
 | 23 | `compare` | persuasão | "A diferença de ter um plano" (sem plano × com o plano de {nome}) | — | — |
-| 24 | `save` | conta | "Salve o plano de {nome}": e-mail e senha. Alternativa: explorar na demonstração (sem conta) | e-mail, senha | Cria a conta com o primeiro enxoval já montado. Mostra também o que a conta libera (marcar compras, preço e link, descontos e cashback, compartilhar) |
+| 24 | `save` | conta | "Salve o plano de {nome}": e-mail e senha. | e-mail, senha | Cria a conta com o primeiro enxoval já montado. Mostra também o que a conta libera (marcar compras, preço e link, descontos e cashback, compartilhar) |
 
 **A origem do visitante** ("onde você ouviu falar da gente?") não vira pergunta: é lida de `utm_source` ou do `referrer`. Pergunta sem retorno para quem responde é só atrito.
 
@@ -110,7 +110,7 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
 
 ## Medição
 
-`src/onboarding/analytics.ts` dispara `CustomEvent("larume:onboarding")` com `{ event, step, index, ... }` em: `onboarding_start`, `step_view`, `step_complete`, `onboarding_back`, `plan_ready`, `signup_submit`, `signup_success`, `demo_open`. Basta ligar um provedor de analytics ao evento. Métricas a acompanhar:
+`src/onboarding/analytics.ts` dispara `CustomEvent("larume:onboarding")` com `{ event, step, index, ... }` em: `onboarding_start`, `step_view`, `step_complete`, `onboarding_back`, `plan_ready`, `signup_submit`, `signup_success`. Basta ligar um provedor de analytics ao evento. Métricas a acompanhar:
 
 1. Início → nome (a abertura convence?).
 2. Taxa de conclusão por pergunta (a que mais perde gente é candidata a sair).
@@ -128,8 +128,6 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
 - **"Entrar com meu convite":** convite por e-mail exige conta; não há link de convite.
 
 ## Integração
-
-- **Demonstração:** "Explorar meu plano agora" cria o enxoval gerado no demo (`applyPlanToDemo`) e abre `/demo`, com o nome da pessoa no lugar de "Ana".
 - **Cadastro:** o passo final chama `POST /api/auth/register` com `enxovalName` e `plan`. O servidor valida o plano antes de criar qualquer coisa (até 15 ambientes, 400 itens, nomes de ambiente no limite do app) e cria usuário, enxoval, membro, ambientes e itens numa única transação. A resposta já traz o enxoval ativo.
 - **Falha no cadastro** (e-mail repetido, rede, validação): a mensagem aparece na própria tela e as respostas continuam no aparelho. Só são apagadas depois que a conta foi criada.
 - **Login:** não usa o plano. As respostas só são lidas pelo funil.

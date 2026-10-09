@@ -2,22 +2,14 @@
 
 Seu lar começa com um plano. Aplicativo React + Express para planejar um enxoval por ambiente, organizar compras e compartilhar listas, com persistência em PostgreSQL.
 
-## Visualizar localmente, sem banco
+## Rotas
 
-```sh
-npm install
-npm run dev:preview
-```
-
-Abra **http://localhost:3000**.
-
-- `/`: landing page com recursos, exemplos de planos e perguntas frequentes.
-- `/login`: entrada com a nova identidade visual. `/signup` redireciona para `/comecar`.
+- `/`: landing page com recursos, planos e perguntas frequentes.
+- `/login`: entrada na conta. `/signup` redireciona para `/comecar`.
 - `/comecar`: única porta de cadastro. Faz perguntas curtas, monta o plano de enxoval e cria a conta já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md).
-- `/demo`: aplicativo interativo com um enxoval de exemplo. Permite criar, editar, concluir e remover itens, criar enxovais e ambientes, reordenar ambientes e itens, registrar descontos e exportar CSV.
 - `/app`: aplicativo conectado à conta.
 
-O comando `dev:preview` **não conecta ao banco nem executa migrações**. A demonstração salva apenas os dados de exemplo em `localStorage`, na chave `larume.demo.v1`, sem salvar senhas. Esses dados são independentes da conta real. Convites não são enviados pela demonstração. Login e cadastro precisam do servidor completo; na prévia, o formulário explica essa condição.
+O produto exige conta e servidor completo (com PostgreSQL): não existe modo de demonstração nem prévia sem banco.
 
 ## Executar com contas e persistência real
 
@@ -67,7 +59,7 @@ Para recuperar um acesso, encontre a conta ativa, clique em **Redefinir senha** 
 
 Ao entrar com a senha temporária, a pessoa vê a tela de nova senha e confirmação (8 a 128 caracteres). Enquanto a troca estiver pendente, a API bloqueia as operações e não retorna os dados do enxoval no bootstrap. A conclusão remove a flag e a expiração, revoga as sessões temporárias e cria uma nova sessão. Desativar uma conta bloqueia login e revoga sessões, preservando listas e itens; reativar não recupera sessões antigas. Contas inativas precisam ser reativadas antes de gerar uma senha temporária.
 
-O admin usa sessão própria em cookie HTTP-only, com duração de 8 horas e token armazenado como hash. As rotas mutáveis exigem JSON e rejeitam origens externas; os logins possuem limite de tentativas por IP em cada processo (10 para admin, 15 para clientes a cada 15 minutos). As novas colunas e a tabela de sessões administrativas são criadas automaticamente pelo servidor completo. A prévia sem banco não habilita a gestão real.
+O admin usa sessão própria em cookie HTTP-only, com duração de 8 horas e token armazenado como hash. As rotas mutáveis exigem JSON e rejeitam origens externas; os logins possuem limite de tentativas por IP em cada processo (10 para admin, 15 para clientes a cada 15 minutos). As novas colunas e a tabela de sessões administrativas são criadas automaticamente pelo servidor completo.
 
 ## Experiência do produto
 
@@ -82,7 +74,7 @@ O admin usa sessão própria em cookie HTTP-only, com duração de 8 horas e tok
 - O ícone de menu abre um painel pela direita com convites, descontos e criação de ambientes. No mobile, também reúne seleção/criação de enxovais e a lista vertical de ambientes; no desktop, esses controles ficam na barra lateral. Renomear e excluir o enxoval aparecem apenas para o dono; excluir mantém a confirmação. O painel tem rolagem independente, bloqueia a interação com o fundo e devolve o foco ao botão ao fechar.
 - No computador: menu lateral, painel financeiro e ações de edição, convite e exportação.
 - Busca sem distinção de acentos, filtros e ordenação por nome, alterações recentes ou “Minha ordem”. Nesta última, sem busca/filtros, as alças reordenam os itens do ambiente. Ambientes podem ser arrastados na barra lateral, na faixa mobile e na lista vertical do menu. As alças também aceitam as setas pelo teclado; a ordem é persistida nos campos existentes.
-- Lápis junto aos nomes permite renomear o enxoval e os ambientes. Nome ou seta do item expande a edição na própria lista; o lápis continua abrindo o modal. A data de adição vem de `created_at` e permanece após editar. Dados antigos da demonstração sem essa data não recebem uma data inventada.
+- Lápis junto aos nomes permite renomear o enxoval e os ambientes. Nome ou seta do item expande a edição na própria lista; o lápis continua abrindo o modal. A data de adição vem de `created_at` e permanece após editar. Itens antigos sem essa data não recebem uma data inventada.
 - Dropdowns com o visual da Larume, navegação por teclado, seleção por toque e Escape para fechar as opções antes de fechar o diálogo.
 - Exportação CSV do enxoval completo ou do ambiente, em português, UTF-8 e separador `;`, com proteção de células que poderiam ser interpretadas como fórmulas. A exportação por ambiente inclui todos os seus itens, independentemente dos filtros ativos.
 - Diálogos com foco controlado, Escape para fechar e retorno ao botão de origem.
@@ -101,9 +93,9 @@ npm run test:item-status-db
 npm run test:password-reset-db
 ```
 
-A suíte Playwright verifica os fluxos principais, persistência e exportação da demonstração, formulários de autenticação com API simulada, gestos e navegação mobile, foco dos diálogos e verificações automatizadas de acessibilidade com axe. As quatro telas principais são verificadas nas larguras 320, 390, 768, 1024 e 1440 px.
+A suíte Playwright verifica as páginas públicas (landing, login e funil `/comecar`) em várias larguras, formulários de autenticação com API simulada, o funil de onboarding, o painel administrativo e verificações automatizadas de acessibilidade com axe. Os testes do aplicativo logado (itens, ambientes, planner, importação e exportação) dependiam do antigo modo de demonstração, foram removidos e precisam ser reescritos.
 
-No Windows, os testes usam o Microsoft Edge instalado. Em outros sistemas, instale o navegador de teste com `npx playwright install chromium`. Quando não há servidor local, os testes iniciam o modo de prévia, sem migração de banco; se já há um servidor na porta 3000, ele é reutilizado. As alterações dos testes ficam na demonstração ou em respostas de API simuladas. Os testes de login e cadastro verificam a integração do frontend com respostas simuladas, não a conexão real com PostgreSQL.
+No Windows, os testes usam o Microsoft Edge instalado. Em outros sistemas, instale o navegador de teste com `npx playwright install chromium`. Os testes iniciam `npm run dev`, que precisa do PostgreSQL configurado (`npm run db:up`); se já há um servidor na porta 3000, ele é reutilizado. Os testes de login e cadastro verificam a integração do frontend com respostas simuladas, não a conexão real com PostgreSQL.
 
 `npm run test:item-status-db` verifica no PostgreSQL real a criação e a troca de situação dos itens, o desconto por item, a quantidade (validação e migração), a compatibilidade com `checked`, a separação entre investido, ganho e pendente e a migração do campo antigo, também em um schema descartável.
 
@@ -134,4 +126,4 @@ Os planos e preços da landing page são **ilustrativos**, conforme a proposta v
 
 A logo foi adaptada da referência enviada usando a ferramenta integrada de geração de imagens e conferida visualmente na interface, em fundo claro e escuro. A assinatura é texto real na interface para manter a grafia Larume e a legibilidade em diferentes telas. Detalhes de identidade e o prompt estão em `docs/larume-brand.md`.
 
-A fotografia foi criada para este projeto; o produto não depende de URLs externas de imagens. As fontes usam Google Fonts, com fontes locais de fallback. A demonstração lê os dados das chaves anteriores `larumi.demo.v1` e `morada.demo.v1` quando necessário e passa a persistir em `larume.demo.v1`, preservando as listas já criadas no navegador.
+A fotografia foi criada para este projeto; o produto não depende de URLs externas de imagens. As fontes usam Google Fonts, com fontes locais de fallback.

@@ -419,8 +419,7 @@ export function ItemRow({
             </div>
             {!added && (
               <p className="item-inline-note">
-                Data de adição indisponível para este item antigo da
-                demonstração.
+                Data de adição indisponível para este item antigo.
               </p>
             )}
             {error && (

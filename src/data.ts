@@ -2,7 +2,7 @@ import type { Category, EnxovalItem } from './types';
 
 export const DEFAULT_ENXOVAL_TEMPLATE_NAME = 'Lista sugerida de enxoval';
 
-/** Limite de caracteres do nome de um ambiente (UI, API e modo demo). */
+/** Limite de caracteres do nome de um ambiente (UI e API). */
 export const MAX_ENVIRONMENT_NAME_LENGTH = 24;
 
 export const DEFAULT_TEMPLATE_CATEGORIES: Category[] = [

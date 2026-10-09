@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "dev:full": "npm run db:up && npm run dev",
-    "dev:preview": "tsx server/index.ts --preview",
     "build": "vite build && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/server.js",
     "start": "node dist/server.js --production",
     "db:migrate": "tsx server/migrate.ts",

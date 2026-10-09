@@ -52,7 +52,7 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         </li>
         <li>
           <strong>Neste aparelho, antes do cadastro:</strong> as respostas do
-          onboarding e os dados da demonstração ficam no armazenamento do seu
+          onboarding ficam no armazenamento do seu
           navegador (<em>localStorage</em>) e só vão para os nossos servidores
           quando você cria a conta.
         </li>

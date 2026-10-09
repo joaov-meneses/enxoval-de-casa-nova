@@ -10,28 +10,12 @@ const port = Number(process.env.PORT ?? 3000);
 const isProduction =
   process.env.NODE_ENV === "production" ||
   process.argv.includes("--production");
-const isLocalPreview = process.argv.includes("--preview");
 
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "1mb" }));
 
-if (isLocalPreview) {
-  // Explicit frontend preview: never connects to or migrates the configured database.
-  app.get("/api/bootstrap", (_req, res) =>
-    res
-      .status(401)
-      .json({ error: "Entre na sua conta ou explore a demonstração." }),
-  );
-  app.use("/api", (_req, res) =>
-    res.status(503).json({
-      error:
-        "Esta prévia local usa dados demonstrativos. Explore a demonstração ou inicie o servidor completo para entrar e criar contas.",
-    }),
-  );
-} else {
-  await migrateDatabase();
-  registerApiRoutes(app);
-}
+await migrateDatabase();
+registerApiRoutes(app);
 
 if (isProduction) {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));

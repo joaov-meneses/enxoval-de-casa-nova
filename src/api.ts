@@ -8,7 +8,6 @@ import type {
   EnxovalWorkspace,
   ItemStatus,
 } from "./types";
-import { demoRequest, isDemoMode } from "./demo";
 import { isItemStatus, normalizeItemStatus } from "./itemStatus";
 import type { Answers, PlanPayload } from "./onboarding/types";
 
@@ -44,7 +43,6 @@ function withItemStatus(data: unknown): unknown {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (isDemoMode()) return demoRequest<T>(path, options);
   const response = await fetch(path, {
     ...options,
     credentials: "same-origin",
