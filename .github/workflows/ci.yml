@@ -47,3 +47,4 @@ jobs:
       - run: npm run build
       - run: npm run test:admin-api
       - run: npm run test:onboarding-db
+      - run: npm run test:item-status-db

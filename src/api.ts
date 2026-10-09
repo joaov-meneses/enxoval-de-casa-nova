@@ -6,8 +6,10 @@ import type {
   EnxovalItem,
   EnxovalMember,
   EnxovalWorkspace,
+  ItemStatus,
 } from "./types";
 import { demoRequest, isDemoMode } from "./demo";
+import { isItemStatus, normalizeItemStatus } from "./itemStatus";
 import type { Answers, PlanPayload } from "./onboarding/types";
 
 export class ApiError extends Error {
@@ -18,6 +20,27 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+/**
+ * Itens vindos de um servidor ainda sem `status` (ou de dados antigos) recebem a situação
+ * derivada do marcador `checked`, para o resto do app poder confiar que ela sempre existe.
+ */
+function withItemStatus(data: unknown): unknown {
+  if (Array.isArray(data)) return data.map(withItemStatus);
+  if (data && typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (
+      typeof obj.checked === "boolean" &&
+      "categoryId" in obj &&
+      !isItemStatus(obj.status)
+    )
+      return { ...obj, status: normalizeItemStatus(obj) };
+    return Object.fromEntries(
+      Object.entries(obj).map(([key, value]) => [key, withItemStatus(value)]),
+    );
+  }
+  return data;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -45,7 +68,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return undefined as T;
   }
 
-  return response.json() as Promise<T>;
+  return withItemStatus(await response.json()) as T;
 }
 
 export function fetchBootstrap(enxovalId?: string) {
@@ -79,20 +102,32 @@ export function logout() {
 
 export function changeRequiredPassword(password: string, confirmation: string) {
   return request<BootstrapData>("/api/auth/change-password", {
-    method: "POST", body: JSON.stringify({ password, confirmation }),
+    method: "POST",
+    body: JSON.stringify({ password, confirmation }),
   });
 }
 
-export const adminSession = () => request<{ login: string }>("/api/admin/session");
-export const adminLogin = (login: string, password: string) => request<{ login: string }>("/api/admin/login", {
-  method: "POST", body: JSON.stringify({ login, password }),
-});
-export const adminLogout = () => request<void>("/api/admin/logout", { method: "POST" });
-export const fetchAdminUsers = () => request<{ users: AdminUser[] }>("/api/admin/users");
-export const resetUserPassword = (id: string) => request<{ temporaryPassword: string; expiresAt: string }>(`/api/admin/users/${encodeURIComponent(id)}/reset-password`, { method: "POST" });
-export const setUserActive = (id: string, isActive: boolean) => request<void>(`/api/admin/users/${encodeURIComponent(id)}/status`, {
-  method: "PATCH", body: JSON.stringify({ isActive }),
-});
+export const adminSession = () =>
+  request<{ login: string }>("/api/admin/session");
+export const adminLogin = (login: string, password: string) =>
+  request<{ login: string }>("/api/admin/login", {
+    method: "POST",
+    body: JSON.stringify({ login, password }),
+  });
+export const adminLogout = () =>
+  request<void>("/api/admin/logout", { method: "POST" });
+export const fetchAdminUsers = () =>
+  request<{ users: AdminUser[] }>("/api/admin/users");
+export const resetUserPassword = (id: string) =>
+  request<{ temporaryPassword: string; expiresAt: string }>(
+    `/api/admin/users/${encodeURIComponent(id)}/reset-password`,
+    { method: "POST" },
+  );
+export const setUserActive = (id: string, isActive: boolean) =>
+  request<void>(`/api/admin/users/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ isActive }),
+  });
 
 export function fetchEnxoval(enxovalId: string) {
   return request<EnxovalWorkspace>(`/api/enxovais/${enxovalId}`);
@@ -180,6 +215,9 @@ export function createItem(input: {
   priceCents?: number | null;
   link?: string;
   description?: string;
+  status?: ItemStatus;
+  discountCents?: number;
+  quantity?: number;
 }) {
   return request<{ item: EnxovalItem; category: EnxovalCategory }>(
     "/api/items",
@@ -195,7 +233,15 @@ export function updateItem(
   updates: Partial<
     Pick<
       EnxovalItem,
-      "name" | "checked" | "link" | "description" | "priceCents" | "categoryId"
+      | "name"
+      | "checked"
+      | "status"
+      | "link"
+      | "description"
+      | "priceCents"
+      | "quantity"
+      | "discountCents"
+      | "categoryId"
     >
   >,
 ) {

@@ -1,6 +1,18 @@
 import type { BootstrapData, EnxovalWorkspace } from "./types";
 import type { PlanPayload } from "./onboarding/types";
 import {
+  isValidQuantity,
+  normalizeQuantity,
+  quantityFromDescription,
+} from "./itemQuantity";
+import {
+  isDoneStatus,
+  isItemStatus,
+  normalizeItemStatus,
+  resolveDiscountCents,
+  statusFromChecked,
+} from "./itemStatus";
+import {
   DEFAULT_TEMPLATE_CATEGORIES,
   DEFAULT_TEMPLATE_ITEMS,
   MAX_ENVIRONMENT_NAME_LENGTH,
@@ -86,6 +98,9 @@ function seed(): DemoStore {
           categoryId: categories[cat].id,
           category: categories[cat].name,
           checked,
+          status: checked ? "bought" : "needed",
+          quantity: 1,
+          discountCents: 0,
           priceCents,
           link: "",
           description:
@@ -117,8 +132,17 @@ function read(): DemoStore {
             Array.isArray(w.categories) &&
             Array.isArray(w.members),
         )
-      )
+      ) {
+        // Dados salvos antes das situações do item não têm `status`: derivamos do marcador antigo.
+        for (const workspace of data.workspaces as EnxovalWorkspace[])
+          for (const item of workspace.items) {
+            item.status = normalizeItemStatus(item);
+            item.checked = isDoneStatus(item.status);
+            item.discountCents = Number(item.discountCents) || 0;
+            item.quantity = normalizeQuantity(item.quantity);
+          }
         return (memoryStore = data);
+      }
     }
   } catch {
     /* A private browser may not allow persistence. */
@@ -175,6 +199,9 @@ function buildPlanWorkspace(
         categoryId: categories[index].id,
         category: category.name,
         checked: false,
+        status: "needed",
+        quantity: quantityFromDescription(item.description),
+        discountCents: 0,
         priceCents: null,
         link: "",
         description: item.description,
@@ -270,6 +297,9 @@ export async function demoRequest<T>(
             category: item.category,
             categoryId: categories.find((c) => c.name === item.category)!.id,
             checked: false,
+            status: "needed",
+            quantity: 1,
+            discountCents: 0,
             priceCents: null,
             link: "",
             description: "",
@@ -383,13 +413,28 @@ export async function demoRequest<T>(
       workspace.categories.push(category);
     }
     if (!category) throw new Error("Escolha um ambiente.");
+    if (body.status !== undefined && !isItemStatus(body.status))
+      throw new Error("Situação inválida.");
+    const status = isItemStatus(body.status) ? body.status : "needed";
+    if (body.quantity !== undefined && !isValidQuantity(body.quantity))
+      throw new Error("Quantidade inválida. Use um número inteiro de 1 a 999.");
+    const quantity = body.quantity ?? 1;
+    const discount = resolveDiscountCents({
+      status,
+      priceCents: body.priceCents ?? null,
+      discountCents: body.discountCents,
+    });
+    if ("error" in discount) throw new Error(discount.error);
     const item = {
       id: id(),
       name: body.name,
       categoryId: category.id,
       category: category.name,
-      checked: false,
+      checked: isDoneStatus(status),
+      status,
       priceCents: body.priceCents ?? null,
+      quantity,
+      discountCents: discount.value,
       link: String(body.link ?? "").trim(),
       description: String(body.description ?? "").trim(),
       sortOrder: workspace.items.length,
@@ -408,7 +453,40 @@ export async function demoRequest<T>(
       workspace.items = workspace.items.filter((i) => i.id !== itemId);
     else {
       const item = workspace.items.find((i) => i.id === itemId)!;
-      Object.assign(item, body, { updatedAt: new Date().toISOString() });
+      if (body.status !== undefined && !isItemStatus(body.status))
+        throw new Error("Situação inválida.");
+      // `status` manda; o marcador `checked` antigo só ajusta quando vier sozinho.
+      const status = isItemStatus(body.status)
+        ? body.status
+        : typeof body.checked === "boolean"
+          ? statusFromChecked(body.checked, normalizeItemStatus(item))
+          : normalizeItemStatus(item);
+      if ("quantity" in body && !isValidQuantity(body.quantity))
+        throw new Error("Quantidade inválida. Use um número inteiro de 1 a 999.");
+      const quantity =
+        "quantity" in body ? body.quantity : normalizeQuantity(item.quantity);
+      let discountCents = Number(item.discountCents) || 0;
+      if (
+        "status" in body ||
+        "priceCents" in body ||
+        "discountCents" in body ||
+        typeof body.checked === "boolean"
+      ) {
+        const resolved = resolveDiscountCents({
+          status,
+          priceCents: "priceCents" in body ? body.priceCents : item.priceCents,
+          discountCents: "discountCents" in body ? body.discountCents : discountCents,
+        });
+        if ("error" in resolved) throw new Error(resolved.error);
+        discountCents = resolved.value;
+      }
+      Object.assign(item, body, {
+        status,
+        checked: isDoneStatus(status),
+        quantity,
+        discountCents,
+        updatedAt: new Date().toISOString(),
+      });
       item.category =
         workspace.categories.find((c) => c.id === item.categoryId)?.name ??
         item.category;

@@ -2,6 +2,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
 import { MAX_ENVIRONMENT_NAME_LENGTH } from '../src/data.ts';
+import { DEFAULT_ITEM_QUANTITY, isValidQuantity, quantityFromDescription } from '../src/itemQuantity.ts';
+import { DEFAULT_ITEM_STATUS, isDoneStatus, isItemStatus, resolveDiscountCents, statusFromChecked, type ItemStatus } from '../src/itemStatus.ts';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from '../src/types.ts';
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
@@ -48,9 +50,12 @@ interface ItemRow {
   category_id: string;
   category: string;
   checked: boolean;
+  status: ItemStatus;
   link: string;
   description: string;
   price_cents: number | null;
+  discount_cents: number;
+  quantity: number;
   sort_order: number;
   updated_at: string | Date;
   created_at: string | Date;
@@ -139,9 +144,12 @@ function mapItem(row: ItemRow): EnxovalItem {
     categoryId: row.category_id,
     category: row.category,
     checked: row.checked,
+    status: row.status,
     link: row.link,
     description: row.description,
     priceCents: row.price_cents === null ? null : Number(row.price_cents),
+    quantity: Number(row.quantity ?? 1),
+    discountCents: Number(row.discount_cents ?? 0),
     sortOrder: row.sort_order,
     createdAt: serializeTimestamp(row.created_at),
     updatedAt: serializeTimestamp(row.updated_at)
@@ -225,9 +233,12 @@ async function fetchItems(queryable: Queryable, userId: string, enxovalId: strin
       i.category_id,
       c.name AS category,
       i.checked,
+      i.status,
       i.link,
       i.description,
       i.price_cents,
+      i.discount_cents,
+      i.quantity,
       i.sort_order,
       i.created_at,
       i.updated_at
@@ -392,9 +403,9 @@ async function seedEnxovalPlan(client: PoolClient, userId: string, enxovalId: st
     if (planCategory.items.length === 0) continue;
 
     await client.query(`
-      INSERT INTO items (id, user_id, enxoval_id, category_id, name, description, sort_order)
-      SELECT t.id, $1::uuid, $2::uuid, $3::uuid, t.name, t.description, t.sort_order
-      FROM unnest($4::uuid[], $5::text[], $6::text[], $7::int[]) AS t(id, name, description, sort_order)
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, description, sort_order, quantity)
+      SELECT t.id, $1::uuid, $2::uuid, $3::uuid, t.name, t.description, t.sort_order, t.quantity
+      FROM unnest($4::uuid[], $5::text[], $6::text[], $7::int[], $8::int[]) AS t(id, name, description, sort_order, quantity)
     `, [
       userId,
       enxovalId,
@@ -402,7 +413,8 @@ async function seedEnxovalPlan(client: PoolClient, userId: string, enxovalId: st
       planCategory.items.map(() => randomUUID()),
       planCategory.items.map(item => item.name),
       planCategory.items.map(item => item.description),
-      planCategory.items.map((_, index) => index)
+      planCategory.items.map((_, index) => index),
+      planCategory.items.map(item => quantityFromDescription(item.description))
     ]);
   }
 }
@@ -480,7 +492,7 @@ async function requireCurrentUser(req: Request, allowPasswordChange = false) {
   return user;
 }
 
-async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string }) {
+async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string; status?: ItemStatus; discountCents?: unknown; quantity?: number }) {
   return withTransaction(async client => {
     await requireEnxovalMember(client, input.userId, input.enxovalId);
 
@@ -502,10 +514,14 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     `, [input.enxovalId, category.id]);
 
     const itemId = randomUUID();
+    const status = input.status ?? DEFAULT_ITEM_STATUS;
+    const quantity = input.quantity ?? DEFAULT_ITEM_QUANTITY;
+    const discount = resolveDiscountCents({ status, priceCents: input.priceCents ?? null, discountCents: input.discountCents });
+    if ('error' in discount) throw new HttpError(400, discount.error);
     await client.query(`
-      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order, price_cents, link, description)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, input.link ?? '', input.description ?? '']);
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order, price_cents, discount_cents, link, description, status, checked, quantity)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, discount.value, input.link ?? '', input.description ?? '', status, isDoneStatus(status), quantity]);
 
     const itemResult = await client.query<ItemRow>(`
       SELECT
@@ -514,9 +530,12 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
         i.category_id,
         c.name AS category,
         i.checked,
+        i.status,
         i.link,
         i.description,
         i.price_cents,
+        i.discount_cents,
+        i.quantity,
         i.sort_order,
         i.created_at,
         i.updated_at
@@ -537,76 +556,116 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     throw new HttpError(400, 'Dados inválidos.');
   }
 
-  const itemScope = await getPool().query<{ enxoval_id: string }>(`
-    SELECT i.enxoval_id
-    FROM items i
-    INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
-    WHERE i.id = $1 AND em.user_id = $2
-    LIMIT 1
-  `, [itemId, userId]);
+  return withTransaction(async client => {
+    // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
+    const current = await client.query<{ enxoval_id: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number }>(`
+      SELECT i.enxoval_id, i.status, i.price_cents, i.discount_cents, i.quantity
+      FROM items i
+      INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
+      WHERE i.id = $1 AND em.user_id = $2
+      LIMIT 1
+      FOR UPDATE OF i
+    `, [itemId, userId]);
 
-  if (!itemScope.rows[0]) throw new HttpError(404, 'Item não encontrado.');
+    if (!current.rows[0]) throw new HttpError(404, 'Item não encontrado.');
 
-  const enxovalId = itemScope.rows[0].enxoval_id;
-  const updates = body as Record<string, unknown>;
-  const setClauses: string[] = [];
-  const values: unknown[] = [];
+    const enxovalId = current.rows[0].enxoval_id;
+    const updates = body as Record<string, unknown>;
+    const has = (key: string) => Object.prototype.hasOwnProperty.call(updates, key);
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
 
-  const addUpdate = (column: string, value: unknown) => {
-    values.push(value);
-    setClauses.push(`${column} = $${values.length}`);
-  };
+    const addUpdate = (column: string, value: unknown) => {
+      values.push(value);
+      setClauses.push(`${column} = $${values.length}`);
+    };
 
-  if (typeof updates.name === 'string') {
-    const name = updates.name.trim();
-    if (!name) throw new HttpError(400, 'Nome do item é obrigatório.');
-    addUpdate('name', name);
-  }
-  if (typeof updates.checked === 'boolean') addUpdate('checked', updates.checked);
-  if (typeof updates.link === 'string') addUpdate('link', updates.link.trim());
-  if (typeof updates.description === 'string') addUpdate('description', updates.description.trim());
-
-  if (Object.prototype.hasOwnProperty.call(updates, 'priceCents')) {
-    if (updates.priceCents === null) {
-      addUpdate('price_cents', null);
-    } else if (typeof updates.priceCents === 'number' && Number.isInteger(updates.priceCents) && updates.priceCents >= 0) {
-      addUpdate('price_cents', updates.priceCents);
-    } else {
-      throw new HttpError(400, 'Preço inválido.');
+    if (typeof updates.name === 'string') {
+      const name = updates.name.trim();
+      if (!name) throw new HttpError(400, 'Nome do item é obrigatório.');
+      addUpdate('name', name);
     }
-  }
 
-  if (typeof updates.categoryId === 'string') {
-    const category = await findCategory(getPool(), userId, enxovalId, updates.categoryId);
-    if (!category) throw new HttpError(404, 'Ambiente não encontrado.');
-    addUpdate('category_id', updates.categoryId);
-  }
+    let status = current.rows[0].status;
+    if (has('status')) {
+      if (!isItemStatus(updates.status)) throw new HttpError(400, 'Situação inválida.');
+      status = updates.status;
+    } else if (typeof updates.checked === 'boolean') {
+      // Compatibilidade com o marcador antigo: mantém uma situação já coerente e só ajusta quando preciso.
+      status = statusFromChecked(updates.checked, status);
+    }
+    if (has('status') || typeof updates.checked === 'boolean') {
+      addUpdate('status', status);
+      addUpdate('checked', isDoneStatus(status));
+    }
 
-  if (setClauses.length === 0) {
-    throw new HttpError(400, 'Nenhuma alteração enviada.');
-  }
+    if (typeof updates.link === 'string') addUpdate('link', updates.link.trim());
+    if (typeof updates.description === 'string') addUpdate('description', updates.description.trim());
 
-  values.push(itemId, enxovalId);
-  const result = await getPool().query<ItemRow>(`
-    UPDATE items
-    SET ${setClauses.join(', ')}, updated_at = now()
-    WHERE id = $${values.length - 1} AND enxoval_id = $${values.length}
-    RETURNING
-      id,
-      name,
-      category_id,
-      (SELECT name FROM categories WHERE categories.id = items.category_id) AS category,
-      checked,
-      link,
-      description,
-      price_cents,
-      sort_order,
-      created_at,
-      updated_at
-  `, values);
+    let priceCents = current.rows[0].price_cents === null ? null : Number(current.rows[0].price_cents);
+    if (has('priceCents')) {
+      if (updates.priceCents === null) {
+        priceCents = null;
+      } else if (typeof updates.priceCents === 'number' && Number.isInteger(updates.priceCents) && updates.priceCents >= 0) {
+        priceCents = updates.priceCents;
+      } else {
+        throw new HttpError(400, 'Preço inválido.');
+      }
+      addUpdate('price_cents', priceCents);
+    }
 
-  if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
-  return mapItem(result.rows[0]);
+    let quantity = Number(current.rows[0].quantity ?? 1);
+    if (has('quantity')) {
+      if (!isValidQuantity(updates.quantity)) throw new HttpError(400, 'Quantidade inválida. Use um número inteiro de 1 a 999.');
+      quantity = updates.quantity;
+      addUpdate('quantity', quantity);
+    }
+
+    if (has('status') || has('priceCents') || has('discountCents') || typeof updates.checked === 'boolean') {
+      const discount = resolveDiscountCents({
+        status,
+        priceCents,
+        discountCents: has('discountCents') ? updates.discountCents : Number(current.rows[0].discount_cents)
+      });
+      if ('error' in discount) throw new HttpError(400, discount.error);
+      addUpdate('discount_cents', discount.value);
+    }
+
+    if (typeof updates.categoryId === 'string') {
+      const category = await findCategory(client, userId, enxovalId, updates.categoryId);
+      if (!category) throw new HttpError(404, 'Ambiente não encontrado.');
+      addUpdate('category_id', updates.categoryId);
+    }
+
+    if (setClauses.length === 0) {
+      throw new HttpError(400, 'Nenhuma alteração enviada.');
+    }
+
+    values.push(itemId, enxovalId);
+    const result = await client.query<ItemRow>(`
+      UPDATE items
+      SET ${setClauses.join(', ')}, updated_at = now()
+      WHERE id = $${values.length - 1} AND enxoval_id = $${values.length}
+      RETURNING
+        id,
+        name,
+        category_id,
+        (SELECT name FROM categories WHERE categories.id = items.category_id) AS category,
+        checked,
+        status,
+        link,
+        description,
+        price_cents,
+        discount_cents,
+        quantity,
+        sort_order,
+        created_at,
+        updated_at
+    `, values);
+
+    if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
+    return mapItem(result.rows[0]);
+  });
 }
 async function deleteItemForUser(userId: string, itemId: string) {
   const result = await getPool().query<{ id: string }>(`
@@ -979,8 +1038,12 @@ export function registerApiRoutes(app: Express) {
     }
     const link = typeof req.body?.link === 'string' ? req.body.link.trim() : undefined;
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() : undefined;
+    const rawStatus = req.body?.status;
+    if (rawStatus !== undefined && !isItemStatus(rawStatus)) throw new HttpError(400, 'Situação inválida.');
+    const rawQuantity = req.body?.quantity;
+    if (rawQuantity !== undefined && !isValidQuantity(rawQuantity)) throw new HttpError(400, 'Quantidade inválida. Use um número inteiro de 1 a 999.');
 
-    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName, priceCents: rawPrice, link, description });
+    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName, priceCents: rawPrice, link, description, status: rawStatus, discountCents: req.body?.discountCents, quantity: rawQuantity });
     res.status(201).json(result);
   }));
 

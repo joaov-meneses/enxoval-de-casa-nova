@@ -61,15 +61,15 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await expect(
       page.getByRole("button", { name: "Organizar ambientes", exact: true }),
     ).toHaveCount(0);
-    await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
-    const menu = page.getByRole("dialog", { name: "Menu do enxoval" });
-    await expect(
-      menu.getByRole("button", { name: "Atualizar enxoval" }),
-    ).toHaveCount(0);
-    await expect(menu.getByRole("combobox", { name: "Seus enxovais" }))[
-      width >= 1024 ? "toBeHidden" : "toBeVisible"
-    ]();
     if (width < 1024) {
+      await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
+      const menu = page.getByRole("dialog", { name: "Menu do enxoval" });
+      await expect(
+        menu.getByRole("button", { name: "Atualizar enxoval" }),
+      ).toHaveCount(0);
+      await expect(
+        menu.getByRole("combobox", { name: "Seus enxovais" }),
+      ).toBeVisible();
       const handle = menu.getByRole("button", {
         name: "Reordenar Quarto",
         exact: true,
@@ -80,8 +80,15 @@ for (const width of [320, 390, 768, 1024, 1440]) {
         "Quarto",
       );
       await expect(handle).toBeEnabled();
+      await menu
+        .getByRole("button", { name: "Fechar menu do enxoval" })
+        .click();
+    } else {
+      // Desktop não tem menu suspenso.
+      await expect(
+        page.getByRole("button", { name: "Abrir menu do enxoval" }),
+      ).toHaveCount(0);
     }
-    await menu.getByRole("button", { name: "Fechar menu do enxoval" }).click();
     if (width >= 1024) {
       const handle = page
         .locator(".sidebar-rooms")

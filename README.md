@@ -64,7 +64,8 @@ O admin usa sessão própria em cookie HTTP-only, com duração de 8 horas e tok
 - Identidade Larume com a casa, os tecidos dobrados e o ramo da referência escolhida, versões para favicon e ícones de tela inicial.
 - Paleta de areia, madeira, off-white e verde suave; tipografia DM Sans e Playfair Display, com Cormorant Garamond na assinatura Larume.
 - Landing page, login e cadastro adaptados para celular, tablet e computador.
-- Navegação por ambientes e visão geral com progresso, total investido e estimativa dos itens pendentes.
+- Navegação por ambientes e visão geral com progresso, total investido, descontos e cashback e estimativa dos itens pendentes.
+- Cada item tem uma situação, escolhida ao adicionar ou ao editar e filtrável na lista: **Preciso comprar** (padrão), **Pesquisando**, **Comprei**, **Ganhei**, **Já tenho**, **Não preciso** e **Descartei**. Comprei, Ganhei e Já tenho contam como conquistados; Não preciso e Descartei saem do progresso e dos totais. Só **Comprei** entra em “Já investimos” (menos o desconto manual do enxoval). O valor cheio dos itens **Ganhei** soma-se aos descontos no cartão “Descontos e cashback” e nunca entra em “Já investimos”. Cada item tem uma **quantidade** (1 a 999, padrão 1, com botões − e + e sem aceitar zero) para não repetir o mesmo item na lista. Ela é só informativa: não multiplica o preço, que continua sendo o valor do item, e não altera resumos nem descontos (o CSV traz a coluna Quantidade). A migração preenche a quantidade uma única vez a partir de descrições do funil como “4 un.”, e novos planos do funil já gravam a quantidade. Cada item aceita um **desconto ou cashback** (cadastro e edição do item, ou o diálogo “Descontos e cashback”, que só subtrai e vincula o valor a um ambiente e item): o valor é abatido do preço, soma-se ao resumo e fica visível ao abrir o item. O campo fica desabilitado em Ganhei, Já tenho, Não preciso e Descartei, e o servidor valida que o desconto não passe do preço do item. O desconto geral antigo do enxoval (`enxovais.discount_cents`), sem item vinculado, continua somando no resumo até ser removido no diálogo. O marcador de check continua alternando entre Preciso comprar e Comprei. As situações ficam na coluna `items.status`, que a migração preenche a partir do antigo `checked` (marcado vira Comprei); `checked` segue gravado e é derivado da situação.
 - No celular: ambientes horizontais, gesto de deslizar entre ambientes, puxar para atualizar, cabeçalho compacto ao rolar, botão de adição e navegação inferior.
 - O cabeçalho mobile usa apenas o ícone do menu, com área de toque de 44 px. Na visão geral, os ambientes e o total gasto ficam fora do cabeçalho; voltam na lista de itens.
 - A navegação inferior destaca a opção ativa com um fundo verde suave e borda arredondada. Compartilhar recebe o destaque enquanto sua janela está aberta.
@@ -85,11 +86,15 @@ npm run lint
 npm run test:e2e
 npm run build
 npm run test:admin-api
+npm run test:onboarding-db
+npm run test:item-status-db
 ```
 
 A suíte Playwright verifica os fluxos principais, persistência e exportação da demonstração, formulários de autenticação com API simulada, gestos e navegação mobile, foco dos diálogos e verificações automatizadas de acessibilidade com axe. As quatro telas principais são verificadas nas larguras 320, 390, 768, 1024 e 1440 px.
 
 No Windows, os testes usam o Microsoft Edge instalado. Em outros sistemas, instale o navegador de teste com `npx playwright install chromium`. Quando não há servidor local, os testes iniciam o modo de prévia, sem migração de banco; se já há um servidor na porta 3000, ele é reutilizado. As alterações dos testes ficam na demonstração ou em respostas de API simuladas. Os testes de login e cadastro verificam a integração do frontend com respostas simuladas, não a conexão real com PostgreSQL.
+
+`npm run test:item-status-db` verifica no PostgreSQL real a criação e a troca de situação dos itens, o desconto por item, a quantidade (validação e migração), a compatibilidade com `checked`, a separação entre investido, ganho e pendente e a migração do campo antigo, também em um schema descartável.
 
 `npm run test:admin-api` verifica o backend real com o PostgreSQL configurado. Cria e remove um schema isolado com contas fictícias, sem consultar ou modificar contas existentes. O usuário do banco precisa de permissão para criar schemas. Verifica permissões, reset, troca obrigatória, expiração, revogação de sessões, status das contas, nomes/ordem de ambientes e itens, preservação da data de adição e das listas.
 

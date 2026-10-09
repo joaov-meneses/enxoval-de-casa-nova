@@ -151,7 +151,7 @@ for (const width of widths) {
         );
         // Descontos do enxoval não entram na conta de um ambiente.
         await expect(page.locator(".workspace-stats")).not.toContainText(
-          "descontos e cashback",
+          "Descontos e cashback",
         );
       } else {
         const pct = Math.round((all.quarto.done / all.quarto.total) * 100);
@@ -166,7 +166,7 @@ for (const width of widths) {
           "todos os ambientes",
         );
         await expect(page.locator(".workspace-stats")).toContainText(
-          "descontos e cashback",
+          "Descontos e cashback",
         );
       }
     });
@@ -180,7 +180,7 @@ for (const width of widths) {
         "geral do enxoval",
       );
       await expect(page.locator(".workspace-stats")).toContainText(
-        "descontos e cashback",
+        "Descontos e cashback",
       );
       expect(
         await page.evaluate(

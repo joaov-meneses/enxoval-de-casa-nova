@@ -148,7 +148,7 @@ test("workspaces and categories can be created and safely removed in demo", asyn
   page,
 }) => {
   await page.goto("/demo");
-  await page.getByRole("button", { name: "Criar outro enxoval" }).click();
+  await page.getByRole("button", { name: "Criar novo enxoval" }).click();
   await page
     .getByRole("dialog")
     .getByLabel("Nome do enxoval")
@@ -174,7 +174,7 @@ test("workspaces and categories can be created and safely removed in demo", asyn
       .filter({ hasText: "Mesa de trabalho" })
       .locator(".item-category-tag"),
   ).toHaveText("Escritório");
-  await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
+  // No desktop não há menu suspenso: a exclusão fica no cabeçalho.
   await page
     .getByRole("button", { name: "Excluir enxoval", exact: true })
     .click();
@@ -364,12 +364,27 @@ for (const width of [390, 1440]) {
 
 test("discounts and keyboard category reordering persist", async ({ page }) => {
   await page.goto("/demo");
-  await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
   await page.getByRole("button", { name: /^Descontos e cashback/ }).click();
-  await page.getByRole("dialog").getByLabel("Valor do ajuste").fill("2500");
-  await page.getByRole("button", { name: "Somar ajuste na prévia" }).click();
-  await page.getByRole("button", { name: "Salvar ajuste" }).click();
+  const discounts = page.getByRole("dialog", { name: "Descontos e cashback" });
+  await expect(discounts.getByText("Operação")).toHaveCount(0);
+  await discounts.getByRole("combobox", { name: "Item", exact: true }).click();
+  await discounts
+    .getByRole("option", { name: /^Jogo de pratos de cerâmica/ })
+    .click();
+  await discounts.getByLabel("Valor do desconto ou cashback").fill("2500");
+  await discounts.getByRole("button", { name: "Salvar desconto" }).click();
+  await expect(
+    discounts.getByRole("button", {
+      name: "Editar desconto de Jogo de pratos de cerâmica",
+    }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.locator(".workspace-stats")).toContainText("R$ 1.532,30");
+  // O desconto fica gravado no item: ao abri-lo, aparece o valor cadastrado.
+  await page
+    .getByRole("button", { name: "Abrir detalhes de Jogo de pratos de cerâmica" })
+    .click();
+  await expect(page.getByLabel("Desconto ou cashback")).toHaveValue("R$ 25,00");
   const handle = page
     .locator(".sidebar-rooms")
     .getByRole("button", { name: "Reordenar Quarto", exact: true });
@@ -496,13 +511,21 @@ test("mobile drawer switches workspaces, creates categories and keeps destructiv
 });
 
 for (const width of [320, 390, 768, 1440]) {
-  test(`workspace drawer is accessible and fits at ${width}px`, async ({
+  test(`workspace menu is accessible and fits at ${width}px`, async ({
     page,
   }) => {
+    // Menu suspenso só abaixo de 1024px; no desktop, "Sair da conta" fica no cabeçalho.
+    const desktop = width >= 1024;
     await page.setViewportSize({ width, height: 740 });
     await page.goto("/demo");
-    await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    if (desktop) {
+      await expect(
+        page.getByRole("button", { name: "Abrir menu do enxoval" }),
+      ).toHaveCount(0);
+    } else {
+      await page.getByRole("button", { name: "Abrir menu do enxoval" }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    }
     await page.waitForTimeout(250);
     expect(
       await page.evaluate(
@@ -521,10 +544,13 @@ for (const width of [320, 390, 768, 1440]) {
         })),
       })),
     ).toEqual([]);
-    await page
-      .getByRole("dialog", { name: "Menu do enxoval" })
-      .getByRole("button", { name: "Sair", exact: true })
-      .click();
+    await (
+      desktop
+        ? page.getByRole("button", { name: "Sair da conta", exact: true })
+        : page
+            .getByRole("dialog", { name: "Menu do enxoval" })
+            .getByRole("button", { name: "Sair", exact: true })
+    ).click();
     await expect(page).toHaveURL(/\/$/);
   });
 }

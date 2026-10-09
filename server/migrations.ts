@@ -201,6 +201,28 @@ export async function migrateDatabase() {
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_cents integer;
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_price_cents_non_negative;
     ALTER TABLE items ADD CONSTRAINT items_price_cents_non_negative CHECK (price_cents IS NULL OR price_cents >= 0);
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'needed';
+    UPDATE items SET status = 'bought' WHERE checked AND status = 'needed';
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0;
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_discount_cents_non_negative;
+    ALTER TABLE items ADD CONSTRAINT items_discount_cents_non_negative CHECK (discount_cents >= 0);
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'items' AND column_name = 'quantity'
+      ) THEN
+        ALTER TABLE items ADD COLUMN quantity integer NOT NULL DEFAULT 1;
+        -- Uma única vez: itens do funil que já dizem "4 un." na descrição passam a ter quantidade 4.
+        UPDATE items
+        SET quantity = LEAST(GREATEST((substring(description from '(\\d+) un\\.'))::int, 1), 999)
+        WHERE description ~ '\\d+ un\\.' AND length(substring(description from '(\\d+) un\\.')) <= 3;
+      END IF;
+    END $$;
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_quantity_valid;
+    ALTER TABLE items ADD CONSTRAINT items_quantity_valid CHECK (quantity >= 1 AND quantity <= 999);
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_status_valid;
+    ALTER TABLE items ADD CONSTRAINT items_status_valid CHECK (status IN ('needed', 'researching', 'bought', 'received', 'owned', 'not_needed', 'discarded'));
 
     ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_user_name_unique;
 
