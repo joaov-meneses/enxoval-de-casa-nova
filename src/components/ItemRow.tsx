@@ -15,7 +15,18 @@ import {
   ChevronDown,
   LoaderCircle,
 } from "lucide-react";
-import type { EnxovalCategory, EnxovalItem } from "../types";
+import type { EnxovalCategory, EnxovalItem, ItemStatus } from "../types";
+import {
+  discountApplies,
+  isInactiveStatus,
+  ITEM_STATUSES,
+  ITEM_STATUS_META,
+  netPriceCents,
+  statusLabel,
+} from "../itemStatus";
+import { MAX_ITEM_NAME_LENGTH } from "../data";
+import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
+import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
 
 interface ItemRowProps {
@@ -56,9 +67,12 @@ export function ItemRow({
   const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState(item.name);
   const [priceText, setPriceText] = useState("");
+  const [discountText, setDiscountText] = useState("");
+  const [quantityText, setQuantityText] = useState("1");
   const [linkText, setLinkText] = useState(item.link);
   const [description, setDescription] = useState(item.description);
   const [categoryId, setCategoryId] = useState(item.categoryId);
+  const [status, setStatus] = useState<ItemStatus>(item.status);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const id = useId();
@@ -67,12 +81,26 @@ export function ItemRow({
     if (expanded) return;
     setName(item.name);
     setPriceText(item.priceCents ? money.format(item.priceCents / 100) : "");
+    setQuantityText(String(normalizeQuantity(item.quantity)));
+    setDiscountText(
+      item.discountCents > 0 ? money.format(item.discountCents / 100) : "",
+    );
     setLinkText(item.link);
     setDescription(item.description);
     setCategoryId(item.categoryId);
+    setStatus(item.status);
     setError("");
   }, [item, expanded]);
-  const price = Number(item.priceCents);
+  // O preço da linha já considera o desconto/cashback registrado (itens ganhos mantêm o valor cheio).
+  const price = netPriceCents(item);
+  const itemDiscount = discountApplies(item.status) ? item.discountCents : 0;
+  const quantity = normalizeQuantity(item.quantity);
+  // Rascunho do formulário: mostra o valor final antes de salvar.
+  const draftPrice = Number(priceText.replace(/\D/g, "")) || 0;
+  const draftDiscount = discountApplies(status)
+    ? Math.min(Number(discountText.replace(/\D/g, "")) || 0, draftPrice)
+    : 0;
+  const draftFinal = draftPrice - draftDiscount;
   const formattedPrice =
     Number.isFinite(price) && price > 0 ? money.format(price / 100) : "";
   const link = safeLink(item.link);
@@ -92,14 +120,36 @@ export function ItemRow({
     setBusy(true);
     setError("");
     const digits = priceText.replace(/\D/g, "");
+    const priceValue = digits && Number(digits) > 0 ? Number(digits) : null;
+    const discountDigits = discountText.replace(/\D/g, "");
+    const discountValue = discountApplies(status) ? Number(discountDigits) || 0 : 0;
+    const quantityValue = Number(quantityText.replace(/\D/g, ""));
+    if (!Number.isInteger(quantityValue) || quantityValue < 1 || quantityValue > MAX_ITEM_QUANTITY) {
+      setError(`A quantidade deve ser um número de 1 a ${MAX_ITEM_QUANTITY}.`);
+      setBusy(false);
+      return;
+    }
+    if (discountValue > 0 && !priceValue) {
+      setError("Informe o preço do item antes do desconto ou cashback.");
+      setBusy(false);
+      return;
+    }
+    if (priceValue !== null && discountValue > priceValue) {
+      setError("O desconto ou cashback não pode ser maior que o preço do item.");
+      setBusy(false);
+      return;
+    }
     let saved = false;
     try {
       await onUpdate(item.id, {
         name: name.trim(),
-        priceCents: digits && Number(digits) > 0 ? Number(digits) : null,
+        priceCents: priceValue,
+        quantity: quantityValue,
+        discountCents: discountValue,
         link: linkText.trim(),
         description: description.trim(),
         categoryId,
+        status,
       });
       setExpanded(false);
       saved = true;
@@ -116,7 +166,7 @@ export function ItemRow({
   }
   return (
     <div
-      className={`item-row ${item.checked ? "checked" : ""} ${expanded ? "expanded" : ""}`}
+      className={`item-row ${item.checked ? "checked" : ""} ${isInactiveStatus(item.status) ? "inactive" : ""} ${expanded ? "expanded" : ""}`}
     >
       <div className="item-row-inner">
         {dragHandle}
@@ -151,10 +201,26 @@ export function ItemRow({
             {categoryName && (
               <span className="item-category-tag">{categoryName}</span>
             )}
+            <span className={`item-status-tag status-${item.status}`}>
+              {statusLabel(item.status)}
+            </span>
             <span className="item-meta-price">
               {formattedPrice || "Sem preço"}
             </span>
-            {added && <span className="item-added">Adicionado em {added}</span>}
+            {quantity > 1 && (
+              <span className="item-quantity-tag">{quantity} un.</span>
+            )}
+            {itemDiscount > 0 && (
+              <span className="item-discount-tag">
+                Desconto/cashback {money.format(itemDiscount / 100)}
+              </span>
+            )}
+            {added && (
+              <span className="item-added">
+                <span className="item-added-prefix">Adicionado em </span>
+                {added}
+              </span>
+            )}
             {link && (
               <a
                 href={link}
@@ -178,8 +244,8 @@ export function ItemRow({
           </div>
         </div>
         <span className="item-price">{formattedPrice || "Sem preço"}</span>
-        <span className="item-status">
-          {item.checked ? "Conquistado" : "Na lista"}
+        <span className={`item-status status-${item.status}`}>
+          {statusLabel(item.status)}
         </span>
         <div className="item-actions">
           <button
@@ -219,17 +285,61 @@ export function ItemRow({
             aria-busy={busy}
           >
             <div className="item-inline-grid">
-              <label htmlFor={`${id}-name`}>
-                Nome do item
+              <h4 className="item-inline-section item-inline-wide">Sobre o item</h4>
+              <label htmlFor={`${id}-name`} className="item-inline-wide">
+                <span className="item-inline-label-row">
+                  Nome do item
+                  <span
+                    className={`name-counter${name.length >= MAX_ITEM_NAME_LENGTH ? " is-full" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {name.length}/{MAX_ITEM_NAME_LENGTH}
+                  </span>
+                </span>
                 <input
                   id={`${id}-name`}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   required
-                  maxLength={200}
+                  maxLength={MAX_ITEM_NAME_LENGTH}
                   disabled={busy}
                 />
               </label>
+              <label htmlFor={`${id}-environment`}>
+                Ambiente
+                <Select
+                  id={`${id}-environment`}
+                  ariaLabel="Ambiente"
+                  value={categoryId}
+                  options={categories.map((category) => ({
+                    value: category.id,
+                    label: category.name,
+                  }))}
+                  onChange={setCategoryId}
+                  disabled={busy}
+                />
+              </label>
+              <label htmlFor={`${id}-status`}>
+                Situação
+                <Select
+                  id={`${id}-status`}
+                  ariaLabel="Situação"
+                  value={status}
+                  options={ITEM_STATUSES.map((value) => ({
+                    value,
+                    label: ITEM_STATUS_META[value].label,
+                  }))}
+                  onChange={(value) => {
+                    setStatus(value as ItemStatus);
+                    if (!discountApplies(value as ItemStatus)) setDiscountText("");
+                  }}
+                  disabled={busy}
+                />
+                <span className="item-inline-hint">
+                  {ITEM_STATUS_META[status].hint}
+                </span>
+              </label>
+              <h4 className="item-inline-section item-inline-wide">Valores</h4>
               <label htmlFor={`${id}-price`}>
                 Preço
                 <input
@@ -248,21 +358,58 @@ export function ItemRow({
                   disabled={busy}
                 />
               </label>
-              <label htmlFor={`${id}-environment`}>
-                Ambiente
-                <Select
-                  id={`${id}-environment`}
-                  ariaLabel="Ambiente"
-                  value={categoryId}
-                  options={categories.map((category) => ({
-                    value: category.id,
-                    label: category.name,
-                  }))}
-                  onChange={setCategoryId}
+              <label htmlFor={`${id}-discount`}>
+                Desconto ou cashback
+                <input
+                  id={`${id}-discount`}
+                  inputMode="numeric"
+                  value={discountText}
+                  onChange={(event) => {
+                    const digits = event.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, 12);
+                    setDiscountText(
+                      digits ? money.format(Number(digits) / 100) : "",
+                    );
+                  }}
+                  placeholder="R$ 0,00"
+                  disabled={busy || !discountApplies(status)}
+                />
+                <span className="item-inline-hint">
+                  {discountApplies(status)
+                    ? "Quanto foi abatido do preço. Aparece no resumo de descontos e cashback."
+                    : status === "received"
+                      ? "Item ganho: o valor cheio já vai para o resumo, sem desconto."
+                      : "Esta situação não tem compra, então não há desconto."}
+                </span>
+              </label>
+              <label htmlFor={`${id}-quantity`}>
+                Quantidade
+                <QuantityStepper
+                  id={`${id}-quantity`}
+                  value={quantityText}
+                  onChange={setQuantityText}
                   disabled={busy}
                 />
+                <span className="item-inline-hint">
+                  Só informa quantas unidades há. Não muda o preço.
+                </span>
               </label>
-              <label htmlFor={`${id}-link`}>
+              <div className="item-inline-summary" aria-live="polite">
+                <span className="item-inline-summary-label">
+                  {status === "received" ? "Valor ganho" : "Valor final"}
+                </span>
+                <strong>{draftPrice > 0 ? money.format(draftFinal / 100) : "—"}</strong>
+                <span className="item-inline-hint">
+                  {status === "received"
+                    ? "Vai para Descontos e cashback, não para Já investimos."
+                    : draftDiscount > 0
+                      ? `${money.format(draftPrice / 100)} menos ${money.format(draftDiscount / 100)} de desconto.`
+                      : "Preço menos o desconto ou cashback."}
+                </span>
+              </div>
+              <h4 className="item-inline-section item-inline-wide">Detalhes</h4>
+              <label htmlFor={`${id}-link`} className="item-inline-wide">
                 Link do produto
                 <input
                   id={`${id}-link`}
@@ -286,8 +433,7 @@ export function ItemRow({
             </div>
             {!added && (
               <p className="item-inline-note">
-                Data de adição indisponível para este item antigo da
-                demonstração.
+                Data de adição indisponível para este item antigo.
               </p>
             )}
             {error && (

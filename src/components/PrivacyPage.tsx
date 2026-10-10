@@ -39,7 +39,7 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           exemplo, morar com o par ou sozinho), data prevista da mudança, estado,
           tipo de moradia, número de moradores, espaços escolhidos, o que você já
           tem, estilo de enxoval, faixa de orçamento, preocupações, como pretende
-          usar a Larume e a origem do acesso (de qual link ou site você veio).
+          usar o Casa Mia e a origem do acesso (de qual link ou site você veio).
         </li>
         <li>
           <strong>Acesso:</strong> um cookie de sessão, necessário para manter você
@@ -52,7 +52,7 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         </li>
         <li>
           <strong>Neste aparelho, antes do cadastro:</strong> as respostas do
-          onboarding e os dados da demonstração ficam no armazenamento do seu
+          onboarding ficam no armazenamento do seu
           navegador (<em>localStorage</em>) e só vão para os nossos servidores
           quando você cria a conta.
         </li>
@@ -70,7 +70,7 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         </li>
         <li>Manter e mostrar o seu enxoval em qualquer aparelho.</li>
         <li>
-          Entender, de forma agregada, quem usa a Larume e melhorar o produto, sem
+          Entender, de forma agregada, quem usa o Casa Mia e melhorar o produto, sem
           identificar você.
         </li>
         <li>Proteger as contas e prevenir abusos.</li>
@@ -159,7 +159,7 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
       </p>
     ) : (
       <p>
-        A Larume ainda não foi lançada. O canal de contato do responsável pelo
+        O Casa Mia ainda não foi lançado. O canal de contato do responsável pelo
         tratamento dos dados será informado aqui antes do lançamento.
       </p>
     ),
@@ -177,7 +177,7 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
 
 export function PrivacyPage() {
   useEffect(() => {
-    document.title = "Política de privacidade | Larume";
+    document.title = "Política de privacidade | Casa Mia";
   }, []);
   return (
     <main className="privacy-page">

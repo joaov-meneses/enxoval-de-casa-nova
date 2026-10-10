@@ -1,5 +1,6 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
+import { isInactiveStatus } from "../itemStatus";
 import { SortableList } from "./SortableList";
 import { RoomIcon } from "./WorkspaceOverview";
 
@@ -58,7 +59,13 @@ export function EnvironmentList({
               {horizontal
                 ? `${items.filter((item) => item.categoryId === category.id && item.checked).length}/`
                 : ""}
-              {items.filter((item) => item.categoryId === category.id).length}
+              {
+                items.filter(
+                  (item) =>
+                    item.categoryId === category.id &&
+                    !isInactiveStatus(item.status),
+                ).length
+              }
             </small>
           </button>
           {!horizontal && (

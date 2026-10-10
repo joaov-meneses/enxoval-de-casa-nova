@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Download, FolderDown, Layers } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
-import { exportItems } from "../utils/export";
+import { exportItems, type ExportFormat } from "../utils/export";
 
 interface ExportMenuProps {
   categories: EnxovalCategory[];
@@ -9,6 +9,11 @@ interface ExportMenuProps {
   enxovalName: string;
   activeCategoryId?: string;
 }
+
+const FORMATS: { id: ExportFormat; label: string; hint: string }[] = [
+  { id: "csv", label: "CSV", hint: ".csv" },
+  { id: "xlsx", label: "Excel", hint: ".xlsx" },
+];
 
 const countLabel = (count: number) =>
   `${count} ${count === 1 ? "item" : "itens"}`;
@@ -20,6 +25,7 @@ export function ExportMenu({
   activeCategoryId,
 }: ExportMenuProps) {
   const [open, setOpen] = useState(false);
+  const [format, setFormat] = useState<ExportFormat>("csv");
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
@@ -63,14 +69,15 @@ export function ExportMenu({
 
   const exportEnvironment = (category: EnxovalCategory) => {
     setOpen(false);
-    exportItems(
+    void exportItems(
       items.filter((item) => item.categoryId === category.id),
       `${enxovalName}-${category.name}`,
+      format,
     );
   };
   const exportAll = () => {
     setOpen(false);
-    exportItems(items, enxovalName);
+    void exportItems(items, enxovalName, format);
   };
 
   return (
@@ -95,6 +102,23 @@ export function ExportMenu({
           style={{ maxHeight: placement.maxHeight }}
           role="menu"
         >
+          <div
+            className="export-menu-formats"
+            role="group"
+            aria-label="Formato do arquivo"
+          >
+            {FORMATS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={format === option.id}
+                onClick={() => setFormat(option.id)}
+              >
+                {option.label} <small>{option.hint}</small>
+              </button>
+            ))}
+          </div>
           <button type="button" role="menuitem" onClick={exportAll}>
             <Layers size={18} aria-hidden="true" />
             <span>

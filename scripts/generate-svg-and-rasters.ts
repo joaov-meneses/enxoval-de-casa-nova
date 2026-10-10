@@ -1,0 +1,124 @@
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
+
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente do chão iluminado na soleira -->
+    <linearGradient id="doorFloorLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF8E8" />
+      <stop offset="60%" stop-color="#FFEBC6" />
+      <stop offset="100%" stop-color="#FCDFA8" />
+    </linearGradient>
+
+    <!-- Gradiente suave do batente interno em perspectiva -->
+    <linearGradient id="innerJambLight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFDF7" />
+      <stop offset="100%" stop-color="#F5EBD7" />
+    </linearGradient>
+  </defs>
+
+  <!-- 1. CHAMINÉ UNIFICADA EM TERRACOTA (à direita, sem verde) -->
+  <path d="M 314 172
+           L 314 130
+           C 314 125 318 121 324 121
+           L 344 121
+           C 350 121 354 125 354 130
+           L 354 205 Z"
+        fill="#C2603F" />
+
+  <!-- 2. ESTRUTURA EXTERNA DA CASA (Telhado com Beiral e Paredes) -->
+  <path d="M 256 104
+           C 252 104 248 107 245 110
+           L 125 208
+           C 120 212 118 219 121 225
+           C 124 231 131 235 138 235
+           L 150 235
+           L 150 382
+           C 150 392 158 400 168 400
+           L 344 400
+           C 354 400 362 392 362 382
+           L 362 235
+           L 374 235
+           C 381 235 388 231 391 225
+           C 394 219 392 212 387 208
+           L 267 110
+           C 264 107 260 104 256 104 Z"
+        fill="#C2603F" />
+
+  <!-- 3. FACHADA INTERNA DA CASA (Creme Claro) -->
+  <path d="M 256 136
+           L 172 204
+           L 172 378
+           L 340 378
+           L 340 204 Z"
+        fill="#FAF4E8" />
+
+  <!-- 4. MOLDURA EXTERNA DO ARCO DA PORTA (Terracota) -->
+  <path d="M 196 378
+           L 196 264
+           C 196 230 223 204 256 204
+           C 289 204 316 230 316 264
+           L 316 378 Z"
+        fill="#C2603F" />
+
+  <!-- 5. O CHÃO ILUMINADO QUE SAI DA PORTA (Luz que avança para fora) -->
+  <polygon points="208,350 304,374 322,400 188,400" fill="url(#doorFloorLight)" />
+
+  <!-- 6. O BATENTE INTERNO ESQUERDO ILUMINADO (Perspectiva da parede da porta) -->
+  <path d="M 208 378
+           L 208 264
+           C 208 237 229 216 256 216
+           C 275 216 292 227 298 244
+           C 278 226 248 224 236 248
+           L 236 348
+           L 208 368 Z"
+        fill="url(#innerJambLight)" />
+
+  <!-- 7. A PORTA ABERTA EM CAFÉ TOSTADO (#3B2A20) COM A BASE CHANFRADA EM PERSPECTIVA -->
+  <path d="M 236 348
+           L 236 248
+           C 248 224 278 226 298 244
+           C 302 248 304 254 304 260
+           L 304 374
+           L 236 348 Z"
+        fill="#3B2A20" />
+
+  <!-- 8. FECHADURA EM FORMA DE CORAÇÃO NA PORTA -->
+  <g transform="translate(268, 292)">
+    <!-- Formato exato do coração da fechadura -->
+    <path d="M 0 -8
+             C -3 -14 -11 -14 -14 -8
+             C -17 -2 -13 5 0 14
+             C 13 5 17 -2 14 -8
+             C 11 -14 3 -14 0 -8 Z"
+          fill="#D6C6A5" />
+    <!-- Entrada da chave -->
+    <polygon points="-3,10 3,10 4,22 -4,22" fill="#D6C6A5" />
+  </g>
+</svg>
+`;
+
+async function build() {
+  const svgPath = path.resolve('public/brand/casamia-symbol.svg');
+  const pngPath = path.resolve('public/brand/casamia-symbol.png');
+  const webpPath = path.resolve('public/brand/casamia-symbol.webp');
+
+  fs.writeFileSync(svgPath, svgContent.trim(), 'utf-8');
+
+  // Renderizar PNG 512x512
+  await sharp(Buffer.from(svgContent))
+    .resize(512, 512)
+    .png({ quality: 100 })
+    .toFile(pngPath);
+
+  // Renderizar WebP 512x512
+  await sharp(Buffer.from(svgContent))
+    .resize(512, 512)
+    .webp({ quality: 98 })
+    .toFile(webpPath);
+
+  console.log('SVG, PNG e WebP renderizados com a porta em perspectiva!');
+}
+
+build().catch(console.error);

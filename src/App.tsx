@@ -12,7 +12,6 @@ import {
   Home,
   Sparkles,
   LogOut,
-  Users,
   UserPlus,
   ListPlus,
   X,
@@ -20,13 +19,12 @@ import {
   Trash2,
   RefreshCw,
   Search,
-  Minus,
   SlidersHorizontal,
   LayoutDashboard,
   ListChecks,
-  ArrowUpRight,
   ChevronRight,
   Menu,
+  Percent,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -66,19 +64,42 @@ import { LandingPage } from "./components/LandingPage";
 import { AuthPage } from "./components/AuthPage";
 import { Brand } from "./components/Brand";
 import { WorkspaceMenu } from "./components/WorkspaceMenu";
+import { ImportItemsButton } from "./components/ImportItemsDialog";
+import { ScrollIndicator } from "./components/ScrollIndicator";
+import { AddChoiceDialog } from "./components/AddChoiceDialog";
 import { RoomIcon, WorkspaceOverview } from "./components/WorkspaceOverview";
-import { isDemoMode } from "./demo";
+import {
+  activeItems,
+  discountApplies,
+  doneItems,
+  isItemStatus,
+  isPendingStatus,
+  ITEM_STATUSES,
+  ITEM_STATUS_META,
+  sumBought,
+  sumItemDiscounts,
+  sumReceived,
+  withStatusUpdate,
+  type ItemStatus,
+} from "./itemStatus";
 import { Dialog } from "./components/Dialog";
 import { RequiredPasswordPage } from "./components/RequiredPasswordPage";
 
-type DiscountOperation = "add" | "subtract";
 type ItemSortMode = "manual" | "name" | "updated";
 type CategorySwipeDirection = "next" | "previous";
 
-const APP_NAME = "Larume";
+const APP_NAME = "Casa Mia";
+// A dica de "npm run dev" só existe no desenvolvimento: o Vite troca `import.meta.env.DEV` por
+// `false` no build e remove o texto, então ela nunca chega ao bundle de produção.
+const STALE_SERVER_MESSAGE = import.meta.env.DEV
+  ? "O servidor está desatualizado e não reconheceu os dados do item (situação, desconto ou quantidade). Reinicie o servidor (npm run dev) e tente de novo."
+  : "Não foi possível salvar o item agora. Atualize a página e tente novamente.";
+
+/** Título padrão da aba. Janelas e telas específicas ainda mostram "Contexto | Casa Mia". */
+const APP_TITLE = `${APP_NAME} | Enxoval de casa nova`;
 
 function makeTitle(context?: string) {
-  return context ? `${context} | ${APP_NAME}` : APP_NAME;
+  return context ? `${context} | ${APP_NAME}` : APP_TITLE;
 }
 
 function normalizeSearchText(value: string) {
@@ -158,6 +179,8 @@ export default function App() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showOnlyPricedItems, setShowOnlyPricedItems] = useState(false);
   const [showOnlyCheckedItems, setShowOnlyCheckedItems] = useState(false);
+  const [showOnlyUnpricedItems, setShowOnlyUnpricedItems] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all");
   const [itemSortMode, setItemSortMode] = useState<ItemSortMode>("manual");
   const [categorySwipeOffset, setCategorySwipeOffset] = useState(0);
   const [categorySwipeDirection, setCategorySwipeDirection] =
@@ -169,15 +192,16 @@ export default function App() {
     setIsWorkspaceMenuOpen(true);
   };
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddChoiceOpen, setIsAddChoiceOpen] = useState(false);
+  const chipsScrollRef = useRef<HTMLDivElement>(null);
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
   const [isDiscountsOpen, setIsDiscountsOpen] = useState(false);
-  const [discountOperation, setDiscountOperation] =
-    useState<DiscountOperation>("add");
-  const [discountAdjustmentText, setDiscountAdjustmentText] = useState("");
-  const [discountWorkingCents, setDiscountWorkingCents] = useState(0);
+  const [discountCategoryId, setDiscountCategoryId] = useState("");
+  const [discountItemId, setDiscountItemId] = useState("");
+  const [discountText, setDiscountText] = useState("");
   const [itemToDelete, setItemToDelete] = useState<EnxovalItem | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [newEnxovalName, setNewEnxovalName] = useState("");
@@ -203,7 +227,6 @@ export default function App() {
   const [error, setError] = useState("");
   const pullStartYRef = useRef<number | null>(null);
   const pullLastDistanceRef = useRef(0);
-  const discountAdjustmentInputRef = useRef<HTMLInputElement | null>(null);
   const categorySwipeRef = useRef<{
     pointerId: number;
     startX: number;
@@ -283,11 +306,11 @@ export default function App() {
       return;
     }
     if (window.location.pathname === "/") {
-      document.title = "Larume — seu lar começa com um plano";
+      document.title = APP_TITLE;
       return;
     }
     if (isLoading) {
-      document.title = makeTitle("Carregando");
+      document.title = APP_TITLE;
       return;
     }
 
@@ -343,16 +366,7 @@ export default function App() {
       return;
     }
 
-    if (activeEnxoval) {
-      document.title = makeTitle(
-        isWorkspaceLoading
-          ? "Carregando " + activeEnxoval.name
-          : activeEnxoval.name,
-      );
-      return;
-    }
-
-    document.title = makeTitle("Meus enxovais");
+    document.title = APP_TITLE;
   }, [
     activeEnxoval,
     isCreateCategoryOpen,
@@ -522,10 +536,16 @@ export default function App() {
   const normalizedSearchQuery = normalizeSearchText(searchQuery);
   const isSearching = normalizedSearchQuery.length > 0;
   const isShowingLatestChanges = itemSortMode === "updated";
-  const hasItemFilters = showOnlyPricedItems || showOnlyCheckedItems;
+  const hasItemFilters =
+    showOnlyPricedItems ||
+    showOnlyUnpricedItems ||
+    showOnlyCheckedItems ||
+    statusFilter !== "all";
   const activeFilterCount =
     (showOnlyPricedItems ? 1 : 0) +
+    (showOnlyUnpricedItems ? 1 : 0) +
     (showOnlyCheckedItems ? 1 : 0) +
+    (statusFilter !== "all" ? 1 : 0) +
     (itemSortMode !== "manual" ? 1 : 0);
   const categoryById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -564,6 +584,14 @@ export default function App() {
       }
 
       if (showOnlyCheckedItems && !item.checked) return false;
+      // "Sem preço" repete a conta do resumo: itens pendentes que ainda não têm preço.
+      if (
+        showOnlyUnpricedItems &&
+        (!isPendingStatus(item.status) ||
+          (normalizePriceCents(item.priceCents) ?? 0) > 0)
+      )
+        return false;
+      if (statusFilter !== "all" && item.status !== statusFilter) return false;
       return true;
     });
 
@@ -607,10 +635,11 @@ export default function App() {
     normalizedSearchQuery,
     showOnlyCheckedItems,
     showOnlyPricedItems,
+    showOnlyUnpricedItems,
+    statusFilter,
   ]);
-  const filteredCheckedCount = filteredItems.filter(
-    (item) => item.checked,
-  ).length;
+  const filteredCheckedCount = doneItems(filteredItems).length;
+  const filteredActiveCount = activeItems(filteredItems).length;
   const itemCountText = `${filteredItems.length} ${filteredItems.length === 1 ? "item" : "itens"}`;
   const listTitle = isSearching
     ? "Resultados da busca"
@@ -625,7 +654,7 @@ export default function App() {
           : "Progresso do enxoval";
   const listCounterText =
     !isSearching && !isShowingLatestChanges && !hasItemFilters
-      ? `${filteredCheckedCount} de ${filteredItems.length} itens`
+      ? `${filteredCheckedCount} de ${filteredActiveCount} itens`
       : itemCountText;
   const showItemCategory = isAllEnvironments || isShowingLatestChanges;
   const searchScopeLabel = activeCategory
@@ -658,92 +687,64 @@ export default function App() {
   );
   const progressStats = useMemo(() => {
     const scoped = scopeItems ?? items;
-    const total = scoped.length;
-    const completed = scoped.filter((i) => i.checked).length;
+    const total = activeItems(scoped).length;
+    const completed = doneItems(scoped).length;
     const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
     return { total, completed, percentage };
   }, [items, scopeItems]);
-  const checkedSubtotalSpentCents = useMemo(
-    () =>
-      items.reduce((total, item) => {
-        if (!item.checked) return total;
-
-        const priceCents = normalizePriceCents(item.priceCents);
-        return priceCents && priceCents > 0 ? total + priceCents : total;
-      }, 0),
-    [items],
-  );
+  const checkedSubtotalSpentCents = useMemo(() => sumBought(items), [items]);
+  const receivedValueCents = useMemo(() => sumReceived(items), [items]);
   const enxovalDiscountCents =
     normalizePriceCents(activeEnxoval?.discountCents) ?? 0;
-  const discountAdjustmentCents = priceTextToCents(discountAdjustmentText) ?? 0;
+  const itemDiscountsTotalCents = useMemo(() => sumItemDiscounts(items), [items]);
+  const discountInputCents = priceTextToCents(discountText) ?? 0;
+  const selectedDiscountItem =
+    items.find((item) => item.id === discountItemId) ?? null;
+  const discountItemOptions = items
+    .filter(
+      (item) =>
+        item.categoryId === discountCategoryId && discountApplies(item.status),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.name} · ${
+        normalizePriceCents(item.priceCents)
+          ? formatCurrency(item.priceCents)
+          : "sem preço"
+      }`,
+    }));
+  const registeredDiscountItems = items.filter(
+    (item) => discountApplies(item.status) && item.discountCents > 0,
+  );
   const checkedTotalSpentCents = Math.max(
     0,
     checkedSubtotalSpentCents - enxovalDiscountCents,
   );
-  const discountPreviewTotalCents = Math.max(
-    0,
-    checkedSubtotalSpentCents - discountWorkingCents,
-  );
-  const checkedSubtotalSpentText = formatCurrency(checkedSubtotalSpentCents);
   const savedDiscountText = formatCurrency(enxovalDiscountCents);
-  const discountsButtonTitle =
-    enxovalDiscountCents > 0
-      ? "Descontos e cashback: - " + savedDiscountText
-      : "Descontos e cashback";
-  const discountAdjustmentPreviewText = formatCurrency(discountAdjustmentCents);
-  const workingDiscountText = formatCurrency(discountWorkingCents);
-  const checkedTotalSpentText = formatCurrency(
-    scopeItems
-      ? scopeItems.reduce((total, item) => {
-          const priceCents = normalizePriceCents(item.priceCents);
-          return item.checked && priceCents && priceCents > 0
-            ? total + priceCents
-            : total;
-        }, 0)
-      : checkedTotalSpentCents,
-  );
-  const discountPreviewTotalText = formatCurrency(discountPreviewTotalCents);
+  const receivedValueText = formatCurrency(receivedValueCents);
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === "owner";
   const visibleProgress = isHeaderMobile ? headerProgress : 0;
   const headerStyle = isHeaderMobile
     ? {
-        paddingTop: `${16 - 4 * visibleProgress}px`,
-        paddingBottom: `${16 - 4 * visibleProgress}px`,
+        paddingTop: `${10 - 3 * visibleProgress}px`,
+        paddingBottom: `${10 - 3 * visibleProgress}px`,
       }
     : undefined;
   const eyebrowStyle: React.CSSProperties = {
-    maxHeight: `${24 * (1 - visibleProgress)}px`,
-    opacity: 1 - visibleProgress,
-    transform: `translateY(${-4 * visibleProgress}px)`,
-    pointerEvents: visibleProgress > 0.9 ? "none" : "auto",
-  };
-  const metaStyle: React.CSSProperties = {
-    marginTop: `${12 * (1 - visibleProgress)}px`,
-    maxHeight: `${24 * (1 - visibleProgress)}px`,
+    maxHeight: `${16 * (1 - visibleProgress)}px`,
     opacity: 1 - visibleProgress,
     transform: `translateY(${-4 * visibleProgress}px)`,
     pointerEvents: visibleProgress > 0.9 ? "none" : "auto",
   };
   const titleStyle = isHeaderMobile
     ? {
-        fontSize: `${25 - 5 * visibleProgress}px`,
+        fontSize: `${20 - 3 * visibleProgress}px`,
       }
     : undefined;
-  const totalSpentTitleStyle: React.CSSProperties = isHeaderMobile
-    ? {
-        marginTop: `${4 * visibleProgress}px`,
-        maxHeight: `${24 * visibleProgress}px`,
-        opacity: visibleProgress,
-        paddingTop: `${4 * visibleProgress}px`,
-        paddingBottom: `${4 * visibleProgress}px`,
-        transform: `translateY(${-4 * (1 - visibleProgress)}px)`,
-        pointerEvents: visibleProgress > 0.45 ? "auto" : "none",
-      }
-    : { display: "none" };
   const categoryBarStyle = isHeaderMobile
     ? {
-        marginTop: `${18 - 6 * visibleProgress}px`,
+        marginTop: `${8 - 3 * visibleProgress}px`,
       }
     : undefined;
 
@@ -914,9 +915,21 @@ export default function App() {
     }
   };
 
+  /** Atalho do resumo: lista só os itens pendentes sem preço, nos ambientes que estavam em foco. */
+  const showUnpricedItems = () => {
+    setShowOnlyPricedItems(false);
+    setShowOnlyCheckedItems(false);
+    setStatusFilter("all");
+    setShowOnlyUnpricedItems(true);
+    setSearchQuery("");
+    setWorkspaceView("list");
+  };
+
   const updateItem = async (id: string, updates: Partial<EnxovalItem>) => {
     const shouldOptimisticallyUpdate =
-      Object.keys(updates).length === 1 && typeof updates.checked === "boolean";
+      Object.keys(updates).length === 1 &&
+      (typeof updates.checked === "boolean" ||
+        typeof updates.status === "string");
     const previousItem = shouldOptimisticallyUpdate
       ? items.find((item) => item.id === id)
       : undefined;
@@ -924,19 +937,25 @@ export default function App() {
     if (shouldOptimisticallyUpdate) {
       setItems((current) =>
         current.map((item) =>
-          item.id === id ? { ...item, ...updates } : item,
+          item.id === id ? withStatusUpdate(item, updates) : item,
         ),
       );
     }
 
     const payload: Parameters<typeof updateItemRequest>[1] = {};
     if (typeof updates.name === "string") payload.name = updates.name;
-    if (typeof updates.checked === "boolean") payload.checked = updates.checked;
+    if (typeof updates.status === "string") payload.status = updates.status;
+    else if (typeof updates.checked === "boolean")
+      payload.checked = updates.checked;
     if (typeof updates.link === "string") payload.link = updates.link;
     if (typeof updates.description === "string")
       payload.description = updates.description;
     if (typeof updates.priceCents === "number" || updates.priceCents === null)
       payload.priceCents = updates.priceCents;
+    if (typeof updates.discountCents === "number")
+      payload.discountCents = updates.discountCents;
+    if (typeof updates.quantity === "number")
+      payload.quantity = updates.quantity;
     if (typeof updates.categoryId === "string")
       payload.categoryId = updates.categoryId;
 
@@ -944,6 +963,9 @@ export default function App() {
 
     try {
       const savedItem = await updateItemRequest(id, payload);
+      // Um servidor que ainda roda o código antigo devolve o item sem situação e ignoraria a alteração.
+      if (!isItemStatus(savedItem.status) || typeof savedItem.quantity !== "number")
+        throw new Error(STALE_SERVER_MESSAGE);
       setItems((current) =>
         current.map((item) => (item.id === id ? savedItem : item)),
       );
@@ -966,10 +988,16 @@ export default function App() {
     name: string,
     categoryId?: string,
     categoryName?: string,
-    details: Pick<EnxovalItem, "priceCents" | "link" | "description"> = {
+    details: Pick<
+      EnxovalItem,
+      "priceCents" | "quantity" | "discountCents" | "link" | "description" | "status"
+    > = {
       priceCents: null,
+      quantity: 1,
+      discountCents: 0,
       link: "",
       description: "",
+      status: "needed",
     },
   ) => {
     if (!activeEnxoval)
@@ -982,6 +1010,11 @@ export default function App() {
       categoryName,
       ...details,
     });
+    if (
+      !isItemStatus(result.item.status) ||
+      typeof result.item.quantity !== "number"
+    )
+      throw new Error(STALE_SERVER_MESSAGE);
 
     setCategories((current) => {
       if (current.some((category) => category.id === result.category.id))
@@ -1212,34 +1245,73 @@ export default function App() {
   const openDiscounts = () => {
     if (!activeEnxoval) return;
     setDialogError("");
-    setDiscountOperation("add");
-    setDiscountAdjustmentText("");
-    setDiscountWorkingCents(
-      normalizePriceCents(activeEnxoval.discountCents) ?? 0,
-    );
+    setDiscountCategoryId(activeCategory?.id ?? categories[0]?.id ?? "");
+    setDiscountItemId("");
+    setDiscountText("");
     setIsDiscountsOpen(true);
   };
 
-  const handleDiscountAdjustmentChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setDiscountAdjustmentText(formatPriceInput(event.target.value));
+  const selectDiscountItem = (itemId: string) => {
+    const item = items.find((candidate) => candidate.id === itemId);
+    if (!item) return;
+    setDialogError("");
+    setDiscountCategoryId(item.categoryId);
+    setDiscountItemId(item.id);
+    setDiscountText(
+      item.discountCents > 0 ? formatPriceInput(String(item.discountCents)) : "",
+    );
   };
 
-  const handleApplyDiscountAdjustment = () => {
-    if (discountAdjustmentCents <= 0) return;
+  const saveItemDiscount = async (itemId: string, discountCents: number) => {
+    setIsDialogSubmitting(true);
+    setDialogError("");
 
-    setDiscountWorkingCents((current) =>
-      discountOperation === "add"
-        ? current + discountAdjustmentCents
-        : Math.max(0, current - discountAdjustmentCents),
-    );
-    setDiscountAdjustmentText("");
-    discountAdjustmentInputRef.current?.focus({ preventScroll: true });
+    try {
+      const savedItem = await updateItemRequest(itemId, { discountCents });
+      setItems((current) =>
+        current.map((item) => (item.id === itemId ? savedItem : item)),
+      );
+      // Escolhido o desconto, o formulário volta limpo para o próximo item.
+      setDiscountItemId("");
+      setDiscountText("");
+    } catch (err) {
+      setDialogError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar o desconto.",
+      );
+    } finally {
+      setIsDialogSubmitting(false);
+    }
   };
 
   const handleSaveDiscounts = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!selectedDiscountItem) {
+      setDialogError("Escolha o item que recebeu o desconto.");
+      return;
+    }
+    const price = normalizePriceCents(selectedDiscountItem.priceCents) ?? 0;
+    if (discountInputCents <= 0) {
+      setDialogError("Informe o valor do desconto ou cashback.");
+      return;
+    }
+    if (price <= 0) {
+      setDialogError(
+        "Informe o preço do item antes de registrar o desconto ou cashback.",
+      );
+      return;
+    }
+    if (discountInputCents > price) {
+      setDialogError(
+        "O desconto ou cashback não pode ser maior que o preço do item.",
+      );
+      return;
+    }
+    await saveItemDiscount(selectedDiscountItem.id, discountInputCents);
+  };
+
+  const removeGeneralDiscount = async () => {
     if (!activeEnxoval) return;
 
     setIsDialogSubmitting(true);
@@ -1247,7 +1319,7 @@ export default function App() {
 
     try {
       const updatedEnxoval = await updateEnxovalRequest(activeEnxoval.id, {
-        discountCents: discountWorkingCents,
+        discountCents: 0,
       });
       setActiveEnxoval(updatedEnxoval);
       setEnxovais((current) =>
@@ -1255,13 +1327,11 @@ export default function App() {
           enxoval.id === updatedEnxoval.id ? updatedEnxoval : enxoval,
         ),
       );
-      setDiscountAdjustmentText("");
-      setIsDiscountsOpen(false);
     } catch (err) {
       setDialogError(
         err instanceof Error
           ? err.message
-          : "Não foi possível salvar os descontos.",
+          : "Não foi possível remover o desconto geral.",
       );
     } finally {
       setIsDialogSubmitting(false);
@@ -1486,7 +1556,9 @@ export default function App() {
         Pular para a lista
       </a>
       <div inert={isWorkspaceMenuOpen}>
-        <aside className="workspace-sidebar">
+        {/* Barra fixa e com rolagem própria: sem layoutRoot/layoutScroll, o motion lê a rolagem da página
+            como deslocamento dos ambientes e os anima "para baixo e de volta" ao trocar de ambiente. */}
+        <motion.aside layoutRoot layoutScroll className="workspace-sidebar">
           <a href="/" className="brand-link">
             <Brand />
           </a>
@@ -1506,6 +1578,14 @@ export default function App() {
               onChange={(id) => void handleEnxovalChange(id)}
               disabled={isWorkspaceLoading || isOrdering}
             />
+            <button
+              type="button"
+              className="workspace-picker-create"
+              onClick={openCreateEnxoval}
+              disabled={isWorkspaceLoading || isOrdering}
+            >
+              <Plus size={15} /> Criar novo enxoval
+            </button>
           </div>
           <nav
             className="workspace-navigation"
@@ -1557,46 +1637,38 @@ export default function App() {
             />
           </nav>
           <div className="sidebar-bottom">
-            <div className="sidebar-note">
-              <Sparkles size={20} />
-              <strong>
-                O próximo capítulo
-                <br />
-                tem a sua cara.
-              </strong>
-              <p>Uma conquista de cada vez.</p>
-              <button onClick={openCreateEnxoval}>
-                Criar outro enxoval <Plus size={15} />
-              </button>
-            </div>
             <div className="sidebar-profile">
               <span className="user-avatar">
                 {user.name.slice(0, 1).toUpperCase()}
               </span>
               <span>
                 <strong>{user.name}</strong>
-                <small>
-                  {isDemoMode() ? "Explorando a Larume" : user.email}
-                </small>
+                <small>{user.email}</small>
               </span>
-              <button onClick={handleLogout} aria-label="Sair">
-                <LogOut size={16} />
-              </button>
             </div>
           </div>
-        </aside>
+        </motion.aside>
         <div className="desktop-app-header">
           <span>
             Meu cantinho <ChevronRight size={14} />{" "}
-            <h1>{activeEnxoval?.name ?? "Bem-vindo à Larume"}</h1>
+            <h1>{activeEnxoval?.name ?? "Bem-vindo ao Casa Mia"}</h1>
             {activeEnxoval?.role === "owner" && (
-              <button
-                className="title-edit-button"
-                aria-label="Editar nome do enxoval"
-                onClick={openRenameEnxoval}
-              >
-                <Pencil size={15} />
-              </button>
+              <>
+                <button
+                  className="title-edit-button"
+                  aria-label="Editar nome do enxoval"
+                  onClick={openRenameEnxoval}
+                >
+                  <Pencil size={15} />
+                </button>
+                <button
+                  className="title-edit-button title-delete-button"
+                  aria-label="Excluir enxoval"
+                  onClick={openDeleteEnxoval}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </>
             )}
           </span>
           <div>
@@ -1615,17 +1687,23 @@ export default function App() {
                 >
                   <UserPlus size={16} /> Convidar
                 </button>
+                <button
+                  className="button button-outline button-small"
+                  aria-label="Descontos e cashback"
+                  title="Descontos e cashback"
+                  onClick={openDiscounts}
+                >
+                  <Percent size={16} /> Descontos
+                </button>
               </>
             )}
             <button
               type="button"
-              className="workspace-menu-trigger"
-              aria-label="Abrir menu do enxoval"
-              aria-expanded={isWorkspaceMenuOpen}
-              aria-controls="workspace-menu"
-              onClick={openWorkspaceMenu}
+              className="button button-outline button-small"
+              aria-label="Sair da conta"
+              onClick={() => void handleLogout()}
             >
-              <Menu size={18} /> Menu
+              <LogOut size={16} /> Sair
             </button>
           </div>
         </div>
@@ -1633,20 +1711,7 @@ export default function App() {
           <a href="/" className="brand-link">
             <Brand />
           </a>
-          <span>Seu lar, tomando forma.</span>
         </div>
-        {isDemoMode() && (
-          <div className="demo-banner">
-            <span>
-              <Sparkles size={14} />
-              <strong>Você está na demonstração.</strong>{" "}
-              <span>Explore à vontade. Os dados ficam neste navegador.</span>
-            </span>
-            <a href="/comecar">
-              Criar minha conta <ArrowUpRight size={14} />
-            </a>
-          </div>
-        )}
         <div
           aria-hidden="true"
           className="pointer-events-none fixed left-1/2 top-3 z-50 sm:hidden transition-opacity duration-150"
@@ -1674,9 +1739,11 @@ export default function App() {
         >
           <div className="mobile-header-title-row">
             <div className="mobile-header-title">
-              <div className="mobile-header-eyebrow" style={eyebrowStyle}>
-                ENXOVAL COMPARTILHADO
-              </div>
+              {members.length > 1 && (
+                <div className="mobile-header-eyebrow" style={eyebrowStyle}>
+                  ENXOVAL COMPARTILHADO
+                </div>
+              )}
               <div className="mobile-title-with-edit">
                 <h1 style={titleStyle}>
                   {activeEnxoval?.name ?? "Meu enxoval"}
@@ -1691,14 +1758,6 @@ export default function App() {
                   </button>
                 )}
               </div>
-              {hasEnxoval && workspaceView === "list" && (
-                <div
-                  className="mobile-header-collapsed-spent"
-                  style={totalSpentTitleStyle}
-                >
-                  Total gasto <strong>{checkedTotalSpentText}</strong>
-                </div>
-              )}
             </div>
             <button
               type="button"
@@ -1711,22 +1770,11 @@ export default function App() {
               <Menu size={26} strokeWidth={1.8} aria-hidden="true" />
             </button>
           </div>
-          {hasEnxoval && (
-            <div className="mobile-header-summary" style={metaStyle}>
-              <span>
-                <strong>{progressStats.percentage}%</strong> conquistado
-              </span>
-              {workspaceView === "list" && (
-                <span>
-                  Total gasto <strong>{checkedTotalSpentText}</strong>
-                </span>
-              )}
-            </div>
-          )}
           {hasEnxoval && workspaceView === "list" && (
             <>
               <motion.div
                 layoutScroll
+                ref={chipsScrollRef}
                 className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
                 style={categoryBarStyle}
               >
@@ -1741,12 +1789,13 @@ export default function App() {
                   allOption={{
                     active: isAllEnvironments,
                     onSelect: showAllItems,
-                    done: items.filter((item) => item.checked).length,
-                    total: items.length,
+                    done: doneItems(items).length,
+                    total: activeItems(items).length,
                   }}
                   horizontal
                 />
               </motion.div>
+              <ScrollIndicator targetRef={chipsScrollRef} />
             </>
           )}
         </motion.header>
@@ -1769,6 +1818,9 @@ export default function App() {
               items={items}
               categories={categories}
               name={activeEnxoval!.name}
+              enxovalId={activeEnxoval!.id}
+              onImported={handleRefresh}
+              onAddCategory={openCreateCategory}
               discountCents={enxovalDiscountCents}
               view={workspaceView}
               scope={
@@ -1782,7 +1834,7 @@ export default function App() {
                 setSearchQuery("");
                 setItemSortMode("manual");
               }}
-              onInvite={openInvite}
+              onShowUnpriced={showUnpricedItems}
             />
           )}
           {hasEnxoval && workspaceView === "list" ? (
@@ -1829,6 +1881,12 @@ export default function App() {
                     )}
                 </div>
                 <div className="list-heading-actions">
+                  <ImportItemsButton
+                    enxovalId={activeEnxoval!.id}
+                    items={items}
+                    categories={categories}
+                    onImported={handleRefresh}
+                  />
                   <ExportMenu
                     categories={categories}
                     items={items}
@@ -1903,7 +1961,9 @@ export default function App() {
                   className={`category-list-swipe ${categorySwipeAnimationClass}`}
                   style={categorySwipeStyle}
                 >
-                  <div className="mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1">
+                  <div
+                    className={`list-progress-row mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1${!isSearching && !isShowingLatestChanges && !hasItemFilters ? " is-redundant" : ""}`}
+                  >
                     <span className="min-w-0 truncate">{listTitle}</span>
                     <span className="shrink-0">{listCounterText}</span>
                   </div>
@@ -1970,28 +2030,10 @@ export default function App() {
           ) : null}
         </main>
 
-        {hasEnxoval && (
-          <div className="mobile-add-item fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-brand-dark text-white rounded-full pl-4 pr-5 py-3 shadow-lg shadow-brand-dark/30 flex items-center gap-2 hover:bg-black transition-transform hover:scale-105 active:scale-95"
-            >
-              <div className="bg-white/20 rounded-full p-1">
-                <Plus size={20} strokeWidth={2.5} />
-              </div>
-              <span className="font-medium">Adicionar item</span>
-            </button>
-          </div>
-        )}
-
         <nav className="mobile-bottom-nav" aria-label="Navegação do aplicativo">
           <button
-            className={
-              !isInviteOpen && workspaceView === "overview" ? "active" : ""
-            }
-            aria-current={
-              !isInviteOpen && workspaceView === "overview" ? "page" : undefined
-            }
+            className={workspaceView === "overview" ? "active" : ""}
+            aria-current={workspaceView === "overview" ? "page" : undefined}
             onClick={() => {
               setWorkspaceView("overview");
               window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2001,26 +2043,25 @@ export default function App() {
             Visão geral
           </button>
           <button
-            className={
-              !isInviteOpen && workspaceView === "list" ? "active" : ""
-            }
-            aria-current={
-              !isInviteOpen && workspaceView === "list" ? "page" : undefined
-            }
+            type="button"
+            className="mobile-nav-add"
+            aria-label="Adicionar item ou ambiente"
+            aria-haspopup="dialog"
+            onClick={() => setIsAddChoiceOpen(true)}
+            disabled={!hasEnxoval}
+          >
+            <span className="mobile-nav-add-icon" aria-hidden="true">
+              <Plus size={22} strokeWidth={2.5} />
+            </span>
+            Adicionar
+          </button>
+          <button
+            className={workspaceView === "list" ? "active" : ""}
+            aria-current={workspaceView === "list" ? "page" : undefined}
             onClick={showAllItems}
           >
             <ListChecks size={19} />
             Meu enxoval
-          </button>
-          <button
-            className={isInviteOpen ? "active" : ""}
-            aria-haspopup="dialog"
-            aria-expanded={isInviteOpen}
-            onClick={openInvite}
-            disabled={!hasEnxoval}
-          >
-            <Users size={19} />
-            Compartilhar
           </button>
         </nav>
       </div>
@@ -2031,11 +2072,13 @@ export default function App() {
         user={user}
         enxovais={enxovais}
         activeEnxoval={activeEnxoval}
-        memberCount={members.length}
+        members={members}
         categories={categories}
         items={items}
         activeCategoryId={activeCategoryId}
         onSelectCategory={selectEnvironment}
+        allSelected={workspaceView === "list" && isAllEnvironments}
+        onSelectAll={showAllItems}
         onRenameCategory={openRenameCategory}
         onDeleteCategory={openDeleteCategory}
         onReorderCategories={commitEnvironmentOrder}
@@ -2043,11 +2086,14 @@ export default function App() {
         onSwitch={(id) => void handleEnxovalChange(id)}
         onCreate={openCreateEnxoval}
         onInvite={openInvite}
-        onDiscounts={openDiscounts}
-        onRename={openRenameEnxoval}
         onDelete={openDeleteEnxoval}
-        onAddCategory={openCreateCategory}
         onLogout={() => void handleLogout()}
+      />
+      <AddChoiceDialog
+        isOpen={isAddChoiceOpen}
+        onClose={() => setIsAddChoiceOpen(false)}
+        onItem={() => setIsAddModalOpen(true)}
+        onCategory={openCreateCategory}
       />
       <Dialog
         title="Editar ambiente"
@@ -2110,12 +2156,14 @@ export default function App() {
             <h4 className="mb-2 text-sm font-semibold text-stone-700">
               Mostrar
             </h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
               <button
                 type="button"
                 onClick={() => {
                   setShowOnlyPricedItems(false);
                   setShowOnlyCheckedItems(false);
+                  setShowOnlyUnpricedItems(false);
+                  setStatusFilter("all");
                 }}
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${!hasItemFilters ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
@@ -2123,10 +2171,23 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowOnlyPricedItems((current) => !current)}
+                onClick={() => {
+                  setShowOnlyPricedItems((current) => !current);
+                  setShowOnlyUnpricedItems(false);
+                }}
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${showOnlyPricedItems ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
                 Com preço
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOnlyUnpricedItems((current) => !current);
+                  setShowOnlyPricedItems(false);
+                }}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${showOnlyUnpricedItems ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
+              >
+                Sem preço
               </button>
               <button
                 type="button"
@@ -2136,6 +2197,25 @@ export default function App() {
                 Checados
               </button>
             </div>
+          </div>
+
+          <div>
+            <h4 className="mb-2 text-sm font-semibold text-stone-700">
+              Situação
+            </h4>
+            <Select
+              id="filter-item-status"
+              ariaLabel="Filtrar por situação"
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value as ItemStatus | "all")}
+              options={[
+                { value: "all", label: "Todas as situações" },
+                ...ITEM_STATUSES.map((status) => ({
+                  value: status,
+                  label: ITEM_STATUS_META[status].label,
+                })),
+              ]}
+            />
           </div>
 
           <div>
@@ -2173,6 +2253,8 @@ export default function App() {
               onClick={() => {
                 setShowOnlyPricedItems(false);
                 setShowOnlyCheckedItems(false);
+                setShowOnlyUnpricedItems(false);
+                setStatusFilter("all");
                 setItemSortMode("manual");
               }}
               disabled={activeFilterCount === 0}
@@ -2307,137 +2389,209 @@ export default function App() {
         isOpen={isDiscountsOpen}
         onClose={() => setIsDiscountsOpen(false)}
       >
-        <form
-          onSubmit={handleSaveDiscounts}
-          className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4"
-        >
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Operação
-            </label>
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1">
-              <button
-                type="button"
-                onClick={() => setDiscountOperation("add")}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${discountOperation === "add" ? "bg-white text-brand-dark shadow-sm" : "text-stone-500 hover:text-stone-700"}`}
-              >
-                Somar
-              </button>
-              <button
-                type="button"
-                onClick={() => setDiscountOperation("subtract")}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${discountOperation === "subtract" ? "bg-white text-brand-dark shadow-sm" : "text-stone-500 hover:text-stone-700"}`}
-              >
-                Subtrair
-              </button>
-            </div>
-          </div>
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-5">
+          <form onSubmit={handleSaveDiscounts} className="space-y-4">
+            <p className="text-sm text-stone-600">
+              Escolha o item e informe quanto foi abatido do preço, seja
+              desconto, cupom ou cashback. O valor entra no resumo e fica salvo
+              no próprio item: é só abri-lo na lista para ver ou ajustar.
+            </p>
 
-          <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
-              Valor do ajuste
-            </label>
-            <div className="flex items-center gap-2">
+            <div>
+              <label
+                htmlFor="discount-category"
+                className="block text-sm font-medium text-stone-700 mb-1"
+              >
+                Ambiente
+              </label>
+              <Select
+                id="discount-category"
+                value={discountCategoryId}
+                disabled={isDialogSubmitting}
+                options={categories.map((category) => ({
+                  value: category.id,
+                  label: category.name,
+                }))}
+                onChange={(categoryId) => {
+                  setDiscountCategoryId(categoryId);
+                  setDiscountItemId("");
+                  setDiscountText("");
+                  setDialogError("");
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="discount-item"
+                className="block text-sm font-medium text-stone-700 mb-1"
+              >
+                Item
+              </label>
+              <Select
+                id="discount-item"
+                value={discountItemId}
+                disabled={isDialogSubmitting}
+                options={discountItemOptions}
+                onChange={selectDiscountItem}
+              />
+              {discountItemOptions.length === 0 && (
+                <p className="mt-1 text-xs text-stone-500">
+                  Este ambiente não tem itens que aceitem desconto. Itens
+                  ganhos, que você já tinha, não precisa ou descartados ficam
+                  de fora.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="discount-value"
+                className="block text-sm font-medium text-stone-700 mb-1"
+              >
+                Valor do desconto ou cashback
+              </label>
               <input
-                ref={discountAdjustmentInputRef}
+                id="discount-value"
                 type="text"
                 inputMode="numeric"
-                aria-label="Valor do ajuste"
-                value={discountAdjustmentText}
-                onChange={handleDiscountAdjustmentChange}
+                value={discountText}
+                onChange={(event) => {
+                  setDiscountText(formatPriceInput(event.target.value));
+                  setDialogError("");
+                }}
                 placeholder="R$ 0,00"
-                className="min-w-0 flex-1 px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+                disabled={!selectedDiscountItem || isDialogSubmitting}
+                className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood disabled:opacity-60"
               />
-              <button
-                type="button"
-                onPointerDown={(event) => event.preventDefault()}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={handleApplyDiscountAdjustment}
-                disabled={discountAdjustmentCents <= 0}
-                aria-label={
-                  discountOperation === "add"
-                    ? "Somar ajuste na prévia"
-                    : "Subtrair ajuste da prévia"
-                }
-                title={
-                  discountOperation === "add"
-                    ? "Somar ajuste na prévia"
-                    : "Subtrair ajuste da prévia"
-                }
-                className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${discountOperation === "add" ? "bg-brand-wood hover:bg-brand-wood/90" : "bg-stone-700 hover:bg-stone-800"}`}
-              >
-                {discountOperation === "add" ? (
-                  <Plus size={20} />
-                ) : (
-                  <Minus size={20} />
-                )}
-              </button>
+              {selectedDiscountItem && (
+                <p className="mt-1 text-xs text-stone-500">
+                  {normalizePriceCents(selectedDiscountItem.priceCents)
+                    ? `Preço do item: ${formatCurrency(selectedDiscountItem.priceCents)}. Fica ${formatCurrency(Math.max(0, (normalizePriceCents(selectedDiscountItem.priceCents) ?? 0) - discountInputCents))} depois do desconto.`
+                    : "Este item ainda não tem preço. Informe o preço dele antes de registrar o desconto."}
+                </p>
+              )}
             </div>
-          </div>
+
+            {dialogError && (
+              <p
+                role="alert"
+                className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
+              >
+                {dialogError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={
+                isDialogSubmitting ||
+                !selectedDiscountItem ||
+                discountInputCents <= 0 ||
+                discountInputCents ===
+                  (selectedDiscountItem?.discountCents ?? 0)
+              }
+              className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDialogSubmitting ? "Salvando..." : "Salvar desconto"}
+            </button>
+          </form>
+
+          <section aria-label="Descontos registrados">
+            <h4 className="mb-2 text-sm font-semibold text-stone-700">
+              Descontos registrados
+            </h4>
+            {registeredDiscountItems.length === 0 &&
+            enxovalDiscountCents === 0 ? (
+              <p className="text-sm text-stone-500">
+                Nenhum desconto ou cashback registrado ainda.
+              </p>
+            ) : (
+              <ul className="divide-y divide-stone-100">
+                {registeredDiscountItems.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 py-2">
+                    <button
+                      type="button"
+                      onClick={() => selectDiscountItem(item.id)}
+                      disabled={isDialogSubmitting}
+                      className="min-w-0 flex-1 text-left"
+                      aria-label={`Editar desconto de ${item.name}`}
+                    >
+                      <span className="block truncate text-sm font-medium text-stone-800">
+                        {item.name}
+                      </span>
+                      <span className="block truncate text-xs text-stone-500">
+                        {categoryById.get(item.categoryId)?.name ??
+                          item.category}{" "}
+                        · - {formatCurrency(item.discountCents)} de{" "}
+                        {formatCurrency(item.priceCents)}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void saveItemDiscount(item.id, 0)}
+                      disabled={isDialogSubmitting}
+                      aria-label={`Remover desconto de ${item.name}`}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+                    >
+                      Remover
+                    </button>
+                  </li>
+                ))}
+                {enxovalDiscountCents > 0 && (
+                  <li className="flex items-center gap-2 py-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-stone-800">
+                        Desconto geral anterior
+                      </span>
+                      <span className="block text-xs text-stone-500">
+                        Sem item vinculado · - {savedDiscountText}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void removeGeneralDiscount()}
+                      disabled={isDialogSubmitting}
+                      aria-label="Remover desconto geral anterior"
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+                    >
+                      Remover
+                    </button>
+                  </li>
+                )}
+              </ul>
+            )}
+          </section>
 
           <div className="rounded-xl bg-stone-50 p-3 text-sm text-stone-600 space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <span>Subtotal marcado</span>
-              <strong className="text-stone-800">
-                {checkedSubtotalSpentText}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>Desconto atual</span>
-              <strong className="text-brand-wood">- {savedDiscountText}</strong>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span>
-                {discountOperation === "add"
-                  ? "Ajuste para somar"
-                  : "Ajuste para subtrair"}
-              </span>
-              <strong
-                className={
-                  discountOperation === "add"
-                    ? "text-brand-wood"
-                    : "text-stone-700"
-                }
-              >
-                {discountOperation === "add" ? "+ " : "- "}
-                {discountAdjustmentPreviewText}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t border-stone-200 pt-2">
-              <span>Novo desconto total</span>
+              <span>Descontos e cashback nos itens</span>
               <strong className="text-brand-wood">
-                - {workingDiscountText}
+                - {formatCurrency(itemDiscountsTotalCents)}
               </strong>
             </div>
+            {enxovalDiscountCents > 0 && (
+              <div className="flex items-center justify-between gap-3">
+                <span>Desconto geral anterior</span>
+                <strong className="text-brand-wood">
+                  - {savedDiscountText}
+                </strong>
+              </div>
+            )}
+            {receivedValueCents > 0 && (
+              <div className="flex items-center justify-between gap-3">
+                <span>Itens ganhos (valor cheio)</span>
+                <strong className="text-brand-wood">{receivedValueText}</strong>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3 border-t border-stone-200 pt-2">
               <span>Total gasto</span>
               <strong className="text-stone-900">
-                {discountPreviewTotalText}
+                {formatCurrency(checkedTotalSpentCents)}
               </strong>
             </div>
           </div>
-
-          {dialogError && (
-            <p
-              role="alert"
-              className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
-            >
-              {dialogError}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={
-              isDialogSubmitting ||
-              !activeEnxoval ||
-              discountWorkingCents === enxovalDiscountCents
-            }
-            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isDialogSubmitting ? "Salvando..." : "Salvar ajuste"}
-          </button>
-        </form>
+        </div>
       </Dialog>
       <Dialog
         title="Editar enxoval"

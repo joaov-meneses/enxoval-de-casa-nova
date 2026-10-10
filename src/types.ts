@@ -1,3 +1,6 @@
+import type { ItemStatus } from './itemStatus';
+
+export type { ItemStatus };
 export type Category = string;
 export type EnxovalRole = 'owner' | 'editor';
 
@@ -27,10 +30,17 @@ export interface EnxovalItem {
   name: string;
   categoryId: string;
   category: Category;
+  /** Derivado de `status`: verdadeiro quando o item já foi conquistado (comprei, ganhei ou já tenho). */
   checked: boolean;
+  status: ItemStatus;
   link: string;
   description: string;
+  /** Valor do item. A quantidade é só informativa e não multiplica o preço. */
   priceCents: number | null;
+  /** Quantas unidades o item tem (1 a 999), para não repetir o mesmo item na lista. */
+  quantity: number;
+  /** Desconto ou cashback já abatido do preço (0 quando não há ou quando o item foi ganho). */
+  discountCents: number;
   sortOrder: number;
   updatedAt: string;
   createdAt?: string;

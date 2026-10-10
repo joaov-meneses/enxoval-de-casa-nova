@@ -40,4 +40,4 @@ A ferramenta integrada `image_gen` recebeu `larume-symbol-source.png` como alvo 
 
 ## Continuidade dos dados
 
-A mudança da marca não altera sessões, contas, permissões nem o esquema PostgreSQL. A demonstração continua lendo as chaves antigas `larumi.demo.v1` e `morada.demo.v1` quando não encontra a nova chave `larume.demo.v1`.
+A mudança da marca não altera sessões, contas, permissões nem o esquema PostgreSQL.

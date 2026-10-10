@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "dev:full": "npm run db:up && npm run dev",
-    "dev:preview": "tsx server/index.ts --preview",
     "build": "vite build && esbuild server/index.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/server.js",
     "start": "node dist/server.js --production",
     "db:migrate": "tsx server/migrate.ts",
@@ -19,7 +18,9 @@
     "lint": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:admin-api": "node --import tsx tests/admin-api.mjs",
-    "test:onboarding-db": "node --import tsx tests/onboarding-register-db.mjs"
+    "test:onboarding-db": "node --import tsx tests/onboarding-register-db.mjs",
+    "test:item-status-db": "node --import tsx tests/item-status-db.mjs",
+    "test:password-reset-db": "node --import tsx tests/password-reset-db.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -32,7 +33,9 @@
     "pg": "^8.13.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^6.2.3"
+    "read-excel-file": "^9.3.12",
+    "vite": "^6.2.3",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -44,7 +47,9 @@
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "jimp": "^1.6.1",
     "prettier": "^3.9.9",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

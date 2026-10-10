@@ -15,20 +15,13 @@
   margin: 0 auto;
   padding: 24px 0 8px;
 }
-.privacy-top .brand-symbol {
-  width: 40px;
-  height: 40px;
-}
-.privacy-top .brand-word {
-  font-size: 34px;
-}
 .privacy-back {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 44px;
   font-size: 14px;
-  color: #5c6055;
+  color: #5d5249;
 }
 .privacy-body {
   width: min(760px, calc(100% - 40px));
@@ -46,7 +39,7 @@
 .privacy-updated {
   margin: 0 0 28px;
   font-size: 14px;
-  color: #5d5f54;
+  color: #5c5148;
 }
 .privacy-body section {
   padding: 22px 0;
@@ -62,7 +55,7 @@
 .privacy-body li {
   font-size: 16px;
   line-height: 1.7;
-  color: #3f4639;
+  color: #4e352a;
 }
 .privacy-body p {
   margin: 0 0 12px;

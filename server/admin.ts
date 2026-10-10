@@ -169,6 +169,8 @@ export function registerAdminRoutes(router: Router) {
           [id, await hashPassword(temporaryPassword), expiresAt],
         );
         await client.query("DELETE FROM sessions WHERE user_id = $1", [id]);
+        // Links de redefinição enviados por e-mail antes deste reset deixam de valer.
+        await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [id]);
       });
       // Only the hash is persisted. The plaintext is returned once, to this admin session.
       res.json({ temporaryPassword, expiresAt: expiresAt.toISOString() });

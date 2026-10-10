@@ -12,6 +12,7 @@ import {
 import { login } from "../api";
 import type { BootstrapData } from "../types";
 import { Brand } from "./Brand";
+import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
 
 export function AuthPage({
   onAuthenticated,
@@ -27,7 +28,7 @@ export function AuthPage({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
-    document.title = "Entre, a casa é sua | Larume";
+    document.title = "Entre, a casa é sua | Casa Mia";
   }, []);
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -134,6 +135,21 @@ export function AuthPage({
                 </button>
               </span>
             </label>
+            <a
+              className="auth-forgot"
+              href="/esqueci-senha"
+              onClick={() => {
+                // Leva o e-mail já digitado para a próxima tela (fica só na sessão, nunca na URL).
+                try {
+                  if (email.trim())
+                    sessionStorage.setItem(FORGOT_EMAIL_KEY, email.trim());
+                } catch {
+                  /* Sem armazenamento, a pessoa digita o e-mail de novo. */
+                }
+              }}
+            >
+              Esqueci minha senha
+            </a>
             {error && (
               <div className="form-error" role="alert">
                 {error}
@@ -157,12 +173,6 @@ export function AuthPage({
             <a href="/comecar">Monte seu plano de casa nova</a> e crie a sua no
             final.
           </p>
-          <div className="auth-divider">
-            <span>ou conheça antes de começar</span>
-          </div>
-          <a href="/demo" className="button button-outline">
-            Explorar a demonstração <ArrowUpIcon />
-          </a>
           <p className="auth-note">
             <ShieldCheck size={15} /> Sem cartão de crédito. No seu tempo.
           </p>
@@ -173,7 +183,4 @@ export function AuthPage({
       </section>
     </main>
   );
-}
-function ArrowUpIcon() {
-  return <ArrowRight size={16} />;
 }

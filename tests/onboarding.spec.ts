@@ -44,7 +44,7 @@ test("o plano segue clima, região, moradia e estilo", () => {
   expect(names({ ...base, state: "CE" })).toContain("Cuscuzeira");
   expect(names({ ...base, state: "SP" })).not.toContain("Cuscuzeira");
   expect(names({ ...base, state: "RS" })).toContain(
-    "Kit chimarrão (cuia, bomba e térmica)",
+    "Kit chimarrão (cuia, bomba, térmica)",
   );
 
   // Moradia: casa tem área externa; apartamento tem varanda; studio funde sala e quarto.
@@ -449,36 +449,6 @@ test.describe("funil /comecar", () => {
     await cta(page, "Continuar").click();
     await expect(page.getByRole("heading", { name: "O inverno pede cobertor" })).toBeVisible();
     await expect(page.getByText("frio", { exact: true })).toBeVisible();
-  });
-
-  test("'Explorar meu plano agora' leva o plano gerado para a demonstração", async ({ page }) => {
-    await openFunnel(page);
-    await reachReady(page, { people: "3 pessoas" });
-    await toSave(page);
-    await page.getByRole("button", { name: "Explorar meu plano agora" }).click();
-    await expect(page).toHaveURL(/\/demo$/);
-    await expect(page.getByText("Você está na demonstração.")).toBeVisible();
-    const active = await page.evaluate(() => {
-      const data = JSON.parse(localStorage.getItem("larume.demo.v1")!);
-      const workspace = data.workspaces.find((w: { enxoval: { id: string } }) => w.enxoval.id === data.activeId);
-      return { name: workspace.enxoval.name, owner: workspace.members[0].name, first: workspace.categories[0].name };
-    });
-    expect(active).toEqual({ name: "Nossa casa nova", owner: "Jeoston", first: "Quarto" });
-    const firstItem = await page.evaluate(() => {
-      const data = JSON.parse(localStorage.getItem("larume.demo.v1")!);
-      return data.workspaces.find((w: { enxoval: { id: string } }) => w.enxoval.id === data.activeId).items[0];
-    });
-    expect(firstItem.description).toMatch(/^Essencial/);
-    expect(firstItem.priceCents).toBeNull();
-    // O primeiro ambiente é o do primeiro dia.
-    await expect(page.getByText("Colchão").first()).toBeVisible();
-    // O plano substitui, e não duplica, ao repetir.
-    const stored = await page.evaluate(() => {
-      const data = JSON.parse(localStorage.getItem("larume.demo.v1")!);
-      return data.workspaces.map((w: { enxoval: { id: string } }) => w.enxoval.id);
-    });
-    expect(stored.filter((id: string) => id.startsWith("demo-plan-"))).toHaveLength(1);
-    expect(stored).toContain("demo-home");
   });
 
   test("criar conta cria a conta já com o enxoval e o plano, em um único pedido", async ({ page }) => {

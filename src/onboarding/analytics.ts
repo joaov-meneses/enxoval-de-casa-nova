@@ -5,8 +5,7 @@ export type OnboardingEvent =
   | "onboarding_back"
   | "plan_ready"
   | "signup_submit"
-  | "signup_success"
-  | "demo_open";
+  | "signup_success";
 
 /**
  * Dispara um evento de DOM em vez de depender de um provedor de analytics.

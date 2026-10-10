@@ -1,15 +1,20 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
-import { MAX_ENVIRONMENT_NAME_LENGTH } from '../src/data.ts';
+import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH } from '../src/data.ts';
+import { DEFAULT_ITEM_QUANTITY, isValidQuantity, quantityFromDescription } from '../src/itemQuantity.ts';
+import { DEFAULT_ITEM_STATUS, isDoneStatus, isItemStatus, resolveDiscountCents, statusFromChecked, type ItemStatus } from '../src/itemStatus.ts';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from '../src/types.ts';
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { appBaseUrl, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const RESET_TOKEN_TTL_MS = 60 * 60_000;
+const RESET_REQUEST_COOLDOWN_SECONDS = 60;
 
 interface DbUserRow {
   id: string;
@@ -48,9 +53,12 @@ interface ItemRow {
   category_id: string;
   category: string;
   checked: boolean;
+  status: ItemStatus;
   link: string;
   description: string;
   price_cents: number | null;
+  discount_cents: number;
+  quantity: number;
   sort_order: number;
   updated_at: string | Date;
   created_at: string | Date;
@@ -139,9 +147,12 @@ function mapItem(row: ItemRow): EnxovalItem {
     categoryId: row.category_id,
     category: row.category,
     checked: row.checked,
+    status: row.status,
     link: row.link,
     description: row.description,
     priceCents: row.price_cents === null ? null : Number(row.price_cents),
+    quantity: Number(row.quantity ?? 1),
+    discountCents: Number(row.discount_cents ?? 0),
     sortOrder: row.sort_order,
     createdAt: serializeTimestamp(row.created_at),
     updatedAt: serializeTimestamp(row.updated_at)
@@ -225,9 +236,12 @@ async function fetchItems(queryable: Queryable, userId: string, enxovalId: strin
       i.category_id,
       c.name AS category,
       i.checked,
+      i.status,
       i.link,
       i.description,
       i.price_cents,
+      i.discount_cents,
+      i.quantity,
       i.sort_order,
       i.created_at,
       i.updated_at
@@ -392,9 +406,9 @@ async function seedEnxovalPlan(client: PoolClient, userId: string, enxovalId: st
     if (planCategory.items.length === 0) continue;
 
     await client.query(`
-      INSERT INTO items (id, user_id, enxoval_id, category_id, name, description, sort_order)
-      SELECT t.id, $1::uuid, $2::uuid, $3::uuid, t.name, t.description, t.sort_order
-      FROM unnest($4::uuid[], $5::text[], $6::text[], $7::int[]) AS t(id, name, description, sort_order)
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, description, sort_order, quantity)
+      SELECT t.id, $1::uuid, $2::uuid, $3::uuid, t.name, t.description, t.sort_order, t.quantity
+      FROM unnest($4::uuid[], $5::text[], $6::text[], $7::int[], $8::int[]) AS t(id, name, description, sort_order, quantity)
     `, [
       userId,
       enxovalId,
@@ -402,7 +416,8 @@ async function seedEnxovalPlan(client: PoolClient, userId: string, enxovalId: st
       planCategory.items.map(() => randomUUID()),
       planCategory.items.map(item => item.name),
       planCategory.items.map(item => item.description),
-      planCategory.items.map((_, index) => index)
+      planCategory.items.map((_, index) => index),
+      planCategory.items.map(item => quantityFromDescription(item.description))
     ]);
   }
 }
@@ -457,6 +472,49 @@ async function createSession(res: Response, userId: string, queryable: Queryable
   });
 }
 
+/**
+ * Cria o link de redefinição e o envia por e-mail. Roda depois de a resposta já ter saído, então o tempo de resposta
+ * não revela se o e-mail tem conta. Só o hash do token vai para o banco.
+ */
+async function issuePasswordReset(email: string) {
+  const found = await getPool().query<{ id: string; name: string; email: string; is_active: boolean }>(
+    'SELECT id, name, email, is_active FROM users WHERE email = $1 LIMIT 1', [email]);
+  const user = found.rows[0];
+  if (!user || !user.is_active) return;
+
+  const base = appBaseUrl();
+  if (!base) {
+    console.error('Redefinição de senha: configure APP_URL (ex.: https://seu-dominio.com) para montar o link do e-mail.');
+    return;
+  }
+
+  const token = randomBytes(32).toString('base64url');
+  const created = await withTransaction(async client => {
+    await client.query('DELETE FROM password_reset_tokens WHERE expires_at <= now()');
+    // Trava a conta para duas solicitações simultâneas não gerarem dois links nem passarem do intervalo mínimo.
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [user.id]);
+    const recent = await client.query(
+      `SELECT 1 FROM password_reset_tokens WHERE user_id = $1 AND created_at > now() - make_interval(secs => $2) LIMIT 1`,
+      [user.id, RESET_REQUEST_COOLDOWN_SECONDS]);
+    if (recent.rowCount) return false;
+    // Um novo pedido invalida o link anterior.
+    await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [user.id]);
+    await client.query(
+      'INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at) VALUES ($1, $2, $3, $4)',
+      [randomUUID(), user.id, hashSessionToken(token), new Date(Date.now() + RESET_TOKEN_TTL_MS)]);
+    return true;
+  });
+  if (!created) return;
+
+  // O token vai no fragmento (#), que o navegador não envia ao servidor nem a outros sites pelo Referer.
+  await sendMail(passwordResetEmail({
+    to: user.email,
+    name: user.name,
+    link: `${base}/redefinir-senha#token=${token}`,
+    minutes: RESET_TOKEN_TTL_MS / 60_000
+  }));
+}
+
 async function getCurrentUser(req: Request) {
   const token = getCookie(req, SESSION_COOKIE);
   if (!token) return null;
@@ -480,7 +538,7 @@ async function requireCurrentUser(req: Request, allowPasswordChange = false) {
   return user;
 }
 
-async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string }) {
+async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string; status?: ItemStatus; discountCents?: unknown; quantity?: number }) {
   return withTransaction(async client => {
     await requireEnxovalMember(client, input.userId, input.enxovalId);
 
@@ -502,10 +560,14 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     `, [input.enxovalId, category.id]);
 
     const itemId = randomUUID();
+    const status = input.status ?? DEFAULT_ITEM_STATUS;
+    const quantity = input.quantity ?? DEFAULT_ITEM_QUANTITY;
+    const discount = resolveDiscountCents({ status, priceCents: input.priceCents ?? null, discountCents: input.discountCents });
+    if ('error' in discount) throw new HttpError(400, discount.error);
     await client.query(`
-      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order, price_cents, link, description)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, input.link ?? '', input.description ?? '']);
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order, price_cents, discount_cents, link, description, status, checked, quantity)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, discount.value, input.link ?? '', input.description ?? '', status, isDoneStatus(status), quantity]);
 
     const itemResult = await client.query<ItemRow>(`
       SELECT
@@ -514,9 +576,12 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
         i.category_id,
         c.name AS category,
         i.checked,
+        i.status,
         i.link,
         i.description,
         i.price_cents,
+        i.discount_cents,
+        i.quantity,
         i.sort_order,
         i.created_at,
         i.updated_at
@@ -537,76 +602,119 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     throw new HttpError(400, 'Dados inválidos.');
   }
 
-  const itemScope = await getPool().query<{ enxoval_id: string }>(`
-    SELECT i.enxoval_id
-    FROM items i
-    INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
-    WHERE i.id = $1 AND em.user_id = $2
-    LIMIT 1
-  `, [itemId, userId]);
+  return withTransaction(async client => {
+    // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
+    const current = await client.query<{ enxoval_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number }>(`
+      SELECT i.enxoval_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity
+      FROM items i
+      INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
+      WHERE i.id = $1 AND em.user_id = $2
+      LIMIT 1
+      FOR UPDATE OF i
+    `, [itemId, userId]);
 
-  if (!itemScope.rows[0]) throw new HttpError(404, 'Item não encontrado.');
+    if (!current.rows[0]) throw new HttpError(404, 'Item não encontrado.');
 
-  const enxovalId = itemScope.rows[0].enxoval_id;
-  const updates = body as Record<string, unknown>;
-  const setClauses: string[] = [];
-  const values: unknown[] = [];
+    const enxovalId = current.rows[0].enxoval_id;
+    const updates = body as Record<string, unknown>;
+    const has = (key: string) => Object.prototype.hasOwnProperty.call(updates, key);
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
 
-  const addUpdate = (column: string, value: unknown) => {
-    values.push(value);
-    setClauses.push(`${column} = $${values.length}`);
-  };
+    const addUpdate = (column: string, value: unknown) => {
+      values.push(value);
+      setClauses.push(`${column} = $${values.length}`);
+    };
 
-  if (typeof updates.name === 'string') {
-    const name = updates.name.trim();
-    if (!name) throw new HttpError(400, 'Nome do item é obrigatório.');
-    addUpdate('name', name);
-  }
-  if (typeof updates.checked === 'boolean') addUpdate('checked', updates.checked);
-  if (typeof updates.link === 'string') addUpdate('link', updates.link.trim());
-  if (typeof updates.description === 'string') addUpdate('description', updates.description.trim());
-
-  if (Object.prototype.hasOwnProperty.call(updates, 'priceCents')) {
-    if (updates.priceCents === null) {
-      addUpdate('price_cents', null);
-    } else if (typeof updates.priceCents === 'number' && Number.isInteger(updates.priceCents) && updates.priceCents >= 0) {
-      addUpdate('price_cents', updates.priceCents);
-    } else {
-      throw new HttpError(400, 'Preço inválido.');
+    if (typeof updates.name === 'string') {
+      const name = updates.name.trim();
+      if (!name) throw new HttpError(400, 'Nome do item é obrigatório.');
+      // Itens antigos podem ter nomes maiores: só barra quando o nome muda e passa do limite.
+      if (name !== current.rows[0].name && name.length > MAX_ITEM_NAME_LENGTH)
+        throw new HttpError(400, `O nome do item pode ter no máximo ${MAX_ITEM_NAME_LENGTH} caracteres.`);
+      addUpdate('name', name);
     }
-  }
 
-  if (typeof updates.categoryId === 'string') {
-    const category = await findCategory(getPool(), userId, enxovalId, updates.categoryId);
-    if (!category) throw new HttpError(404, 'Ambiente não encontrado.');
-    addUpdate('category_id', updates.categoryId);
-  }
+    let status = current.rows[0].status;
+    if (has('status')) {
+      if (!isItemStatus(updates.status)) throw new HttpError(400, 'Situação inválida.');
+      status = updates.status;
+    } else if (typeof updates.checked === 'boolean') {
+      // Compatibilidade com o marcador antigo: mantém uma situação já coerente e só ajusta quando preciso.
+      status = statusFromChecked(updates.checked, status);
+    }
+    if (has('status') || typeof updates.checked === 'boolean') {
+      addUpdate('status', status);
+      addUpdate('checked', isDoneStatus(status));
+    }
 
-  if (setClauses.length === 0) {
-    throw new HttpError(400, 'Nenhuma alteração enviada.');
-  }
+    if (typeof updates.link === 'string') addUpdate('link', updates.link.trim());
+    if (typeof updates.description === 'string') addUpdate('description', updates.description.trim());
 
-  values.push(itemId, enxovalId);
-  const result = await getPool().query<ItemRow>(`
-    UPDATE items
-    SET ${setClauses.join(', ')}, updated_at = now()
-    WHERE id = $${values.length - 1} AND enxoval_id = $${values.length}
-    RETURNING
-      id,
-      name,
-      category_id,
-      (SELECT name FROM categories WHERE categories.id = items.category_id) AS category,
-      checked,
-      link,
-      description,
-      price_cents,
-      sort_order,
-      created_at,
-      updated_at
-  `, values);
+    let priceCents = current.rows[0].price_cents === null ? null : Number(current.rows[0].price_cents);
+    if (has('priceCents')) {
+      if (updates.priceCents === null) {
+        priceCents = null;
+      } else if (typeof updates.priceCents === 'number' && Number.isInteger(updates.priceCents) && updates.priceCents >= 0) {
+        priceCents = updates.priceCents;
+      } else {
+        throw new HttpError(400, 'Preço inválido.');
+      }
+      addUpdate('price_cents', priceCents);
+    }
 
-  if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
-  return mapItem(result.rows[0]);
+    let quantity = Number(current.rows[0].quantity ?? 1);
+    if (has('quantity')) {
+      if (!isValidQuantity(updates.quantity)) throw new HttpError(400, 'Quantidade inválida. Use um número inteiro de 1 a 999.');
+      quantity = updates.quantity;
+      addUpdate('quantity', quantity);
+    }
+
+    if (has('status') || has('priceCents') || has('discountCents') || typeof updates.checked === 'boolean') {
+      const discount = resolveDiscountCents({
+        status,
+        priceCents,
+        discountCents: has('discountCents') ? updates.discountCents : Number(current.rows[0].discount_cents)
+      });
+      if ('error' in discount) throw new HttpError(400, discount.error);
+      addUpdate('discount_cents', discount.value);
+    }
+
+    if (typeof updates.categoryId === 'string') {
+      const category = await findCategory(client, userId, enxovalId, updates.categoryId);
+      if (!category) throw new HttpError(404, 'Ambiente não encontrado.');
+      addUpdate('category_id', updates.categoryId);
+    }
+
+    if (setClauses.length === 0) {
+      throw new HttpError(400, 'Nenhuma alteração enviada.');
+    }
+
+    values.push(itemId, enxovalId);
+    const result = await client.query<ItemRow>(`
+      UPDATE items
+      SET ${setClauses.join(', ')}, updated_at = now()
+      WHERE id = $${values.length - 1} AND enxoval_id = $${values.length}
+      RETURNING
+        id,
+        name,
+        category_id,
+        (SELECT name FROM categories WHERE categories.id = items.category_id) AS category,
+        checked,
+        status,
+        link,
+        description,
+        price_cents,
+        discount_cents,
+        quantity,
+        sort_order,
+        created_at,
+        updated_at
+    `, values);
+
+    if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
+    return mapItem(result.rows[0]);
+  });
 }
 async function deleteItemForUser(userId: string, itemId: string) {
   const result = await getPool().query<{ id: string }>(`
@@ -770,6 +878,57 @@ export function registerApiRoutes(app: Express) {
       return mapUser({ ...row, must_change_password: false });
     });
     res.json(await fetchBootstrap(updatedUser));
+  }));
+
+  router.post('/auth/forgot-password', loginRateLimit(8), asyncHandler(async (req, res) => {
+    const email = normalizeEmail(req.body?.email);
+    if (!email || email.length > 254 || !email.includes('@')) throw new HttpError(400, 'Informe um e-mail válido.');
+    // A resposta é a mesma exista ou não uma conta com esse e-mail: ninguém descobre quem tem cadastro.
+    res.json({ ok: true });
+    void issuePasswordReset(email).catch(err =>
+      console.error('Falha ao preparar a redefinição de senha:', err instanceof Error ? err.message : err));
+  }));
+
+  router.post('/auth/reset-password/check', loginRateLimit(30), asyncHandler(async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    if (token.length < 20 || token.length > 200) {
+      res.json({ valid: false });
+      return;
+    }
+    const result = await getPool().query(
+      `SELECT 1 FROM password_reset_tokens t INNER JOIN users u ON u.id = t.user_id
+       WHERE t.token_hash = $1 AND t.expires_at > now() AND u.is_active`,
+      [hashSessionToken(token)]);
+    res.json({ valid: Boolean(result.rowCount) });
+  }));
+
+  router.post('/auth/reset-password', loginRateLimit(10), asyncHandler(async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const password = requireText(req.body?.password, 'Nova senha');
+    const confirmation = requireText(req.body?.confirmation, 'Confirmação da senha');
+    if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
+    if (password !== confirmation) throw new HttpError(400, 'As senhas não coincidem.');
+    if (token.length < 20 || token.length > 200) throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo link de redefinição.');
+
+    const user = await withTransaction(async client => {
+      const result = await client.query<{ id: string; name: string; email: string }>(
+        `SELECT u.id, u.name, u.email FROM password_reset_tokens t INNER JOIN users u ON u.id = t.user_id
+         WHERE t.token_hash = $1 AND t.expires_at > now() AND u.is_active
+         FOR UPDATE OF t, u`,
+        [hashSessionToken(token)]);
+      const row = result.rows[0];
+      if (!row) throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo link de redefinição.');
+      await client.query(
+        'UPDATE users SET password_hash = $2, must_change_password = false, password_reset_expires_at = NULL, updated_at = now() WHERE id = $1',
+        [row.id, await hashPassword(password)]);
+      // Quem tinha a sessão aberta (inclusive um invasor) é desconectado, e o link não serve de novo.
+      await client.query('DELETE FROM sessions WHERE user_id = $1', [row.id]);
+      await client.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [row.id]);
+      return row;
+    });
+    res.json({ ok: true });
+    void sendMail(passwordChangedEmail({ to: user.email, name: user.name })).catch(err =>
+      console.error('Falha ao enviar o aviso de senha alterada:', err instanceof Error ? err.message : err));
   }));
 
   router.post('/auth/logout', asyncHandler(async (req, res) => {
@@ -967,6 +1126,7 @@ export function registerApiRoutes(app: Express) {
   router.post('/items', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     const name = requireText(req.body?.name, 'Nome do item');
+    if (name.length > MAX_ITEM_NAME_LENGTH) throw new HttpError(400, `O nome do item pode ter no máximo ${MAX_ITEM_NAME_LENGTH} caracteres.`);
     const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
     const categoryId = typeof req.body?.categoryId === 'string' ? req.body.categoryId : undefined;
     const categoryName = typeof req.body?.categoryName === 'string' && req.body.categoryName.trim()
@@ -979,8 +1139,12 @@ export function registerApiRoutes(app: Express) {
     }
     const link = typeof req.body?.link === 'string' ? req.body.link.trim() : undefined;
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() : undefined;
+    const rawStatus = req.body?.status;
+    if (rawStatus !== undefined && !isItemStatus(rawStatus)) throw new HttpError(400, 'Situação inválida.');
+    const rawQuantity = req.body?.quantity;
+    if (rawQuantity !== undefined && !isValidQuantity(rawQuantity)) throw new HttpError(400, 'Quantidade inválida. Use um número inteiro de 1 a 999.');
 
-    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName, priceCents: rawPrice, link, description });
+    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName, priceCents: rawPrice, link, description, status: rawStatus, discountCents: req.body?.discountCents, quantity: rawQuantity });
     res.status(201).json(result);
   }));
 

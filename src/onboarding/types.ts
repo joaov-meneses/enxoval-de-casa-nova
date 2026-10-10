@@ -110,7 +110,7 @@ export interface GeneratedPlan {
   stats: PlanStats;
 }
 
-/** Formato enviado ao servidor e ao demo. */
+/** Formato enviado ao servidor. */
 export interface PlanPayload {
   categories: { name: string; items: { name: string; description: string }[] }[];
 }
