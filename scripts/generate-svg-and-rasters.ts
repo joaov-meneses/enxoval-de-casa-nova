@@ -1,4 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
+
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
     <!-- Gradiente do chão iluminado na soleira -->
     <linearGradient id="doorFloorLight" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -93,3 +97,28 @@
     <polygon points="-3,10 3,10 4,22 -4,22" fill="#D6C6A5" />
   </g>
 </svg>
+`;
+
+async function build() {
+  const svgPath = path.resolve('public/brand/casamia-symbol.svg');
+  const pngPath = path.resolve('public/brand/casamia-symbol.png');
+  const webpPath = path.resolve('public/brand/casamia-symbol.webp');
+
+  fs.writeFileSync(svgPath, svgContent.trim(), 'utf-8');
+
+  // Renderizar PNG 512x512
+  await sharp(Buffer.from(svgContent))
+    .resize(512, 512)
+    .png({ quality: 100 })
+    .toFile(pngPath);
+
+  // Renderizar WebP 512x512
+  await sharp(Buffer.from(svgContent))
+    .resize(512, 512)
+    .webp({ quality: 98 })
+    .toFile(webpPath);
+
+  console.log('SVG, PNG e WebP renderizados com a porta em perspectiva!');
+}
+
+build().catch(console.error);

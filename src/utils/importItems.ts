@@ -1,4 +1,4 @@
-import { MAX_ENVIRONMENT_NAME_LENGTH } from "../data";
+import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH } from "../data";
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity } from "../itemQuantity";
 import {
   DEFAULT_ITEM_STATUS,
@@ -11,7 +11,7 @@ import {
 export const IMPORT_LIMITS = {
   maxFileBytes: 2 * 1024 * 1024,
   maxRows: 500,
-  maxNameLength: 200,
+  maxNameLength: MAX_ITEM_NAME_LENGTH,
   maxDescriptionLength: 1000,
   /** Preço máximo em centavos: o banco guarda inteiros de 32 bits. */
   maxPriceCents: 2_000_000_000,

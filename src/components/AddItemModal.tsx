@@ -8,6 +8,7 @@ import {
 } from "../itemStatus";
 import { MAX_ENVIRONMENT_NAME_LENGTH } from "../data";
 import { DEFAULT_ITEM_QUANTITY, MAX_ITEM_QUANTITY } from "../itemQuantity";
+import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { Dialog } from "./Dialog";
 import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
@@ -148,14 +149,19 @@ export function AddItemModal({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sobre o item</h3>
 
         <div>
-          <label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700 mb-1">
-            Nome do produto
-          </label>
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700">
+              Nome do produto
+            </label>
+            <span className={`name-counter${name.length >= MAX_ITEM_NAME_LENGTH ? " is-full" : ""}`} aria-hidden="true">
+              {name.length}/{MAX_ITEM_NAME_LENGTH}
+            </span>
+          </div>
           <input
             type="text"
             id="new-item-name"
             required
-            maxLength={200}
+            maxLength={MAX_ITEM_NAME_LENGTH}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex: Jogo de Taças"

@@ -32,10 +32,10 @@ for (const width of [320, 390, 768, 1024, 1440]) {
 
 test("landing navigation, FAQ and entry routes work", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveTitle("Larume — seu lar começa com um plano");
+  await expect(page).toHaveTitle("Casa Mia | Enxoval de casa nova");
   await page
     .getByRole("navigation", { name: "Navegação principal" })
-    .getByRole("link", { name: "Planos", exact: true })
+    .getByRole("link", { name: "Preços", exact: true })
     .click();
   await expect(page.locator("#planos")).toBeInViewport();
   const question = page.getByRole("button", {
@@ -47,7 +47,11 @@ test("landing navigation, FAQ and entry routes work", async ({ page }) => {
     page.getByText("Ainda não. Os valores desta página", { exact: false }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /demonstra/i })).toHaveCount(0);
-  await expect(page.locator("#como-funciona")).toHaveCount(0);
+  // As seções da nova Home têm âncora na navegação.
+  for (const id of ["como-funciona", "nino", "cha", "planos", "duvidas"])
+    await expect(page.locator(`#${id}`)).toHaveCount(1);
+  // Quatro planos: gratuito, semestral, anual e mensal.
+  await expect(page.locator(".cm-plan")).toHaveCount(4);
 });
 
 test("login handles API errors and success; registration opens onboarding (mock API)", async ({

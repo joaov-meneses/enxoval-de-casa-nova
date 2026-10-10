@@ -12,7 +12,6 @@ import {
   Home,
   Sparkles,
   LogOut,
-  Users,
   UserPlus,
   ListPlus,
   X,
@@ -66,6 +65,8 @@ import { AuthPage } from "./components/AuthPage";
 import { Brand } from "./components/Brand";
 import { WorkspaceMenu } from "./components/WorkspaceMenu";
 import { ImportItemsButton } from "./components/ImportItemsDialog";
+import { ScrollIndicator } from "./components/ScrollIndicator";
+import { AddChoiceDialog } from "./components/AddChoiceDialog";
 import { RoomIcon, WorkspaceOverview } from "./components/WorkspaceOverview";
 import {
   activeItems,
@@ -87,15 +88,18 @@ import { RequiredPasswordPage } from "./components/RequiredPasswordPage";
 type ItemSortMode = "manual" | "name" | "updated";
 type CategorySwipeDirection = "next" | "previous";
 
-const APP_NAME = "Larume";
+const APP_NAME = "Casa Mia";
 // A dica de "npm run dev" só existe no desenvolvimento: o Vite troca `import.meta.env.DEV` por
 // `false` no build e remove o texto, então ela nunca chega ao bundle de produção.
 const STALE_SERVER_MESSAGE = import.meta.env.DEV
   ? "O servidor está desatualizado e não reconheceu os dados do item (situação, desconto ou quantidade). Reinicie o servidor (npm run dev) e tente de novo."
   : "Não foi possível salvar o item agora. Atualize a página e tente novamente.";
 
+/** Título padrão da aba. Janelas e telas específicas ainda mostram "Contexto | Casa Mia". */
+const APP_TITLE = `${APP_NAME} | Enxoval de casa nova`;
+
 function makeTitle(context?: string) {
-  return context ? `${context} | ${APP_NAME}` : APP_NAME;
+  return context ? `${context} | ${APP_NAME}` : APP_TITLE;
 }
 
 function normalizeSearchText(value: string) {
@@ -188,6 +192,8 @@ export default function App() {
     setIsWorkspaceMenuOpen(true);
   };
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddChoiceOpen, setIsAddChoiceOpen] = useState(false);
+  const chipsScrollRef = useRef<HTMLDivElement>(null);
   const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false);
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
@@ -300,11 +306,11 @@ export default function App() {
       return;
     }
     if (window.location.pathname === "/") {
-      document.title = "Larume — seu lar começa com um plano";
+      document.title = APP_TITLE;
       return;
     }
     if (isLoading) {
-      document.title = makeTitle("Carregando");
+      document.title = APP_TITLE;
       return;
     }
 
@@ -360,16 +366,7 @@ export default function App() {
       return;
     }
 
-    if (activeEnxoval) {
-      document.title = makeTitle(
-        isWorkspaceLoading
-          ? "Carregando " + activeEnxoval.name
-          : activeEnxoval.name,
-      );
-      return;
-    }
-
-    document.title = makeTitle("Meus enxovais");
+    document.title = APP_TITLE;
   }, [
     activeEnxoval,
     isCreateCategoryOpen,
@@ -725,50 +722,29 @@ export default function App() {
   );
   const savedDiscountText = formatCurrency(enxovalDiscountCents);
   const receivedValueText = formatCurrency(receivedValueCents);
-  const checkedTotalSpentText = formatCurrency(
-    scopeItems ? sumBought(scopeItems) : checkedTotalSpentCents,
-  );
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === "owner";
   const visibleProgress = isHeaderMobile ? headerProgress : 0;
   const headerStyle = isHeaderMobile
     ? {
-        paddingTop: `${16 - 4 * visibleProgress}px`,
-        paddingBottom: `${16 - 4 * visibleProgress}px`,
+        paddingTop: `${10 - 3 * visibleProgress}px`,
+        paddingBottom: `${10 - 3 * visibleProgress}px`,
       }
     : undefined;
   const eyebrowStyle: React.CSSProperties = {
-    maxHeight: `${24 * (1 - visibleProgress)}px`,
-    opacity: 1 - visibleProgress,
-    transform: `translateY(${-4 * visibleProgress}px)`,
-    pointerEvents: visibleProgress > 0.9 ? "none" : "auto",
-  };
-  const metaStyle: React.CSSProperties = {
-    marginTop: `${12 * (1 - visibleProgress)}px`,
-    maxHeight: `${24 * (1 - visibleProgress)}px`,
+    maxHeight: `${16 * (1 - visibleProgress)}px`,
     opacity: 1 - visibleProgress,
     transform: `translateY(${-4 * visibleProgress}px)`,
     pointerEvents: visibleProgress > 0.9 ? "none" : "auto",
   };
   const titleStyle = isHeaderMobile
     ? {
-        fontSize: `${25 - 5 * visibleProgress}px`,
+        fontSize: `${20 - 3 * visibleProgress}px`,
       }
     : undefined;
-  const totalSpentTitleStyle: React.CSSProperties = isHeaderMobile
-    ? {
-        marginTop: `${4 * visibleProgress}px`,
-        maxHeight: `${24 * visibleProgress}px`,
-        opacity: visibleProgress,
-        paddingTop: `${4 * visibleProgress}px`,
-        paddingBottom: `${4 * visibleProgress}px`,
-        transform: `translateY(${-4 * (1 - visibleProgress)}px)`,
-        pointerEvents: visibleProgress > 0.45 ? "auto" : "none",
-      }
-    : { display: "none" };
   const categoryBarStyle = isHeaderMobile
     ? {
-        marginTop: `${18 - 6 * visibleProgress}px`,
+        marginTop: `${8 - 3 * visibleProgress}px`,
       }
     : undefined;
 
@@ -1675,7 +1651,7 @@ export default function App() {
         <div className="desktop-app-header">
           <span>
             Meu cantinho <ChevronRight size={14} />{" "}
-            <h1>{activeEnxoval?.name ?? "Bem-vindo à Larume"}</h1>
+            <h1>{activeEnxoval?.name ?? "Bem-vindo ao Casa Mia"}</h1>
             {activeEnxoval?.role === "owner" && (
               <>
                 <button
@@ -1735,7 +1711,6 @@ export default function App() {
           <a href="/" className="brand-link">
             <Brand />
           </a>
-          <span>Seu lar, tomando forma.</span>
         </div>
         <div
           aria-hidden="true"
@@ -1764,9 +1739,11 @@ export default function App() {
         >
           <div className="mobile-header-title-row">
             <div className="mobile-header-title">
-              <div className="mobile-header-eyebrow" style={eyebrowStyle}>
-                ENXOVAL COMPARTILHADO
-              </div>
+              {members.length > 1 && (
+                <div className="mobile-header-eyebrow" style={eyebrowStyle}>
+                  ENXOVAL COMPARTILHADO
+                </div>
+              )}
               <div className="mobile-title-with-edit">
                 <h1 style={titleStyle}>
                   {activeEnxoval?.name ?? "Meu enxoval"}
@@ -1781,14 +1758,6 @@ export default function App() {
                   </button>
                 )}
               </div>
-              {hasEnxoval && workspaceView === "list" && (
-                <div
-                  className="mobile-header-collapsed-spent"
-                  style={totalSpentTitleStyle}
-                >
-                  Total gasto <strong>{checkedTotalSpentText}</strong>
-                </div>
-              )}
             </div>
             <button
               type="button"
@@ -1801,22 +1770,11 @@ export default function App() {
               <Menu size={26} strokeWidth={1.8} aria-hidden="true" />
             </button>
           </div>
-          {hasEnxoval && (
-            <div className="mobile-header-summary" style={metaStyle}>
-              <span>
-                <strong>{progressStats.percentage}%</strong> conquistado
-              </span>
-              {workspaceView === "list" && (
-                <span>
-                  Total gasto <strong>{checkedTotalSpentText}</strong>
-                </span>
-              )}
-            </div>
-          )}
           {hasEnxoval && workspaceView === "list" && (
             <>
               <motion.div
                 layoutScroll
+                ref={chipsScrollRef}
                 className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
                 style={categoryBarStyle}
               >
@@ -1837,6 +1795,7 @@ export default function App() {
                   horizontal
                 />
               </motion.div>
+              <ScrollIndicator targetRef={chipsScrollRef} />
             </>
           )}
         </motion.header>
@@ -1861,6 +1820,7 @@ export default function App() {
               name={activeEnxoval!.name}
               enxovalId={activeEnxoval!.id}
               onImported={handleRefresh}
+              onAddCategory={openCreateCategory}
               discountCents={enxovalDiscountCents}
               view={workspaceView}
               scope={
@@ -2001,7 +1961,9 @@ export default function App() {
                   className={`category-list-swipe ${categorySwipeAnimationClass}`}
                   style={categorySwipeStyle}
                 >
-                  <div className="mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1">
+                  <div
+                    className={`list-progress-row mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1${!isSearching && !isShowingLatestChanges && !hasItemFilters ? " is-redundant" : ""}`}
+                  >
                     <span className="min-w-0 truncate">{listTitle}</span>
                     <span className="shrink-0">{listCounterText}</span>
                   </div>
@@ -2068,28 +2030,10 @@ export default function App() {
           ) : null}
         </main>
 
-        {hasEnxoval && (
-          <div className="mobile-add-item fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-brand-dark text-white rounded-full pl-4 pr-5 py-3 shadow-lg shadow-brand-dark/30 flex items-center gap-2 hover:bg-black transition-transform hover:scale-105 active:scale-95"
-            >
-              <div className="bg-white/20 rounded-full p-1">
-                <Plus size={20} strokeWidth={2.5} />
-              </div>
-              <span className="font-medium">Adicionar item</span>
-            </button>
-          </div>
-        )}
-
         <nav className="mobile-bottom-nav" aria-label="Navegação do aplicativo">
           <button
-            className={
-              !isInviteOpen && workspaceView === "overview" ? "active" : ""
-            }
-            aria-current={
-              !isInviteOpen && workspaceView === "overview" ? "page" : undefined
-            }
+            className={workspaceView === "overview" ? "active" : ""}
+            aria-current={workspaceView === "overview" ? "page" : undefined}
             onClick={() => {
               setWorkspaceView("overview");
               window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2099,26 +2043,25 @@ export default function App() {
             Visão geral
           </button>
           <button
-            className={
-              !isInviteOpen && workspaceView === "list" ? "active" : ""
-            }
-            aria-current={
-              !isInviteOpen && workspaceView === "list" ? "page" : undefined
-            }
+            type="button"
+            className="mobile-nav-add"
+            aria-label="Adicionar item ou ambiente"
+            aria-haspopup="dialog"
+            onClick={() => setIsAddChoiceOpen(true)}
+            disabled={!hasEnxoval}
+          >
+            <span className="mobile-nav-add-icon" aria-hidden="true">
+              <Plus size={22} strokeWidth={2.5} />
+            </span>
+            Adicionar
+          </button>
+          <button
+            className={workspaceView === "list" ? "active" : ""}
+            aria-current={workspaceView === "list" ? "page" : undefined}
             onClick={showAllItems}
           >
             <ListChecks size={19} />
             Meu enxoval
-          </button>
-          <button
-            className={isInviteOpen ? "active" : ""}
-            aria-haspopup="dialog"
-            aria-expanded={isInviteOpen}
-            onClick={openInvite}
-            disabled={!hasEnxoval}
-          >
-            <Users size={19} />
-            Compartilhar
           </button>
         </nav>
       </div>
@@ -2129,11 +2072,13 @@ export default function App() {
         user={user}
         enxovais={enxovais}
         activeEnxoval={activeEnxoval}
-        memberCount={members.length}
+        members={members}
         categories={categories}
         items={items}
         activeCategoryId={activeCategoryId}
         onSelectCategory={selectEnvironment}
+        allSelected={workspaceView === "list" && isAllEnvironments}
+        onSelectAll={showAllItems}
         onRenameCategory={openRenameCategory}
         onDeleteCategory={openDeleteCategory}
         onReorderCategories={commitEnvironmentOrder}
@@ -2141,11 +2086,14 @@ export default function App() {
         onSwitch={(id) => void handleEnxovalChange(id)}
         onCreate={openCreateEnxoval}
         onInvite={openInvite}
-        onDiscounts={openDiscounts}
-        onRename={openRenameEnxoval}
         onDelete={openDeleteEnxoval}
-        onAddCategory={openCreateCategory}
         onLogout={() => void handleLogout()}
+      />
+      <AddChoiceDialog
+        isOpen={isAddChoiceOpen}
+        onClose={() => setIsAddChoiceOpen(false)}
+        onItem={() => setIsAddModalOpen(true)}
+        onCategory={openCreateCategory}
       />
       <Dialog
         title="Editar ambiente"

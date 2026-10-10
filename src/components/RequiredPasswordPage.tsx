@@ -26,7 +26,7 @@ export function RequiredPasswordPage({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    document.title = "Defina sua nova senha | Larume";
+    document.title = "Defina sua nova senha | Casa Mia";
   }, []);
   async function submit(event: FormEvent) {
     event.preventDefault();

@@ -138,7 +138,7 @@ const instructions = [
   ["Como preencher a planilha de importação"],
   [""],
   ["Coluna", "O que colocar", "Obrigatória?"],
-  ["Item", "Nome do item. Até 200 caracteres.", "Sim"],
+  ["Item", "Nome do item. Até 36 caracteres.", "Sim"],
   [
     "Ambiente",
     "Onde o item fica (Quarto, Cozinha...). Ambientes que ainda não existem são criados. Até 24 caracteres.",

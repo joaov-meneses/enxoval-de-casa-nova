@@ -44,7 +44,7 @@ test("o plano segue clima, região, moradia e estilo", () => {
   expect(names({ ...base, state: "CE" })).toContain("Cuscuzeira");
   expect(names({ ...base, state: "SP" })).not.toContain("Cuscuzeira");
   expect(names({ ...base, state: "RS" })).toContain(
-    "Kit chimarrão (cuia, bomba e térmica)",
+    "Kit chimarrão (cuia, bomba, térmica)",
   );
 
   // Moradia: casa tem área externa; apartamento tem varanda; studio funde sala e quarto.

@@ -3,6 +3,7 @@ import {
   ArrowUpRight,
   BadgePercent,
   Check,
+  ChevronDown,
   CircleCheck,
   Coffee,
   BedDouble,
@@ -14,6 +15,7 @@ import {
   TreePalm,
   WashingMachine,
   Package,
+  Plus,
   Wallet,
 } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
@@ -118,8 +120,8 @@ type RoomOrder = "default" | "pending" | "progress";
 
 const ROOM_ORDERS: { id: RoomOrder; label: string }[] = [
   { id: "default", label: "Padrão" },
-  { id: "pending", label: "Mais pendentes" },
-  { id: "progress", label: "Mais avançados" },
+  { id: "pending", label: "Pendentes" },
+  { id: "progress", label: "Avançados" },
 ];
 
 export function WorkspaceOverview({
@@ -130,6 +132,7 @@ export function WorkspaceOverview({
   discountCents,
   onCategory,
   onImported,
+  onAddCategory,
   onShowUnpriced,
   view,
   scope,
@@ -142,6 +145,8 @@ export function WorkspaceOverview({
   onCategory: (id: string) => void;
   /** Recarrega o enxoval depois de uma importação de planilha. */
   onImported: () => void | Promise<void>;
+  /** Abre o formulário de novo ambiente. */
+  onAddCategory: () => void;
   /** Abre a lista só com os itens pendentes que ainda não têm preço. */
   onShowUnpriced?: () => void;
   view: "list" | "overview";
@@ -156,7 +161,9 @@ export function WorkspaceOverview({
   // Só o que foi comprado conta como investimento; itens ganhos entram em descontos e cashback.
   const spent = Math.max(0, sumBought(statsItems) - statsDiscountCents);
   const receivedCents = sumReceived(statsItems);
-  const receivedCount = statsItems.filter((i) => i.status === "received").length;
+  const receivedCount = statsItems.filter(
+    (i) => i.status === "received",
+  ).length;
   // Desconto geral (antigo, sem item) + descontos registrados nos itens + valor cheio dos itens ganhos.
   const discountsCents = statsDiscountCents + sumItemDiscounts(statsItems);
   const savedCents = discountsCents + receivedCents;
@@ -180,6 +187,7 @@ export function WorkspaceOverview({
     }).format(c / 100);
 
   const [roomOrder, setRoomOrder] = useState<RoomOrder>("default");
+  const [statsOpen, setStatsOpen] = useState(false);
   const rooms = categories.map((cat) => {
     const all = activeItems(items.filter((i) => i.categoryId === cat.id));
     const roomPending = pendingItems(all);
@@ -284,7 +292,67 @@ export function WorkspaceOverview({
           </>
         )}
       </p>
-      <div className="workspace-stats">
+      {/* Telas pequenas: resumo em uma linha de leitura; os cartões completos abrem em "Detalhes". */}
+      <section className="stats-compact" aria-label="Resumo em poucos números">
+        <div className="stats-compact-main">
+          <strong className="stats-compact-percent">
+            {percentage}
+            <small>%</small>
+          </strong>
+          <span className="stats-compact-detail">
+            {done.length} de {statsActive.length}{" "}
+            {statsActive.length === 1 ? "conquistado" : "conquistados"}
+          </span>
+          <button
+            type="button"
+            className="stats-compact-toggle"
+            aria-expanded={statsOpen}
+            aria-controls="stats-details"
+            onClick={() => setStatsOpen((open) => !open)}
+          >
+            {statsOpen ? "Ocultar" : "Detalhes"}
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="progress-track" aria-hidden="true">
+          <span
+            style={{
+              width: `${percentage}%`,
+              minWidth: done.length > 0 ? 8 : 0,
+            }}
+          />
+        </div>
+        <dl className="stats-compact-grid">
+          <div>
+            <dt>Já investimos</dt>
+            <dd>
+              <Money cents={spent} />
+            </dd>
+          </div>
+          <div>
+            <dt>Ainda a investir</dt>
+            <dd>
+              {pending.length === 0 ? (
+                <Money cents={0} />
+              ) : planned > 0 ? (
+                <Money cents={planned} />
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Economizou</dt>
+            <dd>
+              <Money cents={savedCents} />
+            </dd>
+          </div>
+        </dl>
+      </section>
+      <div
+        id="stats-details"
+        className={`workspace-stats${statsOpen ? " is-open" : ""}`}
+      >
         <article className="stat-progress">
           <span className="stat-icon sage">
             <CircleCheck size={20} />
@@ -413,9 +481,7 @@ export function WorkspaceOverview({
                 ? "Nenhum item pendente."
                 : planned > 0
                   ? `${pending.length} ${
-                      pending.length === 1
-                        ? "item pendente"
-                        : "itens pendentes"
+                      pending.length === 1 ? "item pendente" : "itens pendentes"
                     }${unpriced > 0 ? `, ${unpriced} sem preço.` : "."}`
                   : "Sem estimativa: nenhum item pendente tem preço ainda."}
             </span>
@@ -462,7 +528,10 @@ export function WorkspaceOverview({
               <ul className="stat-legend">
                 {discountsCents > 0 && (
                   <li>
-                    <i className="stat-dot stat-dot-discount" aria-hidden="true" />
+                    <i
+                      className="stat-dot stat-dot-discount"
+                      aria-hidden="true"
+                    />
                     <span>Descontos e cashback</span>
                     <b>
                       <Money cents={discountsCents} />
@@ -514,12 +583,19 @@ export function WorkspaceOverview({
       {view === "overview" && (
         <div className="overview-grid">
           <section className="overview-rooms">
-            <div className="panel-title">
-              <h3>Cada ambiente, um novo capítulo</h3>
-              <span className="panel-count">
-                {categories.length}{" "}
-                {categories.length === 1 ? "ambiente" : "ambientes"}
-              </span>
+            <div className="rooms-toolbar">
+              <h3 className="rooms-toolbar-title">
+                Ambientes
+                <span className="rooms-count">{categories.length}</span>
+              </h3>
+              <button
+                type="button"
+                className="panel-add"
+                onClick={onAddCategory}
+              >
+                <Plus size={15} strokeWidth={2.2} aria-hidden="true" /> Novo
+                <span className="sr-only"> ambiente</span>
+              </button>
             </div>
             {categories.length > 1 && (
               <div

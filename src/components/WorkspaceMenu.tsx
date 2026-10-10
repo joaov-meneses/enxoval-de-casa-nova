@@ -3,23 +3,22 @@ import {
   Home,
   Plus,
   UserPlus,
-  Percent,
-  Pencil,
   Trash2,
   LogOut,
   X,
-  ChevronRight,
-  Users,
+  ListChecks,
 } from "lucide-react";
 import type {
   AuthUser,
   EnxovalSummary,
   EnxovalCategory,
   EnxovalItem,
+  EnxovalMember,
 } from "../types";
 import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import { Select } from "./Select";
 import { EnvironmentList } from "./EnvironmentList";
+import { activeItems } from "../itemStatus";
 
 interface WorkspaceMenuProps {
   open: boolean;
@@ -28,11 +27,14 @@ interface WorkspaceMenuProps {
   user: AuthUser;
   enxovais: EnxovalSummary[];
   activeEnxoval: EnxovalSummary | null;
-  memberCount: number;
+  members: EnxovalMember[];
   categories: EnxovalCategory[];
   items: EnxovalItem[];
   activeCategoryId: string;
   onSelectCategory: (id: string) => void;
+  /** Mostra os itens de todos os ambientes (a opção "Todos", igual à do topo da lista). */
+  onSelectAll: () => void;
+  allSelected: boolean;
   onRenameCategory: (category: EnxovalCategory) => void;
   onDeleteCategory: (category: EnxovalCategory) => void;
   onReorderCategories: (ids: string[]) => Promise<void>;
@@ -40,10 +42,7 @@ interface WorkspaceMenuProps {
   onSwitch: (id: string) => void;
   onCreate: () => void;
   onInvite: () => void;
-  onDiscounts: () => void;
-  onRename: () => void;
   onDelete: () => void;
-  onAddCategory: () => void;
   onLogout: () => void;
 }
 
@@ -59,20 +58,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
     props.onClose();
     action();
   };
-  const actions = [
-    { label: "Convidar pessoas", icon: UserPlus, action: props.onInvite },
-    { label: "Descontos e cashback", icon: Percent, action: props.onDiscounts },
-    { label: "Adicionar ambiente", icon: Plus, action: props.onAddCategory },
-    ...(props.activeEnxoval?.role === "owner"
-      ? [
-          {
-            label: "Editar nome do enxoval",
-            icon: Pencil,
-            action: props.onRename,
-          },
-        ]
-      : []),
-  ];
   return (
     <div className="workspace-menu-layer">
       <div
@@ -126,14 +111,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
             ) : (
               <p>Vamos começar seu primeiro enxoval?</p>
             )}
-            {hasEnxoval && (
-              <p>
-                <Users size={14} /> {props.memberCount}{" "}
-                {props.memberCount === 1
-                  ? "pessoa organizando"
-                  : "pessoas organizando"}
-              </p>
-            )}
             <button
               type="button"
               className="workspace-menu-create"
@@ -145,11 +122,63 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           </section>
           {hasEnxoval && (
             <section
+              className="workspace-menu-invite"
+              aria-label="Convidar pessoas"
+            >
+              <div className="invite-avatars" aria-hidden="true">
+                {props.members.slice(0, 4).map((member) => (
+                  <span key={member.id}>
+                    {member.name.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
+                {props.members.length > 4 && (
+                  <span>+{props.members.length - 4}</span>
+                )}
+                <span className="invite-avatar-add">
+                  <Plus size={16} strokeWidth={2.2} />
+                </span>
+              </div>
+              <div className="invite-copy">
+                <strong>Organizem juntos</strong>
+                <p>
+                  {props.members.length > 1
+                    ? `${props.members.length} pessoas montando este enxoval. Chame mais alguém.`
+                    : "Chame quem vai montar a casa com você: vocês editam a mesma lista."}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="invite-button"
+                disabled={props.busy}
+                onClick={() => run(props.onInvite)}
+              >
+                <UserPlus size={18} aria-hidden="true" /> Convidar pessoas
+              </button>
+            </section>
+          )}
+          {hasEnxoval && (
+            <section
               className="workspace-menu-environments"
               aria-label="Ambientes do menu lateral"
             >
               <h3>Ambientes</h3>
               <p>Segure a alça e arraste para mudar a ordem.</p>
+              <div
+                className={`environment-row environment-all-row ${props.allSelected ? "active" : ""}`}
+              >
+                <span className="environment-all-spacer" aria-hidden="true" />
+                <button
+                  type="button"
+                  className="environment-select"
+                  disabled={props.busy}
+                  aria-current={props.allSelected ? "true" : undefined}
+                  onClick={() => run(props.onSelectAll)}
+                >
+                  <ListChecks size={18} strokeWidth={1.6} aria-hidden="true" />
+                  <span>Todos</span>
+                  <small>{activeItems(props.items).length}</small>
+                </button>
+              </div>
               <EnvironmentList
                 categories={props.categories}
                 items={props.items}
@@ -164,26 +193,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 }
                 onReorder={props.onReorderCategories}
               />
-            </section>
-          )}
-          {hasEnxoval && (
-            <section
-              className="workspace-menu-actions"
-              aria-label="Organizar enxoval"
-            >
-              <h3>Organizar enxoval</h3>
-              {actions.map(({ label, icon: Icon, action }) => (
-                <button
-                  key={label}
-                  type="button"
-                  disabled={props.busy}
-                  onClick={() => run(action)}
-                >
-                  <Icon size={19} />
-                  <span>{label}</span>
-                  <ChevronRight size={16} />
-                </button>
-              ))}
             </section>
           )}
           {props.activeEnxoval?.role === "owner" && (

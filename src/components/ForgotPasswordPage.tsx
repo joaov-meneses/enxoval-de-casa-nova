@@ -24,7 +24,7 @@ export function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [wait, setWait] = useState(0);
   useEffect(() => {
-    document.title = "Esqueci minha senha | Larume";
+    document.title = "Esqueci minha senha | Casa Mia";
   }, []);
   useEffect(() => {
     if (wait <= 0) return;

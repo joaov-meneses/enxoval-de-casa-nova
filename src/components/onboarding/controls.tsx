@@ -77,7 +77,7 @@ export function CountUp({
   return <span className={className}>{value}</span>;
 }
 
-const CONFETTI = ["#866344", "#d4b895", "#98a58b", "#c9a46c", "#e7d4b4"];
+const CONFETTI = ["#c2603f", "#e7b89a", "#5c6643", "#c9a46c", "#f1dfbf"];
 
 export function Confetti({ reduced }: { reduced: boolean }) {
   if (reduced) return null;

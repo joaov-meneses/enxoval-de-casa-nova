@@ -28,7 +28,7 @@ export function AuthPage({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
-    document.title = "Entre, a casa é sua | Larume";
+    document.title = "Entre, a casa é sua | Casa Mia";
   }, []);
   async function submit(e: FormEvent) {
     e.preventDefault();

@@ -135,7 +135,7 @@ export const CATALOG: CatalogEntry[] = [
   e("cozinha", "Tesoura de cozinha", 1, ""),
   e("cozinha", "Rolo de abrir massa", 1, ""),
   e("cozinha", "Cuscuzeira", 1, "N"),
-  e("cozinha", "Kit chimarrão (cuia, bomba e térmica)", 2, "R"),
+  e("cozinha", "Kit chimarrão (cuia, bomba, térmica)", 2, "R"),
 
   // Eletrodomésticos
   e("eletro", "Geladeira", 4, "E"),
@@ -161,7 +161,7 @@ export const CATALOG: CatalogEntry[] = [
   e("servico", "Vassoura e pá", 1, "E"),
   e("servico", "Rodo", 1, "E"),
   e("servico", "Panos de chão", 1, "E"),
-  e("servico", "Kit de limpeza (flanelas, esponjas, multiuso)", 1, "EI"),
+  e("servico", "Kit de limpeza (flanelas e esponjas)", 1, "EI"),
   e("servico", "Prendedores de roupa", 1, "E"),
   e("servico", "Ferro de passar", 2, "E"),
   e("servico", "Extensões e adaptadores de tomada", 1, "EI"),
@@ -199,7 +199,7 @@ export const CATALOG: CatalogEntry[] = [
   e("sala", "Porta-chaves", 1, ""),
   e("sala", "Plantas e vasos", 2, ""),
   e("sala", "Cestos organizadores", 2, ""),
-  e("sala", "Mesa dobrável ou bancada de refeições", 3, "EO"),
+  e("sala", "Mesa dobrável ou bancada de jantar", 3, "EO"),
   e("sala", "Biombo ou divisória", 2, "O"),
   e("sala", "Cabideiro", 2, "O"),
   e("sala", "Organizadores para baixo da cama", 2, "O"),

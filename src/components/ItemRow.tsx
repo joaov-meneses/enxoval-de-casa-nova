@@ -24,6 +24,7 @@ import {
   netPriceCents,
   statusLabel,
 } from "../itemStatus";
+import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
 import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
@@ -214,7 +215,12 @@ export function ItemRow({
                 Desconto/cashback {money.format(itemDiscount / 100)}
               </span>
             )}
-            {added && <span className="item-added">Adicionado em {added}</span>}
+            {added && (
+              <span className="item-added">
+                <span className="item-added-prefix">Adicionado em </span>
+                {added}
+              </span>
+            )}
             {link && (
               <a
                 href={link}
@@ -281,13 +287,21 @@ export function ItemRow({
             <div className="item-inline-grid">
               <h4 className="item-inline-section item-inline-wide">Sobre o item</h4>
               <label htmlFor={`${id}-name`} className="item-inline-wide">
-                Nome do item
+                <span className="item-inline-label-row">
+                  Nome do item
+                  <span
+                    className={`name-counter${name.length >= MAX_ITEM_NAME_LENGTH ? " is-full" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {name.length}/{MAX_ITEM_NAME_LENGTH}
+                  </span>
+                </span>
                 <input
                   id={`${id}-name`}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   required
-                  maxLength={200}
+                  maxLength={MAX_ITEM_NAME_LENGTH}
                   disabled={busy}
                 />
               </label>

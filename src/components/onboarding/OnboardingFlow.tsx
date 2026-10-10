@@ -396,7 +396,7 @@ export default function OnboardingFlow() {
 
   useEffect(() => {
     track("onboarding_start", { resumed: Boolean(saved) });
-    document.title = "Monte o plano da sua casa nova | Larume";
+    document.title = "Monte o plano da sua casa nova | Casa Mia";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -556,7 +556,7 @@ export default function OnboardingFlow() {
           <div className="ob-center">
             <Ring reduced={reduced}>
               <motion.img
-                src="/brand/larume-symbol.webp"
+                src="/brand/casamia-symbol.webp"
                 alt=""
                 width={512}
                 height={512}
@@ -726,7 +726,7 @@ export default function OnboardingFlow() {
         return (
           <>
             <h1 className="ob-title" tabIndex={-1}>
-              Como você quer usar a Larume?
+              Como você quer usar o Casa Mia?
             </h1>
             <p className="ob-sub">Pode escolher mais de uma opção.</p>
             <CheckOptions
@@ -985,10 +985,10 @@ function WelcomeStep({ reduced }: { reduced: boolean }) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 18, delay: 0.3 }}
         >
-          Oi! Boas-vindas à Larume.
+          Oi! Boas-vindas ao Casa Mia.
         </motion.div>
         <motion.img
-          src="/brand/larume-symbol.webp"
+          src="/brand/casamia-symbol.webp"
           alt=""
           width={512}
           height={512}
@@ -1532,7 +1532,7 @@ function BuildingStep({
   return (
     <div className="ob-center ob-building">
       <motion.img
-        src="/brand/larume-symbol.webp"
+        src="/brand/casamia-symbol.webp"
         alt=""
         width={512}
         height={512}
@@ -1603,7 +1603,7 @@ function ReadyStep({
       ? { t: "Comece pelo quarto e pelo banheiro", d: "É o que você precisa na primeira noite." }
       : { t: "Marque o que você já tem", d: "Assim a lista mostra só o que falta." },
     answers.usage.includes("spend") || answers.budget !== "unknown"
-      ? { t: "Anote os preços que encontrar", d: "A Larume soma o que você já gastou." }
+      ? { t: "Anote os preços que encontrar", d: "O Casa Mia soma o que você já gastou." }
       : { t: "Escolha o que fica para depois", d: "O que é opcional pode esperar a mudança." },
     answers.usage.includes("share")
       ? { t: "Convide quem mora com você", d: "Vocês acompanham a mesma lista." }

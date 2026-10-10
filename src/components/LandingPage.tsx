@@ -1,523 +1,593 @@
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  Heart,
-  ListChecks,
-  Menu,
-  Plus,
-  ShieldCheck,
-  Smartphone,
-  Sparkles,
-  Users,
-  Wallet,
-  X,
-  Coffee,
   BedDouble,
   Bath,
+  Check,
+  ChevronDown,
+  Coffee,
+  Gift,
+  HeartHandshake,
+  Lightbulb,
+  ListChecks,
+  Menu,
+  MessageCircleHeart,
+  QrCode,
+  ShieldCheck,
+  Sofa,
+  WashingMachine,
+  X,
 } from "lucide-react";
 import { Brand } from "./Brand";
+import { HowItWorks } from "./HowItWorks";
+import { Nino } from "./Nino";
 
-const faqs = [
+const FAQS = [
   [
     "Preciso ter a casa pronta para começar?",
-    "Não! A Larume acompanha seu planejamento desde a primeira ideia. Crie o enxoval, salve o que você gostou e vá marcando cada conquista no seu tempo.",
+    "De jeito nenhum. Toda casa começa com um primeiro passo: pode ser só a ideia de se mudar. Você cria a lista, vai conquistando um item de cada vez e ajusta tudo quando a vida mudar.",
   ],
   [
-    "Posso organizar meu enxoval com outra pessoa?",
-    "Sim. Você pode adicionar uma pessoa que já tenha uma conta na Larume pelo e-mail dela. Os membros podem editar a mesma lista e acompanhar as compras juntos.",
+    "Quem é o Nino e como ele me ajuda?",
+    "O Nino é a casinha-chaveiro que acompanha a sua mudança. Ele segura a trena, lembra do que não pode faltar no primeiro dia e ajuda a decidir o que fica para depois, sem julgar nenhuma escolha.",
+  ],
+  [
+    "O plano gratuito tem prazo para acabar?",
+    "Não. Você começa agora, sem cartão, com 2 cômodos e até 5 itens em cada um. Quando a sua casa crescer, é só abrir as portas dos outros cômodos em um plano pago.",
+  ],
+  [
+    "Posso montar a lista com outra pessoa?",
+    "Pode, e é muito mais gostoso assim. Quem mora com você entra pelo e-mail, edita a mesma lista e acompanha cada conquista junto.",
+  ],
+  [
+    "O que é o Chá de Casa Nova?",
+    "É uma página pública só da sua lista. Seus convidados reservam um item ou mandam um Pix direto para você, sem precisar de cadastro, e ainda deixam um recado de carinho.",
   ],
   [
     "Funciona no celular e no computador?",
-    "Sim. A interface se adapta à sua tela. No celular, você pode deslizar entre ambientes, puxar para atualizar e adicionar um atalho à tela inicial pelo navegador.",
-  ],
-  [
-    "Posso guardar links de qualquer loja?",
-    "Sim. Cada item tem espaço para um link, preço e anotações. Você escolhe onde comprar e mantém as referências organizadas por ambiente.",
+    "Sim. O Casa Mia se ajusta à tela e fica à mão na loja ou no sofá. No celular, você ainda pode adicionar um atalho à tela inicial pelo navegador.",
   ],
   [
     "Os planos já estão disponíveis para compra?",
-    "Ainda não. Os valores desta página são uma demonstração da proposta do produto. Não há cobrança, assinatura ativa nem solicitação de cartão.",
+    "Ainda não. Os valores desta página são os previstos para o lançamento. Hoje não há cobrança, assinatura ativa nem pedido de cartão: você cria a conta e começa a montar o seu lar.",
   ],
 ];
 
-const MONTHLY_PRICE = 19.99;
-const ANNUAL_PRICE = 49.9;
-const brl = (value: number) =>
-  new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-/** Quanto o anual economiza em relação a 12 meses no plano mensal. */
-const ANNUAL_SAVING = Math.round(
-  (1 - ANNUAL_PRICE / (MONTHLY_PRICE * 12)) * 100,
-);
+const ROOMS = [
+  { icon: Coffee, name: "Cozinha" },
+  { icon: BedDouble, name: "Quarto" },
+  { icon: Sofa, name: "Sala" },
+  { icon: Bath, name: "Banheiro" },
+  { icon: WashingMachine, name: "Lavanderia" },
+];
 
-type PlanId = "annual" | "monthly";
-
-const PLANS: {
-  id: PlanId;
+type Plan = {
+  id: string;
   name: string;
-  billing: string;
   price: string;
+  per: string;
+  billing: string;
   badge?: string;
-}[] = [
+  featured?: boolean;
+  cta: string;
+  features: string[];
+};
+
+const PAID_FEATURES = [
+  "Cômodos e itens ilimitados",
+  "Lista a dois, em tempo real",
+  "Dicas do Nino ampliadas",
+  "Página do Chá de Casa Nova",
+  "Importar e exportar em Excel e CSV",
+];
+
+const PLANS: Plan[] = [
   {
-    id: "annual",
-    name: "Anual",
-    billing: `${brl(ANNUAL_PRICE)} cobrados por ano`,
-    price: brl(ANNUAL_PRICE / 12),
-    badge: `MELHOR VALOR · ECONOMIZE ${ANNUAL_SAVING}%`,
+    id: "gratis",
+    name: "Gratuito",
+    price: "R$ 0",
+    per: "",
+    billing: "Para começar agora, sem cartão",
+    cta: "Começar Grátis",
+    features: [
+      "2 cômodos com até 5 itens cada",
+      "Lista do Primeiro Dia",
+      "3 dicas do Nino por mês",
+      "No celular e no computador",
+    ],
   },
   {
-    id: "monthly",
+    id: "semestral",
+    name: "Semestral",
+    price: "R$ 19,90",
+    per: "/mês",
+    billing: "Cobrado R$ 119,40 a cada 6 meses",
+    badge: "Mais Escolhido",
+    featured: true,
+    cta: "Quero o Semestral",
+    features: PAID_FEATURES,
+  },
+  {
+    id: "anual",
+    name: "Anual",
+    price: "R$ 14,90",
+    per: "/mês",
+    billing: "Cobrado R$ 178,80 por ano",
+    badge: "50% de desconto",
+    cta: "Quero o Anual",
+    features: PAID_FEATURES,
+  },
+  {
+    id: "mensal",
     name: "Mensal",
-    billing: "Cobrado todo mês",
-    price: brl(MONTHLY_PRICE),
+    price: "R$ 29,90",
+    per: "/mês",
+    billing: "Flexibilidade total, mês a mês",
+    cta: "Quero o Mensal",
+    features: PAID_FEATURES,
   },
 ];
 
-const PLAN_FEATURES = [
-  "Vários enxovais no mesmo lugar",
-  "Lista sugerida por ambiente",
-  "Links, preços e anotações",
-  "Organização compartilhada",
-  "Descontos e cashback",
-  "Importação e exportação em Excel e CSV",
-  "Acesso no celular e no computador",
+const MOCK_ITEMS = [
+  { name: "Colchão", room: "Quarto", done: true },
+  { name: "Chuveiro e ducha", room: "Banheiro", done: true },
+  { name: "Panela de pressão", room: "Cozinha", done: true },
+  { name: "Jogo de toalhas", room: "Banheiro", done: false },
 ];
+
+/** Cada espaço que alguém pode estar montando; a frase troca sozinha no hero. */
+const PLACES = [
+  "o primeiro lar",
+  "o seu quarto",
+  "o seu apartamento",
+  "a sua chácara",
+  "a sua kitnet",
+  "a sua casa de praia",
+  "o seu estúdio",
+  "o seu cantinho",
+];
+const PLACE_INTERVAL_MS = 1500;
+
+/**
+ * "Para quem está montando …" com o final trocando a cada 1,5 s. Para quem usa leitor de tela,
+ * fica uma frase fixa (a animação é decorativa). Pausa ao passar o mouse ou focar, e não gira
+ * para quem prefere menos movimento.
+ */
+function RotatingPlace() {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    if (paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+      return;
+    const timer = window.setInterval(
+      () => setIndex((current) => (current + 1) % PLACES.length),
+      PLACE_INTERVAL_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [paused]);
+  return (
+    <span
+      className="cm-eyebrow cm-rotator"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <span className="sr-only">Para quem está montando {PLACES[0]}</span>
+      <span aria-hidden="true">
+        Para quem está montando{" "}
+        <span className="cm-rotator-window">
+          <span key={index} className="cm-rotator-word">
+            {PLACES[index]}
+          </span>
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** Prévia do app: a porta em arco enche de luz conforme os itens são conquistados. */
+function AppMock() {
+  return (
+    <div className="cm-mock" aria-hidden="true">
+      <div className="cm-mock-top">
+        <span>Meu Lar</span>
+        <small>Apê da Ana e do Léo</small>
+      </div>
+      <div className="cm-mock-door">
+        <svg viewBox="0 0 120 150" width="96" height="120">
+          <defs>
+            <clipPath id="cm-arch">
+              <path d="M16 142 V62 a44 44 0 0 1 88 0 V142 Z" />
+            </clipPath>
+            <linearGradient id="cm-glow" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stopColor="#fcc97a" />
+              <stop offset="1" stopColor="#fff3d6" />
+            </linearGradient>
+          </defs>
+          <path d="M16 142 V62 a44 44 0 0 1 88 0 V142 Z" fill="#f6e7d2" />
+          <rect
+            x="0"
+            y="64"
+            width="120"
+            height="90"
+            fill="url(#cm-glow)"
+            clipPath="url(#cm-arch)"
+          />
+          <path
+            d="M16 142 V62 a44 44 0 0 1 88 0 V142 Z"
+            fill="none"
+            stroke="#a34c30"
+            strokeWidth="6"
+            strokeLinejoin="round"
+          />
+          <rect x="8" y="140" width="104" height="9" rx="4" fill="#a34c30" />
+        </svg>
+        <div>
+          <strong>8 de 12</strong>
+          <span>itens do Primeiro Dia</span>
+        </div>
+      </div>
+      <ul className="cm-mock-list">
+        {MOCK_ITEMS.map((item) => (
+          <li key={item.name} className={item.done ? "is-done" : undefined}>
+            <span className="cm-mock-check">
+              {item.done && <Check size={13} strokeWidth={3} />}
+            </span>
+            <span className="cm-mock-name">{item.name}</span>
+            <small>{item.room}</small>
+          </li>
+        ))}
+      </ul>
+      <p className="cm-mock-note">
+        Mais uma peça no lugar! A sua casa está tomando forma.
+      </p>
+    </div>
+  );
+}
 
 export function LandingPage({ signedIn }: { signedIn: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [faq, setFaq] = useState<number | null>(0);
-  const [plan, setPlan] = useState<PlanId>("annual");
+  // No topo o menu fica sem fundo; ao rolar, vira a barra de vidro.
+  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    document.title = "Larume — seu lar começa com um plano";
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  useEffect(() => {
+    document.title = "Casa Mia | Enxoval de casa nova";
+  }, []);
+  const start = signedIn ? "/app" : "/comecar";
+  const closeMenu = () => setMenuOpen(false);
+
   return (
-    <div className="marketing-page">
+    <div className="cm-page">
       <a className="skip-link" href="#conteudo">
         Pular para o conteúdo
       </a>
-      <header className="site-header">
-        <a href="/" className="brand-link">
+
+      <header className={`cm-header${scrolled ? " is-scrolled" : ""}`}>
+        <a
+          href="/"
+          className="brand-link"
+          aria-label="Casa Mia, página inicial"
+        >
           <Brand />
         </a>
         <nav
-          className={`site-nav ${menuOpen ? "is-open" : ""}`}
+          className={`cm-nav${menuOpen ? " is-open" : ""}`}
           aria-label="Navegação principal"
         >
-          <a href="#recursos" onClick={() => setMenuOpen(false)}>
-            Feito para você
+          <a href="#como-funciona" onClick={closeMenu}>
+            Como Funciona
           </a>
-          <a href="#planos" onClick={() => setMenuOpen(false)}>
-            Planos
+          <a href="#nino" onClick={closeMenu}>
+            O Nino
           </a>
-          <a href="#duvidas" onClick={() => setMenuOpen(false)}>
-            Dúvidas
+          <a href="#cha" onClick={closeMenu}>
+            Chá de Casa Nova
+          </a>
+          <a href="#planos" onClick={closeMenu}>
+            Preços
+          </a>
+          <a className="cm-nav-login" href={signedIn ? "/app" : "/login"}>
+            {signedIn ? "Meu lar" : "Entrar"}
           </a>
         </nav>
-        <div className="header-actions">
-          <a className="login-link" href={signedIn ? "/app" : "/login"}>
-            {signedIn ? "Meu enxoval" : "Entrar"}
+        <div className="cm-header-actions">
+          <a className="cm-login" href={signedIn ? "/app" : "/login"}>
+            {signedIn ? "Meu lar" : "Entrar"}
           </a>
-          <a
-            className="button button-dark button-small"
-            href={signedIn ? "/app" : "/comecar"}
-          >
-            Começar meu enxoval <ArrowUpRight size={16} />
+          <a className="cm-btn cm-btn-primary cm-btn-sm" href={start}>
+            Começar Grátis
           </a>
           <button
-            className="menu-toggle icon-button"
+            type="button"
+            className="cm-menu-toggle"
             aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(!menuOpen)}
           >
-            {menuOpen ? <X /> : <Menu />}
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </header>
+
       <main id="conteudo">
-        <section className="hero page-width">
-          <div className="hero-copy">
-            <span className="eyebrow">
-              <span className="tiny-sun">✳</span> PARA TODOS OS SEUS NOVOS
-              COMEÇOS
-            </span>
+        <section className="cm-hero cm-wrap">
+          <div className="cm-hero-copy">
+            <RotatingPlace />
             <h1>
-              Uma casa nova.
-              <br />
-              Mil possibilidades.
-              <br />
-              <em>
-                Um lugar para
-                <br className="hero-break" /> organizar tudo.
-              </em>
+              Transforme o sonho da casa nova em uma lista que dá para riscar,{" "}
+              <em>item por item.</em>
             </h1>
             <p>
-              Do primeiro jogo de pratos ao último detalhe.
-              <br className="desktop-break" /> Planeje seu enxoval, cuide do
-              orçamento e transforme
-              <br className="desktop-break" /> uma lista de desejos no seu
-              próximo lar.
+              Chega de planilhas estressantes e compras por impulso. O Casa Mia
+              organiza seu enxoval, protege seu orçamento com inteligência
+              artificial e celebra cada conquista do seu novo lar.
             </p>
-            <div className="hero-actions">
+            <div className="cm-hero-actions">
+              <a className="cm-btn cm-btn-primary cm-btn-lg" href={start}>
+                Criar Minha Lista Grátis (Sem Cartão) <ArrowRight size={18} />
+              </a>
               <a
-                href={signedIn ? "/app" : "/comecar"}
-                className="button button-dark"
+                className="cm-btn cm-btn-ghost cm-btn-lg"
+                href="#como-funciona"
               >
-                Começar meu enxoval <ArrowRight size={18} />
+                Ver como funciona
               </a>
             </div>
-            <div className="hero-reassurance">
-              <span>
-                <Check size={14} /> Sem cartão de crédito
-              </span>
-              <span>
-                <Check size={14} /> No seu ritmo
-              </span>
-            </div>
+            <ul className="cm-hero-notes">
+              <li>
+                <Check size={15} /> Sem cartão de crédito
+              </li>
+              <li>
+                <Check size={15} /> Do seu jeito, no seu tempo
+              </li>
+            </ul>
           </div>
-          <div className="hero-visual">
-            <img
-              className="hero-photo"
-              src="/images/larume-home.webp"
-              alt="Sala acolhedora com sofá de linho, mesa de madeira e uma caixa de mudança"
-              fetchPriority="high"
-              width="1536"
-              height="1024"
-            />
-            <span className="photo-caption">
-              SEU PRÓXIMO CAPÍTULO COMEÇA AQUI.
-            </span>
-            <div className="floating-note">
-              <span className="note-icon">
-                <Heart size={20} />
-              </span>
-              <div>
-                <strong>
-                  Tem cara de casa.
-                  <br />
-                  Tem jeito de começo.
-                </strong>
-                <span>Cada detalhe, uma conquista.</span>
-              </div>
+          <div className="cm-hero-visual">
+            <AppMock />
+            <Nino pose="wave" size={190} className="cm-hero-nino" />
+          </div>
+        </section>
+
+        <HowItWorks />
+        <section className="cm-nino" id="nino">
+          <div className="cm-wrap cm-nino-grid">
+            <div className="cm-nino-figure">
+              <Nino
+                pose="think"
+                size={250}
+                title="Nino, a casinha-chaveiro do Casa Mia, com uma pranchetinha"
+              />
             </div>
-            <div className="floating-progress">
-              <div className="progress-note-top">
-                <span className="mini-home">
-                  <Brand compact />
-                </span>
-                <div>
-                  <strong>Nosso primeiro apê</strong>
-                  <span>Um sonho saindo do papel</span>
-                </div>
-                <span className="note-percentage">68%</span>
-              </div>
-              <div className="progress-track">
-                <span style={{ width: "68%" }} />
-              </div>
-              <div className="progress-note-bottom">
-                <span>34 de 50 itens conquistados</span>
-                <span>
-                  Quase lá <Sparkles size={12} />
-                </span>
-              </div>
+            <div className="cm-nino-copy">
+              <span className="cm-eyebrow">Conheça o Nino</span>
+              <h2>O conselheiro da sua mudança.</h2>
+              <p>
+                O Nino é uma casinha-chaveiro com a barriguinha em forma de
+                porta em arco. Ele segura a trena, calcula as suas prioridades e
+                nunca julga: só ajuda a decidir o que vem primeiro.
+              </p>
+              <blockquote>
+                “Respira! A gente pode deixar a luminária decorativa para o mês
+                que vem e focar no colchão agora.”
+                <cite>Nino</cite>
+              </blockquote>
+              <ul className="cm-checks">
+                <li>
+                  <Check size={16} /> Lembra do que não pode faltar no primeiro
+                  dia
+                </li>
+                <li>
+                  <Check size={16} /> Comemora com você cada item riscado
+                </li>
+                <li>
+                  <Check size={16} /> Fala baixinho quando o orçamento aperta
+                </li>
+              </ul>
             </div>
           </div>
         </section>
-        <div className="benefit-ribbon">
-          <div className="page-width">
-            <span>
-              <ListChecks /> Cada detalhe no seu lugar
-            </span>
-            <span>
-              <Wallet /> Orçamento sem surpresas
-            </span>
-            <span>
-              <Users /> Um plano para fazer juntos
-            </span>
-            <span>
-              <Smartphone /> Sempre com você
-            </span>
+
+        <section className="cm-section cm-wrap" id="recursos">
+          <div className="cm-heading">
+            <span className="cm-eyebrow">Feito para o seu lar</span>
+            <h2>Tudo o que a sua casa nova pede, no lugar certo.</h2>
           </div>
-        </div>
-        <section className="features-section section-space" id="recursos">
-          <div className="page-width feature-layout">
-            <div
-              className="product-preview"
-              aria-label="Exemplo ilustrativo de uma lista de enxoval"
-            >
-              <div className="preview-toolbar">
-                <Brand />
-                <span>
-                  Seu lar, tomando forma <Heart size={12} />
-                </span>
-              </div>
-              <div className="preview-body">
-                <span className="eyebrow">CADA CONQUISTA CONTA</span>
-                <h3>
-                  Nosso primeiro apê <span>☀</span>
-                </h3>
-                <div className="preview-stats">
-                  <div>
-                    <span>Já investimos</span>
-                    <strong>
-                      R$ 3.240<span>,00</span>
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Nosso progresso</span>
-                    <strong>
-                      24 <span>/ 40 itens</span>
-                    </strong>
-                    <div className="progress-track">
-                      <span style={{ width: "60%" }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="preview-tabs">
-                  <span className="active">
-                    <Coffee size={14} /> Cozinha
-                  </span>
-                  <span>
-                    <BedDouble size={14} /> Quarto
-                  </span>
-                  <span>
-                    <Bath size={14} /> Banheiro
-                  </span>
-                </div>
-                {[
-                  {
-                    name: "Jogo de pratos de cerâmica",
-                    price: "R$ 249,90",
-                    done: true,
-                  },
-                  {
-                    name: "Conjunto de talheres",
-                    price: "R$ 189,00",
-                    done: true,
-                  },
-                  { name: "Jogo de panelas", price: "R$ 629,90", done: false },
-                  {
-                    name: "Taças para os primeiros brindes",
-                    price: "R$ 159,90",
-                    done: false,
-                  },
-                ].map((item) => (
-                  <div
-                    className={`preview-item ${item.done ? "done" : ""}`}
-                    key={item.name}
-                  >
-                    <span className="preview-check">
-                      {item.done && <Check size={12} />}
-                    </span>
-                    <span>{item.name}</span>
-                    <b>{item.price}</b>
-                  </div>
+          <div className="cm-features">
+            <article className="cm-card">
+              <h3>Organização por cômodos</h3>
+              <p>
+                Cada canto da casa ganha a sua lista, com cards fáceis de tocar
+                e o progresso de cada espaço à vista.
+              </p>
+              <ul className="cm-rooms">
+                {ROOMS.map((room) => (
+                  <li key={room.name}>
+                    <room.icon size={18} strokeWidth={1.7} /> {room.name}
+                  </li>
                 ))}
-                <span className="preview-add">
-                  <Plus size={14} /> Um novo desejo para a lista
-                </span>
-              </div>
-              <span className="preview-label">
-                Uma prévia do seu novo cantinho de organização
+              </ul>
+            </article>
+            <article className="cm-card">
+              <span className="cm-card-icon">
+                <Lightbulb size={22} strokeWidth={1.7} />
               </span>
-            </div>
-            <div className="feature-copy">
-              <span className="eyebrow">PENSADO PARA A VIDA REAL</span>
-              <h2>
-                Tudo o que importa.
-                <br />
-                <em>Junto, de verdade.</em>
-              </h2>
+              <h3>Inteligência de compra</h3>
               <p>
-                Chega de dividir seus planos entre planilhas, prints e
-                mensagens. Seu enxoval merece um cantinho só dele.
+                A IA do Jev avisa se faltou algo do Primeiro Dia e corta compras
+                redundantes, para você gastar o mínimo e morar bem.
               </p>
-              <div className="feature-list">
-                <div>
-                  <Wallet />
-                  <span>
-                    <strong>Seu orçamento, às claras</strong>
-                    <p>
-                      Preços, gastos, descontos e cashback em uma visão simples.
-                    </p>
-                  </span>
-                </div>
-                <div>
-                  <Users />
-                  <span>
-                    <strong>Melhor quando é a dois. Ou mais.</strong>
-                    <p>
-                      Compartilhe a lista e organize cada decisão com quem faz
-                      parte desse começo.
-                    </p>
-                  </span>
-                </div>
-                <div>
-                  <Smartphone />
-                  <span>
-                    <strong>Da loja para a lista, em um toque</strong>
-                    <p>
-                      No sofá com o computador ou passeando pela loja com o
-                      celular. A Larume vai junto.
-                    </p>
-                  </span>
-                </div>
-              </div>
-              <a className="text-link" href={signedIn ? "/app" : "/comecar"}>
-                Conhecer meu futuro enxoval <ArrowRight size={17} />
-              </a>
+            </article>
+            <article className="cm-card">
+              <span className="cm-card-icon">
+                <HeartHandshake size={22} strokeWidth={1.7} />
+              </span>
+              <h3>Lista a dois</h3>
+              <p>
+                Casais e moradores na mesma lista, em tempo real. Cada conquista
+                aparece para todo mundo.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section className="cm-cha" id="cha">
+          <div className="cm-wrap cm-cha-grid">
+            <div className="cm-cha-copy">
+              <span className="cm-eyebrow">Chá de Casa Nova</span>
+              <h2>Quem ama vocês escolhe como presentear.</h2>
+              <p>
+                Compartilhe uma página só da sua lista. Os convidados reservam
+                um item ou mandam um Pix direto para vocês, sem intermediários e
+                sem precisar criar conta.
+              </p>
+              <ul className="cm-checks">
+                <li>
+                  <Gift size={16} /> “Vou presentear com este item”, com reserva
+                  em tempo real
+                </li>
+                <li>
+                  <QrCode size={16} /> Pix com QR Code e copia-e-cola
+                </li>
+                <li>
+                  <MessageCircleHeart size={16} /> Um recado de boas-vindas de
+                  cada convidado
+                </li>
+              </ul>
+            </div>
+            <div className="cm-cha-card" aria-hidden="true">
+              <strong>Chá de Casa Nova da Ana e do Léo</strong>
+              <p>
+                Estamos montando nosso cantinho e ficaremos muito felizes com a
+                sua presença e carinho!
+              </p>
+              <ul>
+                <li>
+                  <span>Jogo de pratos</span>
+                  <small>Vou presentear</small>
+                </li>
+                <li className="is-reserved">
+                  <span>Cafeteira</span>
+                  <small>Reservado por Maria</small>
+                </li>
+                <li>
+                  <span>Presentear via Pix</span>
+                  <small>
+                    <QrCode size={13} /> Pix
+                  </small>
+                </li>
+              </ul>
             </div>
           </div>
         </section>
-        <section className="pricing-section section-space" id="planos">
-          <div className="page-width">
-            <div className="section-heading">
-              <span className="eyebrow">ESPAÇO PARA O SEU PRÓXIMO PASSO</span>
-              <h2>
-                Grandes começos.
-                <br />
-                <em>Planos descomplicados.</em>
-              </h2>
-              <p>
-                Dois planos, com os mesmos recursos. Escolha como prefere pagar.
-              </p>
-            </div>
-            <div className="plan-picker">
-              <div className="plan-includes">
-                <h3>Tudo incluído, em qualquer plano</h3>
+
+        <section className="cm-section cm-wrap" id="planos">
+          <div className="cm-heading">
+            <span className="cm-eyebrow">Preços</span>
+            <h2>Comece de graça. Cresça quando a casa crescer.</h2>
+            <p>Sem letras miúdas: você vê o que paga antes de escolher.</p>
+          </div>
+          <div className="cm-plans">
+            {PLANS.map((plan) => (
+              <article
+                key={plan.id}
+                className={`cm-plan${plan.featured ? " is-featured" : ""}`}
+              >
+                {plan.badge && (
+                  <span className="cm-plan-badge">{plan.badge}</span>
+                )}
+                <h3>{plan.name}</h3>
+                <p className="cm-plan-price">
+                  <strong>{plan.price}</strong>
+                  {plan.per && <span>{plan.per}</span>}
+                </p>
+                <p className="cm-plan-billing">{plan.billing}</p>
+                <a
+                  className={`cm-btn ${plan.featured ? "cm-btn-primary" : "cm-btn-outline"}`}
+                  href={start}
+                >
+                  {plan.cta}
+                </a>
                 <ul>
-                  {PLAN_FEATURES.map((t) => (
-                    <li key={t}>
-                      <Check size={16} />
-                      {t}
+                  {plan.features.map((feature) => (
+                    <li key={feature}>
+                      <Check size={15} /> {feature}
                     </li>
                   ))}
                 </ul>
-              </div>
-              <div className="plan-choice">
-                <fieldset className="plan-options">
-                  <legend className="sr-only">Escolha seu plano</legend>
-                  {PLANS.map((option) => (
-                    <label
-                      key={option.id}
-                      className={`plan-option${plan === option.id ? " is-selected" : ""}${option.badge ? " has-badge" : ""}`}
-                    >
-                      {option.badge && (
-                        <span className="plan-option-badge">
-                          {option.badge}
-                        </span>
-                      )}
-                      <input
-                        type="radio"
-                        name="plano"
-                        value={option.id}
-                        checked={plan === option.id}
-                        onChange={() => setPlan(option.id)}
-                      />
-                      <span className="plan-option-row">
-                        <span className="plan-option-check" aria-hidden="true">
-                          <Check size={14} strokeWidth={2.5} />
-                        </span>
-                        <span className="plan-option-text">
-                          <strong>{option.name}</strong>
-                          <small>{option.billing}</small>
-                        </span>
-                        <span className="plan-option-price">
-                          <strong>{option.price}</strong>
-                          <small>/mês</small>
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-                <a
-                  href={signedIn ? "/app" : "/comecar"}
-                  className="button button-dark plan-cta"
-                >
-                  Começar meu enxoval <ArrowRight size={17} />
-                </a>
-                <p className="plan-summary" aria-live="polite">
-                  {plan === "annual"
-                    ? `Plano anual: ${brl(ANNUAL_PRICE)} por ano, o equivalente a ${brl(ANNUAL_PRICE / 12)} por mês.`
-                    : `Plano mensal: ${brl(MONTHLY_PRICE)} por mês.`}
-                </p>
-              </div>
-            </div>
-            <p className="pricing-disclaimer">
-              <ShieldCheck size={15} /> Planos e valores ilustrativos. Nenhuma
-              cobrança será realizada.
-            </p>
+              </article>
+            ))}
           </div>
+          <p className="cm-disclaimer">
+            <ShieldCheck size={15} /> Os valores são os previstos para o
+            lançamento. Por enquanto, nenhuma cobrança é realizada.
+          </p>
         </section>
-        <section className="faq-section page-width section-space" id="duvidas">
-          <div>
-            <span className="eyebrow">PODE CHEGAR, A CASA É SUA</span>
-            <h2>
-              Alguma dúvida
-              <br />
-              antes de começar?
-            </h2>
-            <p>A gente ajuda com os primeiros passos.</p>
+
+        <section className="cm-section cm-wrap cm-faq" id="duvidas">
+          <div className="cm-heading">
+            <span className="cm-eyebrow">Dúvidas</span>
+            <h2>Conversa franca, do jeito que a gente gosta.</h2>
           </div>
-          <div className="faq-list">
-            {faqs.map(([q, a], i) => (
-              <div className={`faq-item ${faq === i ? "open" : ""}`} key={q}>
+          <div className="cm-faq-list">
+            {FAQS.map(([question, answer], index) => (
+              <div className="cm-faq-item" key={question}>
                 <h3>
                   <button
-                    aria-expanded={faq === i}
-                    aria-controls={`faq-${i}`}
-                    onClick={() => setFaq(faq === i ? null : i)}
+                    type="button"
+                    aria-expanded={faq === index}
+                    aria-controls={`cm-faq-${index}`}
+                    onClick={() => setFaq(faq === index ? null : index)}
                   >
-                    {q}
-                    <ChevronDown size={18} />
+                    {question}
+                    <ChevronDown size={18} aria-hidden="true" />
                   </button>
                 </h3>
-                <div id={`faq-${i}`} hidden={faq !== i}>
-                  <p>{a}</p>
+                <div
+                  id={`cm-faq-${index}`}
+                  role="region"
+                  hidden={faq !== index}
+                >
+                  <p>{answer}</p>
                 </div>
               </div>
             ))}
           </div>
         </section>
-        <section className="final-cta page-width">
-          <span className="cta-sun">✳</span>
-          <span className="eyebrow">O LAR QUE VOCÊ IMAGINA COMEÇA AQUI</span>
-          <h2>
-            Vamos dar espaço
-            <br />
-            ao seu novo começo?
-          </h2>
-          <p>Uma lista hoje. Um lar com a sua cara amanhã.</p>
-          <a
-            href={signedIn ? "/app" : "/comecar"}
-            className="button button-dark"
-          >
-            Criar meu enxoval <ArrowRight size={18} />
+
+        <section className="cm-final cm-wrap">
+          <Nino pose="wave" size={120} className="cm-final-nino" />
+          <h2>Toda casa começa com um primeiro passo.</h2>
+          <p>Que tal colocar a cama ou o chuveiro na lista agora?</p>
+          <a className="cm-btn cm-btn-primary cm-btn-lg" href={start}>
+            Começar Grátis <ArrowRight size={18} />
           </a>
-          <span className="cta-footnote">
-            Sem pressa. Sem cartão. Do seu jeito.
-          </span>
+          <small>Sem pressa. Sem cartão. Do seu jeito.</small>
         </section>
       </main>
-      <footer className="site-footer page-width">
-        <div>
-          <a href="/" className="brand-link">
+
+      <footer className="cm-footer cm-wrap">
+        <div className="cm-footer-brand">
+          <a
+            href="/"
+            className="brand-link"
+            aria-label="Casa Mia, página inicial"
+          >
             <Brand />
           </a>
-          <p>Seu lar começa com um plano.</p>
+          <p>Feito com carinho para quem está montando o próprio cantinho.</p>
         </div>
-        <div className="footer-links">
-          <a href="#planos">Planos</a>
+        <nav className="cm-footer-links" aria-label="Rodapé">
+          <a href="#como-funciona">Como Funciona</a>
+          <a href="#planos">Preços</a>
           <a href="/privacidade">Privacidade</a>
-        </div>
-        <span>
-          Feito com cuidado, para novos começos.
-          <br />© {new Date().getFullYear()} Larume
+        </nav>
+        <span className="cm-footer-copy">
+          © {new Date().getFullYear()} Casa Mia
         </span>
       </footer>
     </div>

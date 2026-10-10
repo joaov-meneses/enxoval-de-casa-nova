@@ -1,0 +1,1055 @@
+/* Home do Casa Mia — paleta e voz do manual de marca (docs/branding-casa-mia.md) */
+.cm-page {
+  --cm-muted: #6a5648;
+  --cm-card: #fff9ef;
+  --cm-sand: #f5e4cc;
+  --cm-line: #ecdcc3;
+  --cm-tint: #f6e3cd;
+  min-height: 100vh;
+  overflow-x: clip;
+  color: var(--cm-text);
+}
+.cm-wrap {
+  width: min(1160px, calc(100% - 40px));
+  margin-inline: auto;
+}
+.cm-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cm-primary-dark);
+}
+
+/* Frase do hero que troca o final ("Para quem está montando …") */
+.cm-rotator-window {
+  display: inline-block;
+  height: 1.5em;
+  overflow: hidden;
+  vertical-align: bottom;
+  line-height: 1.5;
+}
+.cm-rotator-word {
+  display: inline-block;
+  animation: cm-word-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes cm-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(70%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 640px) {
+  /* a palavra ganha a própria linha: nenhuma frase quebra nem empurra o título */
+  .cm-rotator-window {
+    display: block;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-rotator-word {
+    animation: none;
+  }
+}
+
+/* Botões */
+.cm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 22px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+.cm-btn:active {
+  transform: scale(0.98);
+}
+.cm-btn-primary {
+  color: #fff;
+  background: var(--cm-action);
+}
+.cm-btn-primary:hover {
+  background: var(--cm-action-hover);
+}
+.cm-btn-outline {
+  color: var(--cm-text);
+  border-color: var(--cm-text);
+  background: transparent;
+}
+.cm-btn-outline:hover {
+  background: var(--cm-tint);
+}
+.cm-btn-ghost {
+  color: var(--cm-text);
+  background: var(--cm-tint);
+}
+.cm-btn-ghost:hover {
+  background: #f0d6b5;
+}
+.cm-btn-sm {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+.cm-btn-lg {
+  min-height: 54px;
+  padding: 10px 26px;
+  font-size: 16px;
+}
+
+/* Cabeçalho: barra de vidro que acompanha a rolagem */
+html {
+  scroll-padding-top: 104px;
+}
+.cm-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  isolation: isolate;
+}
+/* No topo da página o menu é "normal" (sem fundo); ao rolar, o vidro aparece */
+.cm-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(
+    120deg,
+    #fffcf6d9 0%,
+    #f4d6b880 52%,
+    #fffcf6d1 100%
+  );
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid #3b2a2014;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.cm-header.is-scrolled::before {
+  opacity: 1;
+}
+.cm-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cm-nav a,
+.cm-login {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cm-text);
+  text-decoration: none;
+  border-radius: 999px;
+  /* o preenchimento "varre" da esquerda para a direita, na cor dos botões do app */
+  background:
+    linear-gradient(var(--cm-action), var(--cm-action)) no-repeat left center /
+    0% 100%;
+  transition:
+    background-size 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.2s;
+}
+.cm-nav .cm-nav-login {
+  display: none;
+}
+.cm-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cm-menu-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: var(--cm-text);
+  border-radius: 12px;
+}
+@media (hover: hover) {
+  .cm-nav a:hover,
+  .cm-login:hover {
+    color: #fff;
+    background-size: 100% 100%;
+  }
+}
+.cm-nav a:focus-visible,
+.cm-login:focus-visible {
+  color: #fff;
+  background-size: 100% 100%;
+  outline: 2px solid var(--cm-text);
+  outline-offset: 2px;
+}
+@media (min-width: 921px) {
+  .cm-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    top: 14px;
+    width: min(1160px, calc(100% - 40px));
+    margin: 14px auto 0;
+    padding: 9px 12px 9px 24px;
+    border-radius: 999px;
+  }
+  /* No topo, a marca e o botão se alinham ao conteúdo da página (sem o respiro interno da barra de
+     vidro); ao rolar, voltam ao lugar. Só `transform`, que não força recálculo de layout. */
+  .cm-header > .brand-link,
+  .cm-header-actions {
+    transition: transform 0.3s ease;
+  }
+  .cm-header:not(.is-scrolled) > .brand-link {
+    transform: translateX(-24px);
+  }
+  .cm-header:not(.is-scrolled) .cm-header-actions {
+    transform: translateX(12px);
+  }
+  .cm-header::before {
+    border: 1px solid #ffffffb3;
+    box-shadow:
+      0 14px 36px #3b2a201f,
+      0 0 0 1px #3b2a2012,
+      inset 0 1px 0 #ffffffcc;
+  }
+  .cm-header > .brand-link {
+    justify-self: start;
+  }
+  .cm-header-actions {
+    justify-self: end;
+  }
+}
+
+/* Hero */
+.cm-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  align-items: center;
+  gap: 56px;
+  padding-block: clamp(40px, 7vw, 88px);
+}
+.cm-hero-copy h1 {
+  margin: 14px 0 18px;
+  font-size: clamp(34px, 4.7vw, 58px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.cm-hero-copy h1 em {
+  font-style: italic;
+  color: var(--cm-primary-dark);
+}
+.cm-hero-copy > p {
+  max-width: 560px;
+  font-size: 18px;
+  line-height: 1.65;
+  color: var(--cm-muted);
+}
+.cm-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 28px 0 20px;
+}
+.cm-hero-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cm-muted);
+}
+.cm-hero-notes li,
+.cm-checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cm-hero-notes svg,
+.cm-checks svg {
+  flex-shrink: 0;
+  color: var(--cm-success);
+}
+.cm-hero-visual {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 8px 56px 56px 8px;
+}
+.cm-hero-nino {
+  position: absolute;
+  right: 0;
+  bottom: -4px;
+  filter: drop-shadow(0 10px 18px #3b2a2026);
+}
+
+/* Prévia do app */
+.cm-mock {
+  width: 100%;
+  max-width: 340px;
+  padding: 20px;
+  background: var(--cm-card);
+  border: 1px solid var(--cm-line);
+  border-radius: 26px;
+  box-shadow: 0 28px 60px #3b2a2024;
+}
+.cm-mock-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+.cm-mock-top small {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cm-muted);
+}
+.cm-mock-door {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 14px 0 12px;
+  padding: 14px;
+  background: var(--cm-tint);
+  border-radius: 18px;
+}
+.cm-mock-door strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1.1;
+}
+.cm-mock-door span {
+  font-size: 13px;
+  color: var(--cm-muted);
+}
+.cm-mock-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cm-mock-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--cm-line);
+  border-radius: 12px;
+}
+.cm-mock-list li.is-done .cm-mock-name {
+  color: var(--cm-muted);
+  text-decoration: line-through;
+}
+.cm-mock-name {
+  flex: 1;
+  min-width: 0;
+}
+.cm-mock-list small {
+  display: none;
+}
+.cm-mock-check {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  border: 1.5px solid #d6bfa0;
+  border-radius: 50%;
+}
+.cm-mock-list li.is-done .cm-mock-check {
+  background: var(--cm-success);
+  border-color: var(--cm-success);
+}
+.cm-mock-note {
+  max-width: 62%;
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cm-muted);
+}
+
+/* Seções */
+.cm-section {
+  padding-block: clamp(48px, 7vw, 88px);
+}
+.cm-heading {
+  max-width: 660px;
+  margin: 0 auto 40px;
+  text-align: center;
+}
+.cm-heading h2,
+.cm-nino-copy h2,
+.cm-cha-copy h2,
+.cm-final h2 {
+  margin: 10px 0 12px;
+  font-size: clamp(28px, 3.6vw, 42px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.cm-heading p {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--cm-muted);
+}
+
+/* Como funciona: linha do tempo com as telas reais do app */
+.cm-how {
+  padding-block: clamp(48px, 7vw, 88px);
+  background: var(--cm-card);
+  border-block: 1px solid var(--cm-line);
+}
+.cm-timeline {
+  --p: 0;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cm-how-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  padding-block: 28px;
+}
+.cm-how-num {
+  display: inline-block;
+  font-family: var(--serif);
+  font-size: 44px;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1;
+  color: #e3b88f;
+}
+.cm-how-copy h3 {
+  margin: 8px 0 12px;
+  font-size: clamp(24px, 2.6vw, 32px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.cm-how-copy > p {
+  max-width: 520px;
+  margin: 0 0 18px;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--cm-muted);
+}
+.cm-phone {
+  width: min(100%, 250px);
+  margin-inline: auto;
+  padding: 9px;
+  background: var(--cm-text);
+  border-radius: 40px;
+  box-shadow:
+    0 30px 60px #3b2a2038,
+    inset 0 0 0 2px #5a4638;
+}
+.cm-phone img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 390 / 844;
+  border-radius: 31px;
+  background: var(--cm-bg);
+}
+@media (min-width: 960px) {
+  .cm-timeline::before,
+  .cm-timeline::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 3px;
+    margin-left: -1.5px;
+    border-radius: 3px;
+  }
+  .cm-timeline::before {
+    background: var(--cm-line);
+  }
+  .cm-timeline::after {
+    background: linear-gradient(var(--cm-primary), var(--cm-action));
+    transform-origin: top;
+    transform: scaleY(var(--p));
+  }
+  .cm-how-step {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 112px;
+    padding-block: 56px;
+  }
+  .cm-how-step::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    background: var(--cm-card);
+    border: 3px solid var(--cm-line);
+    border-radius: 50%;
+    box-shadow: 0 0 0 6px var(--cm-card);
+    transition:
+      background-color 0.3s,
+      border-color 0.3s;
+  }
+  .cm-how-step.is-reached::before {
+    background: var(--cm-primary);
+    border-color: var(--cm-primary);
+  }
+  .cm-how-step:nth-child(even) .cm-how-copy {
+    order: 2;
+  }
+  .cm-how-step:nth-child(odd) .cm-how-copy {
+    justify-self: end;
+    padding-right: 8px;
+  }
+  .cm-phone {
+    width: 270px;
+  }
+}
+/* Revelação ao rolar: só entra em cena quando o JavaScript marca a lista como animada */
+.cm-timeline.is-animated .cm-how-step .cm-how-copy,
+.cm-timeline.is-animated .cm-how-step .cm-phone {
+  opacity: 0;
+  transform: translateY(32px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cm-timeline.is-animated .cm-how-step .cm-phone {
+  transition-delay: 0.12s;
+}
+.cm-timeline.is-animated .cm-how-step.is-visible .cm-how-copy,
+.cm-timeline.is-animated .cm-how-step.is-visible .cm-phone {
+  opacity: 1;
+  transform: none;
+}
+
+/* Nino */
+.cm-nino {
+  padding-block: clamp(48px, 7vw, 88px);
+  background: var(--cm-sand);
+}
+.cm-nino-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 48px;
+}
+.cm-nino-figure {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  max-width: 380px;
+  margin-inline: auto;
+  width: 100%;
+  background: radial-gradient(circle at 50% 45%, #fff3da 0%, #f6dcb8 68%, #f0cfa4 100%);
+  border-radius: 50%;
+}
+.cm-nino-copy > p {
+  max-width: 560px;
+  font-size: 17.5px;
+  line-height: 1.65;
+  color: var(--cm-muted);
+}
+/* A fala do Nino é um balão (o mascote "fala"), e não uma citação com faixa lateral */
+.cm-nino-copy blockquote {
+  position: relative;
+  margin: 24px 0;
+  padding: 18px 22px;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-style: italic;
+  line-height: 1.45;
+  background: var(--cm-card);
+  border: 1px solid #ecd2ad;
+  border-radius: 22px;
+  box-shadow: 0 10px 24px #3b2a2012;
+}
+.cm-nino-copy blockquote::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 34px;
+  width: 16px;
+  height: 16px;
+  background: var(--cm-card);
+  border-top: 1px solid #ecd2ad;
+  border-left: 1px solid #ecd2ad;
+  transform: rotate(45deg);
+}
+.cm-nino-copy cite {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--cm-primary-dark);
+}
+.cm-checks {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Recursos */
+.cm-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.cm-card {
+  padding: 28px;
+  background: var(--cm-card);
+  border: 1px solid var(--cm-line);
+  border-radius: 22px;
+}
+.cm-features .cm-card:first-child h3 {
+  margin-top: 0;
+}
+.cm-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cm-rooms li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--cm-tint);
+  border-radius: 999px;
+}
+.cm-rooms svg {
+  color: var(--cm-primary-dark);
+}
+
+/* Chá de Casa Nova */
+.cm-cha {
+  padding-block: clamp(48px, 7vw, 88px);
+  background: #eee7cf;
+}
+.cm-cha-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  align-items: center;
+  gap: 48px;
+}
+.cm-cha-copy > p {
+  max-width: 540px;
+  margin-bottom: 20px;
+  font-size: 17.5px;
+  line-height: 1.65;
+  color: var(--cm-muted);
+}
+.cm-cha-card {
+  max-width: 400px;
+  margin-inline: auto;
+  padding: 24px;
+  background: var(--cm-card);
+  border: 1px solid #e3d8b8;
+  border-radius: 24px;
+  box-shadow: 0 24px 50px #3b2a2018;
+}
+.cm-cha-card > strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.cm-cha-card > p {
+  margin: 8px 0 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--cm-muted);
+}
+.cm-cha-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cm-cha-card li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  background: #fff;
+  border: 1px solid var(--cm-line);
+  border-radius: 12px;
+}
+.cm-cha-card small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cm-primary-dark);
+}
+.cm-cha-card li.is-reserved small {
+  color: var(--cm-success);
+}
+
+/* Preços */
+.cm-plans {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+.cm-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 24px 26px;
+  background: var(--cm-card);
+  border: 1.5px solid var(--cm-line);
+  border-radius: 24px;
+}
+.cm-plan.is-featured {
+  border-color: var(--cm-primary);
+  box-shadow: 0 22px 44px #c2603f26;
+}
+.cm-plan-badge {
+  position: absolute;
+  top: -13px;
+  left: 24px;
+  padding: 5px 13px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--cm-action);
+  border-radius: 999px;
+}
+.cm-plan h3 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+.cm-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 16px 0 4px;
+}
+.cm-plan-price strong {
+  font-family: var(--serif);
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.cm-plan-price span {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cm-muted);
+}
+.cm-plan-billing {
+  min-height: 42px;
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--cm-muted);
+}
+.cm-plan .cm-btn {
+  width: 100%;
+}
+.cm-plan ul {
+  display: grid;
+  gap: 11px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.cm-plan li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+.cm-plan li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--cm-success);
+}
+.cm-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  margin: 26px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--cm-muted);
+}
+.cm-disclaimer svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Dúvidas */
+.cm-faq-list {
+  max-width: 780px;
+  margin-inline: auto;
+}
+.cm-faq-item {
+  border-bottom: 1px solid var(--cm-line);
+}
+.cm-faq-item h3 {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 700;
+}
+.cm-faq-item button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 4px;
+  font: inherit;
+  text-align: left;
+  color: var(--cm-text);
+}
+.cm-faq-item button svg {
+  flex-shrink: 0;
+  color: var(--cm-primary-dark);
+  transition: transform 0.2s;
+}
+.cm-faq-item button[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.cm-faq-item [role="region"] p {
+  margin: 0;
+  padding: 0 4px 20px;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--cm-muted);
+}
+.cm-faq-item [hidden] {
+  display: none;
+}
+
+/* Fechamento e rodapé */
+.cm-final {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-block: clamp(48px, 7vw, 88px);
+  text-align: center;
+}
+.cm-final p {
+  margin: 0 0 24px;
+  font-size: 17px;
+  color: var(--cm-muted);
+}
+.cm-final small {
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--cm-muted);
+}
+.cm-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+  padding-block: 32px 40px;
+  border-top: 1px solid var(--cm-line);
+}
+.cm-footer-brand p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--cm-muted);
+}
+.cm-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.cm-footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cm-text);
+  text-decoration: none;
+}
+.cm-footer-links a:hover {
+  color: var(--cm-primary-dark);
+}
+.cm-footer-copy {
+  font-size: 13px;
+  color: var(--cm-muted);
+}
+
+/* Telas médias */
+@media (max-width: 1100px) {
+  .cm-plans {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 28px;
+  }
+}
+@media (max-width: 920px) {
+  .cm-header {
+    gap: 12px;
+    padding-inline: max(20px, calc((100% - 1160px) / 2));
+  }
+  .cm-menu-toggle {
+    display: grid;
+  }
+  .cm-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px 20px 16px;
+    background: #fbf3e6;
+    border-bottom: 1px solid var(--cm-line);
+    box-shadow: 0 18px 30px #3b2a2014;
+  }
+  .cm-nav a {
+    border-radius: 12px;
+  }
+  .cm-nav.is-open {
+    display: flex;
+  }
+  .cm-nav a {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding-inline: 12px;
+  }
+  .cm-hero,
+  .cm-nino-grid,
+  .cm-cha-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+  }
+  .cm-hero-visual {
+    padding-right: 56px;
+  }
+  .cm-features {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cm-nino-figure {
+    max-width: 300px;
+  }
+  .cm-nino-copy,
+  .cm-cha-copy {
+    text-align: left;
+  }
+}
+@media (max-width: 640px) {
+  .cm-plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cm-plan-billing {
+    min-height: 0;
+  }
+  .cm-hero-actions .cm-btn-lg {
+    width: 100%;
+  }
+  .cm-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (max-width: 480px) {
+  .cm-login {
+    display: none;
+  }
+  .cm-nav .cm-nav-login {
+    display: flex;
+  }
+  .cm-hero-visual {
+    padding: 4px 32px 28px 0;
+  }
+  .cm-hero-nino {
+    width: 132px;
+    height: auto;
+    right: -8px;
+  }
+  .cm-mock {
+    padding: 16px;
+  }
+  .cm-nino-copy blockquote {
+    font-size: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-btn,
+  .cm-faq-item button svg,
+  .cm-header::before,
+  .cm-header > .brand-link,
+  .cm-header-actions {
+    transition: none;
+  }
+}

@@ -28,7 +28,7 @@ export function ResetPasswordPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    document.title = "Criar nova senha | Larume";
+    document.title = "Criar nova senha | Casa Mia";
     if (window.location.hash)
       window.history.replaceState({}, "", "/redefinir-senha");
     if (!initialToken) return;

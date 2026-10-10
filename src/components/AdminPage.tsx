@@ -100,7 +100,7 @@ export function AdminPage() {
     };
   }, [handleError]);
   useEffect(() => {
-    document.title = `${session ? "Gestão de usuários" : "Acesso administrativo"} | Larume`;
+    document.title = `${session ? "Gestão de usuários" : "Acesso administrativo"} | Casa Mia`;
     if (!session) return;
     let mounted = true;
     setRefreshing(true);

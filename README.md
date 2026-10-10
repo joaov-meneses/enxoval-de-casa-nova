@@ -120,7 +120,7 @@ Os planos e preços da landing page são **ilustrativos**, conforme a proposta v
 - `public/brand/larume-symbol.webp`: símbolo otimizado com transparência; o PNG original também está nessa pasta.
 - `public/brand/larume-symbol-white.webp`: versão branca com relevo suave, usada sobre a fotografia do login e cadastro, com o nome à direita.
 - `public/brand/larume-logo.png`: assinatura vertical com símbolo e nome Larume, em PNG transparente.
-- `public/larume-*.png`: ícones para navegador, tela inicial e modo maskable. Os arquivos padrão `favicon.ico` e `apple-touch-icon.png` também usam a nova marca.
+- `public/brand/casamia-symbol.{svg,png,webp}`: símbolo oficial do Casa Mia. `favicon.ico`, `favicon.svg`, `favicon-*.png`, `apple-touch-icon.png` e `icon-maskable-512x512.png` são derivados dele.
 - `public/images/larume-home.webp`: fotografia original criada para a landing page e otimizada em WebP.
 - `src/product.css`: estilos da identidade, páginas públicas e aplicativo.
 

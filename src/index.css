@@ -1,24 +1,56 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap");
 @import "tailwindcss";
 @import "./product.css";
 @import "./onboarding.css";
 @import "./privacy.css";
+@import "./landing.css";
 
 @theme {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif:
-    "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times,
-    serif;
+  --font-sans: "Nunito Variable", "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
+  --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
 
-  --color-brand-beige: #d4b895;
-  --color-brand-wood: #866344;
-  --color-brand-gray: #9ca3af;
-  --color-brand-dark: #292524;
+  --color-brand-cream: #fbf3e6;
+  --color-brand-coffee: #3b2a20;
+  --color-brand-terracotta: #c2603f;
+  --color-brand-olive: #5c6643;
+  --color-brand-tile: #244b66;
+
+  --color-brand-beige: #e7c9a4;
+  --color-brand-wood: #a34c30;
+  --color-brand-gray: #9a8c80;
+  --color-brand-dark: #3b2a20;
 }
 
+/* Tokens oficiais do Casa Mia (docs/branding-casa-mia.md). As variáveis antigas do CSS apontam para eles. */
+:root {
+  --cm-bg: #fbf3e6; /* Creme Acolhedor */
+  --cm-text: #3b2a20; /* Café Tostado */
+  --cm-primary: #c2603f; /* Terracota Artesanal */
+  --cm-primary-dark: #a34c30; /* Terracota para texto e hover (contraste AA sobre o creme) */
+  --cm-success: #5c6643; /* Oliva Natural */
+  --cm-accent: #244b66; /* Azulejo Noturno */
+  /* Terracota calibrado para texto branco sobre botões (4,9:1 — AA); #c2603f dá 4,2:1 com branco */
+  --cm-action: #b5532f;
+  --cm-action-hover: #9a4529;
+}
+
+/* Regra base: Nunito como padrão de todo o projeto */
+:root,
+html,
 body {
-  background-color: #fafaf9; /* stone-50 */
-  color: #292524; /* stone-800 */
+  font-family: var(--font-sans);
+  background-color: var(--color-brand-cream, #fbf3e6);
+  color: var(--color-brand-coffee, #3b2a20);
+}
+
+/* Destaques e marca usam Fraunces */
+h1,
+h2,
+h3,
+.font-display,
+.brand-word {
+  font-family: var(--font-serif);
 }
 
 /* Hide scrollbar for category list */

@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
-import { MAX_ENVIRONMENT_NAME_LENGTH } from '../src/data.ts';
+import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH } from '../src/data.ts';
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity, quantityFromDescription } from '../src/itemQuantity.ts';
 import { DEFAULT_ITEM_STATUS, isDoneStatus, isItemStatus, resolveDiscountCents, statusFromChecked, type ItemStatus } from '../src/itemStatus.ts';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from '../src/types.ts';
@@ -604,8 +604,8 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
   return withTransaction(async client => {
     // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
-    const current = await client.query<{ enxoval_id: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number }>(`
-      SELECT i.enxoval_id, i.status, i.price_cents, i.discount_cents, i.quantity
+    const current = await client.query<{ enxoval_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number }>(`
+      SELECT i.enxoval_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity
       FROM items i
       INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
       WHERE i.id = $1 AND em.user_id = $2
@@ -629,6 +629,9 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     if (typeof updates.name === 'string') {
       const name = updates.name.trim();
       if (!name) throw new HttpError(400, 'Nome do item é obrigatório.');
+      // Itens antigos podem ter nomes maiores: só barra quando o nome muda e passa do limite.
+      if (name !== current.rows[0].name && name.length > MAX_ITEM_NAME_LENGTH)
+        throw new HttpError(400, `O nome do item pode ter no máximo ${MAX_ITEM_NAME_LENGTH} caracteres.`);
       addUpdate('name', name);
     }
 
@@ -1123,6 +1126,7 @@ export function registerApiRoutes(app: Express) {
   router.post('/items', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     const name = requireText(req.body?.name, 'Nome do item');
+    if (name.length > MAX_ITEM_NAME_LENGTH) throw new HttpError(400, `O nome do item pode ter no máximo ${MAX_ITEM_NAME_LENGTH} caracteres.`);
     const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
     const categoryId = typeof req.body?.categoryId === 'string' ? req.body.categoryId : undefined;
     const categoryName = typeof req.body?.categoryName === 'string' && req.body.categoryName.trim()
