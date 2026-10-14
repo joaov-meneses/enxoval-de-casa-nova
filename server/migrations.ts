@@ -182,6 +182,20 @@ export async function migrateDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at timestamptz;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+    -- Conta criada a partir de um convite: só usa enxovais de outras pessoas e não cria os seus.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_guest boolean NOT NULL DEFAULT false;
+
+    CREATE TABLE IF NOT EXISTS enxoval_invitations (
+      id uuid PRIMARY KEY,
+      enxoval_id uuid NOT NULL REFERENCES enxovais(id) ON DELETE CASCADE,
+      email text NOT NULL,
+      token_hash text NOT NULL UNIQUE,
+      invited_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (enxoval_id, email)
+    );
+    CREATE INDEX IF NOT EXISTS enxoval_invitations_expires_at_idx ON enxoval_invitations(expires_at);
 
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id uuid PRIMARY KEY,

@@ -8,6 +8,9 @@ export interface EnxovalSummary {
   id: string;
   name: string;
   ownerId: string;
+  /** Nome de quem é dono. Em enxovais compartilhados (`role: 'editor'`) mostra de quem é a lista. */
+  ownerName: string;
+  /** `owner`: enxoval da própria pessoa. `editor`: enxoval de outra pessoa, ao qual ela foi convidada. */
   role: EnxovalRole;
   discountCents: number;
 }
@@ -17,6 +20,22 @@ export interface EnxovalMember {
   name: string;
   email: string;
   role: EnxovalRole;
+}
+
+export interface EnxovalInvitation {
+  id: string;
+  email: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface InvitationPreview {
+  valid: boolean;
+  email?: string;
+  enxovalName?: string;
+  inviterName?: string;
+  /** Já existe conta com o e-mail do convite: é preciso entrar nela, em vez de criar uma senha. */
+  accountExists?: boolean;
 }
 
 export interface EnxovalCategory {
@@ -51,6 +70,8 @@ export interface AuthUser {
   name: string;
   email: string;
   mustChangePassword?: boolean;
+  /** Conta criada por convite: usa só os enxovais de quem convidou e não cria enxovais próprios. */
+  isGuest?: boolean;
 }
 
 export interface AdminUser {

@@ -30,6 +30,7 @@ import type {
   AuthUser,
   BootstrapData,
   EnxovalCategory,
+  EnxovalInvitation,
   EnxovalItem,
   EnxovalMember,
   EnxovalSummary,
@@ -44,15 +45,24 @@ import {
   deleteItem as deleteItemRequest,
   fetchBootstrap,
   fetchEnxoval as fetchEnxovalRequest,
+  fetchInvitations as fetchInvitationsRequest,
   inviteMember as inviteMemberRequest,
   logout as logoutRequest,
+  removeMember as removeMemberRequest,
   reorderCategories as reorderCategoriesRequest,
   renameCategory as renameCategoryRequest,
   deleteCategory as deleteCategoryRequest,
   reorderItems as reorderItemsRequest,
+  revokeInvitation as revokeInvitationRequest,
   updateEnxoval as updateEnxovalRequest,
   updateItem as updateItemRequest,
 } from "./api";
+import {
+  enxovalSelectOptions,
+  readStoredEnxovalId,
+  storeEnxovalId,
+} from "./enxovais";
+import { NoAccessPage } from "./components/NoAccessPage";
 import { ItemRow } from "./components/ItemRow";
 import { Select } from "./components/Select";
 import { SortableList } from "./components/SortableList";
@@ -216,6 +226,10 @@ export default function App() {
     useState(true);
   const [renameEnxovalName, setRenameEnxovalName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [invitations, setInvitations] = useState<EnxovalInvitation[]>([]);
+  const [inviteNotice, setInviteNotice] = useState("");
+  /** Id de quem aguarda a segunda confirmação para ser removido do enxoval. */
+  const [memberToRemoveId, setMemberToRemoveId] = useState("");
   const [dialogError, setDialogError] = useState("");
   const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -275,7 +289,8 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    fetchBootstrap()
+    // Volta para o enxoval que a pessoa estava usando (o servidor ignora se ela não tiver mais acesso).
+    fetchBootstrap(readStoredEnxovalId())
       .then((data) => {
         if (isMounted) applyBootstrap(data);
       })
@@ -299,6 +314,10 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (user) storeEnxovalId(activeEnxoval?.id ?? null);
+  }, [user, activeEnxoval?.id]);
 
   useEffect(() => {
     if (user?.mustChangePassword) {
@@ -1202,20 +1221,73 @@ export default function App() {
     setIsDialogSubmitting(true);
     setDialogError("");
 
+    setInviteNotice("");
+
     try {
-      const member = await inviteMemberRequest(activeEnxoval.id, email);
-      setMembers((current) =>
-        current.some((existing) => existing.id === member.id)
-          ? current
-          : [...current, member],
-      );
+      const invitation = await inviteMemberRequest(activeEnxoval.id, email);
+      // Convidar de novo o mesmo e-mail só renova o convite pendente.
+      setInvitations((current) => [
+        invitation,
+        ...current.filter((existing) => existing.id !== invitation.id),
+      ]);
+      setInviteNotice(`Convite enviado para ${invitation.email}.`);
       setInviteEmail("");
-      setIsInviteOpen(false);
     } catch (err) {
       setDialogError(
         err instanceof Error
           ? err.message
           : "Não foi possível convidar essa pessoa.",
+      );
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
+  const handleRevokeInvitation = async (invitation: EnxovalInvitation) => {
+    if (!activeEnxoval) return;
+    setIsDialogSubmitting(true);
+    setDialogError("");
+    setInviteNotice("");
+
+    try {
+      await revokeInvitationRequest(activeEnxoval.id, invitation.id);
+      setInvitations((current) =>
+        current.filter((existing) => existing.id !== invitation.id),
+      );
+    } catch (err) {
+      setDialogError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível cancelar o convite.",
+      );
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
+  const handleRemoveMember = async (member: EnxovalMember) => {
+    if (!activeEnxoval) return;
+    // Primeiro toque pede a confirmação; o segundo remove de fato.
+    if (memberToRemoveId !== member.id) {
+      setMemberToRemoveId(member.id);
+      return;
+    }
+    setIsDialogSubmitting(true);
+    setDialogError("");
+    setInviteNotice("");
+
+    try {
+      await removeMemberRequest(activeEnxoval.id, member.id);
+      setMembers((current) =>
+        current.filter((existing) => existing.id !== member.id),
+      );
+      setMemberToRemoveId("");
+      setInviteNotice(`${member.name} não tem mais acesso a este enxoval.`);
+    } catch (err) {
+      setDialogError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível remover essa pessoa.",
       );
     } finally {
       setIsDialogSubmitting(false);
@@ -1345,9 +1417,24 @@ export default function App() {
   };
 
   const openInvite = () => {
+    // Só o dono convida; quem foi convidado não tem esta ação.
+    if (!activeEnxoval || activeEnxoval.role !== "owner") return;
+    const enxovalId = activeEnxoval.id;
     setDialogError("");
+    setInviteNotice("");
     setInviteEmail("");
+    setMemberToRemoveId("");
+    setInvitations([]);
     setIsInviteOpen(true);
+    fetchInvitationsRequest(enxovalId)
+      .then((pending) => setInvitations(pending))
+      .catch((err) =>
+        setDialogError(
+          err instanceof Error
+            ? err.message
+            : "Não foi possível carregar os convites pendentes.",
+        ),
+      );
   };
 
   const showAllItems = () => {
@@ -1505,6 +1592,7 @@ export default function App() {
   const handleLogout = async () => {
     await logoutRequest().catch(() => undefined);
     window.history.replaceState({}, "", "/");
+    storeEnxovalId(null);
     setUser(null);
     setEnxovais([]);
     setActiveEnxoval(null);
@@ -1548,6 +1636,11 @@ export default function App() {
     return <AuthPage onAuthenticated={applyBootstrap} />;
   }
 
+  // Convidado removido de todos os enxovais: a conta continua existindo, mas sem nada para usar.
+  if (user.isGuest && enxovais.length === 0) {
+    return <NoAccessPage user={user} onLogout={() => void handleLogout()} />;
+  }
+
   return (
     <div
       className={`workspace-app workspace-view-${workspaceView} min-h-screen pb-24 font-sans text-brand-dark overscroll-y-contain`}
@@ -1569,23 +1662,22 @@ export default function App() {
               value={activeEnxoval?.id ?? ""}
               options={
                 hasEnxoval
-                  ? enxovais.map((enxoval) => ({
-                      value: enxoval.id,
-                      label: enxoval.name,
-                    }))
+                  ? enxovalSelectOptions(enxovais)
                   : [{ value: "", label: "Seu próximo começo" }]
               }
               onChange={(id) => void handleEnxovalChange(id)}
               disabled={isWorkspaceLoading || isOrdering}
             />
-            <button
-              type="button"
-              className="workspace-picker-create"
-              onClick={openCreateEnxoval}
-              disabled={isWorkspaceLoading || isOrdering}
-            >
-              <Plus size={15} /> Criar novo enxoval
-            </button>
+            {!user.isGuest && (
+              <button
+                type="button"
+                className="workspace-picker-create"
+                onClick={openCreateEnxoval}
+                disabled={isWorkspaceLoading || isOrdering}
+              >
+                <Plus size={15} /> Criar novo enxoval
+              </button>
+            )}
           </div>
           <nav
             className="workspace-navigation"
@@ -1681,12 +1773,18 @@ export default function App() {
                     </span>
                   ))}
                 </span>
-                <button
-                  className="button button-outline button-small"
-                  onClick={openInvite}
-                >
-                  <UserPlus size={16} /> Convidar
-                </button>
+                {isOwner ? (
+                  <button
+                    className="button button-outline button-small"
+                    onClick={openInvite}
+                  >
+                    <UserPlus size={16} /> Convidar
+                  </button>
+                ) : (
+                  <span className="shared-badge">
+                    Convidado de {activeEnxoval?.ownerName}
+                  </span>
+                )}
                 <button
                   className="button button-outline button-small"
                   aria-label="Descontos e cashback"
@@ -2797,22 +2895,86 @@ export default function App() {
             />
           </div>
 
+          <p className="text-sm text-stone-500">
+            A pessoa recebe um convite por e-mail e entra no enxoval ao aceitar.
+            Ela edita a lista com você, mas não cria enxovais, não convida
+            ninguém e não exclui este enxoval.
+          </p>
+
           {members.length > 0 && (
-            <div className="max-h-32 overflow-y-auto rounded-xl border border-stone-100 bg-stone-50">
-              {members.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 text-sm border-b border-stone-100 last:border-0"
-                >
-                  <span className="truncate text-stone-700">
-                    {member.email}
-                  </span>
-                  <span className="text-xs font-medium text-stone-400">
-                    {member.role === "owner" ? "dono" : "editor"}
-                  </span>
-                </div>
-              ))}
+            <div>
+              <h3 className="text-sm font-medium text-stone-700 mb-1">
+                Quem participa
+              </h3>
+              <ul className="invite-people">
+                {members.map((member) => (
+                  <li key={member.id}>
+                    <span className="invite-person">
+                      <strong>{member.name}</strong>
+                      <small>{member.email}</small>
+                    </span>
+                    {member.role === "owner" ? (
+                      <span className="text-xs font-medium text-stone-400">
+                        dono
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`invite-remove ${memberToRemoveId === member.id ? "is-confirming" : ""}`}
+                        disabled={isDialogSubmitting}
+                        onClick={() => void handleRemoveMember(member)}
+                        onBlur={() => setMemberToRemoveId("")}
+                        aria-label={
+                          memberToRemoveId === member.id
+                            ? `Confirmar remoção de ${member.name}`
+                            : `Remover ${member.name}`
+                        }
+                      >
+                        {memberToRemoveId === member.id
+                          ? "Confirmar remoção"
+                          : "Remover"}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
+          )}
+
+          {invitations.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-stone-700 mb-1">
+                Convites pendentes
+              </h3>
+              <ul className="invite-people">
+                {invitations.map((invitation) => (
+                  <li key={invitation.id}>
+                    <span className="invite-person">
+                      <strong>{invitation.email}</strong>
+                      <small>Aguardando aceite</small>
+                    </span>
+                    <button
+                      type="button"
+                      className="invite-remove"
+                      disabled={isDialogSubmitting}
+                      onClick={() => void handleRevokeInvitation(invitation)}
+                      aria-label={`Cancelar convite de ${invitation.email}`}
+                    >
+                      Cancelar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {inviteNotice && (
+            <p
+              role="status"
+              className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2"
+            >
+              {inviteNotice}
+            </p>
           )}
 
           {dialogError && (
@@ -2831,7 +2993,7 @@ export default function App() {
             }
             className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isDialogSubmitting ? "Convidando..." : "Convidar"}
+            {isDialogSubmitting ? "Enviando..." : "Enviar convite"}
           </button>
         </form>
       </Dialog>

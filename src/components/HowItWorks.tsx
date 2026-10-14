@@ -39,7 +39,7 @@ const STEPS = [
     title: "Organizem juntos, no mesmo ritmo",
     text: "Convide quem vai montar a casa com você. Vocês editam a mesma lista e acompanham as conquistas e o orçamento juntos.",
     bullets: [
-      "Convite pelo e-mail de quem já tem conta",
+      "Convite por e-mail, com aceite pelo link",
       "Todo mundo vê cada item conquistado",
       "Resumo do que já foi investido e do que falta",
     ],

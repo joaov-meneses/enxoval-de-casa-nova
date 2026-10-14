@@ -4,17 +4,21 @@ import type { PoolClient } from 'pg';
 import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH } from '../src/data.ts';
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity, quantityFromDescription } from '../src/itemQuantity.ts';
 import { DEFAULT_ITEM_STATUS, isDoneStatus, isItemStatus, resolveDiscountCents, statusFromChecked, type ItemStatus } from '../src/itemStatus.ts';
-import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace } from '../src/types.ts';
+import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalInvitation, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace, InvitationPreview } from '../src/types.ts';
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
-import { appBaseUrl, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
+import { appBaseUrl, canDeliverMail, invitationEmail, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const RESET_TOKEN_TTL_MS = 60 * 60_000;
 const RESET_REQUEST_COOLDOWN_SECONDS = 60;
+const INVITATION_TTL_DAYS = 7;
+const INVITATION_TTL_MS = INVITATION_TTL_DAYS * 24 * 60 * 60_000;
+const INVITATION_RESEND_COOLDOWN_SECONDS = 60;
+const MAX_PENDING_INVITATIONS = 20;
 
 interface DbUserRow {
   id: string;
@@ -22,6 +26,7 @@ interface DbUserRow {
   email: string;
   password_hash: string;
   is_active: boolean;
+  is_guest: boolean;
   must_change_password: boolean;
   password_reset_expires_at: Date | null;
 }
@@ -30,8 +35,16 @@ interface EnxovalRow {
   id: string;
   name: string;
   owner_id: string;
+  owner_name: string;
   role: 'owner' | 'editor';
   discount_cents: number;
+}
+
+interface InvitationRow {
+  id: string;
+  email: string;
+  created_at: Date;
+  expires_at: Date;
 }
 
 interface MemberRow {
@@ -100,12 +113,22 @@ function requireEnvironmentName(value: unknown) {
   return name;
 }
 
-function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password'>>): AuthUser {
+function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password' | 'is_guest'>>): AuthUser {
   return {
     id: row.id,
     name: row.name,
     email: row.email,
-    mustChangePassword: row.must_change_password ?? false
+    mustChangePassword: row.must_change_password ?? false,
+    isGuest: row.is_guest ?? false
+  };
+}
+
+function mapInvitation(row: InvitationRow): EnxovalInvitation {
+  return {
+    id: row.id,
+    email: row.email,
+    createdAt: serializeTimestamp(row.created_at),
+    expiresAt: serializeTimestamp(row.expires_at)
   };
 }
 
@@ -114,6 +137,7 @@ function mapEnxoval(row: EnxovalRow): EnxovalSummary {
     id: row.id,
     name: row.name,
     ownerId: row.owner_id,
+    ownerName: row.owner_name,
     role: row.role,
     discountCents: Number(row.discount_cents ?? 0)
   };
@@ -161,9 +185,10 @@ function mapItem(row: ItemRow): EnxovalItem {
 
 async function fetchEnxovais(queryable: Queryable, userId: string) {
   const result = await queryable.query<EnxovalRow>(`
-    SELECT e.id, e.name, e.owner_id, e.discount_cents, em.role
+    SELECT e.id, e.name, e.owner_id, o.name AS owner_name, e.discount_cents, em.role
     FROM enxovais e
     INNER JOIN enxoval_members em ON em.enxoval_id = e.id
+    INNER JOIN users o ON o.id = e.owner_id
     WHERE em.user_id = $1
     ORDER BY CASE em.role WHEN 'owner' THEN 0 ELSE 1 END, e.created_at ASC, e.name ASC
   `, [userId]);
@@ -188,9 +213,10 @@ async function requireEnxovalOwner(queryable: Queryable, userId: string, enxoval
 
 async function fetchEnxoval(queryable: Queryable, userId: string, enxovalId: string) {
   const result = await queryable.query<EnxovalRow>(`
-    SELECT e.id, e.name, e.owner_id, e.discount_cents, em.role
+    SELECT e.id, e.name, e.owner_id, o.name AS owner_name, e.discount_cents, em.role
     FROM enxovais e
     INNER JOIN enxoval_members em ON em.enxoval_id = e.id
+    INNER JOIN users o ON o.id = e.owner_id
     WHERE e.id = $1 AND em.user_id = $2
     LIMIT 1
   `, [enxovalId, userId]);
@@ -266,7 +292,8 @@ async function fetchWorkspace(queryable: Queryable, userId: string, enxovalId: s
 async function fetchBootstrap(user: AuthUser, requestedEnxovalId?: string): Promise<BootstrapData> {
   if (user.mustChangePassword) return { user, enxovais: [], activeEnxoval: null, members: [], categories: [], items: [] };
   const enxovais = await fetchEnxovais(getPool(), user.id);
-  const activeEnxovalId = requestedEnxovalId ?? enxovais[0]?.id;
+  // Um enxoval pedido que a pessoa não acessa mais (ex.: ela foi removida como convidada) cai no primeiro da lista.
+  const activeEnxovalId = enxovais.find(enxoval => enxoval.id === requestedEnxovalId)?.id ?? enxovais[0]?.id;
   const workspace = activeEnxovalId
     ? await fetchWorkspace(getPool(), user.id, activeEnxovalId)
     : null;
@@ -524,7 +551,7 @@ async function getCurrentUser(req: Request) {
   if (!token) return null;
 
   const result = await getPool().query<DbUserRow>(`
-    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password
+    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password, u.is_guest
     FROM sessions s
     INNER JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = $1 AND s.expires_at > now() AND u.is_active = true
@@ -940,6 +967,7 @@ export function registerApiRoutes(app: Express) {
 
   router.post('/enxovais', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
+    if (user.isGuest) throw new HttpError(403, 'Contas de convidado usam apenas os enxovais para os quais foram convidadas.');
     const name = requireText(req.body?.name, 'Nome do enxoval');
 
     // O enxoval do funil /comecar chega com o plano gerado e as respostas; sem plano, segue o
@@ -987,7 +1015,7 @@ export function registerApiRoutes(app: Express) {
       UPDATE enxovais
       SET ${setClauses.join(', ')}, updated_at = now()
       WHERE id = $${values.length}
-      RETURNING id, name, owner_id, discount_cents, $${values.length + 1}::text AS role
+      RETURNING id, name, owner_id, (SELECT name FROM users WHERE id = enxovais.owner_id) AS owner_name, discount_cents, $${values.length + 1}::text AS role
     `, [...values, role]);
 
     if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
@@ -1003,38 +1031,214 @@ export function registerApiRoutes(app: Express) {
     res.status(204).end();
   }));
 
-  router.post('/enxovais/:id/members', asyncHandler(async (req, res) => {
+  // Convidar, revogar convites e remover participantes é só do dono: quem foi convidado apenas usa o enxoval.
+  router.get('/enxovais/:id/invitations', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+
+    const result = await getPool().query<InvitationRow>(`
+      SELECT id, email, created_at, expires_at
+      FROM enxoval_invitations
+      WHERE enxoval_id = $1 AND expires_at > now()
+      ORDER BY created_at DESC
+    `, [req.params.id]);
+
+    res.json(result.rows.map(mapInvitation));
+  }));
+
+  router.post('/enxovais/:id/invitations', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     const email = normalizeEmail(req.body?.email);
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+$/.test(email)) throw new HttpError(400, 'E-mail inválido.');
+    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+    if (email === user.email) throw new HttpError(409, 'Você já é o dono deste enxoval.');
 
-    if (!email || !email.includes('@')) throw new HttpError(400, 'E-mail inválido.');
-    await requireEnxovalMember(getPool(), user.id, req.params.id);
+    const base = appBaseUrl();
+    if (!base || !canDeliverMail()) {
+      console.error('Convite: configure APP_URL, RESEND_API_KEY e MAIL_FROM para enviar o e-mail do convite.');
+      throw new HttpError(503, 'O envio de e-mails não está configurado. Tente novamente mais tarde.');
+    }
 
-    const invitedUserResult = await getPool().query<DbUserRow>(`
-      SELECT id, name, email, password_hash
-      FROM users
-      WHERE email = $1
-      LIMIT 1
-    `, [email]);
+    const token = randomBytes(32).toString('base64url');
+    const { invitation, enxovalName, accountExists } = await withTransaction(async client => {
+      // Trava o enxoval para convites simultâneos respeitarem o limite e o intervalo de reenvio.
+      const enxoval = await client.query<{ name: string }>('SELECT name FROM enxovais WHERE id = $1 FOR UPDATE', [req.params.id]);
+      if (!enxoval.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
 
-    const invitedUser = invitedUserResult.rows[0];
-    if (!invitedUser) throw new HttpError(404, 'Esse e-mail ainda não tem conta.');
+      const existingUser = await client.query<{ id: string }>('SELECT id FROM users WHERE email = $1 LIMIT 1', [email]);
+      const accountExists = Boolean(existingUser.rows[0]);
+      if (existingUser.rows[0]) {
+        const member = await client.query('SELECT 1 FROM enxoval_members WHERE enxoval_id = $1 AND user_id = $2', [req.params.id, existingUser.rows[0].id]);
+        if (member.rowCount) throw new HttpError(409, 'Essa pessoa já participa deste enxoval.');
+      }
 
-    await getPool().query(`
-      INSERT INTO enxoval_members (enxoval_id, user_id, role, invited_by)
-      VALUES ($1, $2, 'editor', $3)
-      ON CONFLICT (enxoval_id, user_id) DO NOTHING
-    `, [req.params.id, invitedUser.id, user.id]);
+      await client.query('DELETE FROM enxoval_invitations WHERE expires_at <= now()');
+      const recent = await client.query(`
+        SELECT 1 FROM enxoval_invitations
+        WHERE enxoval_id = $1 AND email = $2 AND created_at > now() - make_interval(secs => $3)
+      `, [req.params.id, email, INVITATION_RESEND_COOLDOWN_SECONDS]);
+      if (recent.rowCount) throw new HttpError(429, 'Esse convite foi enviado há pouco. Aguarde um minuto para reenviar.');
 
-    const memberResult = await getPool().query<MemberRow>(`
-      SELECT u.id, u.name, u.email, em.role
-      FROM enxoval_members em
-      INNER JOIN users u ON u.id = em.user_id
-      WHERE em.enxoval_id = $1 AND em.user_id = $2
-      LIMIT 1
-    `, [req.params.id, invitedUser.id]);
+      const pending = await client.query<{ n: number }>(`
+        SELECT count(*)::int AS n FROM enxoval_invitations WHERE enxoval_id = $1 AND email <> $2
+      `, [req.params.id, email]);
+      if (pending.rows[0].n >= MAX_PENDING_INVITATIONS) {
+        throw new HttpError(409, `Este enxoval já tem ${MAX_PENDING_INVITATIONS} convites pendentes. Cancele algum para convidar mais gente.`);
+      }
 
-    res.status(201).json(mapMember(memberResult.rows[0]));
+      // Convidar de novo o mesmo e-mail troca o link anterior por um novo.
+      const saved = await client.query<InvitationRow>(`
+        INSERT INTO enxoval_invitations (id, enxoval_id, email, token_hash, invited_by, expires_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (enxoval_id, email) DO UPDATE
+          SET token_hash = EXCLUDED.token_hash, invited_by = EXCLUDED.invited_by,
+              expires_at = EXCLUDED.expires_at, created_at = now()
+        RETURNING id, email, created_at, expires_at
+      `, [randomUUID(), req.params.id, email, hashSessionToken(token), user.id, new Date(Date.now() + INVITATION_TTL_MS)]);
+
+      return { invitation: saved.rows[0], enxovalName: enxoval.rows[0].name, accountExists };
+    });
+
+    try {
+      // O token vai no fragmento (#), que o navegador não envia ao servidor nem a outros sites pelo Referer.
+      await sendMail(invitationEmail({
+        to: email,
+        inviterName: user.name,
+        enxovalName,
+        link: `${base}/convite#token=${token}`,
+        days: INVITATION_TTL_DAYS,
+        accountExists
+      }));
+    } catch (err) {
+      await getPool().query('DELETE FROM enxoval_invitations WHERE id = $1', [invitation.id]);
+      console.error('Falha ao enviar o e-mail do convite:', err instanceof Error ? err.message : err);
+      throw new HttpError(502, 'Não foi possível enviar o e-mail do convite. Tente novamente em instantes.');
+    }
+
+    res.status(201).json(mapInvitation(invitation));
+  }));
+
+  router.delete('/enxovais/:id/invitations/:invitationId', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+
+    const result = await getPool().query(
+      'DELETE FROM enxoval_invitations WHERE id = $1 AND enxoval_id = $2',
+      [req.params.invitationId, req.params.id]);
+    if (!result.rowCount) throw new HttpError(404, 'Convite não encontrado.');
+
+    res.status(204).end();
+  }));
+
+  router.delete('/enxovais/:id/members/:userId', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+    if (req.params.userId === user.id) {
+      throw new HttpError(400, 'O dono não pode sair do próprio enxoval. Para encerrá-lo, exclua o enxoval.');
+    }
+
+    await withTransaction(async client => {
+      const removed = await client.query(`
+        DELETE FROM enxoval_members
+        WHERE enxoval_id = $1 AND user_id = $2 AND role <> 'owner'
+      `, [req.params.id, req.params.userId]);
+      if (!removed.rowCount) throw new HttpError(404, 'Participante não encontrado.');
+
+      // Convidado sem nenhum outro enxoval perde o acesso à plataforma na hora, inclusive nas sessões já abertas.
+      // Quem tem enxoval próprio (conta avulsa) segue usando o dele normalmente.
+      await client.query(`
+        DELETE FROM sessions s
+        USING users u
+        WHERE s.user_id = u.id AND u.id = $1 AND u.is_guest
+          AND NOT EXISTS (SELECT 1 FROM enxoval_members em WHERE em.user_id = u.id)
+      `, [req.params.userId]);
+    });
+
+    res.status(204).end();
+  }));
+
+  router.post('/invitations/check', loginRateLimit(30), asyncHandler(async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    if (token.length < 20 || token.length > 200) {
+      res.json({ valid: false } satisfies InvitationPreview);
+      return;
+    }
+
+    const result = await getPool().query<{ email: string; enxoval_name: string; inviter_name: string | null; account_exists: boolean }>(`
+      SELECT i.email, e.name AS enxoval_name, inviter.name AS inviter_name,
+        EXISTS (SELECT 1 FROM users u WHERE u.email = i.email) AS account_exists
+      FROM enxoval_invitations i
+      INNER JOIN enxovais e ON e.id = i.enxoval_id
+      LEFT JOIN users inviter ON inviter.id = i.invited_by
+      WHERE i.token_hash = $1 AND i.expires_at > now()
+    `, [hashSessionToken(token)]);
+
+    const row = result.rows[0];
+    res.json(row
+      ? { valid: true, email: row.email, enxovalName: row.enxoval_name, inviterName: row.inviter_name ?? 'Alguém', accountExists: row.account_exists } satisfies InvitationPreview
+      : { valid: false } satisfies InvitationPreview);
+  }));
+
+  router.post('/invitations/accept', loginRateLimit(10), asyncHandler(async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const expired = new HttpError(400, 'Este convite expirou ou já foi usado. Peça um novo convite a quem convidou você.');
+    if (token.length < 20 || token.length > 200) throw expired;
+
+    const signedIn = await getCurrentUser(req);
+
+    const accepted = await withTransaction(async client => {
+      const invitation = await client.query<{ id: string; enxoval_id: string; email: string; invited_by: string | null }>(`
+        SELECT id, enxoval_id, email, invited_by
+        FROM enxoval_invitations
+        WHERE token_hash = $1 AND expires_at > now()
+        FOR UPDATE
+      `, [hashSessionToken(token)]);
+      const row = invitation.rows[0];
+      if (!row) throw expired;
+
+      const existing = await client.query<{ id: string; is_active: boolean }>('SELECT id, is_active FROM users WHERE email = $1 FOR UPDATE', [row.email]);
+      let userId: string;
+
+      if (existing.rows[0]) {
+        // Conta que já existe (inclusive de dono de outro enxoval): só entra quem está logado nela.
+        if (!signedIn) throw new HttpError(401, 'Entre na sua conta para aceitar o convite.');
+        if (signedIn.id !== existing.rows[0].id) throw new HttpError(403, `Este convite é para ${row.email}. Saia da conta atual e entre com esse e-mail.`);
+        if (!existing.rows[0].is_active) throw new HttpError(403, 'Esta conta está inativa. Entre em contato com o suporte.');
+        userId = existing.rows[0].id;
+      } else {
+        // Primeiro acesso: cria uma conta de convidado, que não tem enxoval próprio.
+        const password = requireText(req.body?.password, 'Senha');
+        if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
+        if (password !== req.body?.confirmation) throw new HttpError(400, 'As senhas não coincidem.');
+        const name = typeof req.body?.name === 'string' && req.body.name.trim()
+          ? req.body.name.trim().slice(0, 100)
+          : row.email.split('@')[0];
+        userId = randomUUID();
+        await client.query(`
+          INSERT INTO users (id, name, email, password_hash, is_guest, last_login_at)
+          VALUES ($1, $2, $3, $4, true, now())
+        `, [userId, name, row.email, await hashPassword(password)]);
+        await createSession(res, userId, client);
+      }
+
+      await client.query(`
+        INSERT INTO enxoval_members (enxoval_id, user_id, role, invited_by)
+        VALUES ($1, $2, 'editor', $3)
+        ON CONFLICT (enxoval_id, user_id) DO NOTHING
+      `, [row.enxoval_id, userId, row.invited_by]);
+      await client.query('DELETE FROM enxoval_invitations WHERE id = $1', [row.id]);
+
+      const user = await client.query<DbUserRow>('SELECT id, name, email, must_change_password, is_guest FROM users WHERE id = $1', [userId]);
+      return { user: mapUser(user.rows[0]), enxovalId: row.enxoval_id };
+    }).catch(err => {
+      // Alguém criou uma conta com esse e-mail entre a checagem e a gravação.
+      if ((err as { code?: string }).code === '23505') {
+        throw new HttpError(409, 'Já existe uma conta com esse e-mail. Entre nela para aceitar o convite.');
+      }
+      throw err;
+    });
+
+    res.json(await fetchBootstrap(accepted.user, accepted.enxovalId));
   }));
 
   router.get('/categories', asyncHandler(async (req, res) => {

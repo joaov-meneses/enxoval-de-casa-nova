@@ -1,7 +1,7 @@
-// E-mail transacional do Casa Mia (hoje: redefinição de senha).
+// E-mail transacional do Casa Mia (redefinição de senha e convite para um enxoval).
 // Provedor: Resend, pela API HTTP, quando RESEND_API_KEY e MAIL_FROM estão configurados.
 // Sem configuração, em desenvolvimento a mensagem aparece no console do servidor (com o link); em produção nada
-// é impresso além de um aviso, porque o link de redefinição é um segredo e não deve ir para os logs.
+// é impresso além de um aviso, porque os links (redefinição, convite) são segredos e não devem ir para os logs.
 
 export interface MailMessage {
   to: string;
@@ -44,6 +44,14 @@ export function appBaseUrl(): string | null {
   return isProductionServer()
     ? null
     : `http://localhost:${process.env.PORT ?? 3000}`;
+}
+
+/**
+ * Verdadeiro quando um e-mail enviado de fato chega a alguém: Resend configurado, caixa em memória (testes) ou
+ * desenvolvimento (console). Em produção sem Resend nada sairia, então ações que dependem do e-mail avisam o erro.
+ */
+export function canDeliverMail() {
+  return mailDriver() !== "console" || !isProductionServer();
 }
 
 export async function sendMail(message: MailMessage) {
@@ -127,6 +135,37 @@ Se não foi você, ignore este e-mail: sua senha continua a mesma.`;
 <p style="margin:0 0 12px;line-height:1.6;font-size:14px">O link vale por ${input.minutes} minutos e só pode ser usado uma vez. Se o botão não abrir, copie este endereço no navegador:</p>
 <p style="margin:0 0 20px;font-size:13px;word-break:break-all;color:#6a5648">${escapeHtml(input.link)}</p>
 <p style="margin:0;line-height:1.6;font-size:14px;color:#6a5648">Se não foi você, ignore este e-mail: sua senha continua a mesma.</p>`,
+  );
+  return { to: input.to, subject, text, html };
+}
+
+export function invitationEmail(input: {
+  to: string;
+  inviterName: string;
+  enxovalName: string;
+  link: string;
+  days: number;
+  accountExists: boolean;
+}): MailMessage {
+  const subject = `${input.inviterName} convidou você para o enxoval "${input.enxovalName}"`;
+  const next = input.accountExists
+    ? "Abra o link abaixo e entre com a sua conta do Casa Mia para aceitar."
+    : "Abra o link abaixo, crie a sua senha e pronto: você já entra no enxoval.";
+  const text = `${input.inviterName} convidou você para montar o enxoval "${input.enxovalName}" no Casa Mia. Vocês dois editam a mesma lista.
+
+${next}
+
+${input.link}
+
+O convite vale por ${input.days} dias. Se você não esperava por ele, é só ignorar este e-mail.`;
+  const html = layout(
+    "Você foi convidado(a) para um enxoval",
+    `<p style="margin:0 0 16px;line-height:1.6"><strong>${escapeHtml(input.inviterName)}</strong> convidou você para montar o enxoval <strong>${escapeHtml(input.enxovalName)}</strong>. Vocês dois editam a mesma lista.</p>
+<p style="margin:0 0 24px;line-height:1.6">${escapeHtml(next)}</p>
+<p style="margin:0 0 24px"><a href="${escapeHtml(input.link)}" style="display:inline-block;background:#b5532f;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:600">Aceitar convite</a></p>
+<p style="margin:0 0 12px;line-height:1.6;font-size:14px">Se o botão não abrir, copie este endereço no navegador:</p>
+<p style="margin:0 0 20px;font-size:13px;word-break:break-all;color:#6a5648">${escapeHtml(input.link)}</p>
+<p style="margin:0;line-height:1.6;font-size:14px;color:#6a5648">O convite vale por ${input.days} dias. Se você não esperava por ele, é só ignorar este e-mail.</p>`,
   );
   return { to: input.to, subject, text, html };
 }

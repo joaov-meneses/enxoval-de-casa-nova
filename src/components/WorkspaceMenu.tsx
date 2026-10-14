@@ -19,6 +19,7 @@ import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
 import { Select } from "./Select";
 import { EnvironmentList } from "./EnvironmentList";
 import { activeItems } from "../itemStatus";
+import { enxovalSelectOptions } from "../enxovais";
 
 interface WorkspaceMenuProps {
   open: boolean;
@@ -54,6 +55,7 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
   );
   if (!props.open) return null;
   const hasEnxoval = Boolean(props.activeEnxoval);
+  const isOwner = props.activeEnxoval?.role === "owner";
   const run = (action: () => void) => {
     props.onClose();
     action();
@@ -94,7 +96,7 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
             aria-label="Seus enxovais"
           >
             <label htmlFor="menu-enxoval">
-              <Home size={17} /> Seus enxovais
+              <Home size={17} /> Trocar de enxoval
             </label>
             {props.enxovais.length > 0 ? (
               <Select
@@ -103,24 +105,44 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 value={props.activeEnxoval?.id ?? ""}
                 disabled={props.busy}
                 onChange={(id) => run(() => props.onSwitch(id))}
-                options={props.enxovais.map((enxoval) => ({
-                  value: enxoval.id,
-                  label: enxoval.name,
-                }))}
+                options={enxovalSelectOptions(props.enxovais)}
               />
             ) : (
               <p>Vamos começar seu primeiro enxoval?</p>
             )}
-            <button
-              type="button"
-              className="workspace-menu-create"
-              disabled={props.busy}
-              onClick={() => run(props.onCreate)}
-            >
-              <Plus size={17} /> Criar novo enxoval
-            </button>
+            {props.user.isGuest !== true && (
+              <button
+                type="button"
+                className="workspace-menu-create"
+                disabled={props.busy}
+                onClick={() => run(props.onCreate)}
+              >
+                <Plus size={17} /> Criar novo enxoval
+              </button>
+            )}
           </section>
-          {hasEnxoval && (
+          {hasEnxoval && !isOwner && (
+            <section
+              className="workspace-menu-invite workspace-menu-guest"
+              aria-label="Sobre este enxoval compartilhado"
+            >
+              <div className="invite-avatars" aria-hidden="true">
+                {props.members.slice(0, 4).map((member) => (
+                  <span key={member.id}>
+                    {member.name.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
+              </div>
+              <div className="invite-copy">
+                <strong>Enxoval de {props.activeEnxoval?.ownerName}</strong>
+                <p>
+                  Você participa como convidado: edita a lista junto. Só o dono
+                  convida pessoas ou exclui o enxoval.
+                </p>
+              </div>
+            </section>
+          )}
+          {hasEnxoval && isOwner && (
             <section
               className="workspace-menu-invite"
               aria-label="Convidar pessoas"
@@ -195,7 +217,7 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               />
             </section>
           )}
-          {props.activeEnxoval?.role === "owner" && (
+          {isOwner && (
             <div className="workspace-menu-danger">
               <button
                 type="button"

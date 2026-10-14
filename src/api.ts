@@ -3,9 +3,11 @@ import type {
   AdminUser,
   BootstrapData,
   EnxovalCategory,
+  EnxovalInvitation,
   EnxovalItem,
   EnxovalMember,
   EnxovalWorkspace,
+  InvitationPreview,
   ItemStatus,
 } from "./types";
 import { isItemStatus, normalizeItemStatus } from "./itemStatus";
@@ -195,10 +197,47 @@ export function deleteEnxoval(enxovalId: string) {
   return request<void>(`/api/enxovais/${enxovalId}`, { method: "DELETE" });
 }
 
+/** Envia o convite por e-mail. A pessoa só entra no enxoval quando aceita pelo link. */
 export function inviteMember(enxovalId: string, email: string) {
-  return request<EnxovalMember>(`/api/enxovais/${enxovalId}/members`, {
+  return request<EnxovalInvitation>(`/api/enxovais/${enxovalId}/invitations`, {
     method: "POST",
     body: JSON.stringify({ email }),
+  });
+}
+
+export function fetchInvitations(enxovalId: string) {
+  return request<EnxovalInvitation[]>(`/api/enxovais/${enxovalId}/invitations`);
+}
+
+export function revokeInvitation(enxovalId: string, invitationId: string) {
+  return request<void>(
+    `/api/enxovais/${enxovalId}/invitations/${encodeURIComponent(invitationId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function removeMember(enxovalId: string, userId: string) {
+  return request<void>(
+    `/api/enxovais/${enxovalId}/members/${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function checkInvitation(token: string) {
+  return request<InvitationPreview>("/api/invitations/check", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+/** Quem já tem conta aceita logado (sem `account`); quem não tem cria nome e senha aqui. */
+export function acceptInvitation(
+  token: string,
+  account?: { name: string; password: string; confirmation: string },
+) {
+  return request<BootstrapData>("/api/invitations/accept", {
+    method: "POST",
+    body: JSON.stringify({ token, ...account }),
   });
 }
 
@@ -298,6 +337,7 @@ export type {
   AuthUser,
   BootstrapData,
   EnxovalCategory,
+  EnxovalInvitation,
   EnxovalItem,
   EnxovalMember,
   EnxovalWorkspace,

@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import { AdminPage } from './components/AdminPage';
 import { ForgotPasswordPage } from './components/ForgotPasswordPage';
+import { InvitationPage } from './components/InvitationPage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { PrivacyPage } from './components/PrivacyPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
@@ -23,6 +24,8 @@ createRoot(document.getElementById('root')!).render(
       <ForgotPasswordPage />
     ) : window.location.pathname === '/redefinir-senha' ? (
       <ResetPasswordPage />
+    ) : window.location.pathname === '/convite' ? (
+      <InvitationPage />
     ) : (
       <App />
     )}

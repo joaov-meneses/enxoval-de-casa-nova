@@ -30,7 +30,16 @@ O produto exige conta e servidor completo (com PostgreSQL): não existe modo de 
 | `npm run db:down` | Para e remove o container, mantendo os dados |
 | `docker compose down -v` | Para e **apaga os dados** do volume |
 
-O fluxo de autenticação e a API PostgreSQL originais foram preservados. Compartilhar um enxoval adiciona como membro uma pessoa que já possui conta, usando seu e-mail; convites não enviam e-mail (o e-mail só é usado na recuperação de senha).
+O fluxo de autenticação e a API PostgreSQL originais foram preservados. Compartilhar um enxoval é feito por convite: o dono informa o e-mail, a pessoa recebe a mensagem (Resend) e só entra no enxoval ao aceitar pelo link.
+
+### Convidados e donos
+
+- **Quem convida:** só o dono do enxoval convida, cancela convites pendentes e remove participantes (`POST/GET/DELETE /api/enxovais/:id/invitations`, `DELETE /api/enxovais/:id/members/:userId`). O convite vale por 7 dias; reenviar para o mesmo e-mail troca o link anterior.
+- **Aceite:** `/convite#token=…` (o token fica no fragmento e só o hash vai para o banco). Quem não tem conta define nome e senha e nasce como **conta de convidado** (`users.is_guest`); quem já tem conta entra nela e aceita, sem perder nem misturar o enxoval próprio.
+- **Permissões do convidado:** edita itens e ambientes do enxoval compartilhado como o dono (os dados são ligados a `enxoval_id`, então os dois veem as mesmas alterações), mas não cria enxovais (conta de convidado), não convida, não remove ninguém e não renomeia nem exclui o enxoval.
+- **Remoção:** tira a linha de `enxoval_members`. Uma conta de convidado sem nenhum outro enxoval perde as sessões na hora e vê uma tela "sem acesso" ao entrar; quem tem enxoval próprio segue com o dele normalmente.
+- **Troca de enxoval:** o seletor (barra lateral no desktop, menu no mobile) separa "Meus enxovais" de "Compartilhados comigo". O último aberto é lembrado no aparelho.
+- **Sem cobrança ainda:** como não há assinatura implementada, "conta avulsa" hoje significa ter enxoval próprio. Quando o pagamento existir, basta promover `is_guest` para `false` na compra.
 
 ## Esqueci minha senha (link por e-mail)
 

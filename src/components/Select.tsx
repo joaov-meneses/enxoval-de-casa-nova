@@ -1,9 +1,18 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { Check, ChevronDown } from "lucide-react";
 
 export interface SelectOption {
   value: string;
   label: string;
+  /** Título do grupo. Opções do mesmo grupo devem vir seguidas; o título aparece antes da primeira. */
+  group?: string;
 }
 export function Select({
   value,
@@ -205,27 +214,35 @@ export function Select({
           style={{ maxHeight }}
         >
           {options.map((option, index) => (
-            <div
-              key={option.value}
-              id={`${listId}-${index}`}
-              data-index={index}
-              role="option"
-              aria-selected={option.value === value}
-              className={`larume-select-option ${active === index ? "highlighted" : ""}`}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-              onMouseMove={() => setActive(index)}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                choose(index);
-              }}
-            >
-              <span>{option.label}</span>
-              {option.value === value && <Check size={16} aria-hidden="true" />}
-            </div>
+            <Fragment key={option.value}>
+              {option.group && option.group !== options[index - 1]?.group && (
+                <div role="presentation" className="larume-select-group">
+                  {option.group}
+                </div>
+              )}
+              <div
+                id={`${listId}-${index}`}
+                data-index={index}
+                role="option"
+                aria-selected={option.value === value}
+                className={`larume-select-option ${active === index ? "highlighted" : ""}`}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onMouseMove={() => setActive(index)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  choose(index);
+                }}
+              >
+                <span>{option.label}</span>
+                {option.value === value && (
+                  <Check size={16} aria-hidden="true" />
+                )}
+              </div>
+            </Fragment>
           ))}
         </div>
       )}
