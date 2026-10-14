@@ -27,8 +27,6 @@ import {
   CloudSun,
   CookingPot,
   DoorOpen,
-  Eye,
-  EyeOff,
   Flower2,
   Heart,
   HeartHandshake,
@@ -62,7 +60,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Brand } from "../Brand";
-import { fetchBootstrap, register } from "../../api";
+import { createEnxovalFromOnboarding, fetchBootstrap } from "../../api";
 import { track } from "../../onboarding/analytics";
 import { detectStateFromDevice } from "../../onboarding/location";
 import {
@@ -312,16 +310,26 @@ export default function OnboardingFlow() {
   const [step, setStep] = useState<StepId>("welcome");
   const [dir, setDir] = useState(1);
   const [completed, setCompleted] = useState(saved?.completed ?? false);
-  // O funil é só para quem ainda não tem conta: quem já está logado vai para a área logada.
+  // O funil agora é a etapa pós-cadastro: exige conta criada (sem conta, cria em /login) e só
+  // mostra as perguntas enquanto a conta ainda não tem nenhum enxoval (senão, já passou por aqui).
   const [gate, setGate] = useState<"checking" | "open">("checking");
   useEffect(() => {
     let active = true;
     fetchBootstrap()
-      .then(() => {
-        if (active) window.location.replace("/app");
+      .then((data) => {
+        if (!active) return;
+        if (data.enxovais.length > 0) {
+          window.location.replace("/app");
+          return;
+        }
+        setAnswers((current) => ({
+          ...current,
+          name: current.name || data.user.name,
+        }));
+        setGate("open");
       })
       .catch(() => {
-        if (active) setGate("open");
+        if (active) window.location.replace("/login?cadastro=1");
       });
     return () => {
       active = false;
@@ -691,7 +699,7 @@ export default function OnboardingFlow() {
               Quanto você pretende investir?
             </h1>
             <p className="ob-sub">
-              Uma ideia basta, você ajusta depois. Fica neste aparelho até você criar a conta; depois, guardamos na sua conta para dimensionar o plano.
+              Uma ideia basta, você ajusta depois. Fica neste aparelho até o plano ser criado; depois, guardamos na sua conta para dimensionar o plano.
             </p>
             <RadioOptions
               legend="Orçamento"
@@ -2051,9 +2059,6 @@ function SaveStep({
   first: string;
   reduced: boolean;
 }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [visible, setVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const payload = useMemo(() => toPayload(plan), [plan]);
@@ -2065,19 +2070,16 @@ function SaveStep({
     rooms: answers.rooms ?? defaultRooms(answers.housing, answers.people),
   };
 
-  // Um único pedido cria a conta e o primeiro enxoval, já com o plano. Se falhar,
-  // nada é criado pela metade e as respostas continuam guardadas.
+  // A conta já existe (cadastro feito antes do funil, em /login). Este passo só cria o
+  // primeiro enxoval, já com o plano. Se falhar, nada fica pela metade e as respostas
+  // continuam guardadas para tentar de novo.
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
     setError("");
     track("signup_submit");
     try {
-      await register(answers.name.trim(), email.trim(), password, {
-        enxovalName: plan.enxovalName,
-        plan: payload,
-        profile,
-      });
+      await createEnxovalFromOnboarding(plan.enxovalName, payload, profile);
       clearOnboarding();
       track("signup_success");
       window.location.assign("/app");
@@ -2085,7 +2087,7 @@ function SaveStep({
       setError(
         err instanceof Error
           ? err.message
-          : "Não foi possível criar a conta agora. Tente novamente.",
+          : "Não foi possível salvar o plano agora. Tente novamente.",
       );
       setSubmitting(false);
     }
@@ -2098,10 +2100,10 @@ function SaveStep({
           <ShieldCheck size={32} strokeWidth={1.4} />
         </Ring>
         <h1 className="ob-title ob-title-center" tabIndex={-1}>
-          Salve o plano de {first}
+          O plano de {first} está pronto para salvar
         </h1>
         <p className="ob-sub ob-sub-center">
-          Crie sua conta gratuita para guardar tudo isso e abrir no celular ou
+          Confirme para guardar tudo isso na sua conta e abrir no celular ou
           no computador.
         </p>
         <p className="ob-save-summary">
@@ -2110,7 +2112,7 @@ function SaveStep({
         </p>
       </div>
 
-      <ul className="ob-benefits" aria-label="O que você ganha ao criar a conta">
+      <ul className="ob-benefits" aria-label="O que você ganha com a sua conta">
         {BENEFITS.map(({ Icon, text }) => (
           <li key={text}>
             <span>
@@ -2122,40 +2124,6 @@ function SaveStep({
       </ul>
 
       <form className="ob-form" onSubmit={submit}>
-        <label>
-          Seu e-mail
-          <input
-            className="ob-input"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="voce@exemplo.com"
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Crie uma senha
-          <span className="ob-password">
-            <input
-              className="ob-input"
-              type={visible ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="6 ou mais caracteres"
-              autoComplete="new-password"
-              minLength={6}
-              required
-            />
-            <button
-              type="button"
-              aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
-              onClick={() => setVisible(!visible)}
-            >
-              {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </span>
-        </label>
         {error && (
           <div className="ob-error" role="alert">
             {error}
@@ -2165,15 +2133,15 @@ function SaveStep({
           {submitting ? (
             <LoaderCircle size={18} className="animate-spin" />
           ) : (
-            "Criar conta e salvar plano"
+            "Criar meu plano"
           )}
           {!submitting && <ArrowRight size={18} />}
         </button>
       </form>
       <p className="ob-privacy">
-        Ao criar a conta, guardamos as suas respostas (como estado, data da
-        mudança e faixa de orçamento) para montar e ajustar o seu plano. Veja como
-        tratamos os seus dados na{" "}
+        Guardamos as suas respostas (como estado, data da mudança e faixa de
+        orçamento) para montar e ajustar o seu plano. Veja como tratamos os
+        seus dados na{" "}
         <a href="/privacidade" target="_blank" rel="noopener">
           política de privacidade
         </a>

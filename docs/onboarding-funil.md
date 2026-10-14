@@ -1,25 +1,26 @@
 # Funil de onboarding da Larume (`/comecar`)
 
-Antes do cadastro, a pessoa responde a perguntas curtas e recebe um **plano de enxoval de casa nova já montado**. A conta só é pedida no fim, para *salvar* o plano.
+A pessoa cria a conta primeiro (`/login`, aba "Criar conta") e só depois responde a perguntas curtas para receber um **plano de enxoval de casa nova já montado**. O funil é a etapa pós-cadastro: exige sessão autenticada e termina criando o primeiro enxoval, já com o plano.
 
-**Regra de produto: o funil é exclusivo para criar conta nova.**
+**Regra de produto: o funil só existe para quem já tem conta e ainda não montou um enxoval.**
 
-- Só existe fora da área logada: quem já tem sessão é redirecionado de `/comecar` para `/app`.
-- Não oferece login em nenhuma tela. Quem já tem conta entra por `/login`, e entrar nunca usa nem cria o plano do funil.
-- É a **única porta de cadastro**: `/signup` redireciona para cá e `/login` não cria conta. Assim toda conta nova nasce com as informações do enxoval.
-- O cadastro cria a conta **já com o primeiro enxoval pronto** (ambientes e itens gerados das respostas), em um único pedido e uma única transação no servidor. Se algo falhar, nada fica criado pela metade e as respostas continuam guardadas no aparelho.
-- **O servidor exige o funil.** `POST /api/auth/register` só cria conta com `enxovalName`, `plan` (ao menos um item) e `profile` (as respostas) válidos; sem eles, ou com qualquer valor fora do permitido, responde 400 e não cria nada. Não existe cadastro direto pela API. `POST /api/enxovais` não aceita plano.
+- `/comecar` exige sessão: sem conta, redireciona para `/login?cadastro=1` (aba "Criar conta" já aberta).
+- Quem já tem ao menos um enxoval (já passou pelo funil, ou criou um enxoval de outro jeito) é redirecionado de `/comecar` para `/app` — o funil não se repete.
+- `/login` tem as duas abas, **Entrar** e **Criar conta**, na mesma tela. Criar conta pede nome, e-mail e senha; o próximo passo é sempre `/comecar`.
+- O cadastro (`POST /api/auth/register`) cria **só a conta**, sem nenhum enxoval. O primeiro enxoval (com o plano do funil, ou com o template padrão) é criado depois, autenticado, em `POST /api/enxovais`.
+- Quem cria a conta e sai no meio do funil pode voltar: ao entrar de novo em `/login` (aba Entrar) com zero enxovais, o login manda para `/comecar` em vez de `/app`.
+- `POST /api/enxovais` aceita opcionalmente `plan` (ao menos um item) e `profile` (as respostas do funil); com `plan` presente, o perfil é validado por completo e qualquer valor fora do permitido responde 400 sem criar nada. Sem `plan`, segue o fluxo normal de "criar enxoval" (com ou sem o template padrão).
 
 A referência foi um app de enxoval de bebê (29 telas, 12 perguntas, ~3 minutos). Mantivemos a estrutura (boas-vindas → perguntas curtas → telas de respiro → "montando seu plano" → plano pronto → comparação → salvar) e mudamos o que não se sustentava (ver "O que não copiamos").
 
 ## Princípios
 
 1. **Cada pergunta tem de mudar o resultado.** Toda resposta alimenta o gerador (`src/onboarding/plan.ts`). A que não alimenta, não entra.
-2. **Valor antes da conta.** O cadastro vem depois do plano pronto (princípio de reciprocidade do NN/g; ver pesquisa anterior).
+2. **Conta primeiro, para não perder o plano pelo caminho.** O cadastro (nome, e-mail, senha) acontece antes do funil, em `/login`; o plano some ao fechar a aba de quem nunca criou conta. A sensação de "valor antes de pedir algo" continua dentro do funil: a pessoa só confirma e-mail/senha uma vez, e as telas de economia, primeira noite e cronograma (ver "Informações de valor") mostram o plano pronto antes do botão final de "Criar meu plano".
 3. **Esforço que devolve algo visível.** O efeito IKEA só funciona quando o esforço termina em um resultado concluído. Por isso a tela "montando" e o plano são feitos com as respostas, e não são genéricos.
 4. **Uma decisão por tela, um botão primário.** Botão "Continuar" fixo no rodapé, na área do polegar. Todas as telas têm "Voltar" (botão e botão voltar do navegador/Android). Nenhuma tela do funil leva a login.
 5. **Nada de prova social inventada.** Sem avaliação "5,0", sem "20.858 famílias", sem depoimentos. Só entram números que o próprio plano calcula.
-6. **Respostas guardadas no aparelho** (`localStorage`, `larume.onboarding.v1`). Fechar e voltar retoma de onde parou. Nada é enviado ao servidor até a pessoa criar conta; no cadastro, as respostas vão junto e são gravadas em `enxovais.onboarding_profile`.
+6. **Respostas guardadas no aparelho** (`localStorage`, `larume.onboarding.v1`). Fechar e voltar retoma de onde parou. Nada das respostas é enviado ao servidor até o plano ser criado, no fim do funil; nesse momento elas vão junto e são gravadas em `enxovais.onboarding_profile`.
 
 ## Sequência (24 telas, 12 perguntas)
 
@@ -50,7 +51,7 @@ Barra de progresso entre "nome" e "plano pronto". O número de passos muda: "sem
 | 21 | `firstnight` | valor | "A primeira noite de {nome}, resolvida": os itens essenciais para dormir, tomar banho e comer no dia da mudança, por ambiente, com quantidades | — | — |
 | 22 | `schedule` | valor | "Seu cronograma de compras", com datas até a mudança (só se a data foi informada): móveis e eletros grandes, valor médio, resto do essencial, kit da primeira noite e o que fica para depois | — | — |
 | 23 | `compare` | persuasão | "A diferença de ter um plano" (sem plano × com o plano de {nome}) | — | — |
-| 24 | `save` | conta | "Salve o plano de {nome}": e-mail e senha. | e-mail, senha | Cria a conta com o primeiro enxoval já montado. Mostra também o que a conta libera (marcar compras, preço e link, descontos e cashback, compartilhar) |
+| 24 | `save` | confirmação | "O plano de {nome} está pronto para salvar": um botão, sem pedir credenciais (a conta já existe). | — | Cria o primeiro enxoval já montado, na conta logada. Mostra também o que a conta libera (marcar compras, preço e link, descontos e cashback, compartilhar) |
 
 **A origem do visitante** ("onde você ouviu falar da gente?") não vira pergunta: é lida de `utm_source` ou do `referrer`. Pergunta sem retorno para quem responde é só atrito.
 
@@ -128,13 +129,15 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
 - **"Entrar com meu convite":** convite por e-mail exige conta; não há link de convite.
 
 ## Integração
-- **Cadastro:** o passo final chama `POST /api/auth/register` com `enxovalName` e `plan`. O servidor valida o plano antes de criar qualquer coisa (até 15 ambientes, 400 itens, nomes de ambiente no limite do app) e cria usuário, enxoval, membro, ambientes e itens numa única transação. A resposta já traz o enxoval ativo.
-- **Falha no cadastro** (e-mail repetido, rede, validação): a mensagem aparece na própria tela e as respostas continuam no aparelho. Só são apagadas depois que a conta foi criada.
-- **Login:** não usa o plano. As respostas só são lidas pelo funil.
-- **`/signup`:** não existe mais como tela. O endereço antigo redireciona para `/comecar`. `/login` é só entrada: a tela não cria conta.
-- **Landing:** os CTAs "Começar meu enxoval" levam a `/comecar` (ou a `/app` para quem já está logado).
-- **Perfil no banco:** além do plano, o cadastro envia `profile` (as respostas) e o servidor grava em `enxovais.onboarding_profile` (`jsonb`, nulo para enxovais criados antes do funil). Fica de fora o nome, que já está em `users.name`; campos que não fazem parte do perfil (como `cpf`) são ignorados. A validação é **estrita** (`server/onboarding-profile.ts`): resposta obrigatória ausente (momento, data respondida, estado, moradia, moradores, ao menos um espaço, o que já tem, estilo, orçamento) ou valor fora das listas permitidas recusa o cadastro com 400, e nada é descartado em silêncio. O perfil nunca é devolvido pela API. Exemplo de consulta: `SELECT onboarding_profile->>'state', count(*) FROM enxovais GROUP BY 1;`
-- **Verificação no banco:** `npm run test:onboarding-db` registra uma conta com o plano real do funil e confere, em PostgreSQL, usuário, enxoval, cada ambiente e item (nome, descrição, ordem, sem preço nem marcação) e o perfil; também prova que o cadastro direto, sem o funil, e 13 variações de respostas ou plano inválidos são recusados e não deixam usuário, enxoval nem itens pela metade. Hoje nenhuma tela lê o perfil: ele fica guardado para uso futuro.
+- **Cadastro (`/login`, aba "Criar conta"):** chama `POST /api/auth/register` com nome, e-mail e senha. Cria só a conta e a sessão — nenhum enxoval. Em seguida navega para `/comecar`.
+- **Entrar na conta (`/login`, aba "Entrar"):** chama `POST /api/auth/login`. Se a conta ainda não tem nenhum enxoval (cadastro feito, funil não terminado), vai para `/comecar` em vez de `/app`, retomando o funil.
+- **Gate do funil:** `/comecar` chama `GET /api/bootstrap` ao montar. Sem sessão, redireciona para `/login?cadastro=1`. Com sessão e algum enxoval, redireciona para `/app` (já passou pelo funil). Com sessão e zero enxovais, mostra o funil e pré-preenche a pergunta do nome com `user.name`.
+- **Passo final (`save`):** chama `POST /api/enxovais`, autenticado, com `{ name: enxovalName, plan, profile }`. O servidor valida o plano antes de criar qualquer coisa (até 15 ambientes, 400 itens, nomes de ambiente no limite do app) e cria o enxoval, o membro (dono), os ambientes e os itens numa única transação. A resposta já traz o enxoval criado.
+- **Falha ao criar o plano** (rede, validação): a mensagem aparece na própria tela, a conta permanece e as respostas continuam no aparelho para tentar de novo.
+- **`/signup`:** não existe mais como tela. O endereço antigo redireciona para `/comecar` (que, sem sessão, manda para o cadastro).
+- **Landing:** os CTAs "Começar meu enxoval" levam a `/login?cadastro=1` (ou a `/app` para quem já está logado). O link "Entrar" do menu leva a `/login` (aba "Entrar").
+- **Perfil no banco:** `POST /enxovais`, quando recebe `plan`, exige também `profile` (as respostas) e grava em `enxovais.onboarding_profile` (`jsonb`, nulo para enxovais criados sem o funil). Fica de fora o nome, que já está em `users.name`; campos que não fazem parte do perfil (como `cpf`) são ignorados. A validação é **estrita** (`server/onboarding-profile.ts`): resposta obrigatória ausente (momento, data respondida, estado, moradia, moradores, ao menos um espaço, o que já tem, estilo, orçamento) ou valor fora das listas permitidas recusa o pedido com 400, e nada é descartado em silêncio. O perfil nunca é devolvido pela API. Exemplo de consulta: `SELECT onboarding_profile->>'state', count(*) FROM enxovais GROUP BY 1;`
+- **Verificação no banco:** `npm run test:onboarding-db` registra uma conta (sem plano), monta o enxoval do funil autenticado em `POST /enxovais` e confere, em PostgreSQL, usuário, enxoval, cada ambiente e item (nome, descrição, ordem, sem preço nem marcação) e o perfil; também prova que o cadastro simples (sem plano) cria só a conta e que 11 variações de respostas ou plano inválidos em `POST /enxovais` são recusadas e não deixam enxoval nem itens pela metade. Hoje nenhuma tela lê o perfil: ele fica guardado para uso futuro.
 
 ## Arquivos
 
@@ -147,9 +150,9 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
 
 As respostas do funil (estado, data da mudança, faixa de orçamento e as demais) ficam gravadas na conta e podem ser lidas por quem administra o banco; **não são visíveis só para a pessoa**. Por isso:
 
-- A tela de orçamento deixou de dizer "Só você vê isso". Agora diz que a resposta fica no aparelho até a conta ser criada e depois é guardada na conta para dimensionar o plano.
+- A tela de orçamento deixou de dizer "Só você vê isso". Agora diz que a resposta fica no aparelho até o plano ser criado e depois é guardada na conta para dimensionar o plano.
 - A localização continua sendo convertida em estado no aparelho. O texto diz que guardamos só o estado, não a posição.
-- A tela de salvar avisa, antes do botão de criar a conta, que as respostas serão guardadas, e leva à política de privacidade (abre em outra aba, para não perder o formulário).
+- A tela final avisa, antes do botão de criar o plano, que as respostas serão guardadas, e leva à política de privacidade (abre em outra aba, para não perder o formulário).
 - A página `/privacidade` (`src/components/PrivacyPage.tsx`) descreve, só com o que o sistema realmente faz: dados coletados (inclusive as respostas do onboarding), finalidades, quem pode ver (inclusive a equipe de operação), terceiros (Google Fonts), retenção, direitos da LGPD e segurança. O link está no rodapé da landing.
 
 **Pendências antes do lançamento** (a política não é parecer jurídico): informar o contato do responsável pelo tratamento (`PRIVACY_CONTACT` em `PrivacyPage.tsx`; enquanto vazio, a página avisa que o canal será informado), revisar o texto com quem responde juridicamente pelo serviço e definir como a exclusão de conta será atendida (hoje não há exclusão pelo aplicativo; só desativação pelo painel).

@@ -33,7 +33,7 @@ const FAQS = [
   ],
   [
     "O plano gratuito tem prazo para acabar?",
-    "Não. Você começa agora, sem cartão, com 2 cômodos e até 5 itens em cada um. Quando a sua casa crescer, é só abrir as portas dos outros cômodos em um plano pago.",
+    "Não. Você começa agora, sem cartão, com 2 cômodos e até 10 itens em cada um. Quando a sua casa crescer, é só abrir as portas dos outros cômodos em um plano pago.",
   ],
   [
     "Posso montar a lista com outra pessoa?",
@@ -90,7 +90,7 @@ const PLANS: Plan[] = [
     billing: "Para começar agora, sem cartão",
     cta: "Começar Grátis",
     features: [
-      "2 cômodos com até 5 itens cada",
+      "2 cômodos com até 10 itens cada",
       "Lista do Primeiro Dia",
       "3 dicas do Nino por mês",
       "No celular e no computador",
@@ -258,7 +258,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     document.title = "Casa Mia | Enxoval de casa nova";
   }, []);
-  const start = signedIn ? "/app" : "/comecar";
+  const start = signedIn ? "/app" : "/login?cadastro=1";
   const closeMenu = () => setMenuOpen(false);
 
   return (

@@ -449,7 +449,11 @@ async function insertEnxoval(
   return enxovalId;
 }
 
-async function createEnxovalForUser(userId: string, name: string, options: { useDefaultTemplate?: boolean } = {}) {
+async function createEnxovalForUser(
+  userId: string,
+  name: string,
+  options: { useDefaultTemplate?: boolean; plan?: EnxovalPlan | null; profile?: OnboardingProfile | null } = {}
+) {
   return withTransaction(async client => {
     const enxovalId = await insertEnxoval(client, userId, name, options);
     return fetchWorkspace(client, userId, enxovalId);
@@ -800,28 +804,16 @@ export function registerApiRoutes(app: Express) {
     if (password.length > 128) throw new HttpError(400, 'A senha pode ter no máximo 128 caracteres.');
     if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
 
-    // O cadastro só existe pelo funil de onboarding (/comecar): exige o plano e as respostas,
-    // validados por completo antes de criar qualquer coisa.
-    const plan = parsePlan(req.body?.plan);
-    if (!plan) {
-      throw new HttpError(400, 'O cadastro é feito pelo funil de onboarding. Monte o seu plano em /comecar.');
-    }
-    const enxovalName = requireText(req.body?.enxovalName, 'Nome do enxoval');
-    if (enxovalName.length > 100) throw new HttpError(400, 'Nome do enxoval muito longo.');
-    const profile = parseOnboardingProfile(req.body?.profile);
-
+    // O cadastro cria só a conta. O primeiro enxoval (com ou sem o plano do funil /comecar)
+    // é criado depois, autenticado, em POST /enxovais.
     const passwordHash = await hashPassword(password);
     const userId = randomUUID();
 
     try {
-      await withTransaction(async client => {
-        await client.query(`
-          INSERT INTO users (id, name, email, password_hash, last_login_at)
-          VALUES ($1, $2, $3, $4, now())
-        `, [userId, name, email, passwordHash]);
-
-        await insertEnxoval(client, userId, enxovalName, { useDefaultTemplate: false, plan, profile });
-      });
+      await getPool().query(`
+        INSERT INTO users (id, name, email, password_hash, last_login_at)
+        VALUES ($1, $2, $3, $4, now())
+      `, [userId, name, email, passwordHash]);
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
         throw new HttpError(409, 'Já existe uma conta com esse e-mail.');
@@ -949,9 +941,14 @@ export function registerApiRoutes(app: Express) {
   router.post('/enxovais', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     const name = requireText(req.body?.name, 'Nome do enxoval');
+
+    // O enxoval do funil /comecar chega com o plano gerado e as respostas; sem plano, segue o
+    // fluxo normal de "criar novo enxoval" (com ou sem o template padrão).
+    const plan = parsePlan(req.body?.plan);
+    const profile = plan ? parseOnboardingProfile(req.body?.profile) : null;
     const useDefaultTemplate = req.body?.useDefaultTemplate !== false;
 
-    const workspace = await createEnxovalForUser(user.id, name, { useDefaultTemplate });
+    const workspace = await createEnxovalForUser(user.id, name, { useDefaultTemplate, plan, profile });
     res.status(201).json(workspace);
   }));
   router.patch('/enxovais/:id', asyncHandler(async (req, res) => {

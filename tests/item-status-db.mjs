@@ -70,7 +70,11 @@ try {
     name: "Cliente Situação",
     email: "situacao@example.invalid",
     password: randomBytes(16).toString("base64url"),
-    enxovalName: "Casa de teste",
+  });
+  assert.equal(registered.status, 201, JSON.stringify(registered.data));
+  // O cadastro não cria enxoval nenhum; o funil monta o primeiro depois, já autenticado.
+  const funnelWorkspace = await call("/enxovais", "POST", {
+    name: "Casa de teste",
     plan: {
       categories: [
         { name: "Cozinha", items: [{ name: "Panela", description: "Essencial · 4 un." }] },
@@ -92,9 +96,9 @@ try {
       source: "",
     },
   });
-  assert.equal(registered.status, 201, JSON.stringify(registered.data));
-  const enxovalId = registered.data.activeEnxoval.id;
-  const [seeded] = registered.data.items;
+  assert.equal(funnelWorkspace.status, 201, JSON.stringify(funnelWorkspace.data));
+  const enxovalId = funnelWorkspace.data.enxoval.id;
+  const [seeded] = funnelWorkspace.data.items;
   assert.equal(seeded.status, "needed", "itens do plano começam como 'Preciso comprar'");
   assert.equal(seeded.checked, false);
   assert.equal(seeded.quantity, 4, "o funil grava a quantidade citada na descrição (4 un.)");

@@ -89,16 +89,11 @@ export function login(email: string, password: string) {
   });
 }
 
-/** `onboarding` vem do funil /comecar: cria a conta já com o primeiro enxoval pronto. */
-export function register(
-  name: string,
-  email: string,
-  password: string,
-  onboarding?: { enxovalName: string; plan: PlanPayload; profile?: Answers },
-) {
+/** Cria só a conta (sem enxoval). O funil /comecar monta o primeiro enxoval depois, já autenticado. */
+export function register(name: string, email: string, password: string) {
   return request<BootstrapData>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password, ...onboarding }),
+    body: JSON.stringify({ name, email, password }),
   });
 }
 
@@ -169,6 +164,18 @@ export function createEnxoval(name: string, useDefaultTemplate: boolean) {
   return request<EnxovalWorkspace>("/api/enxovais", {
     method: "POST",
     body: JSON.stringify({ name, useDefaultTemplate }),
+  });
+}
+
+/** Passo final do funil /comecar: cria o primeiro enxoval já com o plano gerado e as respostas. */
+export function createEnxovalFromOnboarding(
+  enxovalName: string,
+  plan: PlanPayload,
+  profile: Answers,
+) {
+  return request<EnxovalWorkspace>("/api/enxovais", {
+    method: "POST",
+    body: JSON.stringify({ name: enxovalName, plan, profile }),
   });
 }
 export function updateEnxoval(

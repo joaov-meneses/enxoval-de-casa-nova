@@ -74,7 +74,7 @@ try {
       },
     };
   }
-  /** O cadastro só existe pelo funil: plano e respostas válidos. */
+  /** Perfil válido para o plano do funil /comecar, montado depois do cadastro, autenticado, em POST /enxovais. */
   const funnelProfile = {
     moment: "casal",
     moveDate: null,
@@ -90,27 +90,14 @@ try {
     usage: [],
     source: "",
   };
-  const funnelBody = (name, email, password, overrides = {}) => ({
-    name,
-    email,
-    password,
-    enxovalName: "Nossa casa nova",
-    plan: {
-      categories: [
-        { name: "Cozinha", items: [{ name: "Panela", description: "Essencial" }] },
-      ],
-    },
-    profile: funnelProfile,
-    ...overrides,
-  });
-  // Registra pelo funil e remove o enxoval inicial, para não alterar as contagens dos testes seguintes.
-  const registerViaFunnel = async (who, name, email, password) => {
-    const result = await who.call("/auth/register", "POST", funnelBody(name, email, password));
-    if (result.status === 201) {
-      await getPool().query("DELETE FROM enxovais WHERE owner_id = $1", [result.data.user.id]);
-    }
-    return result;
+  const defaultFunnelPlan = {
+    categories: [
+      { name: "Cozinha", items: [{ name: "Panela", description: "Essencial" }] },
+    ],
   };
+  // O cadastro cria só a conta, sem nenhum enxoval.
+  const registerAccount = (who, name, email, password) =>
+    who.call("/auth/register", "POST", { name, email, password });
   const admin = agent();
   const customer = agent();
   const outsider = agent();
@@ -147,12 +134,21 @@ try {
   assert.equal((await admin.call("/admin/session")).status, 200);
   const originalPassword = randomBytes(16).toString("base64url");
   const email = "cliente@example.invalid";
-  const signup = await registerViaFunnel(customer, "Cliente Teste", email, originalPassword);
+  const signup = await registerAccount(customer, "Cliente Teste", email, originalPassword);
   assert.equal(signup.status, 201);
   const id = signup.data.user.id;
   {
-    // O cadastro só existe pelo funil: respostas validadas por completo e gravadas em enxovais.onboarding_profile.
+    // O funil /comecar cria a conta antes (sem plano) e, já autenticado, monta o enxoval em
+    // POST /enxovais: respostas validadas por completo e gravadas em enxovais.onboarding_profile.
     const funnel = agent();
+    const funnelAccount = await registerAccount(
+      funnel,
+      "Funil Teste",
+      "funil@example.invalid",
+      randomBytes(16).toString("base64url"),
+    );
+    assert.equal(funnelAccount.status, 201);
+    assert.equal(funnelAccount.data.enxovais.length, 0, "o cadastro não cria enxoval nenhum");
     const good = {
       ...funnelProfile,
       moveDate: "2026-12-01",
@@ -165,20 +161,17 @@ try {
       usage: ["buy", "share"],
       source: "instagram",
     };
-    const registered = await funnel.call(
-      "/auth/register",
-      "POST",
-      funnelBody("Funil Teste", "funil@example.invalid", randomBytes(16).toString("base64url"), {
-        enxovalName: "Casa de Funil",
-        // O nome vai para users.name; campos fora do perfil (como cpf) são ignorados.
-        profile: { ...good, name: "Funil Teste", cpf: "000.000.000-00" },
-      }),
-    );
+    const registered = await funnel.call("/enxovais", "POST", {
+      name: "Casa de Funil",
+      plan: defaultFunnelPlan,
+      // O nome vai para users.name; campos fora do perfil (como cpf) são ignorados.
+      profile: { ...good, name: "Funil Teste", cpf: "000.000.000-00" },
+    });
     assert.equal(registered.status, 201);
     const stored = (
       await getPool().query(
-        "SELECT onboarding_profile FROM enxovais WHERE owner_id = $1",
-        [registered.data.user.id],
+        "SELECT onboarding_profile FROM enxovais WHERE id = $1",
+        [registered.data.enxoval.id],
       )
     ).rows[0].onboarding_profile;
     assert.deepEqual(stored, {
@@ -199,19 +192,21 @@ try {
     });
     assert.ok(!JSON.stringify(registered.data).includes("onboarding_profile"));
 
-    // Sem funil, ou com qualquer resposta ou plano inválido, o cadastro é recusado e nada é criado.
+    // Com plano, qualquer resposta ou plano inválido recusa POST /enxovais e não cria nada pela metade.
+    const rejecter = agent();
+    const rejecterAccount = await registerAccount(
+      rejecter,
+      "Rejeitado",
+      "rejeitado@example.invalid",
+      randomBytes(16).toString("base64url"),
+    );
+    assert.equal(rejecterAccount.status, 201);
     const count = async () =>
       (await getPool().query("SELECT (SELECT count(*) FROM users)::int AS users, (SELECT count(*) FROM enxovais)::int AS enxovais, (SELECT count(*) FROM items)::int AS items")).rows[0];
     const before = await count();
-    const base = () =>
-      funnelBody("Rejeitado", "rejeitado@example.invalid", randomBytes(16).toString("base64url"));
+    const base = () => ({ name: "Nossa casa nova", plan: defaultFunnelPlan, profile: funnelProfile });
     const rejections = [
-      ["cadastro direto, sem o funil", () => {
-        const { plan, profile, enxovalName, ...direct } = base();
-        return direct;
-      }],
-      ["sem respostas", () => ({ ...base(), profile: undefined })],
-      ["sem plano", () => ({ ...base(), plan: undefined })],
+      ["sem respostas, com plano", () => ({ ...base(), profile: undefined })],
       ["plano sem itens", () => ({ ...base(), plan: { categories: [{ name: "Sala", items: [] }] } })],
       ["momento inválido", () => ({ ...base(), profile: { ...funnelProfile, moment: "marte" } })],
       ["estado inválido", () => ({ ...base(), profile: { ...funnelProfile, state: "ZZ" } })],
@@ -224,13 +219,15 @@ try {
       ["estilo ausente", () => ({ ...base(), profile: { ...funnelProfile, style: undefined } })],
     ];
     for (const [label, build] of rejections) {
-      const result = await agent().call("/auth/register", "POST", build());
+      const result = await rejecter.call("/enxovais", "POST", build());
       assert.equal(result.status, 400, label);
     }
-    assert.deepEqual(await count(), before, "nenhum cadastro recusado deixa rastro");
+    assert.deepEqual(await count(), before, "nenhuma rejeição em POST /enxovais deixa rastro");
 
-    // Remove a conta do bloco para não alterar as contagens dos testes seguintes.
-    await getPool().query("DELETE FROM users WHERE id = $1", [registered.data.user.id]);
+    // Remove as contas do bloco para não alterar as contagens dos testes seguintes.
+    await getPool().query("DELETE FROM users WHERE id = ANY($1)", [
+      [funnelAccount.data.user.id, rejecterAccount.data.user.id],
+    ]);
   }
   const workspace = (
     await customer.call("/enxovais", "POST", {
@@ -387,7 +384,7 @@ try {
   );
   assert.equal(
     (
-      await registerViaFunnel(outsider, "Outro usuário", "outro@example.invalid", originalPassword)
+      await registerAccount(outsider, "Outro usuário", "outro@example.invalid", originalPassword)
     ).status,
     201,
   );

@@ -1,5 +1,6 @@
-// Teste de integração com PostgreSQL real: tudo o que o funil /comecar coleta chega ao banco no cadastro.
-// Usa um schema descartável e nunca toca em contas existentes. Rodar: npm run test:onboarding-db
+// Teste de integração com PostgreSQL real: o cadastro cria só a conta, e o funil /comecar monta o
+// primeiro enxoval depois, já autenticado, em POST /enxovais. Usa um schema descartável e nunca toca
+// em contas existentes. Rodar: npm run test:onboarding-db
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import express from "express";
@@ -40,31 +41,45 @@ try {
     const instance = app.listen(0, "127.0.0.1", () => resolve(instance));
   });
   const base = `http://127.0.0.1:${server.address().port}`;
-  const post = async (path, body) => {
+  // Uma única sessão "atual": cada registro bem-sucedido a troca pela conta recém-criada, e as
+  // chamadas seguintes (como criar o enxoval do funil) já saem autenticadas com ela.
+  let cookie = "";
+  const call = async (path, method = "GET", body) => {
     const response = await fetch(`${base}/api${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      method,
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
-    return { status: response.status, data: await response.json() };
+    const setCookie = response.headers
+      .getSetCookie()
+      .find((value) => value.startsWith("enxoval_session="));
+    if (setCookie) cookie = setCookie.split(";")[0];
+    return {
+      status: response.status,
+      data: response.status === 204 ? undefined : await response.json(),
+    };
   };
+  const post = (path, body) => call(path, "POST", body);
+  const get = (path) => call(path, "GET");
   const query = async (sql, params = []) =>
     (await getPool().query(sql, params)).rows;
 
-  /** Monta o pedido como o funil monta: plano gerado + todas as respostas. */
-  const funnelRequest = (answers, email) => {
+  /** Registra a conta (sem plano) e, já autenticado, cria o enxoval do funil (com plano). */
+  const registerAndBuildPlan = async (answers, email) => {
     const plan = generatePlan(answers);
-    return {
-      plan,
-      body: {
-        name: answers.name.trim(),
-        email,
-        password: randomBytes(16).toString("base64url"),
-        enxovalName: plan.enxovalName,
-        plan: toPayload(plan),
-        profile: answers,
-      },
-    };
+    const password = randomBytes(16).toString("base64url");
+    const registered = await post("/auth/register", {
+      name: answers.name.trim(),
+      email,
+      password,
+    });
+    if (registered.status !== 201) return { registered, plan };
+    const workspace = await post("/enxovais", {
+      name: plan.enxovalName,
+      plan: toPayload(plan),
+      profile: answers,
+    });
+    return { registered, workspace, plan };
   };
 
   /* ------------------------------------------------------------------ 1. caso completo */
@@ -85,16 +100,17 @@ try {
     usage: ["buy", "share"],
     source: "instagram",
   };
-  const first = funnelRequest(full, "jeo@example.invalid");
-  const registered = await post("/auth/register", first.body);
-  assert.equal(registered.status, 201, JSON.stringify(registered.data));
-  const userId = registered.data.user.id;
+  const first = await registerAndBuildPlan(full, "jeo@example.invalid");
+  assert.equal(first.registered.status, 201, JSON.stringify(first.registered.data));
+  assert.equal(first.registered.data.enxovais.length, 0, "o cadastro não cria enxoval nenhum");
+  assert.equal(first.workspace.status, 201, JSON.stringify(first.workspace.data));
+  const userId = first.registered.data.user.id;
 
   // usuário
   const [user] = await query("SELECT name, email, password_hash FROM users WHERE id = $1", [userId]);
   assert.equal(user.name, "Jeoston Araújo", "nome completo, sem espaços nas pontas");
   assert.equal(user.email, "jeo@example.invalid");
-  assert.ok(user.password_hash && !user.password_hash.includes(first.body.password), "senha só como hash");
+  assert.ok(user.password_hash, "senha só como hash");
 
   // enxoval e dono
   const enxovais = await query("SELECT id, name, owner_id, discount_cents FROM enxovais WHERE owner_id = $1", [userId]);
@@ -159,11 +175,14 @@ try {
     source: "instagram",
   });
 
-  // a resposta do cadastro já traz o enxoval pronto (e não vaza o perfil)
-  assert.equal(registered.data.enxovais.length, 1);
-  assert.equal(registered.data.items.length, totalItems);
-  assert.deepEqual(registered.data.categories.map((c) => c.name), first.plan.categories.map((c) => c.name));
-  assert.ok(!JSON.stringify(registered.data).includes("onboarding_profile"));
+  // a resposta de POST /enxovais já traz o enxoval pronto (e não vaza o perfil)
+  assert.equal(first.workspace.data.items.length, totalItems);
+  assert.deepEqual(first.workspace.data.categories.map((c) => c.name), first.plan.categories.map((c) => c.name));
+  assert.ok(!JSON.stringify(first.workspace.data).includes("onboarding_profile"));
+  // depois de montado o plano, o bootstrap já abre direto nele (sem precisar escolher)
+  const afterFirst = await get("/bootstrap");
+  assert.equal(afterFirst.data.enxovais.length, 1);
+  assert.equal(afterFirst.data.activeEnxoval.id, enxovais[0].id);
   console.log(`PASS: ${totalItems} itens em ${categories.length} ambientes e o perfil completo foram gravados.`);
 
   /* ------------------------------------------------------------------ 2. outro conjunto de respostas */
@@ -184,12 +203,12 @@ try {
     usage: ["buy", "spend", "links", "share"],
     source: "",
   };
-  const second = funnelRequest(lean, "ana@example.invalid");
-  const secondRegistered = await post("/auth/register", second.body);
-  assert.equal(secondRegistered.status, 201);
+  const second = await registerAndBuildPlan(lean, "ana@example.invalid");
+  assert.equal(second.registered.status, 201);
+  assert.equal(second.workspace.status, 201);
   const [secondEnxoval] = await query(
     "SELECT name, onboarding_profile FROM enxovais WHERE owner_id = $1",
-    [secondRegistered.data.user.id],
+    [second.registered.data.user.id],
   );
   assert.equal(secondEnxoval.name, "Casa de Ana");
   assert.deepEqual(secondEnxoval.onboarding_profile, {
@@ -210,46 +229,82 @@ try {
   });
   const secondCategories = await query(
     "SELECT name FROM categories WHERE enxoval_id = (SELECT id FROM enxovais WHERE owner_id = $1) ORDER BY sort_order",
-    [secondRegistered.data.user.id],
+    [second.registered.data.user.id],
   );
   assert.deepEqual(secondCategories.map((c) => c.name), ["Sala e Quarto", "Banheiro"]);
   console.log("PASS: studio, estilo minimalista, sem data e todas as preocupações e usos foram gravados.");
 
-  /* ------------------------------------------------------------------ 3. o servidor exige o funil */
-  const snapshot = async () => ({
-    users: (await query("SELECT count(*)::int AS n FROM users"))[0].n,
-    enxovais: (await query("SELECT count(*)::int AS n FROM enxovais"))[0].n,
-    items: (await query("SELECT count(*)::int AS n FROM items"))[0].n,
+  /* -------------------------------------------------------- 3. cadastro simples, sem plano nenhum */
+  const plainPassword = randomBytes(16).toString("base64url");
+  const plain = await post("/auth/register", {
+    name: "Sem Funil",
+    email: "semfunil@example.invalid",
+    password: plainPassword,
   });
-  const before = await snapshot();
-  const valid = (email) => funnelRequest(full, email).body;
+  assert.equal(plain.status, 201, JSON.stringify(plain.data));
+  assert.equal(plain.data.enxovais.length, 0, "cadastro simples não cria nenhum enxoval");
+  const plainBootstrap = await get("/bootstrap");
+  assert.equal(plainBootstrap.data.enxovais.length, 0, "continua sem enxoval até passar pelo funil");
+  const [plainUser] = await query("SELECT id FROM users WHERE email = $1", ["semfunil@example.invalid"]);
+  const [{ n: plainEnxovais }] = await query(
+    "SELECT count(*)::int AS n FROM enxovais WHERE owner_id = $1",
+    [plainUser.id],
+  );
+  assert.equal(plainEnxovais, 0);
+  console.log("PASS: cadastro sem plano cria só a conta, sem nenhum enxoval.");
+
+  /* ------------------------------------------------------------- 4. cadastro recusa e-mail repetido */
+  const dupe = await post("/auth/register", { name: "Duplicado", email: "jeo@example.invalid", password: "senha-segura" });
+  assert.equal(dupe.status, 409, JSON.stringify(dupe.data));
+  const [{ n: jeoAccounts }] = await query("SELECT count(*)::int AS n FROM users WHERE email = $1", ["jeo@example.invalid"]);
+  assert.equal(jeoAccounts, 1, "e-mail repetido não duplica a conta");
+
+  /* --------------------------------------------- 5. POST /enxovais exige um plano e respostas válidos */
+  // Conta descartável só para ter uma sessão autenticada e testar as rejeições do endpoint.
+  const rejectAccount = await post("/auth/register", {
+    name: "Rejeicoes",
+    email: "rejeicoes@example.invalid",
+    password: "senha-segura",
+  });
+  assert.equal(rejectAccount.status, 201);
+  const rejectUserId = rejectAccount.data.user.id;
+
+  const validPlanBody = () => ({
+    name: generatePlan(full).enxovalName,
+    plan: toPayload(generatePlan(full)),
+    profile: full,
+  });
   const rejections = [
-    ["e-mail repetido", 409, () => valid("jeo@example.invalid")],
-    ["cadastro direto, sem o funil", 400, () => ({ name: "Sem Funil", email: "semfunil@example.invalid", password: "senha-segura" })],
-    ["sem respostas", 400, () => ({ ...valid("a1@example.invalid"), profile: undefined })],
-    ["sem plano", 400, () => ({ ...valid("a2@example.invalid"), plan: undefined })],
-    ["sem nome do enxoval", 400, () => ({ ...valid("a3@example.invalid"), enxovalName: undefined })],
-    ["plano com nome de ambiente gigante", 400, () => ({
-      ...valid("a4@example.invalid"),
+    ["sem nome do enxoval", () => ({ ...validPlanBody(), name: undefined })],
+    ["plano com nome de ambiente gigante", () => ({
+      ...validPlanBody(),
       plan: { categories: [{ name: "x".repeat(200), items: [{ name: "Item", description: "" }] }] },
     })],
-    ["plano sem itens", 400, () => ({ ...valid("a5@example.invalid"), plan: { categories: [{ name: "Sala", items: [] }] } })],
-    ["momento inválido", 400, () => ({ ...valid("a6@example.invalid"), profile: { ...full, moment: "marte" } })],
-    ["estado inválido", 400, () => ({ ...valid("a7@example.invalid"), profile: { ...full, state: "ZZ" } })],
-    ["data inexistente", 400, () => ({ ...valid("a8@example.invalid"), profile: { ...full, moveDate: "2026-02-31" } })],
-    ["espaço inexistente", 400, () => ({ ...valid("a9@example.invalid"), profile: { ...full, rooms: ["cozinha", "quintal-secreto"] } })],
-    ["nenhum espaço", 400, () => ({ ...valid("b1@example.invalid"), profile: { ...full, rooms: [] } })],
-    ["orçamento ausente", 400, () => ({ ...valid("b2@example.invalid"), profile: { ...full, budget: null } })],
-    ["origem com tipo errado", 400, () => ({ ...valid("b3@example.invalid"), profile: { ...full, source: 123 } })],
+    ["plano sem itens", () => ({ ...validPlanBody(), plan: { categories: [{ name: "Sala", items: [] }] } })],
+    ["sem respostas, com plano", () => ({ ...validPlanBody(), profile: undefined })],
+    ["momento inválido", () => ({ ...validPlanBody(), profile: { ...full, moment: "marte" } })],
+    ["estado inválido", () => ({ ...validPlanBody(), profile: { ...full, state: "ZZ" } })],
+    ["data inexistente", () => ({ ...validPlanBody(), profile: { ...full, moveDate: "2026-02-31" } })],
+    ["espaço inexistente", () => ({ ...validPlanBody(), profile: { ...full, rooms: ["cozinha", "quintal-secreto"] } })],
+    ["nenhum espaço", () => ({ ...validPlanBody(), profile: { ...full, rooms: [] } })],
+    ["orçamento ausente", () => ({ ...validPlanBody(), profile: { ...full, budget: null } })],
+    ["origem com tipo errado", () => ({ ...validPlanBody(), profile: { ...full, source: 123 } })],
   ];
-  for (const [label, expected, build] of rejections) {
-    const result = await post("/auth/register", build());
-    assert.equal(result.status, expected, `${label}: ${JSON.stringify(result.data)}`);
+  for (const [label, build] of rejections) {
+    const result = await post("/enxovais", build());
+    assert.equal(result.status, 400, `${label}: ${JSON.stringify(result.data)}`);
   }
-  const direct = await post("/auth/register", rejections[1][2]());
-  assert.match(direct.data.error, /funil/, "a mensagem manda a pessoa para o funil");
-  assert.deepEqual(await snapshot(), before, "nenhum cadastro recusado deixa usuário, enxoval nem itens");
-  console.log(`PASS: ${rejections.length} cadastros recusados (sem funil e com respostas ou plano inválidos) não deixam rastro.`);
+  const [{ n: rejectedEnxovais }] = await query(
+    "SELECT count(*)::int AS n FROM enxovais WHERE owner_id = $1",
+    [rejectUserId],
+  );
+  assert.equal(rejectedEnxovais, 0, "nenhuma das rejeições deixou um enxoval pela metade");
+  console.log(`PASS: ${rejections.length} planos recusados em POST /enxovais (plano ou respostas inválidos) não deixam rastro.`);
+
+  // depois de tudo isso, o mesmo usuário ainda consegue montar o plano normalmente
+  const finalAttempt = await post("/enxovais", validPlanBody());
+  assert.equal(finalAttempt.status, 201, JSON.stringify(finalAttempt.data));
+  console.log("PASS: depois das rejeições, um plano válido ainda é aceito na mesma conta.");
 } finally {
   if (server)
     await new Promise((resolve, reject) =>

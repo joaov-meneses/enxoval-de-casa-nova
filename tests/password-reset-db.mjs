@@ -85,12 +85,6 @@ try {
     name: "Ana <b>Reset</b>",
     email,
     password: oldPassword,
-    enxovalName: "Casa de teste",
-    plan: { categories: [{ name: "Cozinha", items: [{ name: "Panela", description: "Essencial" }] }] },
-    profile: {
-      moment: "casal", moveDate: null, moveDateAnswered: true, state: "SP", housing: "apartamento",
-      people: 2, rooms: ["cozinha"], owned: "nada", style: "full", budget: "unknown", worries: [], usage: [], source: "",
-    },
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
   const forgot = (anyEmail) => agent().call("/auth/forgot-password", "POST", { email: anyEmail });
