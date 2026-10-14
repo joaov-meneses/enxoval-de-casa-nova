@@ -322,9 +322,14 @@ export default function OnboardingFlow() {
           window.location.replace("/app");
           return;
         }
+        // O cadastro não pede o nome: sem ele a conta usa o começo do e-mail como nome provisório,
+        // que não serve de sugestão. Só pré-preenche quando o nome é de verdade.
+        const provisional = data.user.email.split("@")[0];
         setAnswers((current) => ({
           ...current,
-          name: current.name || data.user.name,
+          name:
+            current.name ||
+            (data.user.name === provisional ? "" : data.user.name),
         }));
         setGate("open");
       })
@@ -2079,7 +2084,12 @@ function SaveStep({
     setError("");
     track("signup_submit");
     try {
-      await createEnxovalFromOnboarding(plan.enxovalName, payload, profile);
+      await createEnxovalFromOnboarding(
+        plan.enxovalName,
+        payload,
+        profile,
+        answers.name.trim(),
+      );
       clearOnboarding();
       track("signup_success");
       window.location.assign("/app");

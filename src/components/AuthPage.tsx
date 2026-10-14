@@ -258,19 +258,23 @@ function LoginPanel({
 }
 
 function RegisterPanel() {
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (password !== confirmation) {
+      setError("As senhas não coincidem.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
-      await register(name.trim(), email.trim(), password);
+      await register(email.trim(), password);
       // Conta criada: o funil de perguntas monta o plano e o primeiro enxoval a seguir.
       window.location.assign("/comecar");
     } catch (err) {
@@ -293,19 +297,6 @@ function RegisterPanel() {
       <h1>Crie sua conta grátis.</h1>
       <p>Depois de criar a conta, você monta o plano da sua casa nova.</p>
       <form onSubmit={submit} className="auth-form">
-        <label htmlFor="register-name">
-          Seu nome
-          <input
-            type="text"
-            id="register-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Como podemos te chamar?"
-            autoComplete="given-name"
-            maxLength={80}
-            required
-          />
-        </label>
         <label htmlFor="register-email">
           Seu e-mail
           <input
@@ -325,7 +316,10 @@ function RegisterPanel() {
               type={visible ? "text" : "password"}
               id="register-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError("");
+              }}
               placeholder="6 ou mais caracteres"
               autoComplete="new-password"
               minLength={6}
@@ -338,6 +332,24 @@ function RegisterPanel() {
             >
               {visible ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
+          </span>
+        </label>
+        <label htmlFor="register-password-confirmation">
+          Confirme a senha
+          <span className="password-field">
+            <input
+              type={visible ? "text" : "password"}
+              id="register-password-confirmation"
+              value={confirmation}
+              onChange={(e) => {
+                setConfirmation(e.target.value);
+                setError("");
+              }}
+              placeholder="Repita a senha"
+              autoComplete="new-password"
+              aria-invalid={confirmation !== "" && confirmation !== password}
+              required
+            />
           </span>
         </label>
         {error && (

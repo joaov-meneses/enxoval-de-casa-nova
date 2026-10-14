@@ -6,8 +6,8 @@ A pessoa cria a conta primeiro (`/login`, aba "Criar conta") e só depois respon
 
 - `/comecar` exige sessão: sem conta, redireciona para `/login?cadastro=1` (aba "Criar conta" já aberta).
 - Quem já tem ao menos um enxoval (já passou pelo funil, ou criou um enxoval de outro jeito) é redirecionado de `/comecar` para `/app` — o funil não se repete.
-- `/login` tem as duas abas, **Entrar** e **Criar conta**, na mesma tela. Criar conta pede nome, e-mail e senha; o próximo passo é sempre `/comecar`.
-- O cadastro (`POST /api/auth/register`) cria **só a conta**, sem nenhum enxoval. O primeiro enxoval (com o plano do funil, ou com o template padrão) é criado depois, autenticado, em `POST /api/enxovais`.
+- `/login` tem as duas abas, **Entrar** e **Criar conta**, na mesma tela. Criar conta pede só e-mail, senha e confirmação da senha (o nome é perguntado no funil, no passo `name`); o próximo passo é sempre `/comecar`.
+- O cadastro (`POST /api/auth/register`) cria **só a conta**, sem nenhum enxoval e sem nome (a conta usa o começo do e-mail como nome provisório até o funil terminar). O primeiro enxoval (com o plano do funil, ou com o template padrão) é criado depois, autenticado, em `POST /api/enxovais`.
 - Quem cria a conta e sai no meio do funil pode voltar: ao entrar de novo em `/login` (aba Entrar) com zero enxovais, o login manda para `/comecar` em vez de `/app`.
 - `POST /api/enxovais` aceita opcionalmente `plan` (ao menos um item) e `profile` (as respostas do funil); com `plan` presente, o perfil é validado por completo e qualquer valor fora do permitido responde 400 sem criar nada. Sem `plan`, segue o fluxo normal de "criar enxoval" (com ou sem o template padrão).
 
@@ -51,7 +51,7 @@ Barra de progresso entre "nome" e "plano pronto". O número de passos muda: "sem
 | 21 | `firstnight` | valor | "A primeira noite de {nome}, resolvida": os itens essenciais para dormir, tomar banho e comer no dia da mudança, por ambiente, com quantidades | — | — |
 | 22 | `schedule` | valor | "Seu cronograma de compras", com datas até a mudança (só se a data foi informada): móveis e eletros grandes, valor médio, resto do essencial, kit da primeira noite e o que fica para depois | — | — |
 | 23 | `compare` | persuasão | "A diferença de ter um plano" (sem plano × com o plano de {nome}) | — | — |
-| 24 | `save` | confirmação | "O plano de {nome} está pronto para salvar": um botão, sem pedir credenciais (a conta já existe). | — | Cria o primeiro enxoval já montado, na conta logada. Mostra também o que a conta libera (marcar compras, preço e link, descontos e cashback, compartilhar) |
+| 24 | `save` | confirmação | "O plano de {nome} está pronto para salvar": um botão, sem pedir credenciais (a conta já existe). | — | Cria o primeiro enxoval já montado, na conta logada, e grava o nome informado em `users.name`. Mostra também o que a conta libera (marcar compras, preço e link, descontos e cashback, compartilhar) |
 
 **A origem do visitante** ("onde você ouviu falar da gente?") não vira pergunta: é lida de `utm_source` ou do `referrer`. Pergunta sem retorno para quem responde é só atrito.
 
@@ -129,10 +129,10 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
 - **"Entrar com meu convite":** convite por e-mail exige conta; não há link de convite.
 
 ## Integração
-- **Cadastro (`/login`, aba "Criar conta"):** chama `POST /api/auth/register` com nome, e-mail e senha. Cria só a conta e a sessão — nenhum enxoval. Em seguida navega para `/comecar`.
+- **Cadastro (`/login`, aba "Criar conta"):** chama `POST /api/auth/register` com e-mail e senha (a confirmação é conferida só na tela). Cria só a conta e a sessão — nenhum enxoval. Em seguida navega para `/comecar`.
 - **Entrar na conta (`/login`, aba "Entrar"):** chama `POST /api/auth/login`. Se a conta ainda não tem nenhum enxoval (cadastro feito, funil não terminado), vai para `/comecar` em vez de `/app`, retomando o funil.
-- **Gate do funil:** `/comecar` chama `GET /api/bootstrap` ao montar. Sem sessão, redireciona para `/login?cadastro=1`. Com sessão e algum enxoval, redireciona para `/app` (já passou pelo funil). Com sessão e zero enxovais, mostra o funil e pré-preenche a pergunta do nome com `user.name`.
-- **Passo final (`save`):** chama `POST /api/enxovais`, autenticado, com `{ name: enxovalName, plan, profile }`. O servidor valida o plano antes de criar qualquer coisa (até 15 ambientes, 400 itens, nomes de ambiente no limite do app) e cria o enxoval, o membro (dono), os ambientes e os itens numa única transação. A resposta já traz o enxoval criado.
+- **Gate do funil:** `/comecar` chama `GET /api/bootstrap` ao montar. Sem sessão, redireciona para `/login?cadastro=1`. Com sessão e algum enxoval, redireciona para `/app` (já passou pelo funil). Com sessão e zero enxovais, mostra o funil e pré-preenche a pergunta do nome com `user.name`, exceto quando ele é só o nome provisório (começo do e-mail).
+- **Passo final (`save`):** chama `POST /api/enxovais`, autenticado, com `{ name: enxovalName, plan, profile, userName }`. `userName` (2–40 caracteres; validado quando vem junto do plano) é gravado em `users.name` na mesma transação que cria o enxoval. O servidor valida o plano antes de criar qualquer coisa (até 15 ambientes, 400 itens, nomes de ambiente no limite do app) e cria o enxoval, o membro (dono), os ambientes e os itens numa única transação. A resposta já traz o enxoval criado.
 - **Falha ao criar o plano** (rede, validação): a mensagem aparece na própria tela, a conta permanece e as respostas continuam no aparelho para tentar de novo.
 - **`/signup`:** não existe mais como tela. O endereço antigo redireciona para `/comecar` (que, sem sessão, manda para o cadastro).
 - **Landing:** os CTAs "Começar meu enxoval" levam a `/login?cadastro=1` (ou a `/app` para quem já está logado). O link "Entrar" do menu leva a `/login` (aba "Entrar").

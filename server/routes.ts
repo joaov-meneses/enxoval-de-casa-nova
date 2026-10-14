@@ -476,12 +476,22 @@ async function insertEnxoval(
   return enxovalId;
 }
 
+function parseUserName(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const name = typeof value === 'string' ? value.trim() : '';
+  if (name.length < 2 || name.length > 40) throw new HttpError(400, 'Informe um nome de 2 a 40 caracteres.');
+  return name;
+}
+
 async function createEnxovalForUser(
   userId: string,
   name: string,
-  options: { useDefaultTemplate?: boolean; plan?: EnxovalPlan | null; profile?: OnboardingProfile | null } = {}
+  options: { useDefaultTemplate?: boolean; plan?: EnxovalPlan | null; profile?: OnboardingProfile | null; userName?: string | null } = {}
 ) {
   return withTransaction(async client => {
+    if (options.userName) {
+      await client.query('UPDATE users SET name = $1 WHERE id = $2', [options.userName, userId]);
+    }
     const enxovalId = await insertEnxoval(client, userId, name, options);
     return fetchWorkspace(client, userId, enxovalId);
   });
@@ -975,8 +985,10 @@ export function registerApiRoutes(app: Express) {
     const plan = parsePlan(req.body?.plan);
     const profile = plan ? parseOnboardingProfile(req.body?.profile) : null;
     const useDefaultTemplate = req.body?.useDefaultTemplate !== false;
+    // O cadastro não pede o nome; o funil pergunta e ele chega aqui, junto do plano.
+    const userName = plan ? parseUserName(req.body?.userName) : null;
 
-    const workspace = await createEnxovalForUser(user.id, name, { useDefaultTemplate, plan, profile });
+    const workspace = await createEnxovalForUser(user.id, name, { useDefaultTemplate, plan, profile, userName });
     res.status(201).json(workspace);
   }));
   router.patch('/enxovais/:id', asyncHandler(async (req, res) => {

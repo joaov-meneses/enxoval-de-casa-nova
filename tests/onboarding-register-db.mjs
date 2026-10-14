@@ -68,16 +68,14 @@ try {
   const registerAndBuildPlan = async (answers, email) => {
     const plan = generatePlan(answers);
     const password = randomBytes(16).toString("base64url");
-    const registered = await post("/auth/register", {
-      name: answers.name.trim(),
-      email,
-      password,
-    });
+    // O cadastro não pede o nome: ele vem do funil, junto do plano.
+    const registered = await post("/auth/register", { email, password });
     if (registered.status !== 201) return { registered, plan };
     const workspace = await post("/enxovais", {
       name: plan.enxovalName,
       plan: toPayload(plan),
       profile: answers,
+      userName: answers.name,
     });
     return { registered, workspace, plan };
   };
@@ -103,6 +101,7 @@ try {
   const first = await registerAndBuildPlan(full, "jeo@example.invalid");
   assert.equal(first.registered.status, 201, JSON.stringify(first.registered.data));
   assert.equal(first.registered.data.enxovais.length, 0, "o cadastro não cria enxoval nenhum");
+  assert.equal(first.registered.data.user.name, "jeo", "sem nome no cadastro, a conta usa o começo do e-mail até o funil");
   assert.equal(first.workspace.status, 201, JSON.stringify(first.workspace.data));
   const userId = first.registered.data.user.id;
 
@@ -282,6 +281,8 @@ try {
     })],
     ["plano sem itens", () => ({ ...validPlanBody(), plan: { categories: [{ name: "Sala", items: [] }] } })],
     ["sem respostas, com plano", () => ({ ...validPlanBody(), profile: undefined })],
+    ["nome de uma letra", () => ({ ...validPlanBody(), userName: "A" })],
+    ["nome gigante", () => ({ ...validPlanBody(), userName: "x".repeat(41) })],
     ["momento inválido", () => ({ ...validPlanBody(), profile: { ...full, moment: "marte" } })],
     ["estado inválido", () => ({ ...validPlanBody(), profile: { ...full, state: "ZZ" } })],
     ["data inexistente", () => ({ ...validPlanBody(), profile: { ...full, moveDate: "2026-02-31" } })],

@@ -91,11 +91,11 @@ export function login(email: string, password: string) {
   });
 }
 
-/** Cria só a conta (sem enxoval). O funil /comecar monta o primeiro enxoval depois, já autenticado. */
-export function register(name: string, email: string, password: string) {
+/** Cria só a conta (sem enxoval, e sem nome: o funil /comecar pergunta o nome e monta o primeiro enxoval depois, já autenticado). */
+export function register(email: string, password: string) {
   return request<BootstrapData>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ email, password }),
   });
 }
 
@@ -174,10 +174,11 @@ export function createEnxovalFromOnboarding(
   enxovalName: string,
   plan: PlanPayload,
   profile: Answers,
+  userName: string,
 ) {
   return request<EnxovalWorkspace>("/api/enxovais", {
     method: "POST",
-    body: JSON.stringify({ name: enxovalName, plan, profile }),
+    body: JSON.stringify({ name: enxovalName, plan, profile, userName }),
   });
 }
 export function updateEnxoval(
