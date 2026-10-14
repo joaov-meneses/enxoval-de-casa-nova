@@ -75,12 +75,15 @@ try {
   };
   const register = async (name, email, password, enxovalName) => {
     const person = agent();
-    const result = await person.call("/auth/register", "POST", {
-      name, email, password, enxovalName, profile,
+    // O cadastro cria só a conta; o enxoval nasce depois, já autenticado.
+    const account = await person.call("/auth/register", "POST", { name, email, password });
+    assert.equal(account.status, 201, JSON.stringify(account.data));
+    const workspace = await person.call("/enxovais", "POST", {
+      name: enxovalName, profile,
       plan: { categories: [{ name: "Cozinha", items: [{ name: "Panela", description: "Essencial" }] }] },
     });
-    assert.equal(result.status, 201, JSON.stringify(result.data));
-    return { person, enxovalId: result.data.activeEnxoval.id, id: result.data.user.id };
+    assert.equal(workspace.status, 201, JSON.stringify(workspace.data));
+    return { person, enxovalId: workspace.data.enxoval.id, id: account.data.user.id };
   };
 
   const password = randomBytes(12).toString("base64url");
