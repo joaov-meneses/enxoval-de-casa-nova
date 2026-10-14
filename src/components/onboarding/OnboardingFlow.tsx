@@ -334,7 +334,7 @@ export default function OnboardingFlow() {
         setGate("open");
       })
       .catch(() => {
-        if (active) window.location.replace("/login?cadastro=1");
+        if (active) window.location.replace("/cadastro");
       });
     return () => {
       active = false;

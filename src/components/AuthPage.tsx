@@ -16,15 +16,14 @@ import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
 
 type AuthMode = "login" | "register";
 
-/** `?cadastro=1` abre a tela já na aba de criar conta (usado pelo CTA "Começar Grátis" da landing). */
+const MODE_PATH: Record<AuthMode, string> = {
+  login: "/login",
+  register: "/cadastro",
+};
+
+/** `/cadastro` abre a tela já na aba de criar conta (usado pelo CTA "Começar Grátis" da landing). */
 function initialMode(): AuthMode {
-  try {
-    return new URLSearchParams(window.location.search).get("cadastro")
-      ? "register"
-      : "login";
-  } catch {
-    return "login";
-  }
+  return window.location.pathname === MODE_PATH.register ? "register" : "login";
 }
 
 export function AuthPage({
@@ -35,7 +34,13 @@ export function AuthPage({
     options?: { promptCreateEnxoval?: boolean },
   ) => void;
 }) {
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  const [mode, setModeState] = useState<AuthMode>(initialMode);
+  // Ao trocar de aba, a URL acompanha (para recarregar ou compartilhar manter a aba). Na abertura
+  // ela não muda, para não perder o endereço de quem chegou aqui vindo de outra rota.
+  const setMode = (next: AuthMode) => {
+    setModeState(next);
+    window.history.replaceState({}, "", MODE_PATH[next]);
+  };
   useEffect(() => {
     document.title =
       mode === "register"

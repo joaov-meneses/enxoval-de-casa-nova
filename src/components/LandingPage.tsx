@@ -258,7 +258,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     document.title = "Casa Mia | Enxoval de casa nova";
   }, []);
-  const start = signedIn ? "/app" : "/login?cadastro=1";
+  const start = signedIn ? "/app" : "/cadastro";
   const closeMenu = () => setMenuOpen(false);
 
   return (

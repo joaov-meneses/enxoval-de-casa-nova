@@ -5,8 +5,8 @@ Seu lar começa com um plano. Aplicativo React + Express para planejar um enxova
 ## Rotas
 
 - `/`: landing page com recursos, planos e perguntas frequentes.
-- `/login`: entrada na conta. `/signup` redireciona para `/comecar`.
-- `/comecar`: única porta de cadastro. Faz perguntas curtas, monta o plano de enxoval e cria a conta já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md).
+- `/login` e `/cadastro`: a mesma tela, com as abas "Entrar" e "Criar conta" (`/cadastro` abre na segunda). `/login?cadastro=1` e `/signup` ficam como atalhos antigos: o primeiro vai para `/cadastro`, o segundo para `/comecar`.
+- `/comecar`: funil pós-cadastro (exige conta e nenhum enxoval ainda). Pergunta o nome e perguntas curtas, monta o plano e cria o primeiro enxoval já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md).
 - `/app`: aplicativo conectado à conta.
 
 O produto exige conta e servidor completo (com PostgreSQL): não existe modo de demonstração nem prévia sem banco.

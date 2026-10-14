@@ -12,6 +12,14 @@ import './index.css';
 // /signup antigo: a conta só é criada no fim do funil de onboarding.
 if (window.location.pathname === '/signup') window.history.replaceState({}, '', '/comecar');
 
+// /login?cadastro=1 antigo: o cadastro agora tem rota própria.
+if (
+  window.location.pathname === '/login' &&
+  new URLSearchParams(window.location.search).has('cadastro')
+) {
+  window.history.replaceState({}, '', '/cadastro');
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {/^\/admin(?:\/|$)/.test(window.location.pathname) ? (
