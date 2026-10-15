@@ -693,7 +693,7 @@
   display: none;
 }
 .workspace-menu-help {
-  margin: 0 0 4px;
+  margin: 14px 0 0;
 }
 .workspace-menu-help button {
   display: flex;

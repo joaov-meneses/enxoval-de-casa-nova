@@ -96,17 +96,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           </button>
         </div>
         <div className="workspace-menu-content">
-          <div className="workspace-menu-help">
-            <button type="button" onClick={() => run(props.onHelp)}>
-              <span className="workspace-menu-help-icon" aria-hidden="true">
-                <MessageCircleHeart size={20} />
-              </span>
-              <span className="workspace-menu-help-text">
-                <strong>Central de ajuda</strong>
-                <small>Relate um problema ou sugira uma melhoria</small>
-              </span>
-            </button>
-          </div>
           <section
             className="workspace-menu-switcher"
             aria-label="Seus enxovais"
@@ -254,9 +243,19 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               >
                 <Trash2 size={18} /> Excluir enxoval
               </button>
-              <p>Você confirma antes de excluir.</p>
             </div>
           )}
+          <div className="workspace-menu-help">
+            <button type="button" onClick={() => run(props.onHelp)}>
+              <span className="workspace-menu-help-icon" aria-hidden="true">
+                <MessageCircleHeart size={20} />
+              </span>
+              <span className="workspace-menu-help-text">
+                <strong>Central de ajuda</strong>
+                <small>Relate um problema ou sugira uma melhoria</small>
+              </span>
+            </button>
+          </div>
         </div>
         <div className="workspace-menu-account">
           <span className="workspace-menu-avatar">
