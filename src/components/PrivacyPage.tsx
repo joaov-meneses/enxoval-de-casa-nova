@@ -110,6 +110,12 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           armazenam os dados em nosso nome. As fontes de texto são carregadas do
           Google Fonts, que recebe o endereço IP do seu navegador ao entregá-las.
         </p>
+        <p>
+          Quando a ajuda do Nino está ativa, enviamos à TypeSafe AI (que opera o modelo
+          Jev) apenas o necessário para a sugestão: o nome do item e dos ambientes, o
+          tipo de moradia, o número de moradores, o estado, o perfil de gasto e o prazo
+          da mudança. Nunca enviamos o seu nome, e-mail ou senha.
+        </p>
       </>
     ),
   },

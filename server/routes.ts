@@ -10,6 +10,8 @@ import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, rateLimit, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
 import { registerFeedbackRoutes } from './feedback.ts';
+import { registerAiRoutes } from './ai.ts';
+import { urgencyKey } from './services/jev.ts';
 import { appBaseUrl, canDeliverMail, invitationEmail, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 import { isPriceCategory, isSpendingTier, type PriceCategory, type SpendingTier } from '../src/planning/spending.ts';
@@ -85,6 +87,9 @@ interface ItemRow {
   quantity: number;
   sort_order: number;
   buy_week: number | null;
+  ai_urgency: number | null;
+  ai_urgency_confidence: number | null;
+  ai_urgency_key: string | null;
   price_category: number | null;
   priority: ItemPriority | null;
   timing: ItemTiming | null;
@@ -227,6 +232,10 @@ function mapPriceTracking(row: ItemRow): ItemPriceTracking | null {
   };
 }
 
+function hasValidUrgency(row: ItemRow) {
+  return row.ai_urgency !== null && row.ai_urgency !== undefined && row.ai_urgency_key === urgencyKey(row.name, row.category);
+}
+
 function mapItem(row: ItemRow): EnxovalItem {
   return {
     id: row.id,
@@ -242,6 +251,9 @@ function mapItem(row: ItemRow): EnxovalItem {
     discountCents: Number(row.discount_cents ?? 0),
     sortOrder: row.sort_order,
     buyWeek: row.buy_week === null || row.buy_week === undefined ? null : Number(row.buy_week),
+    // A nota do Jev só vale para o nome e o ambiente em que foi inferida.
+    aiUrgency: hasValidUrgency(row) ? Number(row.ai_urgency) : null,
+    aiUrgencyConfidence: hasValidUrgency(row) ? Number(row.ai_urgency_confidence ?? 0) : null,
     priceCategory: isPriceCategory(Number(row.price_category)) ? Number(row.price_category) as PriceCategory : null,
     priority: row.priority ?? null,
     timing: row.timing ?? null,
@@ -270,6 +282,9 @@ const ITEM_SELECT = `
     i.quantity,
     i.sort_order,
     i.buy_week,
+    i.ai_urgency,
+    i.ai_urgency_confidence,
+    i.ai_urgency_key,
     i.price_category,
     i.priority,
     i.timing,
@@ -1032,6 +1047,7 @@ export function registerApiRoutes(app: Express) {
   router.use(protectMutationOrigin);
   registerAdminRoutes(router);
   registerFeedbackRoutes(router, requireCurrentUser);
+  registerAiRoutes(router, { requireUser: requireCurrentUser, fetchItems, fetchCategories });
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true });

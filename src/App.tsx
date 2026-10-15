@@ -2474,6 +2474,7 @@ export default function App() {
         onAdd={addItem}
         defaultCategoryId={activeCategory?.id ?? ""}
         categories={categories}
+        enxovalId={activeEnxoval?.id}
       />
 
       <Dialog

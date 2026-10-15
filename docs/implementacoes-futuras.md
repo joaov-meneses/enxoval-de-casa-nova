@@ -122,6 +122,14 @@ Esta fase monetiza a plataforma, implementando as regras de limite do plano grat
 
 Esta fase transforma o Casa Mia em um assistente proativo que pensa com inteligência prescritiva.
 
+> **Status:** a base está implementada e fica desligada até existir `TYPESAFE_API_KEY` no servidor.
+> * `server/services/jev.ts` (cliente, cache de 10 min, teto diário `JEV_DAILY_LIMIT`, limiares de confiança) e `server/ai.ts` (rotas).
+> * Rotas reais: `POST /api/ai/assess-item` (ambiente do item novo + aviso de compra redundante, numa só chamada), `POST /api/ai/recommend` (próximo item essencial do ambiente, escolhido entre itens do catálogo que faltam) e `POST /api/ai/prioritize` (prioridade de compra dos itens pendentes de um ambiente numa régua de 8 níveis, de "pode esperar mais de 6 meses" a "comprar já: leva tempo", definida em `src/planning/purchaseUrgency.ts`; a nota fica gravada em `items.ai_urgency` e só é inferida de novo para item novo, renomeado ou movido de ambiente). `GET /api/ai/status` diz ao app se o Jev está ligado.
+> * Interface: `AddItemModal` (sugere o ambiente e avisa de repetição) e `NinoAssistant`, no planejamento de compras (próximo item e itens por urgência).
+> * Sem chave, erro ou confiança baixa, tudo volta vazio e o app funciona como antes (o regex de `suggestCategory` continua valendo para links de lojas).
+> * **Ainda não feito:** limite de consultas por plano (depende do Freemium da Fase 2), estados visuais do Nino (pensativo/comemorando/descansando) e o balãozinho dentro do ambiente.
+> * Nomes das rotas diferem do planejado abaixo: `check-redundancy` virou parte de `assess-item`, para gastar uma chamada em vez de duas.
+
 #### 3.1 Setup do SDK TypeSafe AI
 * Adicionar a dependência do TypeSafe AI no backend Node.js (`server/`).
 * Configurar a chave de API segura no arquivo de variáveis de ambiente (`TYPESAFE_API_KEY`).

@@ -28,11 +28,14 @@
     "test:planning-db": "node --import tsx tests/planning-db.mjs",
     "test:feedback-db": "node --import tsx tests/feedback-db.mjs",
     "test:environment-name-db": "node --import tsx tests/environment-name-db.mjs",
-    "test:price-tracking-db": "node --import tsx tests/price-tracking-db.mjs"
+    "test:price-tracking-db": "node --import tsx tests/price-tracking-db.mjs",
+    "test:jev": "node --import tsx --test tests/jev.mjs",
+    "test:ai-db": "node --import tsx tests/ai-db.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
+    "@typesafe-ai/sdk": "^0.7.0",
     "@vitejs/plugin-react": "^5.0.4",
     "cheerio": "^1.2.0",
     "dotenv": "^17.2.3",

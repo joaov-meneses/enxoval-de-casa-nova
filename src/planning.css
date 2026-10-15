@@ -1246,3 +1246,135 @@
     font-size: 11.5px;
   }
 }
+
+/* Ajuda do Nino (Jev): próximo item de um ambiente e itens em ordem de urgência */
+.pp-nino {
+  display: grid;
+  gap: 16px;
+}
+.pp-nino-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pp-nino-head .nino {
+  flex: none;
+  height: auto;
+}
+.pp-nino-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pp-nino-block {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #f0e6d6;
+}
+.pp-nino-block label,
+.pp-nino-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3b2a20;
+}
+.pp-nino-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.pp-nino-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.pp-nino-row-between {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.pp-nino-row-between > :first-child {
+  flex: none;
+}
+.pp-nino-result,
+.pp-nino-ranking li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.pp-nino-result {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f6efe1;
+}
+.pp-nino-result > div,
+.pp-nino-ranking li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.pp-nino-result strong,
+.pp-nino-ranking strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3b2a20;
+}
+.pp-nino-result span,
+.pp-nino-ranking li span {
+  font-size: 12px;
+  color: #6a5b50;
+}
+.pp-nino-ranking {
+  list-style: decimal inside;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.pp-nino-ranking li {
+  padding: 9px 0;
+  border-top: 1px solid #f0e6d6;
+}
+.pp-nino-ranking li::marker {
+  color: #6a5b50;
+  font-size: 12px;
+}
+.pp-nino-urgency {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f1e9db;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a3a2f;
+  white-space: nowrap;
+}
+/* Do mais calmo (1) ao mais urgente (8): o tom esquenta a partir de "Na primeira semana". */
+.pp-nino-urgency.is-5 {
+  background: #f7ead8;
+  color: #6b4a1f;
+}
+.pp-nino-urgency.is-6 {
+  background: #f8e3d3;
+  color: #8a3d24;
+}
+.pp-nino-urgency.is-7 {
+  background: #f3d3c6;
+  color: #7a301a;
+}
+.pp-nino-urgency.is-8 {
+  background: #eec0ae;
+  color: #6a2713;
+}
+@media (max-width: 520px) {
+  .pp-nino-row:not(.pp-nino-row-between) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+.pp-nino-options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}

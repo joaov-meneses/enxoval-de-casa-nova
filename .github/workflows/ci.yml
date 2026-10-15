@@ -52,3 +52,5 @@ jobs:
       - run: npm run test:invitations-db
       - run: npm run test:product-scraper
       - run: npm run test:price-tracking-db
+      - run: npm run test:jev
+      - run: npm run test:ai-db

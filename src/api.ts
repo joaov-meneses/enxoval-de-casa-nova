@@ -8,9 +8,12 @@ import type {
   EnxovalMember,
   EnxovalWorkspace,
   InvitationPreview,
+  ItemAssessment,
   ItemPriceHistory,
   ItemStatus,
   ItemTrackingInput,
+  ItemUrgencyResult,
+  NextItemRecommendation,
   ScrapedProductPreview,
 } from "./types";
 import { isItemStatus, normalizeItemStatus } from "./itemStatus";
@@ -376,6 +379,33 @@ export const updateAdminFeedbackStatus = (id: string, status: FeedbackStatus) =>
   request<AdminFeedback>(`/api/admin/feedback/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
+  });
+
+/** O servidor tem a chave do Jev? Sem ela, a ajuda do Nino não aparece. */
+export const fetchAiStatus = () => request<{ enabled: boolean }>("/api/ai/status");
+
+/** Ambiente provável e aviso de compra redundante para um item que ainda está sendo preenchido. */
+export const assessItemDraft = (
+  input: { enxovalId: string; name: string; classify: boolean },
+  signal?: AbortSignal,
+) =>
+  request<ItemAssessment>("/api/ai/assess-item", {
+    method: "POST",
+    body: JSON.stringify(input),
+    signal,
+  });
+
+export const recommendNextItem = (enxovalId: string, categoryId: string) =>
+  request<NextItemRecommendation>("/api/ai/recommend", {
+    method: "POST",
+    body: JSON.stringify({ enxovalId, categoryId }),
+  });
+
+/** Urgência dos itens pendentes de um ambiente. O servidor só consulta o Jev para itens que ainda não têm nota guardada. */
+export const prioritizeEnvironment = (enxovalId: string, categoryId: string) =>
+  request<ItemUrgencyResult>("/api/ai/prioritize", {
+    method: "POST",
+    body: JSON.stringify({ enxovalId, categoryId }),
   });
 
 export function deleteItem(id: string) {

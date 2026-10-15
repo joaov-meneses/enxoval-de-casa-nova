@@ -5,10 +5,12 @@ import type {
   EnxovalItem,
   ItemStatus,
   ItemTrackingInput,
+  ItemAssessment,
   PriceBasis,
   ScrapedProductPreview,
 } from "../types";
-import { extractProduct } from "../api";
+import { assessItemDraft, extractProduct } from "../api";
+import { useJevEnabled } from "../hooks/useJevEnabled";
 import { storeLabel } from "../priceTracking";
 import {
   DEFAULT_ITEM_STATUS,
@@ -44,7 +46,13 @@ interface AddItemModalProps {
   ) => Promise<void> | void;
   defaultCategoryId: string;
   categories: EnxovalCategory[];
+  /** Enxoval em que o item será criado; com ele (e o Jev ligado) o Nino ajuda a escolher o ambiente e avisa de repetições. */
+  enxovalId?: string;
 }
+
+/** Quanto tempo a pessoa precisa parar de digitar o nome para o Nino analisar o item. */
+const NINO_DELAY_MS = 1000;
+const NINO_MIN_NAME_LENGTH = 3;
 
 /** Texto que parece o endereço de um site (com ou sem "https://"), sem espaços. */
 function looksLikeUrl(text: string) {
@@ -89,6 +97,7 @@ export function AddItemModal({
   onAdd,
   defaultCategoryId,
   categories,
+  enxovalId,
 }: AddItemModalProps) {
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
@@ -119,9 +128,57 @@ export function AddItemModal({
   const importTicket = useRef(0);
   // Último endereço já lido, para o campo "Link do produto" não buscar a mesma loja de novo ao perder o foco.
   const lastImportedUrl = useRef("");
+  // Nino (Jev): só existe quando o servidor tem a chave; a análise é uma ajuda, nunca bloqueia o formulário.
+  const jevEnabled = useJevEnabled();
+  const [ninoTip, setNinoTip] = useState<{
+    redundancy: ItemAssessment["redundancy"];
+    environmentName: string | null;
+  } | null>(null);
+  const lastAssessedName = useRef("");
+
+  useEffect(() => {
+    if (!isOpen || !jevEnabled || !enxovalId) return;
+    const draft = name.trim();
+    if (draft.length < NINO_MIN_NAME_LENGTH) {
+      lastAssessedName.current = "";
+      setNinoTip(null);
+      return;
+    }
+    if (draft === lastAssessedName.current) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await assessItemDraft(
+          {
+            enxovalId,
+            name: draft,
+            // Só sugere o ambiente enquanto a pessoa não escolheu um.
+            classify: !categoryTouched.current && categories.length >= 2,
+          },
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
+        lastAssessedName.current = draft;
+        let environmentName: string | null = null;
+        if (result.environment && !categoryTouched.current) {
+          setCategoryId(result.environment.id);
+          environmentName = result.environment.name;
+        }
+        setNinoTip({ redundancy: result.redundancy, environmentName });
+      } catch {
+        // Sem a ajuda do Nino o formulário continua igual.
+      }
+    }, NINO_DELAY_MS);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [name, isOpen, jevEnabled, enxovalId, categories.length]);
 
   useEffect(() => {
     if (!isOpen) return;
+    lastAssessedName.current = "";
+    setNinoTip(null);
     importTicket.current += 1;
     lastImportedUrl.current = "";
     setImportUrl("");
@@ -561,6 +618,25 @@ export function AddItemModal({
             placeholder="Ex: Jogo de Taças"
             className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
           />
+          {ninoTip?.redundancy && (
+            <p
+              role="status"
+              className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-snug text-amber-900"
+            >
+              <Sparkles size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                <strong className="font-semibold">Nino:</strong>{" "}
+                {ninoTip.redundancy.overlapsWith ? (
+                  <>
+                    você já tem <b>{ninoTip.redundancy.overlapsWith}</b> na lista. Este item
+                    pode fazer o mesmo trabalho, e dá para economizar.
+                  </>
+                ) : (
+                  <>este item parece repetir algo que você já tem. Vale conferir a lista antes de comprar.</>
+                )}
+              </span>
+            </p>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -581,6 +657,11 @@ export function AddItemModal({
                 { value: NEW_CATEGORY_VALUE, label: "+ Novo ambiente" },
               ]}
             />
+            {ninoTip?.environmentName && !categoryTouched.current && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-stone-500">
+                <Sparkles size={12} aria-hidden="true" /> Ambiente sugerido pelo Nino
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="new-item-status" className="block text-sm font-medium text-stone-700 mb-1">

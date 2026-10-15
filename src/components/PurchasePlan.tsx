@@ -38,6 +38,7 @@ import { weekOptions } from "../planning/weekOptions";
 import { citiesOfState, cityById, TRAIT_COPY } from "../onboarding/regions";
 import { STATES, stateInfo } from "../onboarding/plan";
 import { ITEM_STATUS_META, netPriceCents } from "../itemStatus";
+import { NinoAssistant } from "./NinoAssistant";
 import { Select, type SelectOption } from "./Select";
 
 export interface PlanningUpdates {
@@ -650,6 +651,13 @@ export function PurchasePlanView({
           </small>
         </div>
       </section>
+
+      <NinoAssistant
+        enxovalId={enxoval.id}
+        categories={categories}
+        items={items}
+        onAddItem={onAddItem}
+      />
 
       {populated.length === 0 ? (
         <p className="pp-empty">

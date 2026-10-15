@@ -159,6 +159,10 @@ export interface EnxovalItem {
   sortOrder: number;
   /** Semana de compra escolhida pela pessoa, contada a partir da semana da mudança (negativa: antes). Null: vale a sugestão. */
   buyWeek: number | null;
+  /** Urgência de compra (1 a 5) inferida pelo Jev e guardada. Null: ainda não avaliada, ou o item mudou de nome ou ambiente. */
+  aiUrgency?: number | null;
+  /** Confiança (0 a 1) da nota de urgência. */
+  aiUrgencyConfidence?: number | null;
   /** Dados do catálogo gravados quando o item veio do funil; nulos nos demais (o planejamento infere pelo nome). */
   priceCategory: PriceCategory | null;
   priority: ItemPriority | null;
@@ -207,4 +211,42 @@ export interface BootstrapData {
   members: EnxovalMember[];
   categories: EnxovalCategory[];
   items: EnxovalItem[];
+}
+
+/** Respostas do Nino (Jev) para um item que a pessoa está cadastrando. Cada parte vem vazia quando não há certeza. */
+export interface ItemAssessment {
+  /** Falso quando o Jev não está ligado no servidor (sem chave): o app segue sem a ajuda. */
+  available: boolean;
+  environment: { id: string; name: string; confidence: number } | null;
+  redundancy: { probability: number; overlapsWith: string | null } | null;
+}
+
+export interface NextItemRecommendation {
+  available: boolean;
+  recommendation: {
+    name: string;
+    essential: boolean;
+    confidence: number;
+    /** Há um favorito claro. Se não, mostre `options` para a pessoa escolher. */
+    clear: boolean;
+    /** As melhores opções, da mais provável para a menos; a primeira é `name`. */
+    options: { name: string; essential: boolean; probability: number }[];
+    categoryId: string;
+    categoryName: string;
+  } | null;
+  /** Por que não há sugestão: "complete" (o catálogo todo já está na lista), "none" (nada indispensável falta, ou o Jev não teve certeza) ou "unknown_room". */
+  reason?: "complete" | "none" | "unknown_room" | "unavailable";
+}
+
+export interface ItemUrgencyResult {
+  available: boolean;
+  categoryId: string;
+  /** Nota de todos os itens pendentes do ambiente que já foram avaliados (antes ou agora). */
+  scores: { id: string; urgency: number; confidence: number }[];
+  /** Itens avaliados agora, com uma consulta nova ao Jev. */
+  inferred: number;
+  /** Itens que já tinham nota guardada e não gastaram consulta. */
+  cached: number;
+  /** Itens pendentes que ficaram sem nota (limite por consulta, ou o Jev não respondeu). */
+  unscored: number;
 }

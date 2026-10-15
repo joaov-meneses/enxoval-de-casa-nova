@@ -288,6 +288,13 @@ export async function migrateDatabase() {
     ALTER TABLE items ADD CONSTRAINT items_priority_valid CHECK (priority IS NULL OR priority IN ('essential', 'optional'));
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_timing_valid;
     ALTER TABLE items ADD CONSTRAINT items_timing_valid CHECK (timing IS NULL OR timing IN ('first_night', 'first_week'));
+    -- Urgência de compra (1 a 5) inferida pelo Jev, guardada para não gastar outra consulta. A chave diz para qual
+    -- nome e ambiente a nota vale: se o item mudar de nome ou de ambiente, a nota deixa de valer e é inferida de novo.
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS ai_urgency real;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS ai_urgency_confidence real;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS ai_urgency_key text;
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_ai_urgency_valid;
+    ALTER TABLE items ADD CONSTRAINT items_ai_urgency_valid CHECK (ai_urgency IS NULL OR (ai_urgency >= 1 AND ai_urgency <= 10));
 
     -- Central de ajuda: problemas, sugestões e outros assuntos enviados por quem usa o app.
     CREATE TABLE IF NOT EXISTS feedback (
