@@ -187,3 +187,90 @@ Se não reconhece essa alteração, peça um novo link em "Esqueci minha senha" 
   );
   return { to: input.to, subject, text, html };
 }
+
+/** Aviso interno de uma nova mensagem da central de ajuda (vai para FEEDBACK_TO_EMAIL). */
+export function feedbackNotificationEmail(input: {
+  to: string;
+  kindLabel: string;
+  title: string;
+  userName: string;
+  userEmail: string;
+  replyTo: string;
+  lines: { label: string; value: string }[];
+  link: string | null;
+}): MailMessage {
+  const subject = `[Casa Mia] ${input.kindLabel}: ${input.title}`;
+  const text = [
+    `${input.kindLabel} de ${input.userName} <${input.userEmail}>`,
+    input.replyTo ? `Pode responder para: ${input.replyTo}` : "Não pediu resposta por e-mail.",
+    "",
+    ...input.lines.map((line) => `${line.label}: ${line.value}`),
+    ...(input.link ? ["", `Abrir no painel: ${input.link}`] : []),
+  ].join("\n");
+  const rows = input.lines
+    .map(
+      (line) =>
+        `<p style="margin:0 0 12px;line-height:1.55"><strong style="display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#6a5648">${escapeHtml(line.label)}</strong>${escapeHtml(line.value).replaceAll("\n", "<br>")}</p>`,
+    )
+    .join("");
+  const html = layout(
+    input.title,
+    `<p style="margin:0 0 16px;line-height:1.6;font-size:14px;color:#6a5648">${escapeHtml(input.kindLabel)} de <strong>${escapeHtml(input.userName)}</strong> (${escapeHtml(input.userEmail)}). ${input.replyTo ? `Pode responder para ${escapeHtml(input.replyTo)}.` : "Não pediu resposta por e-mail."}</p>${rows}${input.link ? `<p style="margin:20px 0 0"><a href="${escapeHtml(input.link)}" style="color:#b5532f;font-weight:600">Abrir no painel</a></p>` : ""}`,
+  );
+  return { to: input.to, subject, text, html };
+}
+
+export interface PriceOpportunity {
+  itemName: string;
+  enxovalName: string;
+  priceCents: number;
+  /** `lowest`: menor preço já visto; `target`: caiu até o valor que a pessoa pediu para ser avisada. */
+  reason: "lowest" | "target";
+  url: string;
+}
+
+const brl = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
+
+function opportunityLine(opportunity: PriceOpportunity) {
+  const reason =
+    opportunity.reason === "lowest"
+      ? "Menor preço histórico!"
+      : "Chegou ao preço que você queria!";
+  return `${opportunity.itemName} caiu para ${brl.format(opportunity.priceCents / 100)} (${reason})`;
+}
+
+/** Aviso de preço: um e-mail por pessoa, com todos os itens que baixaram na mesma rodada. */
+export function priceOpportunityEmail(input: {
+  to: string;
+  name: string;
+  opportunities: PriceOpportunity[];
+}): MailMessage {
+  const [first] = input.opportunities;
+  const many = input.opportunities.length > 1;
+  const subject = many
+    ? `${input.opportunities.length} itens do seu enxoval baixaram de preço`
+    : `${first.itemName} baixou de preço`;
+  const lines = input.opportunities.map(opportunityLine);
+  const text = `Olá, ${input.name}.
+
+${many ? "Estes itens do seu enxoval baixaram de preço:" : "Uma boa notícia sobre o seu enxoval:"}
+
+${input.opportunities.map((opportunity, index) => `- ${lines[index]}\n  ${opportunity.url}`).join("\n")}
+
+Os preços mudam o tempo todo: confira na loja antes de comprar. Para parar de receber estes avisos, desligue "Avisar quando o preço cair" no item.`;
+  const html = layout(
+    many ? "Seus itens baixaram de preço" : "Seu item baixou de preço",
+    `<p style="margin:0 0 16px;line-height:1.6">Olá, ${escapeHtml(input.name)}. ${many ? "Estes itens do seu enxoval baixaram de preço:" : "Uma boa notícia sobre o seu enxoval:"}</p>
+${input.opportunities
+  .map(
+    (opportunity, index) =>
+      `<p style="margin:0 0 14px;line-height:1.5"><strong>${escapeHtml(lines[index])}</strong><br><span style="font-size:13px;color:#6a5648">${escapeHtml(opportunity.enxovalName)}</span><br><a href="${escapeHtml(opportunity.url)}" style="color:#b5532f;font-weight:600">Ver na loja</a></p>`,
+  )
+  .join("\n")}
+<p style="margin:16px 0 0;line-height:1.6;font-size:14px;color:#6a5648">Os preços mudam o tempo todo: confira na loja antes de comprar. Para parar de receber estes avisos, desligue "Avisar quando o preço cair" no item.</p>`,
+  );
+  return { to: input.to, subject, text, html };
+}

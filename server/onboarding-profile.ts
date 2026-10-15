@@ -5,6 +5,8 @@
  * uma resposta obrigatória ausente, recusa o cadastro com erro 400 (nada é descartado em silêncio).
  * Campos que não fazem parte do perfil (como o nome, que fica em `users.name`) são ignorados.
  */
+import { DEFAULT_SPENDING_TIER, isSpendingTier, type SpendingTier } from '../src/planning/spending.ts';
+import { cityById, cityMatchesState } from '../src/onboarding/regions.ts';
 import { HttpError } from './security.ts';
 
 export const ONBOARDING_PROFILE_VERSION = 1;
@@ -31,12 +33,16 @@ export interface OnboardingProfile {
   moveDate: string | null;
   moveDateAnswered: true;
   state: string;
+  /** Id da cidade (`src/onboarding/regions.ts`), ou null para "outra cidade". */
+  city: string | null;
   housing: string;
   people: number;
   rooms: string[];
   owned: string;
   style: string;
   budget: string;
+  /** Perfil de gasto: o que o funil sugeriu para o orçamento, ou o derivado do orçamento. */
+  spendingTier: SpendingTier;
   worries: string[];
   usage: string[];
   source: string;
@@ -65,6 +71,29 @@ function readMany<T extends string>(allowed: readonly T[], value: unknown, label
   return unique;
 }
 
+/** Perfil de gasto equivalente a cada faixa de orçamento do funil. */
+export function spendingTierFromBudget(budget: string): SpendingTier {
+  switch (budget) {
+    case 'lt10': return 'economico';
+    case '25-50': return 'confortavel';
+    case 'gt50': return 'premium';
+    default: return DEFAULT_SPENDING_TIER;
+  }
+}
+
+/** Cidade opcional: precisa existir na lista e pertencer ao estado informado. */
+function readCity(value: unknown, state: string): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !cityById(value) || !cityMatchesState(value, state)) throw invalid('cidade');
+  return value;
+}
+
+function readSpendingTier(value: unknown, budget: string): SpendingTier {
+  if (value === undefined || value === null) return spendingTierFromBudget(budget);
+  if (!isSpendingTier(value)) throw invalid('perfil de gasto');
+  return value;
+}
+
 /** AAAA-MM-DD válido, ou null quando a pessoa respondeu "ainda não sei". */
 function readDate(value: unknown): string | null {
   if (value === undefined || value === null) return null;
@@ -87,18 +116,23 @@ export function parseOnboardingProfile(value: unknown): OnboardingProfile {
   }
   if (raw.source !== undefined && raw.source !== null && typeof raw.source !== 'string') throw invalid('origem');
 
+  const state = requireOne(STATES, raw.state, 'estado');
+  const budget = requireOne(BUDGETS, raw.budget, 'orçamento');
+
   return {
     v: ONBOARDING_PROFILE_VERSION,
     moment: requireOne(MOMENTS, raw.moment, 'momento'),
     moveDate: readDate(raw.moveDate),
     moveDateAnswered: true,
-    state: requireOne(STATES, raw.state, 'estado'),
+    state,
+    city: readCity(raw.city, state),
     housing: requireOne(HOUSINGS, raw.housing, 'moradia'),
     people: raw.people,
     rooms: readMany(ROOMS, raw.rooms, 'espaços', 1),
     owned: requireOne(OWNED, raw.owned, 'o que você já tem'),
     style: requireOne(STYLES, raw.style, 'estilo'),
-    budget: requireOne(BUDGETS, raw.budget, 'orçamento'),
+    budget,
+    spendingTier: readSpendingTier(raw.spendingTier, budget),
     worries: readMany(WORRIES, raw.worries, 'preocupações'),
     usage: readMany(USAGES, raw.usage, 'uso'),
     source: typeof raw.source === 'string' ? raw.source.trim().slice(0, 60) : ''

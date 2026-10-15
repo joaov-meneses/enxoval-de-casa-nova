@@ -181,7 +181,7 @@ export function Select({
   }
   return (
     <div
-      className={`larume-select ${open ? "is-open" : ""} ${className}`}
+      className={`casamia-select ${open ? "is-open" : ""} ${className}`}
       ref={root}
     >
       <button
@@ -197,7 +197,7 @@ export function Select({
         disabled={disabled || !options.length}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={keydown}
-        className="larume-select-trigger"
+        className="casamia-select-trigger"
         data-dialog-autofocus={autoFocus || undefined}
       >
         <span>{options[selected]?.label ?? "Selecione"}</span>
@@ -210,13 +210,13 @@ export function Select({
           aria-label={
             ariaLabel ?? trigger.current?.labels?.[0]?.textContent ?? "Opções"
           }
-          className={`larume-select-popup ${above ? "above" : ""}`}
+          className={`casamia-select-popup ${above ? "above" : ""}`}
           style={{ maxHeight }}
         >
           {options.map((option, index) => (
             <Fragment key={option.value}>
               {option.group && option.group !== options[index - 1]?.group && (
-                <div role="presentation" className="larume-select-group">
+                <div role="presentation" className="casamia-select-group">
                   {option.group}
                 </div>
               )}
@@ -225,7 +225,7 @@ export function Select({
                 data-index={index}
                 role="option"
                 aria-selected={option.value === value}
-                className={`larume-select-option ${active === index ? "highlighted" : ""}`}
+                className={`casamia-select-option ${active === index ? "highlighted" : ""}`}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   event.stopPropagation();

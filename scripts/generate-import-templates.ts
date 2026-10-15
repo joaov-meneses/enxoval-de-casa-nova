@@ -188,7 +188,7 @@ const instructions = [
 
 await mkdir("public/modelos", { recursive: true });
 await writeFile(
-  "public/modelos/larume-modelo-importacao.csv",
+  "public/modelos/casamia-modelo-importacao.csv",
   createCsv(examples),
   "utf8",
 );
@@ -207,7 +207,7 @@ const blob = await writeXlsxFile([
   },
 ]).toBlob();
 await writeFile(
-  "public/modelos/larume-modelo-importacao.xlsx",
+  "public/modelos/casamia-modelo-importacao.xlsx",
   Buffer.from(await blob.arrayBuffer()),
 );
 console.log("Modelos gerados em public/modelos/");

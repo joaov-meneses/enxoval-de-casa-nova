@@ -52,7 +52,7 @@ export function AuthPage({
     <main className="auth-page">
       <section className="auth-story">
         <img
-          src="/images/larume-home.webp"
+          src="/images/casamia-home.webp"
           alt="Seu próximo lar, acolhedor e cheio de possibilidades"
         />
         <div className="auth-story-top">

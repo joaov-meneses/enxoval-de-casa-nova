@@ -14,8 +14,20 @@ import {
   Clock3,
   ChevronDown,
   LoaderCircle,
+  Flame,
+  TrendingDown,
+  TrendingUp,
+  PackageX,
+  CalendarClock,
 } from "lucide-react";
-import type { EnxovalCategory, EnxovalItem, ItemStatus } from "../types";
+import type {
+  EnxovalCategory,
+  EnxovalItem,
+  ItemStatus,
+  ItemTrackingInput,
+} from "../types";
+import { priceChange } from "../priceTracking";
+import { PriceHistoryDialog } from "./PriceHistoryDialog";
 import {
   discountApplies,
   isInactiveStatus,
@@ -28,6 +40,17 @@ import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
 import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
+import { weekOptions } from "../planning/weekOptions";
+import { weekLabel } from "../planning/purchasePlan";
+
+/** Semana de compra do item no planejamento (sugerida pelo algoritmo ou escolhida pela pessoa). */
+export interface ItemBuyPlan {
+  week: number;
+  manual: boolean;
+  reason: string;
+  moveDate: string | null;
+  overdue: boolean;
+}
 
 interface ItemRowProps {
   item: EnxovalItem;
@@ -36,7 +59,11 @@ interface ItemRowProps {
   showUpdatedAt?: boolean;
   updatedAtLabel?: string;
   dragHandle?: ReactNode;
-  onUpdate: (id: string, updates: Partial<EnxovalItem>) => Promise<void> | void;
+  buyPlan?: ItemBuyPlan;
+  onUpdate: (
+    id: string,
+    updates: Partial<EnxovalItem> & ItemTrackingInput,
+  ) => Promise<void> | void;
   onDelete: (item: EnxovalItem) => void;
 }
 const money = new Intl.NumberFormat("pt-BR", {
@@ -61,6 +88,7 @@ export function ItemRow({
   showUpdatedAt,
   updatedAtLabel,
   dragHandle,
+  buyPlan,
   onUpdate,
   onDelete,
 }: ItemRowProps) {
@@ -73,6 +101,11 @@ export function ItemRow({
   const [description, setDescription] = useState(item.description);
   const [categoryId, setCategoryId] = useState(item.categoryId);
   const [status, setStatus] = useState<ItemStatus>(item.status);
+  const [weekValue, setWeekValue] = useState("auto");
+  const [targetText, setTargetText] = useState("");
+  const [alertEnabled, setAlertEnabled] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const id = useId();
@@ -89,8 +122,16 @@ export function ItemRow({
     setDescription(item.description);
     setCategoryId(item.categoryId);
     setStatus(item.status);
+    setWeekValue(item.buyWeek === null ? "auto" : String(item.buyWeek));
+    setTargetText(
+      item.priceTracking?.targetPriceCents
+        ? money.format(item.priceTracking.targetPriceCents / 100)
+        : "",
+    );
+    setAlertEnabled(item.priceTracking?.priceAlertEnabled ?? true);
     setError("");
   }, [item, expanded]);
+  useEffect(() => setThumbFailed(false), [item.imageUrl]);
   // O preço da linha já considera o desconto/cashback registrado (itens ganhos mantêm o valor cheio).
   const price = netPriceCents(item);
   const itemDiscount = discountApplies(item.status) ? item.discountCents : 0;
@@ -104,6 +145,9 @@ export function ItemRow({
   const formattedPrice =
     Number.isFinite(price) && price > 0 ? money.format(price / 100) : "";
   const link = safeLink(item.link);
+  const tracking = item.priceTracking ?? null;
+  const change = priceChange(tracking);
+  const thumbnail = item.imageUrl && !thumbFailed ? item.imageUrl : "";
   const added =
     item.createdAt && Number.isFinite(Date.parse(item.createdAt))
       ? new Date(item.createdAt).toLocaleDateString("pt-BR")
@@ -150,6 +194,16 @@ export function ItemRow({
         description: description.trim(),
         categoryId,
         status,
+        // A semana só vai no pedido quando a pessoa mexeu nela.
+        ...(weekValue !== (item.buyWeek === null ? "auto" : String(item.buyWeek))
+          ? { buyWeek: weekValue === "auto" ? null : Number(weekValue) }
+          : {}),
+        ...(tracking
+          ? {
+              targetPriceCents: Number(targetText.replace(/\D/g, "")) || null,
+              priceAlertEnabled: alertEnabled,
+            }
+          : {}),
       });
       setExpanded(false);
       saved = true;
@@ -185,6 +239,16 @@ export function ItemRow({
         >
           <Check size={13} strokeWidth={2.5} />
         </button>
+        {thumbnail && (
+          <img
+            className="item-thumb"
+            src={thumbnail}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setThumbFailed(true)}
+          />
+        )}
         <div className="item-content">
           <button
             type="button"
@@ -210,9 +274,64 @@ export function ItemRow({
             {quantity > 1 && (
               <span className="item-quantity-tag">{quantity} un.</span>
             )}
+            {buyPlan && !item.checked && !isInactiveStatus(item.status) && (
+              <span
+                className={`item-week-tag${buyPlan.overdue ? " is-late" : ""}${buyPlan.manual ? " is-manual" : ""}`}
+                title={buyPlan.reason}
+              >
+                <CalendarClock size={11} aria-hidden="true" />
+                {buyPlan.overdue ? "Atrasado · " : "Comprar: "}
+                {weekLabel(buyPlan.week).toLowerCase()}
+              </span>
+            )}
             {itemDiscount > 0 && (
               <span className="item-discount-tag">
                 Desconto/cashback {money.format(itemDiscount / 100)}
+              </span>
+            )}
+            {item.selectedVariation && (
+              <span className="item-quantity-tag">{item.selectedVariation}</span>
+            )}
+            {tracking && change && change.direction !== "same" && (
+              <button
+                type="button"
+                className={`price-badge ${change.direction === "down" ? "is-down" : "is-up"}`}
+                onClick={() => setHistoryOpen(true)}
+                aria-label={`${change.direction === "down" ? "Preço caiu" : "Preço subiu"} ${money.format(Math.abs(change.deltaCents) / 100)} (${change.percent}%) desde o cadastro. Abrir histórico de preços.`}
+                title="Ver histórico de preços"
+              >
+                {change.direction === "down" ? (
+                  <TrendingDown size={12} aria-hidden="true" />
+                ) : (
+                  <TrendingUp size={12} aria-hidden="true" />
+                )}
+                {change.direction === "down" ? "−" : "+"}
+                {money.format(Math.abs(change.deltaCents) / 100)} ({change.percent}%)
+              </button>
+            )}
+            {tracking?.isLowestIn60d && (
+              <button
+                type="button"
+                className="price-badge is-lowest"
+                onClick={() => setHistoryOpen(true)}
+                title="Ver histórico de preços"
+              >
+                <Flame size={12} aria-hidden="true" /> Menor preço em 60 dias
+              </button>
+            )}
+            {tracking && !change && tracking.currentPriceCents !== null && (
+              <button
+                type="button"
+                className="price-badge"
+                onClick={() => setHistoryOpen(true)}
+                title="Ver histórico de preços"
+              >
+                Acompanhando o preço
+              </button>
+            )}
+            {tracking && !tracking.inStock && (
+              <span className="price-badge is-out">
+                <PackageX size={12} aria-hidden="true" /> Indisponível
               </span>
             )}
             {added && (
@@ -286,7 +405,7 @@ export function ItemRow({
           >
             <div className="item-inline-grid">
               <h4 className="item-inline-section item-inline-wide">Sobre o item</h4>
-              <label htmlFor={`${id}-name`} className="item-inline-wide">
+              <label htmlFor={`${id}-name`} className="item-inline-wide item-field-name">
                 <span className="item-inline-label-row">
                   Nome do item
                   <span
@@ -305,7 +424,7 @@ export function ItemRow({
                   disabled={busy}
                 />
               </label>
-              <label htmlFor={`${id}-environment`}>
+              <label htmlFor={`${id}-environment`} className="item-field-env">
                 Ambiente
                 <Select
                   id={`${id}-environment`}
@@ -319,7 +438,7 @@ export function ItemRow({
                   disabled={busy}
                 />
               </label>
-              <label htmlFor={`${id}-status`}>
+              <label htmlFor={`${id}-status`} className="item-field-status" title={ITEM_STATUS_META[status].hint}>
                 Situação
                 <Select
                   id={`${id}-status`}
@@ -339,8 +458,34 @@ export function ItemRow({
                   {ITEM_STATUS_META[status].hint}
                 </span>
               </label>
+              {buyPlan && (
+                <label
+                  htmlFor={`${id}-week`}
+                  className="item-inline-wide item-field-week"
+                  title={weekValue === "auto" ? `Sugestão: ${buyPlan.reason}` : "Semana escolhida por você, contada a partir da mudança."}
+                >
+                  Quando comprar
+                  <Select
+                    id={`${id}-week`}
+                    ariaLabel="Semana de compra"
+                    value={weekValue}
+                    options={weekOptions({
+                      moveDate: buyPlan.moveDate,
+                      week: item.buyWeek ?? buyPlan.week,
+                      manual: item.buyWeek !== null,
+                    })}
+                    onChange={setWeekValue}
+                    disabled={busy}
+                  />
+                  <span className="item-inline-hint">
+                    {weekValue === "auto"
+                      ? `Sugestão: ${buyPlan.reason}`
+                      : "Semana escolhida por você, contada a partir da mudança. Vale mais que a sugestão."}
+                  </span>
+                </label>
+              )}
               <h4 className="item-inline-section item-inline-wide">Valores</h4>
-              <label htmlFor={`${id}-price`}>
+              <label htmlFor={`${id}-price`} className="item-field-price">
                 Preço
                 <input
                   id={`${id}-price`}
@@ -358,7 +503,17 @@ export function ItemRow({
                   disabled={busy}
                 />
               </label>
-              <label htmlFor={`${id}-discount`}>
+              <label
+                htmlFor={`${id}-discount`}
+                className="item-field-discount"
+                title={
+                  discountApplies(status)
+                    ? "Quanto foi abatido do preço. Aparece no resumo de descontos e cashback."
+                    : status === "received"
+                      ? "Item ganho: o valor cheio já vai para o resumo, sem desconto."
+                      : "Esta situação não tem compra, então não há desconto."
+                }
+              >
                 Desconto ou cashback
                 <input
                   id={`${id}-discount`}
@@ -383,7 +538,7 @@ export function ItemRow({
                       : "Esta situação não tem compra, então não há desconto."}
                 </span>
               </label>
-              <label htmlFor={`${id}-quantity`}>
+              <label htmlFor={`${id}-quantity`} className="item-field-qty" title="Só informa quantas unidades há. Não muda o preço.">
                 Quantidade
                 <QuantityStepper
                   id={`${id}-quantity`}
@@ -395,7 +550,7 @@ export function ItemRow({
                   Só informa quantas unidades há. Não muda o preço.
                 </span>
               </label>
-              <div className="item-inline-summary" aria-live="polite">
+              <div className="item-inline-summary item-field-total" aria-live="polite">
                 <span className="item-inline-summary-label">
                   {status === "received" ? "Valor ganho" : "Valor final"}
                 </span>
@@ -408,8 +563,41 @@ export function ItemRow({
                       : "Preço menos o desconto ou cashback."}
                 </span>
               </div>
+              {tracking && (
+                <>
+                  <h4 className="item-inline-section item-inline-wide">Acompanhar preço</h4>
+                  <label htmlFor={`${id}-target`} className="item-field-target">
+                    Me avise se cair abaixo de
+                    <input
+                      id={`${id}-target`}
+                      inputMode="numeric"
+                      value={targetText}
+                      onChange={(event) => {
+                        const digits = event.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 12);
+                        setTargetText(
+                          digits ? money.format(Number(digits) / 100) : "",
+                        );
+                      }}
+                      placeholder="R$ 0,00"
+                      disabled={busy}
+                    />
+                  </label>
+                  <label htmlFor={`${id}-alert`} className="item-inline-check item-field-alert">
+                    <input
+                      id={`${id}-alert`}
+                      type="checkbox"
+                      checked={alertEnabled}
+                      onChange={(event) => setAlertEnabled(event.target.checked)}
+                      disabled={busy}
+                    />
+                    <span>Avisar por e-mail quando o preço cair</span>
+                  </label>
+                </>
+              )}
               <h4 className="item-inline-section item-inline-wide">Detalhes</h4>
-              <label htmlFor={`${id}-link`} className="item-inline-wide">
+              <label htmlFor={`${id}-link`} className="item-inline-wide item-field-link">
                 Link do produto
                 <input
                   id={`${id}-link`}
@@ -420,7 +608,7 @@ export function ItemRow({
                   disabled={busy}
                 />
               </label>
-              <label htmlFor={`${id}-description`} className="item-inline-wide">
+              <label htmlFor={`${id}-description`} className="item-inline-wide item-field-notes">
                 Observações
                 <textarea
                   id={`${id}-description`}
@@ -465,6 +653,13 @@ export function ItemRow({
           </form>
         )}
       </div>
+      {tracking && (
+        <PriceHistoryDialog
+          item={item}
+          isOpen={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
     </div>
   );
 }

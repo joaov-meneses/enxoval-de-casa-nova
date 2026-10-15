@@ -108,9 +108,9 @@ textarea:focus-visible {
 /* O símbolo escala com o font-size do contexto: defina o tamanho em .brand e tudo acompanha */
 .brand-symbol {
   display: block;
-  width: 1.15em;
-  height: 1.15em;
-  aspect-ratio: 1 / 1;
+  height: 1.4em;
+  width: auto;
+  aspect-ratio: 224 / 264;
   object-fit: contain;
 }
 .brand-word {
@@ -132,8 +132,7 @@ textarea:focus-visible {
   text-align: center;
 }
 .brand-stacked .brand-symbol {
-  width: 2.2em;
-  height: 2.2em;
+  height: 2.6em;
 }
 .auth-story-top .brand-word {
   color: #fff;
@@ -579,7 +578,8 @@ h2 {
   background: #faf6ef;
   color: var(--ink);
   font-family: var(--sans);
-  padding-left: 280px;
+  /* Largura da barra lateral: o App a calcula para o maior nome de ambiente caber inteiro, em uma linha. */
+  padding-left: var(--sidebar-w, 280px);
   padding-bottom: 50px;
   min-height: 100dvh;
 }
@@ -588,7 +588,7 @@ h2 {
   flex-direction: column;
   position: fixed;
   inset: 0 auto 0 0;
-  width: 280px;
+  width: var(--sidebar-w, 280px);
   padding: 31px 20px 16px;
   border-right: 1px solid #efe4d4;
   background: #fdfcf8;
@@ -1229,10 +1229,10 @@ h2 {
 }
 @media (min-width: 1024px) and (max-width: 1190px) {
   .workspace-app {
-    padding-left: 256px;
+    padding-left: var(--sidebar-w, 256px);
   }
   .workspace-sidebar {
-    width: 256px;
+    width: var(--sidebar-w, 256px);
     padding-inline: 14px;
   }
   .workspace-main {
@@ -1964,7 +1964,7 @@ h2 {
   .admin-dialog-actions { flex-direction: column-reverse; }
 }
 
-.larume-dialog .text-stone-400 {
+.casamia-dialog .text-stone-400 {
   color: #a34c30;
 }
 /* Desktop uses a labeled button; mobile keeps a generous icon tap target. */
@@ -2308,7 +2308,7 @@ h2 {
   backdrop-filter: blur(4px);
   animation: dialog-fade-in 0.15s ease-out;
 }
-.larume-dialog {
+.casamia-dialog {
   position: absolute;
   inset: auto 0 0;
   width: 100%;
@@ -2355,28 +2355,28 @@ h2 {
 .dialog-close:hover {
   background: #eee2d1;
 }
-.larume-dialog > form,
-.larume-dialog > div:not(.dialog-heading) {
+.casamia-dialog > form,
+.casamia-dialog > div:not(.dialog-heading) {
   padding: 20px;
 }
-.larume-dialog label {
+.casamia-dialog label {
   font-size: 13px;
   color: #564a41;
 }
-.larume-dialog .text-stone-500 {
+.casamia-dialog .text-stone-500 {
   color: #695a4f;
 }
-.larume-dialog button {
+.casamia-dialog button {
   min-height: 44px;
 }
-.larume-dialog .icon-button {
+.casamia-dialog .icon-button {
   min-width: 44px;
   padding: 10px;
   flex-shrink: 0;
 }
-.larume-dialog input:not([type="checkbox"]),
-.larume-dialog textarea,
-.larume-dialog select {
+.casamia-dialog input:not([type="checkbox"]),
+.casamia-dialog textarea,
+.casamia-dialog select {
   min-height: 46px;
   border-color: #e6dbca;
   border-radius: 12px;
@@ -2384,47 +2384,47 @@ h2 {
   color: #432e24;
   font-size: 16px;
 }
-.larume-dialog input::placeholder,
-.larume-dialog textarea::placeholder {
+.casamia-dialog input::placeholder,
+.casamia-dialog textarea::placeholder {
   color: #79685c;
 }
-.larume-dialog input[type="checkbox"] {
+.casamia-dialog input[type="checkbox"] {
   accent-color: #828e5a;
 }
-.larume-dialog button[type="submit"],
-.larume-dialog button.bg-brand-dark {
+.casamia-dialog button[type="submit"],
+.casamia-dialog button.bg-brand-dark {
   min-height: 46px;
   border-radius: 12px;
   font-size: 14px;
   background: var(--cm-action);
   color: #fff;
 }
-.larume-dialog button[type="submit"]:hover:not(:disabled),
-.larume-dialog button.bg-brand-dark:hover:not(:disabled) {
+.casamia-dialog button[type="submit"]:hover:not(:disabled),
+.casamia-dialog button.bg-brand-dark:hover:not(:disabled) {
   background: #a34c30;
 }
-.larume-dialog button.bg-stone-100 {
+.casamia-dialog button.bg-stone-100 {
   min-height: 44px;
   background: #f3ece1;
   color: #564a41;
 }
-.larume-dialog button.bg-red-600 {
+.casamia-dialog button.bg-red-600 {
   min-height: 46px;
   border-radius: 12px;
   background: #a43d30;
   color: #fff;
   font-size: 14px;
 }
-.larume-dialog button.bg-red-600:hover:not(:disabled) {
+.casamia-dialog button.bg-red-600:hover:not(:disabled) {
   background: #8c3026;
 }
 .dialog-danger .dialog-heading h2 {
   color: #91382d;
 }
-.larume-dialog .bg-stone-50 {
+.casamia-dialog .bg-stone-50 {
   background: #f8f1e6;
 }
-.larume-dialog .border-stone-100 {
+.casamia-dialog .border-stone-100 {
   border-color: #eee2d1;
 }
 @keyframes dialog-fade-in {
@@ -2436,7 +2436,7 @@ h2 {
   }
 }
 @media (min-width: 768px) {
-  .larume-dialog {
+  .casamia-dialog {
     inset: 50% auto auto 50%;
     width: min(480px, calc(100vw - 48px));
     max-height: calc(100dvh - 48px);
@@ -2452,14 +2452,14 @@ h2 {
   .dialog-heading h2 {
     font-size: 22px;
   }
-  .larume-dialog > form,
-  .larume-dialog > div:not(.dialog-heading) {
+  .casamia-dialog > form,
+  .casamia-dialog > div:not(.dialog-heading) {
     padding: 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .dialog-backdrop,
-  .larume-dialog {
+  .casamia-dialog {
     animation: none;
   }
   .mobile-bottom-nav button {
@@ -2471,15 +2471,15 @@ h2 {
 .workspace-app {
   overflow-anchor: none;
 }
-.larume-select {
+.casamia-select {
   position: relative;
   min-width: 0;
   width: 100%;
 }
-.larume-select.is-open {
+.casamia-select.is-open {
   z-index: 70;
 }
-button.larume-select-trigger {
+button.casamia-select-trigger {
   width: 100%;
   min-height: 46px;
   display: flex;
@@ -2496,25 +2496,25 @@ button.larume-select-trigger {
   font-weight: 400;
   line-height: 1.4;
 }
-.larume-select-trigger > span {
+.casamia-select-trigger > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.larume-select-trigger > svg {
+.casamia-select-trigger > svg {
   flex-shrink: 0;
   color: #a34c30;
   transition: transform 0.15s;
 }
-.larume-select.is-open .larume-select-trigger > svg {
+.casamia-select.is-open .casamia-select-trigger > svg {
   transform: rotate(180deg);
 }
-.larume-select-trigger:disabled {
+.casamia-select-trigger:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.larume-select-popup {
+.casamia-select-popup {
   position: absolute;
   z-index: 80;
   top: calc(100% + 6px);
@@ -2530,11 +2530,11 @@ button.larume-select-trigger {
   overscroll-behavior: contain;
   text-align: left;
 }
-.larume-select-popup.above {
+.casamia-select-popup.above {
   top: auto;
   bottom: calc(100% + 6px);
 }
-.larume-select-option {
+.casamia-select-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2547,17 +2547,17 @@ button.larume-select-trigger {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-.larume-select-option > span {
+.casamia-select-option > span {
   min-width: 0;
 }
-.larume-select-option > svg {
+.casamia-select-option > svg {
   flex-shrink: 0;
   color: #5b633f;
 }
-.larume-select-option.highlighted {
+.casamia-select-option.highlighted {
   background: #f1e8db;
 }
-.larume-select-option[aria-selected="true"] {
+.casamia-select-option[aria-selected="true"] {
   font-weight: 600;
 }
 .title-edit-button {
@@ -2590,7 +2590,7 @@ button.larume-select-trigger {
 .sortable-entry {
   min-width: 0;
 }
-.sortable-entry:has(.larume-select.is-open) {
+.sortable-entry:has(.casamia-select.is-open) {
   z-index: 30 !important;
 }
 button.reorder-handle {
@@ -2899,7 +2899,7 @@ button.reorder-handle:disabled {
   }
 }
 @media (max-width: 767px) {
-  button.larume-select-trigger,
+  button.casamia-select-trigger,
   .item-inline-grid input,
   .item-inline-grid textarea {
     font-size: 16px;
@@ -3153,13 +3153,15 @@ button.reorder-handle:disabled {
   background: #f4ece1;
 }
 /* O botão da visão geral segue o mesmo tamanho do botão da lista */
-.workspace-welcome .export-menu-trigger {
+.workspace-welcome .export-menu-trigger,
+.rooms-toolbar .export-menu-trigger {
   min-height: 42px;
   padding: 10px 17px;
   font-size: 13px;
 }
 @media (max-width: 767px) {
-  .workspace-welcome .export-menu-trigger {
+  .workspace-welcome .export-menu-trigger,
+  .rooms-toolbar .export-menu-trigger {
     width: 44px;
     min-height: 44px;
     padding: 0;
@@ -4540,10 +4542,13 @@ button.reorder-handle:disabled {
     gap: 4px;
   }
   .workspace-app .mobile-bottom-nav button {
+    flex: 1 1 0;
+    min-width: 0;
     min-height: 44px;
     padding: 4px 6px;
     gap: 1px;
     font-size: 11px;
+    text-align: center;
   }
   .workspace-app .mobile-bottom-nav button svg {
     width: 20px;
@@ -4614,8 +4619,9 @@ button.reorder-handle:disabled {
 /* Barra inferior: o ＋ central adiciona item (no lugar do botão flutuante, que cobria a lista) */
 @media (max-width: 1023px) {
   .workspace-app .mobile-bottom-nav button.mobile-nav-add {
-    flex: 0 0 auto;
-    min-width: 76px;
+    /* Mesma largura dos demais, para os quatro itens ficarem igualmente distribuídos e centralizados. */
+    flex: 1 1 0;
+    min-width: 0;
     color: #4f362b;
     font-weight: 600;
     background: transparent;
@@ -4651,6 +4657,12 @@ button.reorder-handle:disabled {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+.rooms-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .rooms-toolbar-title {
   display: flex;
@@ -4689,10 +4701,11 @@ button.reorder-handle:disabled {
   background: #a34c30;
 }
 
-/* ───────── Mobile: formulário de edição do item, compacto ─────────
-   Duas colunas, sem títulos de seção nem textos de ajuda, campos de 38px
-   e a barra "Cancelar / Salvar alterações" sempre à vista acima da navegação. */
-@media (max-width: 1023px) {
+/* ───────── Formulário de edição do item, compacto (celular, tablet e desktop estreito) ─────────
+   Duas colunas, sem títulos de seção nem textos de ajuda (a explicação fica no title do campo),
+   campos de 38px e, no celular, a barra "Cancelar / Salvar alterações" sempre à vista acima da navegação.
+   Vale em qualquer largura; a partir de 1360px a grade larga (bloco logo abaixo) reorganiza as colunas. */
+@media screen {
   .workspace-app .item-inline-panel {
     padding: 10px 10px 0;
   }
@@ -4723,7 +4736,7 @@ button.reorder-handle:disabled {
   .workspace-app .item-inline-grid textarea {
     min-height: 52px;
   }
-  .workspace-app .item-inline-grid button.larume-select-trigger {
+  .workspace-app .item-inline-grid button.casamia-select-trigger {
     min-height: 38px;
     padding: 6px 8px 6px 10px;
     border-radius: 10px;
@@ -4789,6 +4802,99 @@ button.reorder-handle:disabled {
     min-height: 40px;
     padding: 8px 10px;
     font-size: 14px;
+  }
+}
+
+/* ───────── Formulário de edição do item no desktop ─────────
+   Sem navegação inferior: a barra de ações volta ao fluxo normal, alinhada à direita. */
+@media (min-width: 1024px) {
+  .workspace-app .item-inline-panel {
+    padding: 12px 14px;
+  }
+  .workspace-app .item-inline-actions {
+    position: static;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border-top: 0;
+    backdrop-filter: none;
+  }
+  .workspace-app .item-inline-actions .button {
+    flex: 0 0 auto;
+    min-width: 128px;
+    min-height: 38px;
+  }
+}
+
+/* Grade de 12 colunas: tudo cabe em 3 a 4 linhas, sem rolar.
+     linha 1  Nome · Ambiente · Situação (· Quando comprar, se houver plano)
+     linha 2  Preço · Desconto · Quantidade · Valor final
+     linha 3  Link · Observações   (com preço acompanhado: Avise abaixo de · E-mail · Link, e Observações na linha 4) */
+@media (min-width: 1360px) {
+  .workspace-app .item-inline-form {
+    gap: 10px;
+  }
+  .workspace-app .item-inline-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 10px 12px;
+    align-items: end;
+  }
+  .workspace-app .item-inline-grid > label {
+    gap: 4px;
+    font-size: 12px;
+  }
+  .workspace-app .item-inline-grid input,
+  .workspace-app .item-inline-grid textarea {
+    font-size: 14px;
+    padding: 7px 11px;
+  }
+  .workspace-app .item-inline-grid button.casamia-select-trigger {
+    font-size: 14px;
+  }
+
+  .workspace-app .item-inline-grid > .item-field-name { grid-column: span 6; }
+  .workspace-app .item-inline-grid > .item-field-env,
+  .workspace-app .item-inline-grid > .item-field-status { grid-column: span 3; }
+  .workspace-app .item-inline-grid:has(> .item-field-week) > .item-field-name { grid-column: span 4; }
+  .workspace-app .item-inline-grid:has(> .item-field-week) > .item-field-env { grid-column: span 2; }
+  .workspace-app .item-inline-grid > .item-field-week { grid-column: span 3; }
+
+  .workspace-app .item-inline-grid > .item-field-price,
+  .workspace-app .item-inline-grid > .item-field-discount,
+  .workspace-app .item-inline-grid > .item-field-qty,
+  .workspace-app .item-inline-grid > .item-field-total { grid-column: span 3; }
+
+  .workspace-app .item-inline-grid > .item-field-target,
+  .workspace-app .item-inline-grid > .item-field-alert { grid-column: span 3; }
+  .workspace-app .item-inline-grid > .item-field-link { grid-column: span 6; }
+  .workspace-app .item-inline-grid > .item-field-notes { grid-column: span 6; }
+  .workspace-app .item-inline-grid:has(> .item-field-target) > .item-field-notes { grid-column: 1 / -1; }
+
+  /* O valor final fica na altura dos campos, em uma linha só. */
+  .workspace-app .item-inline-grid > .item-field-total {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 12px;
+  }
+  .workspace-app .item-inline-grid > label.item-inline-check {
+    min-height: 38px;
+    line-height: 1.25;
+  }
+
+  /* Observações: uma linha que cresce conforme o texto (e o usuário ainda pode puxar a borda). */
+  .workspace-app .item-inline-grid .item-field-notes textarea {
+    height: 38px;
+    min-height: 38px;
+    max-height: 120px;
+    resize: vertical;
+  }
+  @supports (field-sizing: content) {
+    .workspace-app .item-inline-grid .item-field-notes textarea {
+      height: auto;
+      field-sizing: content;
+    }
   }
 }
 
@@ -4922,7 +5028,7 @@ button.reorder-handle:disabled {
   display: grid;
   gap: 10px;
 }
-.larume-dialog .add-choice > button {
+.casamia-dialog .add-choice > button {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -4934,7 +5040,7 @@ button.reorder-handle:disabled {
   border: 1px solid #eee2d1;
   border-radius: 14px;
 }
-.larume-dialog .add-choice > button:active {
+.casamia-dialog .add-choice > button:active {
   background: #f1e8db;
 }
 .add-choice-icon {
@@ -5040,7 +5146,7 @@ button.reorder-handle:disabled {
 }
 
 /* Troca entre enxovais próprios e compartilhados */
-.larume-select-group {
+.casamia-select-group {
   padding: 10px 10px 4px;
   font-size: 11px;
   font-weight: 700;
@@ -5048,7 +5154,7 @@ button.reorder-handle:disabled {
   text-transform: uppercase;
   color: #7a6a5d;
 }
-.larume-select-group:not(:first-child) {
+.casamia-select-group:not(:first-child) {
   margin-top: 4px;
   border-top: 1px solid #eee4d3;
 }
@@ -5129,4 +5235,492 @@ button.reorder-handle:disabled {
 .invite-remove:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Acompanhamento de preços: miniatura, selos de oscilação, histórico e termômetro de economia */
+.item-thumb {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid #ede2d1;
+  background: #fff;
+  object-fit: contain;
+}
+.price-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: #f3ebe0;
+  color: #59613e;
+  border: 1px solid transparent;
+}
+button.price-badge:hover {
+  border-color: currentColor;
+}
+.price-badge.is-down {
+  background: #e6efd8;
+  color: #3f5a1f;
+}
+.price-badge.is-up {
+  background: #f8e3dc;
+  color: #9a3a22;
+}
+.price-badge.is-lowest {
+  background: #fbe7c9;
+  color: #8a4a0b;
+}
+.price-badge.is-out {
+  background: #eee7df;
+  color: #6a5648;
+}
+.item-inline-grid > label.item-inline-check {
+  flex-direction: row;
+  align-items: center;
+  align-self: end;
+  gap: 10px;
+  min-height: 46px;
+}
+.item-inline-grid > label.item-inline-check input {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  flex-shrink: 0;
+  padding: 0;
+  accent-color: #5d6540;
+}
+
+.price-history {
+  padding: 4px 18px 20px;
+  display: grid;
+  gap: 12px;
+}
+.price-history-name {
+  margin: 0;
+  font-weight: 600;
+  color: #432e24;
+}
+.price-history-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.price-history-summary strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 500;
+  color: #432e24;
+}
+.price-history-summary strong.is-down {
+  color: #3f5a1f;
+}
+.price-history-summary strong.is-up {
+  color: #9a3a22;
+}
+.price-history-label {
+  display: block;
+  font-size: 12px;
+  color: #6a5648;
+}
+.price-history-lowest {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8a4a0b;
+  background: #fbe7c9;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.price-history-loading,
+.price-history-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: #6a5648;
+}
+.price-chart {
+  position: relative;
+}
+.price-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: pan-y;
+}
+.price-chart-axis {
+  stroke: #e3d7c4;
+  stroke-width: 1;
+}
+.price-chart-line {
+  fill: none;
+  stroke: #5d6540;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.price-chart-area {
+  fill: #96a071;
+  fill-opacity: 0.18;
+}
+.price-chart-initial {
+  stroke: #a34c30;
+  stroke-width: 1.5;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+}
+.price-chart-target {
+  stroke: #8a4a0b;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.price-chart-cursor {
+  stroke: #a89a8b;
+  stroke-width: 1;
+}
+.price-chart-dot {
+  fill: #5d6540;
+  stroke: #fdfcf8;
+  stroke-width: 2;
+}
+.price-chart-tick {
+  font-size: 10px;
+  fill: #6a5648;
+}
+.price-chart-tip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 1px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #432e24;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.price-chart-tip strong {
+  font-weight: 600;
+}
+.price-history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: #6a5648;
+}
+.price-history-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.price-history-legend i {
+  display: inline-block;
+  width: 18px;
+  border-top: 2px solid #5d6540;
+}
+.price-history-legend .legend-initial {
+  border-top: 2px dotted #a34c30;
+}
+.price-history-legend .legend-target {
+  border-top: 2px dashed #8a4a0b;
+}
+.price-history-store {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+}
+
+.savings-card {
+  border: 1px solid #e3ead0;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #f6f8ec, #fdfcf8 70%);
+  padding: 20px 21px;
+  margin: 4px 0 20px;
+  display: grid;
+  gap: 16px;
+}
+.savings-main {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.savings-card .stat-icon {
+  position: static;
+  flex-shrink: 0;
+}
+.savings-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6a5648;
+}
+.savings-value {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #432e24;
+}
+.savings-value strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  color: #3f5a1f;
+}
+.savings-note,
+.savings-detail {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #615349;
+}
+.savings-meter {
+  height: 6px;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: #e8e2d4;
+  overflow: hidden;
+}
+.savings-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #6f8a3c;
+}
+.savings-deals h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #432e24;
+}
+.savings-deals ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.savings-deals li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  border: 1px solid #ede2d1;
+  border-radius: 8px;
+  background: #fdfcf8;
+  font-size: 13px;
+}
+.savings-deal-name {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-weight: 500;
+  color: #432e24;
+}
+.savings-deal-name small {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: #6a5648;
+}
+.savings-deal-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: #432e24;
+}
+.savings-deal-price b {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3f5a1f;
+}
+.savings-deal-price b.is-lowest {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #8a4a0b;
+}
+.savings-deals li a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  color: #a34c30;
+}
+@media (max-width: 640px) {
+  .savings-card {
+    padding: 16px;
+  }
+  .item-thumb {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------------
+   Nome do ambiente: até 100 caracteres, sempre em uma linha de digitação, e nunca cortado na tela.
+   O texto quebra de linha dentro do espaço disponível (em vez de virar "…") sem estourar o layout.
+   ------------------------------------------------------------------------------------------------ */
+.env-name-counter {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  text-align: right;
+  color: #5b4d43;
+}
+.env-name-counter.is-full {
+  font-weight: 700;
+  color: #a8421f;
+}
+/* Barra lateral, gaveta do celular e chips: o nome do ambiente fica em UMA linha, completo, sem reticências.
+   A barra lateral cresce até caber o maior nome; se nem assim couber (nome de 100 letras em tela pequena),
+   a lista rola de lado em vez de cortar ou quebrar o nome. */
+.environment-select > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  min-width: max-content;
+}
+.environment-list {
+  min-width: 100%;
+  width: max-content;
+}
+/* Se nem a barra no tamanho máximo comportar o nome, a barra inteira rola de lado (nada é cortado nem quebrado). */
+.workspace-sidebar,
+.workspace-menu-content {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.environment-list .environment-row {
+  min-width: 100%;
+}
+/* Nomes em textos corridos (selects, cartões, resumo): quebram de linha nos espaços, nunca viram "…". */
+.stat-room-name,
+.casamia-select-trigger > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.3;
+}
+.stat-room {
+  align-items: center;
+}
+.list-section-heading h2,
+.item-category-tag,
+.overview-room strong,
+.overview-room strong > * {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.list-section-heading h2 {
+  line-height: 1.25;
+  min-width: 0;
+}
+.item-category-tag {
+  max-width: 100%;
+  line-height: 1.4;
+}
+.overview-room strong {
+  align-items: flex-start;
+}
+
+/* Ícones de editar e excluir ao lado do nome: juntos, com áreas de toque que não se sobrepõem. */
+.desktop-app-header > span .title-edit-button {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border-radius: 8px;
+}
+.desktop-app-header > span h1 + .title-edit-button {
+  margin-left: -5px;
+}
+.desktop-app-header > span .title-delete-button {
+  margin-left: -7px;
+}
+.list-section-heading .title-edit-button {
+  width: 30px;
+  height: 30px;
+  margin-left: -4px;
+}
+.list-section-heading .title-edit-button + .title-edit-button,
+.list-section-heading .title-delete-button {
+  margin-left: -8px;
+}
+.mobile-title-with-edit {
+  gap: 4px;
+}
+@media (max-width: 720px) {
+  .list-section-heading .title-edit-button {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Resumo por ambiente: a palavra nunca é partida no meio; a barra de progresso cede espaço. */
+.stat-room {
+  grid-template-columns: minmax(min-content, 1fr) 56px auto;
+}
+
+/* Com a barra lateral larga (nome de ambiente longo) sobra menos espaço para o conteúdo. Estes ajustes olham a
+   largura do próprio conteúdo, e não a da janela, para os cartões e o cabeçalho se reorganizarem sem cortar nada. */
+.workspace-main {
+  container-type: inline-size;
+}
+@container (max-width: 800px) {
+  .workspace-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "progress savings"
+      "money money";
+  }
+}
+@container (max-width: 520px) {
+  .workspace-stats {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "progress"
+      "money"
+      "savings";
+  }
+}
+@media (min-width: 1024px) {
+  .desktop-app-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .desktop-app-header > span {
+    flex: 1 1 auto;
+    white-space: nowrap;
+  }
+  .desktop-app-header > div {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+  }
 }

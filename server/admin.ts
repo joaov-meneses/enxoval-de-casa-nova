@@ -17,7 +17,7 @@ import {
 } from "./security.ts";
 import type { AdminUser } from "../src/types.ts";
 
-const ADMIN_COOKIE = "larume_admin_session";
+const ADMIN_COOKIE = "casamia_admin_session";
 const ADMIN_SESSION_TTL = 8 * 60 * 60_000;
 
 function adminConfig() {
@@ -30,7 +30,7 @@ function adminConfig() {
   return { login, password, version };
 }
 
-async function requireAdmin(req: Request) {
+export async function requireAdmin(req: Request) {
   const config = adminConfig();
   if (!config)
     throw new HttpError(

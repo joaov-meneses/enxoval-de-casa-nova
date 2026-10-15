@@ -60,7 +60,7 @@ async function mockAdmin(page: Page) {
       user.mustChangePassword = true;
       user.passwordResetExpiresAt = "2030-10-02T12:00:00Z";
       return json(200, {
-        temporaryPassword: "Larume-Teste1234",
+        temporaryPassword: "CasaMia-Teste1234",
         expiresAt: user.passwordResetExpiresAt,
       });
     }
@@ -146,7 +146,7 @@ for (const width of [320, 390, 1440]) {
     dialog = page.getByRole("dialog", { name: "Senha temporária pronta" });
     await expect(
       dialog.getByLabel("Senha temporária", { exact: true }),
-    ).toHaveValue("Larume-Teste1234");
+    ).toHaveValue("CasaMia-Teste1234");
     await expect(
       dialog.getByLabel("Senha temporária", { exact: true }),
     ).toBeFocused();

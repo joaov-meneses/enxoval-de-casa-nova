@@ -1,4 +1,6 @@
 import type { ItemStatus } from './itemStatus';
+import type { PriceCategory, SpendingTier } from './planning/spending';
+import type { ItemPriority, ItemTiming } from './planning/purchasePlan';
 
 export type { ItemStatus };
 export type Category = string;
@@ -13,6 +15,13 @@ export interface EnxovalSummary {
   /** `owner`: enxoval da própria pessoa. `editor`: enxoval de outra pessoa, ao qual ela foi convidada. */
   role: EnxovalRole;
   discountCents: number;
+  /** AAAA-MM-DD da mudança, ou null quando ainda não se sabe. */
+  moveDate: string | null;
+  /** UF e cidade (id de `onboarding/regions.ts`) da casa nova; a cidade é opcional. */
+  state: string | null;
+  city: string | null;
+  /** Perfil de gasto: define as faixas de referência de cada item e de cada período de compra. */
+  spendingTier: SpendingTier;
 }
 
 export interface EnxovalMember {
@@ -44,6 +53,93 @@ export interface EnxovalCategory {
   sortOrder: number;
 }
 
+/** Qual preço do produto o item acompanha: o normal (parcelado) ou o à vista no Pix. */
+export type PriceBasis = 'regular' | 'pix';
+
+/** Resultado da última leitura do produto: `blocked` quando o site barrou a leitura automática. */
+export type TrackingStatus = 'pending' | 'ok' | 'no_price' | 'blocked' | 'failed';
+
+/** Acompanhamento de preço de um item cadastrado a partir do link de uma loja. */
+export interface ItemPriceTracking {
+  /** Endereço da loja (sem "www."), por exemplo `mercadolivre.com.br`. */
+  domain: string;
+  url: string;
+  /** Preço no dia do cadastro: é a referência para dizer se ficou mais barato ou mais caro. */
+  initialPriceCents: number | null;
+  targetPriceCents: number | null;
+  priceAlertEnabled: boolean;
+  priceBasis: PriceBasis;
+  /** Último preço lido na loja (no Pix ou normal, conforme `priceBasis`). */
+  currentPriceCents: number | null;
+  /** Menor preço visto nos últimos 60 dias. */
+  lowestPriceCents60d: number | null;
+  /** O preço atual é o menor dos últimos 60 dias (e já foi mais alto nesse período). */
+  isLowestIn60d: boolean;
+  inStock: boolean;
+  lastCheckedAt: string | null;
+  status: TrackingStatus;
+}
+
+/** Campos opcionais para criar ou editar um item ligado ao link de uma loja. */
+export interface ItemTrackingInput {
+  trackedProductUrl?: string | null;
+  initialPriceCents?: number | null;
+  targetPriceCents?: number | null;
+  selectedVariation?: string | null;
+  imageUrl?: string | null;
+  priceBasis?: PriceBasis;
+  priceAlertEnabled?: boolean;
+}
+
+/** Dados lidos do link de um produto, para preencher o formulário. */
+export interface ScrapedProductPreview {
+  url: string;
+  canonicalUrl?: string;
+  domain: string;
+  title: string;
+  imageUrl?: string;
+  priceCents: number | null;
+  pixPriceCents?: number | null;
+  currency: string;
+  inStock: boolean;
+  variations?: {
+    voltage?: ('110V' | '127V' | '220V' | 'Bivolt')[];
+    colors?: string[];
+  };
+  /** Ambiente sugerido pelo nome do produto: Cozinha, Quarto, Banheiro, Sala ou Área de Serviço. */
+  suggestedCategory?: string;
+  /** A loja não deixou ler a página: só o nome (tirado do próprio link) é confiável; preço e foto ficam por conta da pessoa. */
+  partial?: boolean;
+}
+
+export interface PriceHistoryPoint {
+  date: string;
+  priceCents: number;
+  pixPriceCents?: number;
+}
+
+export interface ItemPriceHistory {
+  points: PriceHistoryPoint[];
+  initialPriceCents: number | null;
+  targetPriceCents: number | null;
+  priceBasis: PriceBasis;
+  url: string;
+  domain: string;
+}
+
+export interface SavingsSummary {
+  /** Itens a comprar que têm preço de cadastro e preço atual lido na loja. */
+  trackedItemsCount: number;
+  totalInitialCents: number;
+  totalCurrentCents: number;
+  /** Soma do quanto os itens baixaram desde o cadastro. */
+  totalSavingsCents: number;
+  /** Soma do quanto os itens subiram desde o cadastro. */
+  totalIncreaseCents: number;
+  itemsWithDropsCount: number;
+  itemsAtLowestPriceCount: number;
+}
+
 export interface EnxovalItem {
   id: string;
   name: string;
@@ -61,8 +157,19 @@ export interface EnxovalItem {
   /** Desconto ou cashback já abatido do preço (0 quando não há ou quando o item foi ganho). */
   discountCents: number;
   sortOrder: number;
+  /** Semana de compra escolhida pela pessoa, contada a partir da semana da mudança (negativa: antes). Null: vale a sugestão. */
+  buyWeek: number | null;
+  /** Dados do catálogo gravados quando o item veio do funil; nulos nos demais (o planejamento infere pelo nome). */
+  priceCategory: PriceCategory | null;
+  priority: ItemPriority | null;
+  timing: ItemTiming | null;
   updatedAt: string;
   createdAt?: string;
+  /** Foto do produto, quando o item veio do link de uma loja. */
+  imageUrl?: string | null;
+  /** Variação escolhida na importação, como "220V" ou "110V · Preto". */
+  selectedVariation?: string | null;
+  priceTracking?: ItemPriceTracking | null;
 }
 
 export interface AuthUser {

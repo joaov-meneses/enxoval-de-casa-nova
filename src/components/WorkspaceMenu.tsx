@@ -4,9 +4,11 @@ import {
   Plus,
   UserPlus,
   Trash2,
+  DoorOpen,
   LogOut,
   X,
   ListChecks,
+  MessageCircleHeart,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -44,7 +46,10 @@ interface WorkspaceMenuProps {
   onCreate: () => void;
   onInvite: () => void;
   onDelete: () => void;
+  onLeave: () => void;
   onLogout: () => void;
+  /** Abre a central de ajuda (relatar problema ou sugerir melhoria). */
+  onHelp: () => void;
 }
 
 export function WorkspaceMenu(props: WorkspaceMenuProps) {
@@ -91,6 +96,17 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           </button>
         </div>
         <div className="workspace-menu-content">
+          <div className="workspace-menu-help">
+            <button type="button" onClick={() => run(props.onHelp)}>
+              <span className="workspace-menu-help-icon" aria-hidden="true">
+                <MessageCircleHeart size={20} />
+              </span>
+              <span className="workspace-menu-help-text">
+                <strong>Central de ajuda</strong>
+                <small>Relate um problema ou sugira uma melhoria</small>
+              </span>
+            </button>
+          </div>
           <section
             className="workspace-menu-switcher"
             aria-label="Seus enxovais"
@@ -141,6 +157,18 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 </p>
               </div>
             </section>
+          )}
+          {hasEnxoval && !isOwner && (
+            <div className="workspace-menu-danger">
+              <button
+                type="button"
+                disabled={props.busy}
+                onClick={() => run(props.onLeave)}
+              >
+                <DoorOpen size={18} /> Sair do enxoval
+              </button>
+              <p>Você confirma antes de sair.</p>
+            </div>
           )}
           {hasEnxoval && isOwner && (
             <section

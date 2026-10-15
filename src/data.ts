@@ -2,8 +2,20 @@ import type { Category, EnxovalItem } from './types';
 
 export const DEFAULT_ENXOVAL_TEMPLATE_NAME = 'Lista sugerida de enxoval';
 
-/** Limite de caracteres do nome de um ambiente (UI e API). */
-export const MAX_ENVIRONMENT_NAME_LENGTH = 24;
+/** Limite de caracteres do nome de um ambiente, contando os espaços (UI e API). */
+export const MAX_ENVIRONMENT_NAME_LENGTH = 100;
+
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f\u2028\u2029]+/g;
+
+/** Nome de ambiente em uma linha só: quebras de linha, tabulações e espaços repetidos viram um único espaço. */
+export function normalizeEnvironmentName(value: string) {
+  return value.replace(CONTROL_CHARACTERS, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Para o campo enquanto se digita ou cola: tira quebras de linha e tabulações, sem apagar os espaços digitados. */
+export function sanitizeEnvironmentNameInput(value: string) {
+  return value.replace(CONTROL_CHARACTERS, ' ').slice(0, MAX_ENVIRONMENT_NAME_LENGTH);
+}
 
 /** Limite de caracteres do nome de um item: cabe numa linha do título, até em telas de 344 px (medido com a fonte real, em Title Case e MAIÚSCULAS). */
 export const MAX_ITEM_NAME_LENGTH = 36;
@@ -237,5 +249,9 @@ export const defaultItems: EnxovalItem[] = DEFAULT_TEMPLATE_ITEMS.map((item, ind
   description: '',
   priceCents: null,
   sortOrder: index,
+  buyWeek: null,
+  priceCategory: null,
+  priority: null,
+  timing: null,
   updatedAt: fallbackUpdatedAt
 }));

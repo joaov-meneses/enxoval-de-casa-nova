@@ -5,6 +5,8 @@ import {
   Check,
   ChevronDown,
   CircleCheck,
+  Flame,
+  PiggyBank,
   Coffee,
   BedDouble,
   BedSingle,
@@ -19,6 +21,12 @@ import {
   Wallet,
 } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
+import {
+  buyOpportunities,
+  computeSavings,
+  savingsEquivalent,
+  storeLabel,
+} from "../priceTracking";
 import { ExportMenu } from "./ExportMenu";
 import { ImportItemsButton } from "./ImportItemsDialog";
 import {
@@ -114,6 +122,121 @@ export function RoomIcon({ name, size = 18 }: { name: string; size?: number }) {
                     ? TreePalm
                     : Package;
   return <Icon size={size} strokeWidth={1.6} />;
+}
+
+function safeStoreUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Quanto os itens acompanhados já baixaram desde o cadastro e quais valem a compra hoje. */
+function SavingsThermometer({
+  items,
+  allItems,
+}: {
+  items: EnxovalItem[];
+  allItems: EnxovalItem[];
+}) {
+  const summary = computeSavings(items);
+  if (summary.trackedItemsCount === 0) return null;
+  const opportunities = buyOpportunities(items).slice(0, 4);
+  const equivalent = savingsEquivalent(allItems, summary.totalSavingsCents);
+  const savedShare = summary.totalInitialCents
+    ? Math.min(100, Math.round((summary.totalSavingsCents / summary.totalInitialCents) * 100))
+    : 0;
+  const format = (cents: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+  const hasSavings = summary.totalSavingsCents > 0;
+
+  return (
+    <section className="savings-card" aria-labelledby="savings-title">
+      <div className="savings-main">
+        <span className="stat-icon sage" aria-hidden="true">
+          <PiggyBank size={20} />
+        </span>
+        <div>
+          <h3 id="savings-title" className="savings-title">
+            Termômetro de economia
+          </h3>
+          {hasSavings ? (
+            <>
+              <p className="savings-value">
+                Economia potencial acumulada: <strong>{format(summary.totalSavingsCents)}</strong>
+              </p>
+              <p className="savings-note">
+                {equivalent.length > 0
+                  ? `Comprando agora, a economia equivale a ${equivalent.join(" e ")}. Os preços mudam, então vale conferir na loja.`
+                  : `São ${summary.itemsWithDropsCount} ${summary.itemsWithDropsCount === 1 ? "item" : "itens"} mais ${summary.itemsWithDropsCount === 1 ? "barato" : "baratos"} que no dia em que você cadastrou.`}
+              </p>
+            </>
+          ) : (
+            <p className="savings-value">
+              Os preços dos {summary.trackedItemsCount}{" "}
+              {summary.trackedItemsCount === 1 ? "item acompanhado" : "itens acompanhados"} ainda não baixaram.
+              {summary.totalIncreaseCents > 0
+                ? ` Subiram ${format(summary.totalIncreaseCents)} no total.`
+                : ""}
+            </p>
+          )}
+          <div
+            className="savings-meter"
+            role="meter"
+            aria-label="Economia em relação aos preços cadastrados"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={savedShare}
+          >
+            <span style={{ width: `${savedShare}%`, minWidth: hasSavings ? 6 : 0 }} />
+          </div>
+          <p className="savings-detail">
+            {savedShare}% abaixo do cadastrado · {summary.itemsAtLowestPriceCount}{" "}
+            {summary.itemsAtLowestPriceCount === 1 ? "item no menor preço" : "itens no menor preço"} dos últimos 60 dias
+          </p>
+        </div>
+      </div>
+      {opportunities.length > 0 && (
+        <div className="savings-deals">
+          <h4>Oportunidades de compra hoje</h4>
+          <ul>
+            {opportunities.map(({ item, tracking, change }) => {
+              const url = safeStoreUrl(tracking.url);
+              return (
+                <li key={item.id}>
+                  <span className="savings-deal-name">
+                    {item.name}
+                    <small>{storeLabel(tracking.domain)}</small>
+                  </span>
+                  <span className="savings-deal-price">
+                    {tracking.currentPriceCents !== null && format(tracking.currentPriceCents)}
+                    {change.direction === "down" && (
+                      <b>
+                        −{format(Math.abs(change.deltaCents))} ({change.percent}%)
+                      </b>
+                    )}
+                    {tracking.isLowestIn60d && (
+                      <b className="is-lowest">
+                        <Flame size={11} aria-hidden="true" /> menor em 60 dias
+                      </b>
+                    )}
+                  </span>
+                  {url && (
+                    <a href={url} target="_blank" rel="noopener noreferrer">
+                      Ver na loja
+                      <ArrowUpRight size={12} aria-hidden="true" />
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
 }
 
 type RoomOrder = "default" | "pending" | "progress";
@@ -261,22 +384,8 @@ export function WorkspaceOverview({
               : "Organize os desejos, acompanhe as compras e aproveite o caminho."}
           </p>
         </div>
-        {view === "overview" && (
-          <div className="workspace-welcome-actions">
-            <ImportItemsButton
-              enxovalId={enxovalId}
-              items={items}
-              categories={categories}
-              onImported={onImported}
-            />
-            <ExportMenu
-              categories={categories}
-              items={items}
-              enxovalName={name}
-            />
-          </div>
-        )}
       </div>
+      <SavingsThermometer items={statsItems} allItems={items} />
       <p className="stats-scope">
         {scope ? (
           <>
@@ -588,14 +697,27 @@ export function WorkspaceOverview({
                 Ambientes
                 <span className="rooms-count">{categories.length}</span>
               </h3>
-              <button
-                type="button"
-                className="panel-add"
-                onClick={onAddCategory}
-              >
-                <Plus size={15} strokeWidth={2.2} aria-hidden="true" /> Novo
-                <span className="sr-only"> ambiente</span>
-              </button>
+              <div className="rooms-toolbar-actions">
+                <ImportItemsButton
+                  enxovalId={enxovalId}
+                  items={items}
+                  categories={categories}
+                  onImported={onImported}
+                />
+                <ExportMenu
+                  categories={categories}
+                  items={items}
+                  enxovalName={name}
+                />
+                <button
+                  type="button"
+                  className="panel-add"
+                  onClick={onAddCategory}
+                >
+                  <Plus size={15} strokeWidth={2.2} aria-hidden="true" /> Novo
+                  <span className="sr-only"> ambiente</span>
+                </button>
+              </div>
             </div>
             {categories.length > 1 && (
               <div

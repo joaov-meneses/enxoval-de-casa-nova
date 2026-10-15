@@ -98,7 +98,7 @@ export async function createXlsxBlob(items: EnxovalItem[]): Promise<Blob> {
 }
 
 function fileBaseName(name: string) {
-  return `larume-${
+  return `casamia-${
     name
       .replace(/[^\p{L}\p{N}\s-]/gu, "")
       .trim()

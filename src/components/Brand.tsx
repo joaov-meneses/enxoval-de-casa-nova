@@ -16,14 +16,14 @@ export function Brand({
       aria-label="Casa Mia — sua casa, item por item"
     >
       <picture className="brand-picture">
-        <source srcSet="/brand/casamia-symbol.svg" type="image/svg+xml" />
+        <source srcSet="/brand/nino-logo.webp" type="image/webp" />
         <img
-          src="/brand/casamia-symbol.png"
+          src="/brand/nino-logo.png"
           alt=""
           aria-hidden="true"
           className="brand-symbol"
-          width="512"
-          height="512"
+          width="224"
+          height="264"
         />
       </picture>
       {!compact && <span className="brand-word">Casa Mia</span>}

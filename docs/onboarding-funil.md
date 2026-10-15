@@ -1,4 +1,4 @@
-# Funil de onboarding da Larume (`/comecar`)
+# Funil de onboarding do Casa Mia (`/comecar`)
 
 A pessoa cria a conta primeiro (`/login`, aba "Criar conta") e só depois responde a perguntas curtas para receber um **plano de enxoval de casa nova já montado**. O funil é a etapa pós-cadastro: exige sessão autenticada e termina criando o primeiro enxoval, já com o plano.
 
@@ -20,7 +20,7 @@ A referência foi um app de enxoval de bebê (29 telas, 12 perguntas, ~3 minutos
 3. **Esforço que devolve algo visível.** O efeito IKEA só funciona quando o esforço termina em um resultado concluído. Por isso a tela "montando" e o plano são feitos com as respostas, e não são genéricos.
 4. **Uma decisão por tela, um botão primário.** Botão "Continuar" fixo no rodapé, na área do polegar. Todas as telas têm "Voltar" (botão e botão voltar do navegador/Android). Nenhuma tela do funil leva a login.
 5. **Nada de prova social inventada.** Sem avaliação "5,0", sem "20.858 famílias", sem depoimentos. Só entram números que o próprio plano calcula.
-6. **Respostas guardadas no aparelho** (`localStorage`, `larume.onboarding.v1`). Fechar e voltar retoma de onde parou. Nada das respostas é enviado ao servidor até o plano ser criado, no fim do funil; nesse momento elas vão junto e são gravadas em `enxovais.onboarding_profile`.
+6. **Respostas guardadas no aparelho** (`localStorage`, `casamia.onboarding.v1`). Fechar e voltar retoma de onde parou. Nada das respostas é enviado ao servidor até o plano ser criado, no fim do funil; nesse momento elas vão junto e são gravadas em `enxovais.onboarding_profile`.
 
 ## Sequência (24 telas, 12 perguntas)
 
@@ -43,7 +43,7 @@ Barra de progresso entre "nome" e "plano pronto". O número de passos muda: "sem
 | 13 | `style` | única | Completo ou minimalista (com a contagem de itens de cada um, ao vivo) | `style` | Lista só com essenciais ou lista completa |
 | 14 | `budget` | única | Quanto pretende investir? | `budget` | Faixa de referência e "compras para depois" |
 | 15 | `worries` | múltipla, opcional | O que mais te preocupa? | `worries[]` | Texto da tela de comparação |
-| 16 | `usage` | múltipla, opcional | Como quer usar a Larume? | `usage[]` | Primeiros passos sugeridos |
+| 16 | `usage` | múltipla, opcional | Como quer usar o Casa Mia? | `usage[]` | Primeiros passos sugeridos |
 | 17 | `thanks` | respiro | Frase por momento + "Um plano só seu" | — | — |
 | 18 | `building` | espera | % animado, checklist que vai marcando (≈ 4 s) | — | — |
 | 19 | `ready` | resultado | Essenciais × plano completo, ambientes com contagem, estimativa de referência, 3 primeiros passos | — | — |
@@ -57,7 +57,7 @@ Barra de progresso entre "nome" e "plano pronto". O número de passos muda: "sem
 
 ## Informações de valor antes da conta
 
-Depois do plano pronto, três telas mostram **resultados calculados a partir das respostas**, para que a pessoa veja o que a Larume já resolveu antes de criar a conta. Nada é inventado: tudo sai do catálogo e das respostas (`savingsFor`, `firstNightItems` e `scheduleFor` em `src/onboarding/plan.ts`).
+Depois do plano pronto, três telas mostram **resultados calculados a partir das respostas**, para que a pessoa veja o que o Casa Mia já resolveu antes de criar a conta. Nada é inventado: tudo sai do catálogo e das respostas (`savingsFor`, `firstNightItems` e `scheduleFor` em `src/onboarding/plan.ts`).
 
 - **Economia (`savings`)**: compara o plano com uma lista genérica (todo o catálogo, sem considerar clima, moradia, região, momento nem espaços). Plano + itens de fora = lista genérica, e cada item de fora tem um motivo. Os valores são a mesma faixa de referência do restante do funil e aparecem rotulados como tal.
 - **Primeira noite (`firstnight`)**: itens marcados com `I` no catálogo, presentes só nos espaços escolhidos, com as quantidades por morador.
@@ -75,12 +75,13 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
   - **Quantidades** vão na descrição do item ("Essencial · 4 un."). A descrição é editável pela pessoa.
   - **Studio** funde sala e quarto no ambiente "Sala e Quarto": marcar "Sala e quarto" traz os dois.
 - **Progresso salvo antes da escolha de cozinha e banheiro** (versão 1 do armazenamento) é migrado: volta com os dois marcados.
-- **Estimativa de referência** (faixas por categoria de preço): é só uma ordem de grandeza, rotulada como tal, e **nunca é gravada no preço dos itens** (o preço do item alimenta o total gasto e os descontos, então deve ser sempre do usuário).
+- **Cidade (opcional, no passo `state`)**: refina o estado com características locais (umidade, maresia, estação seca, chuva forte) e libera itens regionais do catálogo. O perfil de gasto sugerido para o orçamento também segue junto das respostas. Ver [planejamento-de-compras.md](planejamento-de-compras.md).
+- **Estimativa de referência** (faixas por categoria de preço, no perfil "equilibrado"): é só uma ordem de grandeza, rotulada como tal, e **nunca é gravada no preço dos itens** (o preço do item alimenta o total gasto e os descontos, então deve ser sempre do usuário).
 
 ## Design
 
-- **Paleta Larume**: papel `#faf8f4`, tinta `#343b32`, madeira `#866344`, areia `#efe7da`, sálvia `#e9eee5`. Títulos em Playfair Display; texto em DM Sans.
-- **Guia visual**: o símbolo da casa Larume faz o papel do mascote da referência (flutua, "acena", aparece na fala de abertura).
+- **Paleta Casa Mia**: creme `#fbf3e6`, café `#3b2a20`, terracota `#c2603f`, oliva `#5c6643`, azulejo `#244b66` (tokens `--color-brand-*` em `src/index.css`). Títulos em Fraunces; texto em Nunito. Detalhes em [branding-casa-mia.md](branding-casa-mia.md).
+- **Guia visual**: o mascote Nino (`src/components/Nino.tsx`) faz o papel do mascote da referência (flutua, "acena", aparece na fala de abertura).
 - **Mobile (padrão)**: tela cheia `100dvh`; cabeçalho com voltar + barra de progresso; conteúdo rolável; botão fixo no rodapé com `env(safe-area-inset-bottom)`; alvos de toque ≥ 52 px.
 - **Tablet**: coluna única centralizada (máx. 560 px).
 - **Desktop (≥ 1000 px)**: duas colunas. À esquerda a fotografia da marca e uma frase; à direita o funil (máx. 480 px), com o botão no fluxo, logo abaixo do conteúdo.
@@ -111,7 +112,7 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
 
 ## Medição
 
-`src/onboarding/analytics.ts` dispara `CustomEvent("larume:onboarding")` com `{ event, step, index, ... }` em: `onboarding_start`, `step_view`, `step_complete`, `onboarding_back`, `plan_ready`, `signup_submit`, `signup_success`. Basta ligar um provedor de analytics ao evento. Métricas a acompanhar:
+`src/onboarding/analytics.ts` dispara `CustomEvent("casamia:onboarding")` com `{ event, step, index, ... }` em: `onboarding_start`, `step_view`, `step_complete`, `onboarding_back`, `plan_ready`, `signup_submit`, `signup_success`. Basta ligar um provedor de analytics ao evento. Métricas a acompanhar:
 
 1. Início → nome (a abertura convence?).
 2. Taxa de conclusão por pergunta (a que mais perde gente é candidata a sair).

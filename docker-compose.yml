@@ -1,24 +1,24 @@
-# PostgreSQL de desenvolvimento do Larume.
+# PostgreSQL de desenvolvimento do Casa Mia.
 # Variáveis lidas do .env (veja .env.example). Uso: npm run db:up
-name: larume
+name: casamia
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: larume_db
+    container_name: casamia_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-larume}
+      POSTGRES_USER: ${POSTGRES_USER:-casamia}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
-      POSTGRES_DB: ${POSTGRES_DB:-larume}
+      POSTGRES_DB: ${POSTGRES_DB:-casamia}
       # Permitem usar `psql` dentro do container sem informar usuário/banco.
-      PGUSER: ${POSTGRES_USER:-larume}
-      PGDATABASE: ${POSTGRES_DB:-larume}
+      PGUSER: ${POSTGRES_USER:-casamia}
+      PGDATABASE: ${POSTGRES_DB:-casamia}
     ports:
       # Só localhost. 5433 evita conflito com outros Postgres locais na 5432.
       - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
-      - larume_pgdata:/var/lib/postgresql/data
+      - casamia_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -26,4 +26,4 @@ services:
       retries: 10
 
 volumes:
-  larume_pgdata:
+  casamia_pgdata:

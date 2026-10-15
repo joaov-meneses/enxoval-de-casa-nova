@@ -4,6 +4,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import { migrateDatabase } from "./migrations.ts";
 import { registerApiRoutes } from "./routes.ts";
+import { startPriceTrackerScheduler } from "./workers/priceTrackerWorker.ts";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -50,3 +51,9 @@ if (isProduction) {
 app.listen(port, "0.0.0.0", () => {
   console.log(`Servidor rodando em http://localhost:${port}`);
 });
+
+// Relê os preços dos produtos acompanhados a cada 12 horas. Em desenvolvimento fica desligado, para não acessar
+// lojas sem querer; PRICE_TRACKER=on liga e PRICE_TRACKER=off desliga em qualquer ambiente.
+if (process.env.PRICE_TRACKER === "on" || (isProduction && process.env.PRICE_TRACKER !== "off")) {
+  startPriceTrackerScheduler();
+}

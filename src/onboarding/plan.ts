@@ -1,4 +1,6 @@
-import { CATALOG, type CatalogEntry } from "./catalog";
+import { CATALOG, matchesWhere, type CatalogEntry } from "./catalog";
+import { bandFor, suggestSpendingTier } from "../planning/spending";
+import { cityMatchesState, NORDESTE, traitsOfCity, type Trait } from "./regions";
 import type {
   Answers,
   Budget,
@@ -22,6 +24,7 @@ export const emptyAnswers: Answers = {
   moveDate: null,
   moveDateAnswered: false,
   state: null,
+  city: null,
   housing: null,
   people: null,
   rooms: null,
@@ -72,8 +75,6 @@ export const STATES: StateInfo[] = [
   { uf: "SE", name: "Sergipe", loc: "em Sergipe", climate: "hot" },
   { uf: "TO", name: "Tocantins", loc: "no Tocantins", climate: "hot" },
 ];
-
-const NORDESTE = new Set(["AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"]);
 
 export function stateInfo(uf: string | null): StateInfo {
   return STATES.find((s) => s.uf === uf) ?? STATES.find((s) => s.uf === "SP")!;
@@ -161,12 +162,12 @@ const BUDGET_MAX_CENTS: Record<Budget, number | null> = {
   unknown: null,
 };
 
-/** Faixas de referência por categoria de preço (centavos). Só para a estimativa do funil. */
+/** Faixas de referência por categoria de preço (centavos), no perfil equilibrado. Só para a estimativa do funil. */
 const TIER_BAND: Record<1 | 2 | 3 | 4, [number, number]> = {
-  1: [2_500, 5_000],
-  2: [8_000, 15_000],
-  3: [25_000, 50_000],
-  4: [120_000, 220_000],
+  1: [bandFor("equilibrado", 1).minCents, bandFor("equilibrado", 1).maxCents],
+  2: [bandFor("equilibrado", 2).minCents, bandFor("equilibrado", 2).maxCents],
+  3: [bandFor("equilibrado", 3).minCents, bandFor("equilibrado", 3).maxCents],
+  4: [bandFor("equilibrado", 4).minCents, bandFor("equilibrado", 4).maxCents],
 };
 
 const DEFERRED_NOTE = "pode ficar para depois";
@@ -180,6 +181,10 @@ interface Resolved {
   people: number;
   rooms: Set<RoomKey>;
   uf: string;
+  /** Cidade escolhida (sempre do estado informado), ou null. */
+  city: string | null;
+  /** Características da cidade (umidade, maresia, estação seca, chuva forte). */
+  traits: Set<Trait>;
   climate: Climate;
   style: "full" | "min";
   budget: Budget;
@@ -200,12 +205,15 @@ function resolve(a: Answers): Resolved {
     else rooms.delete("quarto");
   }
   const info = stateInfo(a.state);
+  const city = a.city && cityMatchesState(a.city, info.uf) ? a.city : null;
   return {
     moment,
     housing,
     people,
     rooms,
     uf: info.uf,
+    city,
+    traits: traitsOfCity(city),
     climate: info.climate,
     style: a.style ?? "full",
     budget: a.budget ?? "unknown",
@@ -237,6 +245,9 @@ function evaluate(entry: CatalogEntry, r: Resolved, full: boolean): Evaluation {
   }
   if (has("F") && r.climate === "hot") return skip("climate");
   if ((has("N") && !NORDESTE.has(r.uf)) || (has("R") && r.uf !== "RS")) {
+    return skip("region");
+  }
+  if (!matchesWhere(entry.where, { uf: r.uf, city: r.city, traits: r.traits })) {
     return skip("region");
   }
   if ((has("C") && r.moment !== "casal") || (has("S") && r.moment === "casal")) {
@@ -281,6 +292,7 @@ function itemsFor(r: Resolved, full: boolean) {
     if (quantity > 1 || (quantity === 1 && has("P"))) {
       parts.push(`${quantity} un.`);
     }
+    if (entry.note) parts.push(entry.note);
 
     const list = byRoom.get(roomKey) ?? [];
     list.push({
@@ -290,6 +302,7 @@ function itemsFor(r: Resolved, full: boolean) {
       tier: entry.tier,
       room: entry.room,
       firstNight: has("I"),
+      soon: has("U"),
     });
     byRoom.set(roomKey, list);
   }
@@ -360,6 +373,10 @@ export function generatePlan(answers: Answers): GeneratedPlan {
 
   const { min, max } = estimate(categories);
   const limit = BUDGET_MAX_CENTS[r.budget];
+  const spendingTier = suggestSpendingTier(
+    categories.flatMap((category) => category.items.map((item) => item.tier)),
+    limit,
+  );
   const budgetFit =
     limit === null ? "unknown" : min > limit ? "over" : max <= limit ? "within" : "tight";
 
@@ -404,6 +421,7 @@ export function generatePlan(answers: Answers): GeneratedPlan {
       estimateNowMaxCents: now.max,
       bigTicketDeferred: deferred,
       budgetFit,
+      spendingTier,
     },
   };
 }
@@ -415,6 +433,13 @@ export function toPayload(plan: GeneratedPlan): PlanPayload {
       items: category.items.map((item) => ({
         name: item.name,
         description: item.description,
+        priceCategory: item.tier,
+        priority: item.essential ? ("essential" as const) : ("optional" as const),
+        timing: item.firstNight
+          ? ("first_night" as const)
+          : item.soon
+            ? ("first_week" as const)
+            : null,
       })),
     })),
   };

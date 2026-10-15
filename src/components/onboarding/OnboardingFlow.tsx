@@ -64,6 +64,12 @@ import { createEnxovalFromOnboarding, fetchBootstrap } from "../../api";
 import { track } from "../../onboarding/analytics";
 import { detectStateFromDevice } from "../../onboarding/location";
 import {
+  citiesOfState,
+  cityById,
+  cityMatchesState,
+  TRAIT_COPY,
+} from "../../onboarding/regions";
+import {
   defaultPeople,
   defaultRooms,
   emptyAnswers,
@@ -569,10 +575,10 @@ export default function OnboardingFlow() {
           <div className="ob-center">
             <Ring reduced={reduced}>
               <motion.img
-                src="/brand/casamia-symbol.webp"
+                src="/brand/nino.webp"
                 alt=""
-                width={512}
-                height={512}
+                width={809}
+                height={952}
                 className="ob-ring-mark"
                 animate={reduced ? undefined : { rotate: [0, -8, 7, -4, 0] }}
                 transition={{ duration: 1.4, delay: 0.5, ease: "easeInOut" }}
@@ -629,7 +635,21 @@ export default function OnboardingFlow() {
 
       case "state":
         return (
-          <StateStep value={stateValue} onChange={(state) => set({ state })} />
+          <StateStep
+            value={stateValue}
+            city={answers.city}
+            onChange={(state) =>
+              set({
+                state,
+                // A cidade nunca contradiz o estado: trocar de estado limpa a cidade anterior.
+                city:
+                  answers.city && cityMatchesState(answers.city, state)
+                    ? answers.city
+                    : null,
+              })
+            }
+            onCityChange={(city) => set({ city })}
+          />
         );
 
       case "climate":
@@ -846,7 +866,7 @@ export default function OnboardingFlow() {
   return (
     <div className="ob" data-step={step}>
       <aside className="ob-aside">
-        <img src="/images/larume-home.webp" alt="" />
+        <img src="/images/casamia-home.webp" alt="" />
         <a href="/" className="brand-link ob-aside-brand">
           <Brand light />
         </a>
@@ -1001,10 +1021,10 @@ function WelcomeStep({ reduced }: { reduced: boolean }) {
           Oi! Boas-vindas ao Casa Mia.
         </motion.div>
         <motion.img
-          src="/brand/casamia-symbol.webp"
+          src="/brand/nino.webp"
           alt=""
-          width={512}
-          height={512}
+          width={809}
+          height={952}
           className="ob-mark"
           animate={reduced ? undefined : { y: [0, -7, 0] }}
           transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
@@ -1190,11 +1210,17 @@ function TimelineStep({
 
 function StateStep({
   value,
+  city,
   onChange,
+  onCityChange,
 }: {
   value: string;
+  city: string | null;
   onChange: (uf: string) => void;
+  onCityChange: (city: string | null) => void;
 }) {
+  const cities = citiesOfState(value);
+  const chosen = cityById(city);
   const [status, setStatus] = useState<
     "idle" | "loading" | "ok" | "outside" | "denied" | "unavailable"
   >("idle");
@@ -1251,6 +1277,33 @@ function StateStep({
         options={STATES.map((s) => ({ value: s.uf, label: s.name }))}
         onChange={onChange}
       />
+      {cities.length > 0 && (
+        <fieldset className="ob-city">
+          <legend>E a cidade? (opcional)</legend>
+          <div className="ob-city-chips">
+            {[...cities, null].map((entry) => {
+              const id = entry?.id ?? "";
+              return (
+                <label key={id || "outra"} className="ob-city-chip">
+                  <input
+                    type="radio"
+                    name="ob-city"
+                    value={id}
+                    checked={(city ?? "") === id}
+                    onChange={() => onCityChange(entry?.id ?? null)}
+                  />
+                  <span>{entry?.name ?? "Outra cidade"}</span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="ob-city-note" role="status">
+            {chosen && chosen.traits.length > 0
+              ? `${chosen.name} tem ${chosen.traits.map((trait) => TRAIT_COPY[trait]).join("; ")}. Vou incluir itens para isso.`
+              : "Com a cidade eu acrescento itens do clima e dos costumes locais. Sem ela, valem os do estado."}
+          </p>
+        </fieldset>
+      )}
     </>
   );
 }
@@ -1545,10 +1598,10 @@ function BuildingStep({
   return (
     <div className="ob-center ob-building">
       <motion.img
-        src="/brand/casamia-symbol.webp"
+        src="/brand/nino.webp"
         alt=""
-        width={512}
-        height={512}
+        width={809}
+        height={952}
         className="ob-mark ob-mark-sm"
         animate={reduced ? undefined : { rotate: [0, -5, 5, 0] }}
         transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
@@ -2071,6 +2124,8 @@ function SaveStep({
   const profile = {
     ...answers,
     state: answers.state ?? guessState(),
+    // O perfil de gasto sugerido pelo orçamento; a pessoa pode mudar depois, no planejamento.
+    spendingTier: plan.stats.spendingTier,
     people: answers.people ?? defaultPeople(answers.moment),
     rooms: answers.rooms ?? defaultRooms(answers.housing, answers.people),
   };

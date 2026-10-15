@@ -26,7 +26,7 @@ const control = new pg.Pool({
   connectionString: originalUrl.toString(),
   ssl: ssl ? { rejectUnauthorized: false } : undefined,
 });
-const schema = `larume_password_reset_test_${randomUUID().replaceAll("-", "")}`;
+const schema = `casamia_password_reset_test_${randomUUID().replaceAll("-", "")}`;
 let server;
 let created = false;
 

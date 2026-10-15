@@ -1,15 +1,22 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
-import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH } from '../src/data.ts';
+import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH, normalizeEnvironmentName } from '../src/data.ts';
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity, quantityFromDescription } from '../src/itemQuantity.ts';
 import { DEFAULT_ITEM_STATUS, isDoneStatus, isItemStatus, resolveDiscountCents, statusFromChecked, type ItemStatus } from '../src/itemStatus.ts';
-import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalInvitation, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace, InvitationPreview } from '../src/types.ts';
+import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalInvitation, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace, InvitationPreview, ItemPriceHistory, ItemPriceTracking, ItemTrackingInput, PriceBasis, TrackingStatus } from '../src/types.ts';
+import { computeSavings } from '../src/priceTracking.ts';
 import { getPool, withTransaction, Queryable } from './database.ts';
-import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, verifyPassword } from './security.ts';
+import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, rateLimit, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { registerFeedbackRoutes } from './feedback.ts';
 import { appBaseUrl, canDeliverMail, invitationEmail, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
+import { isPriceCategory, isSpendingTier, type PriceCategory, type SpendingTier } from '../src/planning/spending.ts';
+import { isBuyWeek, MAX_BUY_WEEK, MIN_BUY_WEEK, type ItemPriority, type ItemTiming } from '../src/planning/purchasePlan.ts';
+import { cityById, cityMatchesState } from '../src/onboarding/regions.ts';
+import { ScrapeError, rememberPreview, scrapeProduct } from './services/productScraper.ts';
+import { findOrCreateTrackedProduct, requireTrackableUrl } from './trackedProducts.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -38,6 +45,10 @@ interface EnxovalRow {
   owner_name: string;
   role: 'owner' | 'editor';
   discount_cents: number;
+  move_date: string | null;
+  state: string | null;
+  city: string | null;
+  spending_tier: SpendingTier;
 }
 
 interface InvitationRow {
@@ -73,8 +84,28 @@ interface ItemRow {
   discount_cents: number;
   quantity: number;
   sort_order: number;
+  buy_week: number | null;
+  price_category: number | null;
+  priority: ItemPriority | null;
+  timing: ItemTiming | null;
   updated_at: string | Date;
   created_at: string | Date;
+  image_url: string | null;
+  selected_variation: string | null;
+  tracked_product_id: string | null;
+  initial_price_cents: number | null;
+  target_price_cents: number | null;
+  price_alert_enabled: boolean;
+  price_basis: PriceBasis;
+  tracked_url: string | null;
+  tracked_domain: string | null;
+  tracked_in_stock: boolean | null;
+  tracked_last_scraped_at: string | Date | null;
+  tracked_status: TrackingStatus | null;
+  tracked_current_cents: number | null;
+  tracked_low60_cents: number | null;
+  tracked_high60_cents: number | null;
+  tracked_samples60: number | null;
 }
 
 interface TemplateRow {
@@ -106,7 +137,9 @@ function requireText(value: unknown, fieldName: string) {
 }
 
 function requireEnvironmentName(value: unknown) {
-  const name = requireText(value, 'Nome do ambiente');
+  // Uma linha só: quebras de linha e espaços repetidos viram um espaço antes de contar os caracteres.
+  const name = normalizeEnvironmentName(requireText(value, 'Nome do ambiente'));
+  if (!name) throw new HttpError(400, 'Nome do ambiente é obrigatório.');
   if (name.length > MAX_ENVIRONMENT_NAME_LENGTH) {
     throw new HttpError(400, `O nome do ambiente pode ter no máximo ${MAX_ENVIRONMENT_NAME_LENGTH} caracteres.`);
   }
@@ -139,7 +172,11 @@ function mapEnxoval(row: EnxovalRow): EnxovalSummary {
     ownerId: row.owner_id,
     ownerName: row.owner_name,
     role: row.role,
-    discountCents: Number(row.discount_cents ?? 0)
+    discountCents: Number(row.discount_cents ?? 0),
+    moveDate: row.move_date ?? null,
+    state: row.state ?? null,
+    city: row.city ?? null,
+    spendingTier: row.spending_tier ?? 'equilibrado'
   };
 }
 
@@ -164,6 +201,32 @@ function mapCategory(row: CategoryRow): EnxovalCategory {
   };
 }
 
+function nullableCents(value: number | null | undefined) {
+  return value === null || value === undefined ? null : Number(value);
+}
+
+function mapPriceTracking(row: ItemRow): ItemPriceTracking | null {
+  if (!row.tracked_product_id || !row.tracked_url) return null;
+  const current = nullableCents(row.tracked_current_cents);
+  const low = nullableCents(row.tracked_low60_cents);
+  const high = nullableCents(row.tracked_high60_cents);
+  return {
+    domain: row.tracked_domain ?? '',
+    url: row.tracked_url,
+    initialPriceCents: nullableCents(row.initial_price_cents),
+    targetPriceCents: nullableCents(row.target_price_cents),
+    priceAlertEnabled: row.price_alert_enabled,
+    priceBasis: row.price_basis,
+    currentPriceCents: current,
+    lowestPriceCents60d: low,
+    // "Menor preço dos últimos 60 dias" só vale quando houve variação: preço sempre igual não é destaque.
+    isLowestIn60d: current !== null && low !== null && high !== null && Number(row.tracked_samples60 ?? 0) >= 2 && current <= low && high > current,
+    inStock: row.tracked_in_stock ?? true,
+    lastCheckedAt: row.tracked_last_scraped_at ? serializeTimestamp(row.tracked_last_scraped_at) : null,
+    status: row.tracked_status ?? 'pending'
+  };
+}
+
 function mapItem(row: ItemRow): EnxovalItem {
   return {
     id: row.id,
@@ -178,14 +241,79 @@ function mapItem(row: ItemRow): EnxovalItem {
     quantity: Number(row.quantity ?? 1),
     discountCents: Number(row.discount_cents ?? 0),
     sortOrder: row.sort_order,
+    buyWeek: row.buy_week === null || row.buy_week === undefined ? null : Number(row.buy_week),
+    priceCategory: isPriceCategory(Number(row.price_category)) ? Number(row.price_category) as PriceCategory : null,
+    priority: row.priority ?? null,
+    timing: row.timing ?? null,
     createdAt: serializeTimestamp(row.created_at),
-    updatedAt: serializeTimestamp(row.updated_at)
+    updatedAt: serializeTimestamp(row.updated_at),
+    imageUrl: row.image_url,
+    selectedVariation: row.selected_variation,
+    priceTracking: mapPriceTracking(row)
   };
 }
 
+// Item com ambiente e, quando acompanha o preço de uma loja, o preço lido e o menor dos últimos 60 dias (no mesmo
+// preço que o item acompanha: normal ou Pix).
+const ITEM_SELECT = `
+  SELECT
+    i.id,
+    i.name,
+    i.category_id,
+    c.name AS category,
+    i.checked,
+    i.status,
+    i.link,
+    i.description,
+    i.price_cents,
+    i.discount_cents,
+    i.quantity,
+    i.sort_order,
+    i.buy_week,
+    i.price_category,
+    i.priority,
+    i.timing,
+    i.created_at,
+    i.updated_at,
+    i.image_url,
+    i.selected_variation,
+    i.tracked_product_id,
+    i.initial_price_cents,
+    i.target_price_cents,
+    i.price_alert_enabled,
+    i.price_basis,
+    tp.url AS tracked_url,
+    tp.domain AS tracked_domain,
+    tp.in_stock AS tracked_in_stock,
+    tp.last_scraped_at AS tracked_last_scraped_at,
+    tp.last_scrape_status AS tracked_status,
+    CASE WHEN i.price_basis = 'pix' THEN tp.pix_price_cents ELSE tp.current_price_cents END AS tracked_current_cents,
+    ps.low_cents AS tracked_low60_cents,
+    ps.high_cents AS tracked_high60_cents,
+    ps.samples AS tracked_samples60
+  FROM items i
+  INNER JOIN categories c ON c.id = i.category_id
+  LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
+  LEFT JOIN LATERAL (
+    SELECT MIN(v) AS low_cents, MAX(v) AS high_cents, COUNT(v)::int AS samples
+    FROM (
+      SELECT CASE WHEN i.price_basis = 'pix' THEN s.pix_price_cents ELSE s.price_cents END AS v
+      FROM product_price_snapshots s
+      WHERE s.tracked_product_id = i.tracked_product_id
+        AND s.captured_at >= now() - interval '60 days'
+    ) recent
+    WHERE v IS NOT NULL
+  ) ps ON true
+`;
+
+// Data da mudança como texto AAAA-MM-DD: o driver converteria `date` em um Date no fuso do servidor.
+const ENXOVAL_COLUMNS = `
+    e.id, e.name, e.owner_id, o.name AS owner_name, e.discount_cents,
+    to_char(e.move_date, 'YYYY-MM-DD') AS move_date, e.state, e.city, e.spending_tier`;
+
 async function fetchEnxovais(queryable: Queryable, userId: string) {
   const result = await queryable.query<EnxovalRow>(`
-    SELECT e.id, e.name, e.owner_id, o.name AS owner_name, e.discount_cents, em.role
+    SELECT ${ENXOVAL_COLUMNS}, em.role
     FROM enxovais e
     INNER JOIN enxoval_members em ON em.enxoval_id = e.id
     INNER JOIN users o ON o.id = e.owner_id
@@ -213,7 +341,7 @@ async function requireEnxovalOwner(queryable: Queryable, userId: string, enxoval
 
 async function fetchEnxoval(queryable: Queryable, userId: string, enxovalId: string) {
   const result = await queryable.query<EnxovalRow>(`
-    SELECT e.id, e.name, e.owner_id, o.name AS owner_name, e.discount_cents, em.role
+    SELECT ${ENXOVAL_COLUMNS}, em.role
     FROM enxovais e
     INNER JOIN enxoval_members em ON em.enxoval_id = e.id
     INNER JOIN users o ON o.id = e.owner_id
@@ -256,23 +384,7 @@ async function fetchItems(queryable: Queryable, userId: string, enxovalId: strin
   await requireEnxovalMember(queryable, userId, enxovalId);
 
   const result = await queryable.query<ItemRow>(`
-    SELECT
-      i.id,
-      i.name,
-      i.category_id,
-      c.name AS category,
-      i.checked,
-      i.status,
-      i.link,
-      i.description,
-      i.price_cents,
-      i.discount_cents,
-      i.quantity,
-      i.sort_order,
-      i.created_at,
-      i.updated_at
-    FROM items i
-    INNER JOIN categories c ON c.id = i.category_id
+    ${ITEM_SELECT}
     WHERE i.enxoval_id = $1
     ORDER BY c.sort_order ASC, i.sort_order ASC, i.created_at ASC
   `, [enxovalId]);
@@ -383,9 +495,27 @@ async function seedEnxovalDefaults(client: PoolClient, userId: string, enxovalId
   }
 }
 
-interface EnxovalPlan {
-  categories: { name: string; items: { name: string; description: string }[] }[];
+interface EnxovalPlanItem {
+  name: string;
+  description: string;
+  priceCategory: PriceCategory | null;
+  priority: ItemPriority | null;
+  timing: ItemTiming | null;
 }
+
+interface EnxovalPlan {
+  categories: { name: string; items: EnxovalPlanItem[] }[];
+}
+
+/** Campo opcional de um item do plano: ausente vale null; qualquer valor fora da lista recusa o plano. */
+function planField<T>(value: unknown, isValid: (value: unknown) => value is T): T | null {
+  if (value === undefined || value === null) return null;
+  if (!isValid(value)) throw new HttpError(400, 'Plano inválido.');
+  return value;
+}
+
+const isPriority = (value: unknown): value is ItemPriority => value === 'essential' || value === 'optional';
+const isTiming = (value: unknown): value is ItemTiming => value === 'first_night' || value === 'first_week';
 
 const MAX_PLAN_CATEGORIES = 15;
 const MAX_PLAN_ITEMS = 400;
@@ -414,7 +544,14 @@ function parsePlan(value: unknown): EnxovalPlan | null {
         if (name.length > 120) throw new HttpError(400, 'Nome do item muito longo.');
         const description = typeof rawDescription === 'string' ? rawDescription.trim() : '';
         if (description.length > 200) throw new HttpError(400, 'Descrição do item muito longa.');
-        return { name, description };
+        const meta = item as { priceCategory?: unknown; priority?: unknown; timing?: unknown };
+        return {
+          name,
+          description,
+          priceCategory: planField(meta.priceCategory, isPriceCategory),
+          priority: planField(meta.priority, isPriority),
+          timing: planField(meta.timing, isTiming)
+        };
       })
     };
   });
@@ -433,9 +570,10 @@ async function seedEnxovalPlan(client: PoolClient, userId: string, enxovalId: st
     if (planCategory.items.length === 0) continue;
 
     await client.query(`
-      INSERT INTO items (id, user_id, enxoval_id, category_id, name, description, sort_order, quantity)
-      SELECT t.id, $1::uuid, $2::uuid, $3::uuid, t.name, t.description, t.sort_order, t.quantity
-      FROM unnest($4::uuid[], $5::text[], $6::text[], $7::int[], $8::int[]) AS t(id, name, description, sort_order, quantity)
+      INSERT INTO items (id, user_id, enxoval_id, category_id, name, description, sort_order, quantity, price_category, priority, timing)
+      SELECT t.id, $1::uuid, $2::uuid, $3::uuid, t.name, t.description, t.sort_order, t.quantity, t.price_category, t.priority, t.timing
+      FROM unnest($4::uuid[], $5::text[], $6::text[], $7::int[], $8::int[], $9::smallint[], $10::text[], $11::text[])
+        AS t(id, name, description, sort_order, quantity, price_category, priority, timing)
     `, [
       userId,
       enxovalId,
@@ -444,7 +582,10 @@ async function seedEnxovalPlan(client: PoolClient, userId: string, enxovalId: st
       planCategory.items.map(item => item.name),
       planCategory.items.map(item => item.description),
       planCategory.items.map((_, index) => index),
-      planCategory.items.map(item => quantityFromDescription(item.description))
+      planCategory.items.map(item => quantityFromDescription(item.description)),
+      planCategory.items.map(item => item.priceCategory),
+      planCategory.items.map(item => item.priority),
+      planCategory.items.map(item => item.timing)
     ]);
   }
 }
@@ -457,10 +598,15 @@ async function insertEnxoval(
 ) {
   const enxovalId = randomUUID();
 
+  // As respostas que o planejamento usa depois (data, lugar e perfil de gasto) também viram colunas editáveis.
+  const profile = options.profile ?? null;
   await client.query(`
-    INSERT INTO enxovais (id, name, owner_id, onboarding_profile)
-    VALUES ($1, $2, $3, $4::jsonb)
-  `, [enxovalId, name, userId, options.profile ? JSON.stringify(options.profile) : null]);
+    INSERT INTO enxovais (id, name, owner_id, onboarding_profile, move_date, state, city, spending_tier)
+    VALUES ($1, $2, $3, $4::jsonb, $5::date, $6, $7, $8)
+  `, [
+    enxovalId, name, userId, profile ? JSON.stringify(profile) : null,
+    profile?.moveDate ?? null, profile?.state ?? null, profile?.city ?? null, profile?.spendingTier ?? 'equilibrado'
+  ]);
 
   await client.query(`
     INSERT INTO enxoval_members (enxoval_id, user_id, role)
@@ -579,7 +725,77 @@ async function requireCurrentUser(req: Request, allowPasswordChange = false) {
   return user;
 }
 
-async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string; status?: ItemStatus; discountCents?: unknown; quantity?: number }) {
+async function fetchItemRow(queryable: Queryable, itemId: string, enxovalId: string) {
+  const result = await queryable.query<ItemRow>(`
+    ${ITEM_SELECT}
+    WHERE i.id = $1 AND i.enxoval_id = $2
+  `, [itemId, enxovalId]);
+  if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
+  return mapItem(result.rows[0]);
+}
+
+const MAX_PRICE_CENTS = 1_000_000_000;
+
+function parseOptionalCents(value: unknown, message: string) {
+  if (value === undefined || value === null) return value;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > MAX_PRICE_CENTS) throw new HttpError(400, message);
+  return value;
+}
+
+/** AAAA-MM-DD de um dia que existe no calendário (recusa 2027-02-31 e 2027-13-01). */
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** Semana de compra escolhida pela pessoa: inteira, de ${MIN_BUY_WEEK} a ${MAX_BUY_WEEK}; null devolve a escolha ao algoritmo. */
+function parseBuyWeek(value: unknown): number | null {
+  if (value === null) return null;
+  if (!isBuyWeek(value)) throw new HttpError(400, `Semana de compra inválida. Use um número inteiro de ${MIN_BUY_WEEK} a ${MAX_BUY_WEEK}.`);
+  return value;
+}
+
+/** Imagem do produto: só endereços http(s) de tamanho razoável; qualquer outra coisa é descartada sem barrar o item. */
+function sanitizeImageUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 2000) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Lê e valida os campos opcionais de acompanhamento de preço. Só devolve as chaves que vieram no corpo. */
+function parseTrackingInput(body: unknown): ItemTrackingInput {
+  const source = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const has = (key: string) => Object.prototype.hasOwnProperty.call(source, key) && source[key] !== undefined;
+  const input: ItemTrackingInput = {};
+
+  if (has('trackedProductUrl')) input.trackedProductUrl = source.trackedProductUrl === null ? null : requireTrackableUrl(source.trackedProductUrl);
+  if (has('initialPriceCents')) input.initialPriceCents = parseOptionalCents(source.initialPriceCents, 'Preço de referência inválido.') as number | null;
+  if (has('targetPriceCents')) input.targetPriceCents = parseOptionalCents(source.targetPriceCents, 'Preço desejado inválido.') as number | null;
+  if (has('selectedVariation')) {
+    const variation = source.selectedVariation;
+    if (variation !== null && typeof variation !== 'string') throw new HttpError(400, 'Variação inválida.');
+    const text = typeof variation === 'string' ? variation.trim() : '';
+    if (text.length > 80) throw new HttpError(400, 'A variação pode ter no máximo 80 caracteres.');
+    input.selectedVariation = text || null;
+  }
+  if (has('imageUrl')) input.imageUrl = sanitizeImageUrl(source.imageUrl);
+  if (has('priceBasis')) {
+    if (source.priceBasis !== 'regular' && source.priceBasis !== 'pix') throw new HttpError(400, 'Tipo de preço inválido.');
+    input.priceBasis = source.priceBasis;
+  }
+  if (has('priceAlertEnabled')) {
+    if (typeof source.priceAlertEnabled !== 'boolean') throw new HttpError(400, 'Aviso de preço inválido.');
+    input.priceAlertEnabled = source.priceAlertEnabled;
+  }
+  return input;
+}
+
+async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string; status?: ItemStatus; discountCents?: unknown; quantity?: number; buyWeek?: number | null; tracking?: ItemTrackingInput }) {
   return withTransaction(async client => {
     await requireEnxovalMember(client, input.userId, input.enxovalId);
 
@@ -605,34 +821,25 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     const quantity = input.quantity ?? DEFAULT_ITEM_QUANTITY;
     const discount = resolveDiscountCents({ status, priceCents: input.priceCents ?? null, discountCents: input.discountCents });
     if ('error' in discount) throw new HttpError(400, discount.error);
+    const tracking = input.tracking ?? {};
+    const trackedProductId = tracking.trackedProductUrl
+      ? await findOrCreateTrackedProduct(client, tracking.trackedProductUrl, input.name)
+      : null;
+    // O preço de referência é o do dia do cadastro: o informado no formulário ou, na falta dele, o preço do item.
+    const initialPriceCents = trackedProductId ? (tracking.initialPriceCents ?? input.priceCents ?? null) : null;
     await client.query(`
-      INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order, price_cents, discount_cents, link, description, status, checked, quantity)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-    `, [itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, discount.value, input.link ?? '', input.description ?? '', status, isDoneStatus(status), quantity]);
-
-    const itemResult = await client.query<ItemRow>(`
-      SELECT
-        i.id,
-        i.name,
-        i.category_id,
-        c.name AS category,
-        i.checked,
-        i.status,
-        i.link,
-        i.description,
-        i.price_cents,
-        i.discount_cents,
-        i.quantity,
-        i.sort_order,
-        i.created_at,
-        i.updated_at
-      FROM items i
-      INNER JOIN categories c ON c.id = i.category_id
-      WHERE i.id = $1 AND i.enxoval_id = $2
-    `, [itemId, input.enxovalId]);
+      INSERT INTO items (
+        id, user_id, enxoval_id, category_id, name, sort_order, price_cents, discount_cents, link, description, status, checked, quantity,
+        tracked_product_id, initial_price_cents, target_price_cents, selected_variation, image_url, price_alert_enabled, price_basis, buy_week
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+    `, [
+      itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, discount.value, input.link ?? '', input.description ?? '', status, isDoneStatus(status), quantity,
+      trackedProductId, initialPriceCents, trackedProductId ? (tracking.targetPriceCents ?? null) : null, tracking.selectedVariation ?? null, tracking.imageUrl ?? null, tracking.priceAlertEnabled ?? true, tracking.priceBasis ?? 'regular', input.buyWeek ?? null
+    ]);
 
     return {
-      item: mapItem(itemResult.rows[0]),
+      item: await fetchItemRow(client, itemId, input.enxovalId),
       category
     };
   });
@@ -645,8 +852,8 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
   return withTransaction(async client => {
     // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
-    const current = await client.query<{ enxoval_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number }>(`
-      SELECT i.enxoval_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity
+    const current = await client.query<{ enxoval_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null }>(`
+      SELECT i.enxoval_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity, i.tracked_product_id, i.initial_price_cents
       FROM items i
       INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
       WHERE i.id = $1 AND em.user_id = $2
@@ -711,6 +918,8 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       addUpdate('quantity', quantity);
     }
 
+    if (has('buyWeek')) addUpdate('buy_week', parseBuyWeek(updates.buyWeek));
+
     if (has('status') || has('priceCents') || has('discountCents') || typeof updates.checked === 'boolean') {
       const discount = resolveDiscountCents({
         status,
@@ -727,34 +936,37 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       addUpdate('category_id', updates.categoryId);
     }
 
+    const tracking = parseTrackingInput(updates);
+    if (tracking.trackedProductUrl) {
+      const trackedProductId = await findOrCreateTrackedProduct(client, tracking.trackedProductUrl, current.rows[0].name);
+      addUpdate('tracked_product_id', trackedProductId);
+      // Passou a acompanhar agora: o preço de referência é o informado ou o preço atual do item.
+      if (tracking.initialPriceCents === undefined && current.rows[0].initial_price_cents === null) addUpdate('initial_price_cents', priceCents);
+    } else if (tracking.trackedProductUrl === null) {
+      addUpdate('tracked_product_id', null);
+    }
+    if (tracking.initialPriceCents !== undefined) addUpdate('initial_price_cents', tracking.initialPriceCents);
+    if (tracking.targetPriceCents !== undefined) addUpdate('target_price_cents', tracking.targetPriceCents);
+    if (tracking.selectedVariation !== undefined) addUpdate('selected_variation', tracking.selectedVariation);
+    if (tracking.imageUrl !== undefined) addUpdate('image_url', tracking.imageUrl);
+    if (tracking.priceBasis !== undefined) addUpdate('price_basis', tracking.priceBasis);
+    if (tracking.priceAlertEnabled !== undefined) addUpdate('price_alert_enabled', tracking.priceAlertEnabled);
+    // Mudou o alvo, o tipo de preço ou o produto: o último aviso enviado deixa de valer.
+    if (tracking.targetPriceCents !== undefined || tracking.priceBasis !== undefined || tracking.trackedProductUrl !== undefined) addUpdate('last_alert_price_cents', null);
+
     if (setClauses.length === 0) {
       throw new HttpError(400, 'Nenhuma alteração enviada.');
     }
 
     values.push(itemId, enxovalId);
-    const result = await client.query<ItemRow>(`
+    const result = await client.query(`
       UPDATE items
       SET ${setClauses.join(', ')}, updated_at = now()
       WHERE id = $${values.length - 1} AND enxoval_id = $${values.length}
-      RETURNING
-        id,
-        name,
-        category_id,
-        (SELECT name FROM categories WHERE categories.id = items.category_id) AS category,
-        checked,
-        status,
-        link,
-        description,
-        price_cents,
-        discount_cents,
-        quantity,
-        sort_order,
-        created_at,
-        updated_at
     `, values);
 
-    if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
-    return mapItem(result.rows[0]);
+    if (!result.rowCount) throw new HttpError(404, 'Item não encontrado.');
+    return fetchItemRow(client, itemId, enxovalId);
   });
 }
 async function deleteItemForUser(userId: string, itemId: string) {
@@ -819,6 +1031,7 @@ export function registerApiRoutes(app: Express) {
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(protectMutationOrigin);
   registerAdminRoutes(router);
+  registerFeedbackRoutes(router, requireCurrentUser);
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true });
@@ -1020,6 +1233,32 @@ export function registerApiRoutes(app: Express) {
       addUpdate('discount_cents', updates.discountCents);
     }
 
+    // Planejamento (data da mudança, lugar e perfil de gasto) é decisão de quem é dono do enxoval.
+    const has = (key: string) => Object.prototype.hasOwnProperty.call(updates, key);
+    if (has('moveDate') || has('spendingTier') || has('state') || has('city')) {
+      if (role !== 'owner') throw new HttpError(403, 'Apenas o dono pode alterar esse enxoval.');
+    }
+    if (has('moveDate')) {
+      const raw = updates.moveDate;
+      if (raw !== null && !isIsoDate(raw)) throw new HttpError(400, 'Data da mudança inválida.');
+      addUpdate('move_date', raw);
+    }
+    if (has('spendingTier')) {
+      if (!isSpendingTier(updates.spendingTier)) throw new HttpError(400, 'Perfil de gasto inválido.');
+      addUpdate('spending_tier', updates.spendingTier);
+    }
+    if (has('state') || has('city')) {
+      // A cidade nunca contradiz o estado: trocar de estado sem informar cidade apaga a cidade anterior.
+      const current = await getPool().query<{ state: string | null; city: string | null }>('SELECT state, city FROM enxovais WHERE id = $1', [req.params.id]);
+      const state = has('state') ? updates.state : current.rows[0]?.state ?? null;
+      const city = has('city') ? updates.city : has('state') && state !== current.rows[0]?.state ? null : current.rows[0]?.city ?? null;
+      if (state !== null && (typeof state !== 'string' || !/^[A-Z]{2}$/.test(state))) throw new HttpError(400, 'Estado inválido.');
+      if (city !== null && (typeof city !== 'string' || !cityById(city))) throw new HttpError(400, 'Cidade inválida.');
+      if (city !== null && !cityMatchesState(city as string, state as string | null)) throw new HttpError(400, 'A cidade não pertence ao estado informado.');
+      if (has('state')) addUpdate('state', state);
+      if (has('city') || (has('state') && state !== current.rows[0]?.state)) addUpdate('city', city);
+    }
+
     if (setClauses.length === 0) throw new HttpError(400, 'Nenhuma alteração enviada.');
 
     values.push(req.params.id);
@@ -1027,7 +1266,8 @@ export function registerApiRoutes(app: Express) {
       UPDATE enxovais
       SET ${setClauses.join(', ')}, updated_at = now()
       WHERE id = $${values.length}
-      RETURNING id, name, owner_id, (SELECT name FROM users WHERE id = enxovais.owner_id) AS owner_name, discount_cents, $${values.length + 1}::text AS role
+      RETURNING id, name, owner_id, (SELECT name FROM users WHERE id = enxovais.owner_id) AS owner_name, discount_cents,
+        to_char(move_date, 'YYYY-MM-DD') AS move_date, state, city, spending_tier, $${values.length + 1}::text AS role
     `, [...values, role]);
 
     if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
@@ -1043,7 +1283,7 @@ export function registerApiRoutes(app: Express) {
     res.status(204).end();
   }));
 
-  // Convidar, revogar convites e remover participantes é só do dono: quem foi convidado apenas usa o enxoval.
+  // Convidar, revogar convites e remover participantes é só do dono: quem foi convidado apenas usa o enxoval (e pode sair dele).
   router.get('/enxovais/:id/invitations', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     await requireEnxovalOwner(getPool(), user.id, req.params.id);
@@ -1144,10 +1384,23 @@ export function registerApiRoutes(app: Express) {
 
   router.delete('/enxovais/:id/members/:userId', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    await requireEnxovalOwner(getPool(), user.id, req.params.id);
+
+    // O convidado pode sair por conta própria; remover outra pessoa continua sendo só do dono.
     if (req.params.userId === user.id) {
-      throw new HttpError(400, 'O dono não pode sair do próprio enxoval. Para encerrá-lo, exclua o enxoval.');
+      const role = await requireEnxovalMember(getPool(), user.id, req.params.id);
+      if (role === 'owner') {
+        throw new HttpError(400, 'O dono não pode sair do próprio enxoval. Para encerrá-lo, exclua o enxoval.');
+      }
+
+      // A sessão fica de pé: sem outro enxoval, o app mostra a tela "sem acesso" em vez de derrubar a conta.
+      await getPool().query(
+        'DELETE FROM enxoval_members WHERE enxoval_id = $1 AND user_id = $2 AND role <> \'owner\'',
+        [req.params.id, user.id]);
+      res.status(204).end();
+      return;
     }
+
+    await requireEnxovalOwner(getPool(), user.id, req.params.id);
 
     await withTransaction(async client => {
       const removed = await client.query(`
@@ -1357,7 +1610,10 @@ export function registerApiRoutes(app: Express) {
     const rawQuantity = req.body?.quantity;
     if (rawQuantity !== undefined && !isValidQuantity(rawQuantity)) throw new HttpError(400, 'Quantidade inválida. Use um número inteiro de 1 a 999.');
 
-    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName, priceCents: rawPrice, link, description, status: rawStatus, discountCents: req.body?.discountCents, quantity: rawQuantity });
+    const buyWeek = req.body?.buyWeek === undefined ? undefined : parseBuyWeek(req.body.buyWeek);
+
+    const tracking = parseTrackingInput(req.body);
+    const result = await createItemForUser({ userId: user.id, enxovalId, name, categoryId, categoryName, priceCents: rawPrice, link: link || tracking.trackedProductUrl || undefined, description, status: rawStatus, discountCents: req.body?.discountCents, quantity: rawQuantity, buyWeek, tracking });
     res.status(201).json(result);
   }));
 
@@ -1371,6 +1627,63 @@ export function registerApiRoutes(app: Express) {
     const user = await requireCurrentUser(req);
     await deleteItemForUser(user.id, req.params.id);
     res.status(204).end();
+  }));
+
+  // Lê o link de um produto para preencher o formulário. Não cria nada: o item só nasce ao salvar.
+  router.post('/products/extract', rateLimit(30, 10 * 60_000), asyncHandler(async (req, res) => {
+    await requireCurrentUser(req);
+    const url = requireText(req.body?.url, 'Link do produto');
+    try {
+      const preview = await scrapeProduct(url, { allowPartial: true });
+      // Resultado parcial (só o nome tirado do link) não é um dado confiável da loja: não vira produto acompanhado.
+      if (!preview.partial) rememberPreview(preview);
+      res.json(preview);
+    } catch (err) {
+      if (err instanceof ScrapeError) throw new HttpError(err.code === 'invalid_url' ? 400 : 422, err.message);
+      throw err;
+    }
+  }));
+
+  router.get('/items/:id/price-history', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    const rawDays = Number(req.query.days ?? 60);
+    const days = Number.isInteger(rawDays) ? Math.min(Math.max(rawDays, 7), 365) : 60;
+    const itemResult = await getPool().query<{ tracked_product_id: string | null; initial_price_cents: number | null; target_price_cents: number | null; price_basis: PriceBasis; url: string | null; domain: string | null }>(`
+      SELECT i.tracked_product_id, i.initial_price_cents, i.target_price_cents, i.price_basis, tp.url, tp.domain
+      FROM items i
+      INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id AND em.user_id = $2
+      LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
+      WHERE i.id = $1
+    `, [req.params.id, user.id]);
+    const item = itemResult.rows[0];
+    if (!item) throw new HttpError(404, 'Item não encontrado.');
+    if (!item.tracked_product_id || !item.url) throw new HttpError(404, 'Este item não acompanha o preço de uma loja.');
+
+    const snapshots = await getPool().query<{ captured_at: Date; price_cents: number; pix_price_cents: number | null }>(`
+      SELECT captured_at, price_cents, pix_price_cents
+      FROM product_price_snapshots
+      WHERE tracked_product_id = $1 AND captured_at >= now() - ($2::int * interval '1 day')
+      ORDER BY captured_at ASC
+    `, [item.tracked_product_id, days]);
+
+    const history: ItemPriceHistory = {
+      points: snapshots.rows.map(row => ({
+        date: serializeTimestamp(row.captured_at),
+        priceCents: Number(row.price_cents),
+        ...(row.pix_price_cents === null ? {} : { pixPriceCents: Number(row.pix_price_cents) })
+      })),
+      initialPriceCents: nullableCents(item.initial_price_cents),
+      targetPriceCents: nullableCents(item.target_price_cents),
+      priceBasis: item.price_basis,
+      url: item.url,
+      domain: item.domain ?? ''
+    };
+    res.json(history);
+  }));
+
+  router.get('/enxovais/:id/savings-summary', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    res.json(computeSavings(await fetchItems(getPool(), user.id, req.params.id)));
   }));
 
   app.use('/api', router);

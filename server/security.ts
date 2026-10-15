@@ -93,6 +93,32 @@ export function loginRateLimit(maxAttempts = 15): RequestHandler {
   };
 }
 
+// Limite de chamadas por IP numa janela de tempo (ex.: leitura de links de lojas, que faz acessos a sites externos).
+export function rateLimit(
+  maxRequests: number,
+  windowMs: number,
+  message = "Muitas buscas seguidas. Aguarde um instante e tente de novo.",
+): RequestHandler {
+  const hits = new Map<string, { count: number; expires: number }>();
+  return (req, res, next) => {
+    const now = Date.now();
+    for (const [key, value] of hits)
+      if (value.expires <= now) hits.delete(key);
+    const key = req.ip ?? "unknown";
+    const value = hits.get(key) ?? { count: 0, expires: now + windowMs };
+    if (value.count >= maxRequests) {
+      res.set("Retry-After", String(Math.ceil((value.expires - now) / 1000)));
+      res
+        .status(429)
+        .json({ error: message });
+      return;
+    }
+    value.count++;
+    hits.set(key, value);
+    next();
+  };
+}
+
 export const protectMutationOrigin: RequestHandler = (req, res, next) => {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     next();

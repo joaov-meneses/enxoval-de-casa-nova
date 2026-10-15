@@ -28,7 +28,7 @@ const control = new pg.Pool({
   connectionString: originalUrl.toString(),
   ssl: ssl ? { rejectUnauthorized: false } : undefined,
 });
-const schema = `larume_item_status_test_${randomUUID().replaceAll("-", "")}`;
+const schema = `casamia_item_status_test_${randomUUID().replaceAll("-", "")}`;
 let server;
 let created = false;
 

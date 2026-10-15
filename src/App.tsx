@@ -13,6 +13,7 @@ import {
   Sparkles,
   LogOut,
   UserPlus,
+  DoorOpen,
   ListPlus,
   X,
   Pencil,
@@ -25,6 +26,8 @@ import {
   ChevronRight,
   Menu,
   Percent,
+  CalendarClock,
+  MessageCircleHeart,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -32,6 +35,7 @@ import type {
   EnxovalCategory,
   EnxovalInvitation,
   EnxovalItem,
+  ItemTrackingInput,
   EnxovalMember,
   EnxovalSummary,
   EnxovalWorkspace,
@@ -68,7 +72,11 @@ import { Select } from "./components/Select";
 import { SortableList } from "./components/SortableList";
 import { EnvironmentList } from "./components/EnvironmentList";
 import { ExportMenu } from "./components/ExportMenu";
-import { MAX_ENVIRONMENT_NAME_LENGTH } from "./data";
+import {
+  MAX_ENVIRONMENT_NAME_LENGTH,
+  normalizeEnvironmentName,
+  sanitizeEnvironmentNameInput,
+} from "./data";
 import { AddItemModal } from "./components/AddItemModal";
 import { LandingPage } from "./components/LandingPage";
 import { AuthPage } from "./components/AuthPage";
@@ -78,6 +86,10 @@ import { ImportItemsButton } from "./components/ImportItemsDialog";
 import { ScrollIndicator } from "./components/ScrollIndicator";
 import { AddChoiceDialog } from "./components/AddChoiceDialog";
 import { RoomIcon, WorkspaceOverview } from "./components/WorkspaceOverview";
+import { PurchasePlanView, type PlanningUpdates } from "./components/PurchasePlan";
+import { buildPurchasePlan } from "./planning/purchasePlan";
+import { measureTextWidth } from "./utils/textWidth";
+import { FeedbackDialog } from "./components/FeedbackDialog";
 import {
   activeItems,
   discountApplies,
@@ -172,10 +184,13 @@ function formatUpdatedAt(value: string) {
   return dateTimeFormatter.format(date);
 }
 
+const SIDEBAR_MIN_WIDTH = 280;
+const SIDEBAR_ROW_CHROME = 228;
+
 export default function App() {
-  const [workspaceView, setWorkspaceView] = useState<"list" | "overview">(
-    "list",
-  );
+  const [workspaceView, setWorkspaceView] = useState<
+    "list" | "overview" | "plan"
+  >("list");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [enxovais, setEnxovais] = useState<EnxovalSummary[]>([]);
   const [activeEnxoval, setActiveEnxoval] = useState<EnxovalSummary | null>(
@@ -197,6 +212,9 @@ export default function App() {
     useState<CategorySwipeDirection | null>(null);
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // Central de ajuda: quem abriu (botão do topo ou menu do celular) recebe o foco de volta ao fechar.
+  const helpTriggerRef = useRef<HTMLElement | null>(null);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const openWorkspaceMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     menuTriggerRef.current = event.currentTarget;
     setIsWorkspaceMenuOpen(true);
@@ -208,6 +226,7 @@ export default function App() {
   const [isCreateEnxovalOpen, setIsCreateEnxovalOpen] = useState(false);
   const [isRenameEnxovalOpen, setIsRenameEnxovalOpen] = useState(false);
   const [isDeleteEnxovalOpen, setIsDeleteEnxovalOpen] = useState(false);
+  const [isLeaveEnxovalOpen, setIsLeaveEnxovalOpen] = useState(false);
   const [isDiscountsOpen, setIsDiscountsOpen] = useState(false);
   const [discountCategoryId, setDiscountCategoryId] = useState("");
   const [discountItemId, setDiscountItemId] = useState("");
@@ -361,6 +380,13 @@ export default function App() {
       return;
     }
 
+    if (isLeaveEnxovalOpen) {
+      document.title = makeTitle(
+        activeEnxoval ? "Sair de " + activeEnxoval.name : "Sair do enxoval",
+      );
+      return;
+    }
+
     if (isDiscountsOpen) {
       document.title = makeTitle("Descontos e cashback");
       return;
@@ -393,6 +419,7 @@ export default function App() {
     isDeleteEnxovalOpen,
     isDiscountsOpen,
     isInviteOpen,
+    isLeaveEnxovalOpen,
     isLoading,
     isRenameEnxovalOpen,
     isWorkspaceLoading,
@@ -944,7 +971,10 @@ export default function App() {
     setWorkspaceView("list");
   };
 
-  const updateItem = async (id: string, updates: Partial<EnxovalItem>) => {
+  const updateItem = async (
+    id: string,
+    updates: Partial<EnxovalItem> & ItemTrackingInput,
+  ) => {
     const shouldOptimisticallyUpdate =
       Object.keys(updates).length === 1 &&
       (typeof updates.checked === "boolean" ||
@@ -977,6 +1007,12 @@ export default function App() {
       payload.quantity = updates.quantity;
     if (typeof updates.categoryId === "string")
       payload.categoryId = updates.categoryId;
+    if (typeof updates.buyWeek === "number" || updates.buyWeek === null)
+      payload.buyWeek = updates.buyWeek;
+    if (updates.targetPriceCents !== undefined)
+      payload.targetPriceCents = updates.targetPriceCents;
+    if (typeof updates.priceAlertEnabled === "boolean")
+      payload.priceAlertEnabled = updates.priceAlertEnabled;
 
     if (Object.keys(payload).length === 0) return;
 
@@ -1003,6 +1039,21 @@ export default function App() {
     }
   };
 
+  /** Data da mudança, lugar e perfil de gasto (só o dono): o servidor valida e devolve o enxoval atualizado. */
+  const updatePlanning = async (updates: PlanningUpdates) => {
+    if (!activeEnxoval) return;
+    const updatedEnxoval = await updateEnxovalRequest(
+      activeEnxoval.id,
+      updates,
+    );
+    setActiveEnxoval(updatedEnxoval);
+    setEnxovais((current) =>
+      current.map((enxoval) =>
+        enxoval.id === updatedEnxoval.id ? updatedEnxoval : enxoval,
+      ),
+    );
+  };
+
   const addItem = async (
     name: string,
     categoryId?: string,
@@ -1010,7 +1061,8 @@ export default function App() {
     details: Pick<
       EnxovalItem,
       "priceCents" | "quantity" | "discountCents" | "link" | "description" | "status"
-    > = {
+    > &
+      ItemTrackingInput = {
       priceCents: null,
       quantity: 1,
       discountCents: 0,
@@ -1077,7 +1129,7 @@ export default function App() {
     event.preventDefault();
     if (!activeEnxoval) return;
 
-    const name = newCategoryName.trim();
+    const name = normalizeEnvironmentName(newCategoryName);
     if (!name) return;
 
     setIsDialogSubmitting(true);
@@ -1211,6 +1263,43 @@ export default function App() {
       setIsDialogSubmitting(false);
     }
   };
+  const handleLeaveEnxoval = async () => {
+    if (!activeEnxoval || !user || activeEnxoval.role === "owner") return;
+
+    setIsDialogSubmitting(true);
+    setDialogError("");
+
+    try {
+      const leftId = activeEnxoval.id;
+      await removeMemberRequest(leftId, user.id);
+
+      const remainingEnxovais = enxovais.filter(
+        (enxoval) => enxoval.id !== leftId,
+      );
+      setEnxovais(remainingEnxovais);
+      setIsLeaveEnxovalOpen(false);
+
+      const nextEnxoval = remainingEnxovais[0];
+      if (nextEnxoval) {
+        const workspace = await fetchEnxovalRequest(nextEnxoval.id);
+        applyWorkspace(workspace);
+      } else {
+        storeEnxovalId(null);
+        setActiveEnxoval(null);
+        setMembers([]);
+        setCategories([]);
+        setItems([]);
+        setActiveCategoryId("");
+      }
+    } catch (err) {
+      setDialogError(
+        err instanceof Error ? err.message : "Não foi possível sair do enxoval.",
+      );
+    } finally {
+      setIsDialogSubmitting(false);
+    }
+  };
+
   const handleInviteMember = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!activeEnxoval) return;
@@ -1416,6 +1505,12 @@ export default function App() {
     setIsDeleteEnxovalOpen(true);
   };
 
+  const openLeaveEnxoval = () => {
+    if (!activeEnxoval || activeEnxoval.role === "owner") return;
+    setDialogError("");
+    setIsLeaveEnxovalOpen(true);
+  };
+
   const openInvite = () => {
     // Só o dono convida; quem foi convidado não tem esta ação.
     if (!activeEnxoval || activeEnxoval.role !== "owner") return;
@@ -1505,7 +1600,7 @@ export default function App() {
       const saved = await renameCategoryRequest(
         activeEnxoval.id,
         categoryToRename.id,
-        renameCategoryName.trim(),
+        normalizeEnvironmentName(renameCategoryName),
       );
       setCategories((current) =>
         current.map((category) =>
@@ -1566,12 +1661,66 @@ export default function App() {
       setIsDialogSubmitting(false);
     }
   };
-  const renderItem = (item: EnxovalItem, dragHandle?: React.ReactNode) => (
+  // Largura da barra lateral: cresce o bastante para o maior nome de ambiente caber inteiro, em uma linha.
+  // Espaço fixo da linha (alça, ícone, contagem, editar, excluir e margens) somado à largura real do texto.
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const [fontsTick, setFontsTick] = useState(0);
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    // A fonte da marca carrega depois da página: mede de novo quando ela chega.
+    void document.fonts?.ready.then(() => setFontsTick((tick) => tick + 1));
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const sidebarWidth = useMemo(() => {
+    const longest = categories.reduce(
+      (max, category) =>
+        Math.max(
+          max,
+          measureTextWidth(
+            category.name,
+            '13px "Nunito Variable", Nunito, ui-sans-serif, system-ui, sans-serif',
+          ),
+        ),
+      0,
+    );
+    const wanted = Math.ceil(longest + SIDEBAR_ROW_CHROME);
+    // Teto: a barra cresce até 60% da tela (e 960 px) para o maior nome caber inteiro. Passando disso, a barra rola de lado.
+    const cap = Math.max(SIDEBAR_MIN_WIDTH, Math.min(Math.round(viewportWidth * 0.6), 960));
+    return Math.min(Math.max(wanted, SIDEBAR_MIN_WIDTH), cap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, viewportWidth, fontsTick]);
+
+  // Semana de compra de cada item: calculada uma vez por mudança nos itens ou no perfil do enxoval.
+  const purchasePlan = useMemo(
+    () =>
+      activeEnxoval
+        ? buildPurchasePlan(items, {
+            tier: activeEnxoval.spendingTier,
+            moveDate: activeEnxoval.moveDate,
+          })
+        : null,
+    [items, activeEnxoval],
+  );
+  const renderItem = (item: EnxovalItem, dragHandle?: React.ReactNode) => {
+    const planned = purchasePlan?.byId.get(item.id);
+    return (
     <ItemRow
       key={item.id}
       item={item}
       categories={categories}
       dragHandle={dragHandle}
+      buyPlan={
+        planned
+          ? {
+              week: planned.placement.week,
+              manual: planned.placement.source === "manual",
+              reason: planned.placement.reason,
+              moveDate: activeEnxoval?.moveDate ?? null,
+              overdue: planned.overdue,
+            }
+          : undefined
+      }
       categoryName={
         showItemCategory
           ? (categoryById.get(item.categoryId)?.name ?? item.category)
@@ -1582,7 +1731,8 @@ export default function App() {
       onUpdate={updateItem}
       onDelete={openDeleteItem}
     />
-  );
+    );
+  };
   const canReorderItems =
     itemSortMode === "manual" &&
     !isSearching &&
@@ -1644,6 +1794,7 @@ export default function App() {
   return (
     <div
       className={`workspace-app workspace-view-${workspaceView} min-h-screen pb-24 font-sans text-brand-dark overscroll-y-contain`}
+      style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}
     >
       <a className="skip-link" href="#workspace-main">
         Pular para a lista
@@ -1688,6 +1839,14 @@ export default function App() {
               onClick={() => setWorkspaceView("overview")}
             >
               <LayoutDashboard size={18} /> Visão geral
+            </button>
+            <button
+              className={workspaceView === "plan" ? "active" : ""}
+              aria-current={workspaceView === "plan" ? "page" : undefined}
+              onClick={() => setWorkspaceView("plan")}
+              disabled={!hasEnxoval}
+            >
+              <CalendarClock size={18} /> Planejamento
             </button>
             <button
               className={
@@ -1781,9 +1940,18 @@ export default function App() {
                     <UserPlus size={16} /> Convidar
                   </button>
                 ) : (
-                  <span className="shared-badge">
-                    Convidado de {activeEnxoval?.ownerName}
-                  </span>
+                  <>
+                    <span className="shared-badge">
+                      Convidado de {activeEnxoval?.ownerName}
+                    </span>
+                    <button
+                      type="button"
+                      className="button button-outline button-small"
+                      onClick={openLeaveEnxoval}
+                    >
+                      <DoorOpen size={16} /> Sair do enxoval
+                    </button>
+                  </>
                 )}
                 <button
                   className="button button-outline button-small"
@@ -1795,6 +1963,18 @@ export default function App() {
                 </button>
               </>
             )}
+            <button
+              type="button"
+              className="button button-outline button-small help-entry"
+              aria-label="Central de ajuda: relatar um problema ou sugerir uma melhoria"
+              title="Relatar um problema ou sugerir uma melhoria"
+              onClick={(event) => {
+                helpTriggerRef.current = event.currentTarget;
+                setIsFeedbackOpen(true);
+              }}
+            >
+              <MessageCircleHeart size={16} /> Ajuda e sugestões
+            </button>
             <button
               type="button"
               className="button button-outline button-small"
@@ -1911,7 +2091,20 @@ export default function App() {
             </div>
           )}
 
-          {hasEnxoval && (
+          {hasEnxoval && workspaceView === "plan" && (
+            <PurchasePlanView
+              enxoval={activeEnxoval!}
+              items={items}
+              categories={categories}
+              canEdit={isOwner}
+              onUpdateEnxoval={updatePlanning}
+              onUpdateItem={(id, updates) => updateItem(id, updates)}
+              onAddItem={(name, categoryId, categoryName) =>
+                addItem(name, categoryId, categoryName)
+              }
+            />
+          )}
+          {hasEnxoval && workspaceView !== "plan" && (
             <WorkspaceOverview
               items={items}
               categories={categories}
@@ -2141,6 +2334,26 @@ export default function App() {
             Visão geral
           </button>
           <button
+            className={workspaceView === "list" ? "active" : ""}
+            aria-current={workspaceView === "list" ? "page" : undefined}
+            onClick={showAllItems}
+          >
+            <ListChecks size={19} />
+            Meu enxoval
+          </button>
+          <button
+            className={workspaceView === "plan" ? "active" : ""}
+            aria-current={workspaceView === "plan" ? "page" : undefined}
+            onClick={() => {
+              setWorkspaceView("plan");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            disabled={!hasEnxoval}
+          >
+            <CalendarClock size={19} />
+            Planejamento
+          </button>
+          <button
             type="button"
             className="mobile-nav-add"
             aria-label="Adicionar item ou ambiente"
@@ -2153,18 +2366,27 @@ export default function App() {
             </span>
             Adicionar
           </button>
-          <button
-            className={workspaceView === "list" ? "active" : ""}
-            aria-current={workspaceView === "list" ? "page" : undefined}
-            onClick={showAllItems}
-          >
-            <ListChecks size={19} />
-            Meu enxoval
-          </button>
         </nav>
       </div>
+      <FeedbackDialog
+        open={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        user={user}
+        currentArea={
+          workspaceView === "plan"
+            ? "plan"
+            : workspaceView === "overview"
+              ? "overview"
+              : "list"
+        }
+        triggerRef={helpTriggerRef}
+      />
       <WorkspaceMenu
         open={isWorkspaceMenuOpen}
+        onHelp={() => {
+          helpTriggerRef.current = menuTriggerRef.current;
+          setIsFeedbackOpen(true);
+        }}
         onClose={() => setIsWorkspaceMenuOpen(false)}
         triggerRef={menuTriggerRef}
         user={user}
@@ -2185,6 +2407,7 @@ export default function App() {
         onCreate={openCreateEnxoval}
         onInvite={openInvite}
         onDelete={openDeleteEnxoval}
+        onLeave={openLeaveEnxoval}
         onLogout={() => void handleLogout()}
       />
       <AddChoiceDialog
@@ -2207,11 +2430,20 @@ export default function App() {
           <input
             id="rename-environment"
             value={renameCategoryName}
-            onChange={(event) => setRenameCategoryName(event.target.value)}
+            onChange={(event) =>
+              setRenameCategoryName(sanitizeEnvironmentNameInput(event.target.value))
+            }
             required
             maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
+            aria-describedby="rename-environment-count"
             disabled={isDialogSubmitting}
           />
+          <span
+            id="rename-environment-count"
+            className={`env-name-counter${renameCategoryName.length >= MAX_ENVIRONMENT_NAME_LENGTH ? " is-full" : ""}`}
+          >
+            {renameCategoryName.length}/{MAX_ENVIRONMENT_NAME_LENGTH} caracteres
+          </span>
           {dialogError && (
             <div role="alert" className="form-error">
               {dialogError}
@@ -2389,10 +2621,19 @@ export default function App() {
               aria-label="Nome do ambiente"
               maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
               value={newCategoryName}
-              onChange={(event) => setNewCategoryName(event.target.value)}
+              onChange={(event) =>
+                setNewCategoryName(sanitizeEnvironmentNameInput(event.target.value))
+              }
+              aria-describedby="new-environment-count"
               placeholder="Ex: Escritório"
               className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
             />
+            <span
+              id="new-environment-count"
+              className={`env-name-counter${newCategoryName.length >= MAX_ENVIRONMENT_NAME_LENGTH ? " is-full" : ""}`}
+            >
+              {newCategoryName.length}/{MAX_ENVIRONMENT_NAME_LENGTH} caracteres
+            </span>
           </div>
 
           {dialogError && (
@@ -2774,6 +3015,51 @@ export default function App() {
               className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDialogSubmitting ? "Excluindo..." : "Excluir"}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+      <Dialog
+        title="Sair do enxoval"
+        busy={isDialogSubmitting}
+        tone="danger"
+        isOpen={isLeaveEnxovalOpen}
+        onClose={() => setIsLeaveEnxovalOpen(false)}
+      >
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
+          <p className="text-sm text-stone-600">
+            Você vai deixar de participar do enxoval{" "}
+            {activeEnxoval ? `"${activeEnxoval.name}"` : ""} de{" "}
+            {activeEnxoval?.ownerName}. Para voltar, será preciso receber um
+            novo convite.
+          </p>
+
+          {dialogError && (
+            <p
+              role="alert"
+              className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
+            >
+              {dialogError}
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setIsLeaveEnxovalOpen(false)}
+              data-dialog-autofocus
+              disabled={isDialogSubmitting}
+              className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleLeaveEnxoval()}
+              disabled={isDialogSubmitting || !activeEnxoval}
+              className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDialogSubmitting ? "Saindo..." : "Sair do enxoval"}
             </button>
           </div>
         </div>

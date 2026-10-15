@@ -504,7 +504,7 @@ test.describe("funil /comecar", () => {
     }
     expect(body!.profile.moveDateAnswered).toBe(true);
     // As respostas só saem do aparelho depois que a conta foi criada.
-    expect(await page.evaluate(() => localStorage.getItem("larume.onboarding.v1"))).toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem("casamia.onboarding.v1"))).toBeNull();
   });
 
   test("se o cadastro falhar, nada é perdido e a mensagem aparece", async ({ page }) => {
@@ -520,7 +520,7 @@ test.describe("funil /comecar", () => {
     await expect(page.getByRole("alert")).toHaveText("Já existe uma conta com esse e-mail.");
     await expect(page).toHaveURL(/\/comecar$/);
     await expect(page.getByLabel("Seu e-mail")).toHaveValue("jeo@exemplo.com");
-    expect(await page.evaluate(() => localStorage.getItem("larume.onboarding.v1"))).not.toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem("casamia.onboarding.v1"))).not.toBeNull();
   });
 
   test("o funil é só cadastro: não oferece login em nenhuma tela", async ({ page }) => {
@@ -567,7 +567,7 @@ test.describe("funil /comecar", () => {
     await page.waitForTimeout(500);
     expect(enxovalCalls).toBe(0);
     // O plano continua guardado para quando a pessoa criar uma conta nova.
-    expect(await page.evaluate(() => localStorage.getItem("larume.onboarding.v1"))).not.toBeNull();
+    expect(await page.evaluate(() => localStorage.getItem("casamia.onboarding.v1"))).not.toBeNull();
   });
 
   test("o login não oferece criar conta; /signup e o link levam ao funil", async ({ page }) => {
@@ -750,7 +750,7 @@ test.describe("funil /comecar", () => {
       await page.goto("/comecar");
       await page.evaluate(() => {
         localStorage.setItem(
-          "larume.onboarding.v1",
+          "casamia.onboarding.v1",
           JSON.stringify({
             v: 1,
             step: "rooms",

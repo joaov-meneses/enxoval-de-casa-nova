@@ -22,7 +22,7 @@ const control = new pg.Pool({
   connectionString: originalUrl.toString(),
   ssl: ssl ? { rejectUnauthorized: false } : undefined,
 });
-const schema = `larume_onboarding_test_${randomUUID().replaceAll("-", "")}`;
+const schema = `casamia_onboarding_test_${randomUUID().replaceAll("-", "")}`;
 let server;
 let created = false;
 
@@ -163,12 +163,14 @@ try {
     moveDate: "2027-01-12",
     moveDateAnswered: true,
     state: "BA",
+    city: null,
     housing: "apartamento",
     people: 3,
     rooms: ["cozinha", "banheiro", "sala", "quarto", "quartoExtra", "servico", "externa"],
     owned: "algumas",
     style: "full",
     budget: "10-25",
+    spendingTier: "equilibrado",
     worries: ["waste", "forget"],
     usage: ["buy", "share"],
     source: "instagram",
@@ -216,12 +218,14 @@ try {
     moveDate: null,
     moveDateAnswered: true,
     state: "RS",
+    city: null,
     housing: "studio",
     people: 1,
     rooms: ["banheiro", "sala"],
     owned: "nada",
     style: "min",
     budget: "gt50",
+    spendingTier: "premium",
     worries: ["start", "waste", "forget", "budget", "time"],
     usage: ["buy", "spend", "links", "share"],
     source: "",

@@ -20,7 +20,7 @@ const control = new pg.Pool({
   connectionString: originalUrl.toString(),
   ssl: ssl ? { rejectUnauthorized: false } : undefined,
 });
-const schema = `larume_admin_test_${randomUUID().replaceAll("-", "")}`;
+const schema = `casamia_admin_test_${randomUUID().replaceAll("-", "")}`;
 let server;
 let created = false;
 try {
@@ -62,7 +62,7 @@ try {
           .find((value) =>
             value.startsWith(
               path.startsWith("/admin")
-                ? "larume_admin_session="
+                ? "casamia_admin_session="
                 : "enxoval_session=",
             ),
           );
@@ -180,12 +180,14 @@ try {
       moveDate: "2026-12-01",
       moveDateAnswered: true,
       state: "SP",
+      city: null,
       housing: "apartamento",
       people: 2,
       rooms: ["cozinha", "sala", "banheiro"],
       owned: "algumas",
       style: "min",
       budget: "10-25",
+      spendingTier: "equilibrado",
       worries: ["budget"],
       usage: ["buy", "share"],
       source: "instagram",

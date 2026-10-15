@@ -1,7 +1,7 @@
 import { emptyAnswers } from "./plan";
 import type { Answers } from "./types";
 
-const STORAGE_KEY = "larume.onboarding.v1";
+const STORAGE_KEY = "casamia.onboarding.v1";
 
 export interface SavedOnboarding {
   v: 2;

@@ -28,8 +28,8 @@ export function NoAccessPage({
         </span>
         <h1 id="no-access-title">Você não participa de nenhum enxoval.</h1>
         <p>
-          Seu acesso foi removido por quem convidou você. Se foi engano, peça um
-          novo convite para {user.email}: ele chega por e-mail.
+          Você saiu ou foi removido do enxoval. Para voltar, peça um novo
+          convite para {user.email}: ele chega por e-mail.
         </p>
         <button
           type="button"

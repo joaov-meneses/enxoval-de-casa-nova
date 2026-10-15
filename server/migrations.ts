@@ -248,6 +248,141 @@ export async function migrateDatabase() {
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_status_valid;
     ALTER TABLE items ADD CONSTRAINT items_status_valid CHECK (status IN ('needed', 'researching', 'bought', 'received', 'owned', 'not_needed', 'discarded'));
 
+    -- Planejamento de compras: data da mudança, localização e perfil de gasto passam a ser do enxoval.
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'enxovais' AND column_name = 'spending_tier'
+      ) THEN
+        ALTER TABLE enxovais ADD COLUMN move_date date;
+        ALTER TABLE enxovais ADD COLUMN state text;
+        ALTER TABLE enxovais ADD COLUMN city text;
+        ALTER TABLE enxovais ADD COLUMN spending_tier text NOT NULL DEFAULT 'equilibrado';
+        -- Uma única vez: enxovais criados pelo funil levam as respostas (já validadas) para as colunas.
+        UPDATE enxovais
+        SET move_date = CASE WHEN onboarding_profile->>'moveDate' ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN (onboarding_profile->>'moveDate')::date END,
+            state = onboarding_profile->>'state',
+            spending_tier = CASE onboarding_profile->>'budget'
+              WHEN 'lt10' THEN 'economico'
+              WHEN '25-50' THEN 'confortavel'
+              WHEN 'gt50' THEN 'premium'
+              ELSE 'equilibrado'
+            END
+        WHERE onboarding_profile IS NOT NULL;
+      END IF;
+    END $$;
+    ALTER TABLE enxovais DROP CONSTRAINT IF EXISTS enxovais_spending_tier_valid;
+    ALTER TABLE enxovais ADD CONSTRAINT enxovais_spending_tier_valid CHECK (spending_tier IN ('economico', 'equilibrado', 'confortavel', 'premium'));
+    -- Semana de compra escolhida pela pessoa (nula: vale a sugestão do algoritmo), contada a partir da semana da mudança.
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS buy_week smallint;
+    -- Dados do catálogo gravados quando o item vem do funil; nos demais, o planejamento infere pelo nome.
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS price_category smallint;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS priority text;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS timing text;
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_buy_week_valid;
+    ALTER TABLE items ADD CONSTRAINT items_buy_week_valid CHECK (buy_week IS NULL OR (buy_week >= -52 AND buy_week <= 104));
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_price_category_valid;
+    ALTER TABLE items ADD CONSTRAINT items_price_category_valid CHECK (price_category IS NULL OR (price_category >= 1 AND price_category <= 4));
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_priority_valid;
+    ALTER TABLE items ADD CONSTRAINT items_priority_valid CHECK (priority IS NULL OR priority IN ('essential', 'optional'));
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_timing_valid;
+    ALTER TABLE items ADD CONSTRAINT items_timing_valid CHECK (timing IS NULL OR timing IN ('first_night', 'first_week'));
+
+    -- Central de ajuda: problemas, sugestões e outros assuntos enviados por quem usa o app.
+    CREATE TABLE IF NOT EXISTS feedback (
+      id uuid PRIMARY KEY,
+      user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      user_name text NOT NULL,
+      user_email text NOT NULL,
+      kind text NOT NULL,
+      title text NOT NULL,
+      description text NOT NULL,
+      area text,
+      steps text NOT NULL DEFAULT '',
+      expected text NOT NULL DEFAULT '',
+      problem text NOT NULL DEFAULT '',
+      frequency text,
+      severity text,
+      importance text,
+      contact_ok boolean NOT NULL DEFAULT false,
+      contact_email text NOT NULL DEFAULT '',
+      tech jsonb,
+      screenshot bytea,
+      screenshot_type text,
+      status text NOT NULL DEFAULT 'new',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT feedback_kind_valid CHECK (kind IN ('bug', 'idea', 'other')),
+      CONSTRAINT feedback_status_valid CHECK (status IN ('new', 'seen', 'planned', 'done', 'dismissed')),
+      CONSTRAINT feedback_frequency_valid CHECK (frequency IS NULL OR frequency IN ('always', 'sometimes', 'once')),
+      CONSTRAINT feedback_severity_valid CHECK (severity IS NULL OR severity IN ('blocked', 'annoying', 'minor')),
+      CONSTRAINT feedback_importance_valid CHECK (importance IS NULL OR importance IN ('nice', 'helps', 'essential')),
+      CONSTRAINT feedback_screenshot_type_valid CHECK (screenshot_type IS NULL OR screenshot_type IN ('image/jpeg', 'image/png', 'image/webp'))
+    );
+    CREATE INDEX IF NOT EXISTS feedback_created_at_idx ON feedback(created_at DESC);
+    CREATE INDEX IF NOT EXISTS feedback_status_idx ON feedback(status);
+
+    -- Acompanhamento de preços: produtos de loja (um por link, compartilhado entre itens) e o histórico de preços.
+    CREATE TABLE IF NOT EXISTS tracked_products (
+      id uuid PRIMARY KEY,
+      url text NOT NULL,
+      canonical_url text,
+      domain text NOT NULL,
+      title text NOT NULL,
+      image_url text,
+      current_price_cents integer,
+      pix_price_cents integer,
+      lowest_price_cents integer,
+      highest_price_cents integer,
+      in_stock boolean NOT NULL DEFAULT true,
+      last_scraped_at timestamptz,
+      last_scrape_status text NOT NULL DEFAULT 'pending',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS tracked_products_url_unique ON tracked_products(url);
+    CREATE INDEX IF NOT EXISTS tracked_products_domain_idx ON tracked_products(domain);
+    CREATE INDEX IF NOT EXISTS tracked_products_last_scraped_idx ON tracked_products(last_scraped_at);
+
+    CREATE TABLE IF NOT EXISTS product_price_snapshots (
+      id uuid PRIMARY KEY,
+      tracked_product_id uuid NOT NULL REFERENCES tracked_products(id) ON DELETE CASCADE,
+      price_cents integer NOT NULL,
+      pix_price_cents integer,
+      in_stock boolean NOT NULL DEFAULT true,
+      captured_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS price_snapshots_product_captured_idx
+      ON product_price_snapshots(tracked_product_id, captured_at DESC);
+
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'items' AND column_name = 'initial_price_cents'
+      ) THEN
+        ALTER TABLE items ADD COLUMN initial_price_cents integer;
+        -- Uma única vez: o preço que os itens já tinham passa a ser o preço de referência.
+        UPDATE items SET initial_price_cents = price_cents WHERE price_cents IS NOT NULL;
+      END IF;
+    END $$;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS tracked_product_id uuid REFERENCES tracked_products(id) ON DELETE SET NULL;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS target_price_cents integer;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS selected_variation text;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS image_url text;
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS price_alert_enabled boolean NOT NULL DEFAULT true;
+    -- Qual preço da loja o item acompanha (normal ou no Pix) e o último preço avisado por e-mail (evita repetir o aviso).
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS price_basis text NOT NULL DEFAULT 'regular';
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS last_alert_price_cents integer;
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_price_basis_valid;
+    ALTER TABLE items ADD CONSTRAINT items_price_basis_valid CHECK (price_basis IN ('regular', 'pix'));
+    ALTER TABLE items DROP CONSTRAINT IF EXISTS items_tracking_prices_non_negative;
+    ALTER TABLE items ADD CONSTRAINT items_tracking_prices_non_negative CHECK (
+      (initial_price_cents IS NULL OR initial_price_cents >= 0)
+      AND (target_price_cents IS NULL OR target_price_cents >= 0)
+    );
+    CREATE INDEX IF NOT EXISTS items_tracked_product_id_idx ON items(tracked_product_id);
+
     ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_user_name_unique;
 
     CREATE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions(token_hash);

@@ -8,10 +8,14 @@ import type {
   EnxovalMember,
   EnxovalWorkspace,
   InvitationPreview,
+  ItemPriceHistory,
   ItemStatus,
+  ItemTrackingInput,
+  ScrapedProductPreview,
 } from "./types";
 import { isItemStatus, normalizeItemStatus } from "./itemStatus";
 import type { Answers, PlanPayload } from "./onboarding/types";
+import type { AdminFeedback, FeedbackInput, FeedbackStatus } from "./feedback";
 
 export class ApiError extends Error {
   status: number;
@@ -185,7 +189,17 @@ export function updateEnxoval(
   enxovalId: string,
   updates:
     | string
-    | Partial<Pick<EnxovalWorkspace["enxoval"], "name" | "discountCents">>,
+    | Partial<
+        Pick<
+          EnxovalWorkspace["enxoval"],
+          | "name"
+          | "discountCents"
+          | "moveDate"
+          | "spendingTier"
+          | "state"
+          | "city"
+        >
+      >,
 ) {
   const body = typeof updates === "string" ? { name: updates } : updates;
   return request<EnxovalWorkspace["enxoval"]>(`/api/enxovais/${enxovalId}`, {
@@ -297,7 +311,8 @@ export function createItem(input: {
   status?: ItemStatus;
   discountCents?: number;
   quantity?: number;
-}) {
+  buyWeek?: number | null;
+} & ItemTrackingInput) {
   return request<{ item: EnxovalItem; category: EnxovalCategory }>(
     "/api/items",
     {
@@ -321,14 +336,47 @@ export function updateItem(
       | "quantity"
       | "discountCents"
       | "categoryId"
+      | "buyWeek"
     >
-  >,
+  > &
+    ItemTrackingInput,
 ) {
   return request<EnxovalItem>(`/api/items/${id}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
   });
 }
+
+/** Lê o link de um produto de loja (nome, foto, preço, variações) para preencher o formulário. */
+export function extractProduct(url: string) {
+  return request<ScrapedProductPreview>("/api/products/extract", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function fetchItemPriceHistory(itemId: string, days = 60) {
+  return request<ItemPriceHistory>(
+    `/api/items/${encodeURIComponent(itemId)}/price-history?days=${days}`,
+  );
+}
+
+/** Central de ajuda: envia um problema, uma sugestão ou outro assunto. */
+export function sendFeedback(input: FeedbackInput) {
+  return request<{ id: string }>("/api/feedback", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export const fetchAdminFeedback = () =>
+  request<{ feedback: AdminFeedback[] }>("/api/admin/feedback");
+
+export const updateAdminFeedbackStatus = (id: string, status: FeedbackStatus) =>
+  request<AdminFeedback>(`/api/admin/feedback/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 
 export function deleteItem(id: string) {
   return request<void>(`/api/items/${id}`, { method: "DELETE" });

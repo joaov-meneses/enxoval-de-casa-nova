@@ -4,6 +4,8 @@
 @import "./onboarding.css";
 @import "./privacy.css";
 @import "./landing.css";
+@import "./planning.css";
+@import "./feedback.css";
 
 @theme {
   --font-sans: "Nunito Variable", "Nunito", ui-sans-serif, system-ui, sans-serif;

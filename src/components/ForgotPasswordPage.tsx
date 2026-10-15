@@ -4,7 +4,7 @@ import { requestPasswordReset } from "../api";
 import { Brand } from "./Brand";
 
 /** O login guarda o e-mail digitado aqui para esta tela já abrir preenchida (nunca vai na URL). */
-export const FORGOT_EMAIL_KEY = "larume.forgot.email";
+export const FORGOT_EMAIL_KEY = "casamia.forgot.email";
 const RESEND_AFTER_SECONDS = 60;
 
 function takePrefilledEmail() {

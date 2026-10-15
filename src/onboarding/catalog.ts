@@ -1,4 +1,5 @@
 import type { RoomKey } from "./types";
+import type { Trait } from "./regions";
 
 /**
  * Catálogo de itens para uma casa nova.
@@ -12,15 +13,47 @@ import type { RoomKey } from "./types";
  *  X fora do studio                  O só studio
  *  N só Nordeste                     R só Rio Grande do Sul
  *  I precisa estar pronto na primeira noite
+ *  U melhor já na primeira semana na casa nova (evita um problema logo no começo)
  *
- * Faixa de preço (1 a 4) serve apenas para a estimativa de referência do funil.
+ * Faixa de preço (1 a 4) serve apenas para a estimativa de referência do funil e do planejamento.
  * Nunca é gravada como preço do item.
+ *
+ * Itens regionais (`where`): entram só para quem mora onde a regra vale. `ufs` e `cities` liberam o item
+ * para esses estados ou cidades (basta um); `trait` exige uma característica da cidade escolhida (umidade,
+ * maresia, estação seca, chuva forte) e, portanto, só vale quando a pessoa informou a cidade.
+ * `note` vai na descrição do item e explica o porquê, em poucas palavras.
  */
+export interface Where {
+  ufs?: string[];
+  cities?: string[];
+  trait?: Trait;
+}
+
+export interface Place {
+  uf: string;
+  city: string | null;
+  traits: ReadonlySet<Trait>;
+}
+
+/** O item vale para este lugar? Sem `where`, vale para qualquer um. */
+export function matchesWhere(where: Where | undefined, place: Place) {
+  if (!where) return true;
+  const hasPlace = Boolean(where.ufs || where.cities);
+  const placeOk =
+    !hasPlace ||
+    Boolean(where.ufs?.includes(place.uf)) ||
+    Boolean(place.city && where.cities?.includes(place.city));
+  const traitOk = !where.trait || place.traits.has(where.trait);
+  return placeOk && traitOk;
+}
+
 export interface CatalogEntry {
   room: RoomKey;
   name: string;
   tier: 1 | 2 | 3 | 4;
   flags: string;
+  where?: Where;
+  note?: string;
 }
 
 const e = (
@@ -28,7 +61,13 @@ const e = (
   name: string,
   tier: 1 | 2 | 3 | 4,
   flags = "",
-): CatalogEntry => ({ room, name, tier, flags });
+  extra: { where?: Where; note?: string } = {},
+): CatalogEntry => ({ room, name, tier, flags, ...extra });
+
+const NORTE_NORDESTE = [
+  "AC", "AM", "AP", "PA", "RO", "RR", "TO",
+  "AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE",
+];
 
 export const CATALOG: CatalogEntry[] = [
   // Quarto principal
@@ -55,6 +94,33 @@ export const CATALOG: CatalogEntry[] = [
   e("quarto", "Caixas organizadoras", 2, ""),
   e("quarto", "Penteadeira ou cômoda", 3, "X"),
   e("quarto", "Roupão", 2, "F"),
+  e("quarto", "Jogo de cama reserva {cama}", 2, ""),
+  e("quarto", "Cobre-leito ou colcha leve", 2, ""),
+  e("quarto", "Protetor de travesseiro", 1, ""),
+  e("quarto", "Arara de roupas", 2, ""),
+  e("quarto", "Aquecedor de ambiente", 3, "F"),
+  e("quarto", "Pantufas", 1, "F"),
+  // Regionais: o que o clima da cidade pede.
+  e("quarto", "Sachês antimofo para o guarda-roupa", 1, "EU", {
+    where: { trait: "umido" },
+    note: "Umidade alta aqui: evita mofo nas roupas",
+  }),
+  e("quarto", "Desumidificador de ar", 3, "", {
+    where: { trait: "umido" },
+    note: "Ajuda contra mofo em clima úmido",
+  }),
+  e("quarto", "Mosquiteiro ou tela mosquiteira", 2, "U", {
+    where: { trait: "umido" },
+    note: "Mosquitos são comuns em clima úmido",
+  }),
+  e("quarto", "Umidificador de ar", 2, "", {
+    where: { trait: "seco" },
+    note: "Ajuda no ar muito seco da estação seca",
+  }),
+  e("quarto", "Rede de dormir e ganchos", 2, "", {
+    where: { ufs: NORTE_NORDESTE },
+    note: "Costume forte na região",
+  }),
 
   // Quarto extra
   e("quartoExtra", "Cama de solteiro ou sofá-cama", 4, "E"),
@@ -68,6 +134,16 @@ export const CATALOG: CatalogEntry[] = [
   e("quartoExtra", "Ventilador", 2, "H"),
   e("quartoExtra", "Abajur", 2, ""),
   e("quartoExtra", "Cesto de roupa suja", 1, ""),
+  e("quartoExtra", "Mesa de estudo", 3, ""),
+  e("quartoExtra", "Tapete", 2, ""),
+  e("quartoExtra", "Mosquiteiro ou tela mosquiteira", 2, "", {
+    where: { trait: "umido" },
+    note: "Mosquitos são comuns em clima úmido",
+  }),
+  e("quartoExtra", "Umidificador de ar", 2, "", {
+    where: { trait: "seco" },
+    note: "Ajuda no ar muito seco da estação seca",
+  }),
 
   // Banheiro
   e("banheiro", "Toalhas de banho", 2, "ETI"),
@@ -87,6 +163,15 @@ export const CATALOG: CatalogEntry[] = [
   e("banheiro", "Toalha de lavabo", 1, ""),
   e("banheiro", "Ducha higiênica", 2, ""),
   e("banheiro", "Porta-cotonetes", 1, ""),
+  e("banheiro", "Tapete antiderrapante para o box", 1, ""),
+  e("banheiro", "Prateleira ou porta-shampoo de box", 1, ""),
+  e("banheiro", "Balança de banheiro", 2, ""),
+  e("banheiro", "Secador de cabelo", 2, ""),
+  e("banheiro", "Cesto de roupa suja do banheiro", 1, ""),
+  e("banheiro", "Sachê antimofo ou absorvedor de umidade", 1, "U", {
+    where: { trait: "umido" },
+    note: "Banheiro fechado mofa rápido em clima úmido",
+  }),
 
   // Cozinha
   e("cozinha", "Jogo de panelas", 3, "E"),
@@ -136,6 +221,39 @@ export const CATALOG: CatalogEntry[] = [
   e("cozinha", "Rolo de abrir massa", 1, ""),
   e("cozinha", "Cuscuzeira", 1, "N"),
   e("cozinha", "Kit chimarrão (cuia, bomba, térmica)", 2, "R"),
+  e("cozinha", "Balança de cozinha", 2, ""),
+  e("cozinha", "Copos medidores e colheres dosadoras", 1, ""),
+  e("cozinha", "Pegador e pinça de cozinha", 1, ""),
+  e("cozinha", "Espremedor de frutas", 1, ""),
+  e("cozinha", "Potes para marmita", 2, ""),
+  e("cozinha", "Garrafas de água", 1, "P"),
+  e("cozinha", "Jogo americano e porta-copos", 1, ""),
+  e("cozinha", "Caldeirão grande", 2, ""),
+  e("cozinha", "Pipoqueira", 1, ""),
+  // Regionais: costumes de cozinha da região.
+  e("cozinha", "Panela de barro", 2, "", {
+    where: { ufs: ["BA", "ES"] },
+    note: "Para moqueca, como manda a tradição daqui",
+  }),
+  e("cozinha", "Tapioqueira", 1, "N", {
+    note: "Tapioca na hora, muito comum na região",
+  }),
+  e("cozinha", "Panela de ferro", 2, "", {
+    where: { ufs: ["MG", "GO"] },
+    note: "Aquece por igual e dura décadas",
+  }),
+  e("cozinha", "Panela de pedra-sabão", 3, "", {
+    where: { ufs: ["MG"] },
+    note: "Tradição mineira para feijão e caldos",
+  }),
+  e("cozinha", "Coador de pano para café", 1, "", {
+    where: { ufs: ["MG"] },
+    note: "Café coado, do jeito mineiro",
+  }),
+  e("cozinha", "Kit tereré (guampa e bomba)", 1, "", {
+    where: { ufs: ["MS", "MT"] },
+    note: "Bebida fria típica da região",
+  }),
 
   // Eletrodomésticos
   e("eletro", "Geladeira", 4, "E"),
@@ -153,6 +271,10 @@ export const CATALOG: CatalogEntry[] = [
   e("eletro", "Mixer", 2, ""),
   e("eletro", "Lava-louças", 4, "X"),
   e("eletro", "Coifa ou depurador", 3, "X"),
+  e("eletro", "Torradeira", 2, ""),
+  e("eletro", "Forno elétrico", 3, ""),
+  e("eletro", "Espremedor elétrico de frutas", 2, ""),
+  e("eletro", "Filtro de água de bancada", 2, ""),
 
   // Área de serviço
   e("servico", "Máquina de lavar roupa", 4, "E"),
@@ -176,6 +298,22 @@ export const CATALOG: CatalogEntry[] = [
   e("servico", "Desentupidor", 1, ""),
   e("servico", "Robô aspirador", 4, ""),
   e("servico", "Secadora de roupas", 4, ""),
+  e("servico", "Lanterna e pilhas", 1, ""),
+  e("servico", "Kit de primeiros socorros", 1, ""),
+  e("servico", "Caixa organizadora de ferramentas", 2, ""),
+  // Regionais.
+  e("servico", "Varal dobrável para dias de chuva", 1, "E", {
+    where: { trait: "chuvoso" },
+    note: "Roupa não seca ao ar livre com chuva frequente",
+  }),
+  e("servico", "Spray anticorrosão para fechaduras e dobradiças", 1, "", {
+    where: { trait: "maresia" },
+    note: "A maresia enferruja metais mais rápido",
+  }),
+  e("servico", "Absorvedor de umidade para armários", 1, "U", {
+    where: { trait: "umido" },
+    note: "Umidade alta: evita mofo em armários fechados",
+  }),
 
   // Sala de Estar
   e("sala", "Sofá", 4, "E"),
@@ -203,6 +341,25 @@ export const CATALOG: CatalogEntry[] = [
   e("sala", "Biombo ou divisória", 2, "O"),
   e("sala", "Cabideiro", 2, "O"),
   e("sala", "Organizadores para baixo da cama", 2, "O"),
+  e("sala", "Filtro de linha", 1, "E"),
+  e("sala", "Pufe", 2, ""),
+  e("sala", "Relógio de parede", 1, ""),
+  e("sala", "Espelho decorativo", 2, ""),
+  e("sala", "Suporte e organizador de controles", 1, ""),
+  e("sala", "Aquecedor de ambiente", 3, "F"),
+  // Regionais.
+  e("sala", "Porta-guarda-chuva", 1, "", {
+    where: { trait: "chuvoso" },
+    note: "Chuva forte e frequente",
+  }),
+  e("sala", "Desumidificador de ar", 3, "", {
+    where: { trait: "umido" },
+    note: "Ajuda contra mofo em clima úmido",
+  }),
+  e("sala", "Umidificador de ar", 2, "", {
+    where: { trait: "seco" },
+    note: "Ajuda no ar muito seco da estação seca",
+  }),
 
   // Varanda e área externa
   e("externa", "Capacho", 1, "E"),
@@ -217,6 +374,16 @@ export const CATALOG: CatalogEntry[] = [
   e("externa", "Kit churrasco", 3, "K"),
   e("externa", "Iluminação externa", 2, "K"),
   e("externa", "Borrifador e regador", 1, "A"),
+  e("externa", "Churrasqueira portátil", 2, "A"),
+  e("externa", "Ombrelone ou toldo", 3, ""),
+  e("externa", "Capacho absorvente", 1, "", {
+    where: { trait: "chuvoso" },
+    note: "Segura a água que entra com a chuva",
+  }),
+  e("externa", "Cadeira de praia e guarda-sol", 2, "", {
+    where: { trait: "maresia" },
+    note: "Praia por perto",
+  }),
 
   // Home office
   e("escritorio", "Mesa de trabalho", 3, "E"),
@@ -229,4 +396,11 @@ export const CATALOG: CatalogEntry[] = [
   e("escritorio", "Organizadores de mesa", 1, ""),
   e("escritorio", "Apoio para os pés", 2, ""),
   e("escritorio", "Organizadores de cabos", 1, ""),
+  e("escritorio", "Fone de ouvido com microfone", 2, ""),
+  e("escritorio", "Lixeira de escritório", 1, ""),
+  e("escritorio", "Quadro de avisos ou lousa", 1, ""),
+  e("escritorio", "Nobreak ou estabilizador", 2, "", {
+    where: { trait: "chuvoso" },
+    note: "Tempestades derrubam a energia e queimam equipamentos",
+  }),
 ];

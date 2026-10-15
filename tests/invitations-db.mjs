@@ -26,7 +26,7 @@ const control = new pg.Pool({
   connectionString: originalUrl.toString(),
   ssl: ssl ? { rejectUnauthorized: false } : undefined,
 });
-const schema = `larume_invitations_test_${randomUUID().replaceAll("-", "")}`;
+const schema = `casamia_invitations_test_${randomUUID().replaceAll("-", "")}`;
 let server;
 let created = false;
 
@@ -237,6 +237,17 @@ try {
   assert.deepEqual((await agent().call("/invitations/check", "POST", { token: secondLink })).data, { valid: false }, "convite expira");
   assert.equal((await ana.person.call(`/enxovais/${ana.enxovalId}/invitations`)).data.length, 0, "expirados saem da lista");
   console.log("PASS: lista, cancelamento, reenvio e expiração dos convites; quem foi removido pode ser convidado de novo.");
+
+  // 8b. O convidado sai por conta própria: perde o acesso, mas a sessão continua (a tela "sem acesso" é do app).
+  assert.equal((await relogin.call(`/enxovais/${ana.enxovalId}/members/${ana.id}`, "DELETE")).status, 403, "convidado não remove o dono");
+  assert.equal((await relogin.call(`/enxovais/${ana.enxovalId}/members/${guestId}`, "DELETE")).status, 204, "convidado sai do enxoval");
+  const afterLeave = await relogin.call("/bootstrap");
+  assert.equal(afterLeave.status, 200, "sair não derruba a sessão");
+  assert.deepEqual(afterLeave.data.enxovais, []);
+  assert.equal((await relogin.call(`/enxovais/${ana.enxovalId}`)).status, 404, "sem acesso depois de sair");
+  assert.equal((await relogin.call(`/enxovais/${ana.enxovalId}/members/${guestId}`, "DELETE")).status, 404, "quem já saiu não é membro");
+  assert.equal((await ana.person.call(`/enxovais/${ana.enxovalId}`)).data.members.length, 1, "só o dono ficou");
+  console.log("PASS: o convidado sai do enxoval por conta própria e o dono não pode sair.");
 
   // 9. Falha do provedor de e-mail não deixa convite pendente; excluir o enxoval apaga os convites.
   const originalFetch = globalThis.fetch;

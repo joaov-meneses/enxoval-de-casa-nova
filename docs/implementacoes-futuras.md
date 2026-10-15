@@ -14,13 +14,12 @@
 * **Área Administrativa:** gestão básica de contas e permissões (`src/components/AdminPage.tsx`, `server/admin.ts`).
 
 ### O que NÃO existe e precisa ser implementado
-1. **Identidade Visual e Marca:** o código atual ainda utiliza os assets e textos da marca antiga "Larume" (`src/components/Brand.tsx`, `LandingPage.tsx`, `product.css`, favicons e imagens).
-2. **Página Principal (Home Page):** a `LandingPage.tsx` precisa ser 100% reconstruída com a paleta terracota/creme, o mascote Nino, o conceito de enxoval inteligente e a nova tabela de planos.
-3. **Regras e Travas de Freemium:** atualmente qualquer usuário pode criar cômodos e itens ilimitados sem restrição.
-4. **Motor de Pagamentos:** não há conexão ativa com a Stripe para cobrança recorrente, checkout ou portal de autoatendimento do cliente.
-5. **Inteligência Artificial (Jev):** não há integração com a TypeSafe AI para recomendações determinísticas e cálculos de urgência.
-6. **Mascote Nino:** ausência de ilustrações e componentes de interface do Nino.
-7. **Página de Chá de Casa Nova:** não há suporte a rotas públicas para convidados visualizarem presentes e enviarem Pix.
+1. **Página Principal (Home Page):** a `LandingPage.tsx` precisa ser 100% reconstruída com a paleta terracota/creme, o mascote Nino, o conceito de enxoval inteligente e a nova tabela de planos.
+2. **Regras e Travas de Freemium:** atualmente qualquer usuário pode criar cômodos e itens ilimitados sem restrição.
+3. **Motor de Pagamentos:** não há conexão ativa com a Stripe para cobrança recorrente, checkout ou portal de autoatendimento do cliente.
+4. **Inteligência Artificial (Jev):** não há integração com a TypeSafe AI para recomendações determinísticas e cálculos de urgência.
+5. **Mascote Nino:** ausência de ilustrações e componentes de interface do Nino.
+6. **Página de Chá de Casa Nova:** não há suporte a rotas públicas para convidados visualizarem presentes e enviarem Pix.
 
 ---
 
@@ -38,7 +37,7 @@ flowchart LR
 
 ### FASE 1: Rebranding Visual & Reconstrução Total da Home Page
 
-> **Status: implementada.** Paleta oficial em tokens `--cm-*` (`src/index.css`) e migração das cores do app; tipografia **Nunito** (interface) + **Fraunces** (títulos e logotipo); `Brand` com símbolo em `<picture>` e tamanho em `em`; favicons, manifest e títulos; mascote **Nino** (`src/components/Nino.tsx`, ilustração vetorial provisória); nova Home em `src/components/LandingPage.tsx` + `src/landing.css`, com cabeçalho de vidro fixo. Desvios do texto abaixo: a interface usa Nunito, e não DM Sans; o botão secundário do hero é "Ver como funciona" (não existe demonstração). Os limites do plano gratuito, a cobrança e as dicas de IA citados na página só passam a existir nas Fases 2 e 3.
+> **Status: implementada.** Paleta oficial em tokens `--cm-*` (`src/index.css`) e migração das cores do app; tipografia **Nunito** (interface) + **Fraunces** (títulos e logotipo); `Brand` com o Nino em `<picture>` e tamanho em `em`; favicons, manifest e títulos; mascote **Nino** (`src/components/Nino.tsx`, arte final em `public/brand/nino*.png`, gerada em ícones por `scripts/generate-brand-assets.ts`); nova Home em `src/components/LandingPage.tsx` + `src/landing.css`, com cabeçalho de vidro fixo. Desvios do texto abaixo: a interface usa Nunito, e não DM Sans; o botão secundário do hero é "Ver como funciona" (não existe demonstração). Os limites do plano gratuito, a cobrança e as dicas de IA citados na página só passam a existir nas Fases 2 e 3.
 
 Esta fase alinha toda a experiência visual da aplicação ao manual de branding do **Casa Mia**.
 
@@ -55,7 +54,7 @@ Esta fase alinha toda a experiência visual da aplicação ao manual de branding
   * Manter **DM Sans** para interfaces, botões e dados tabulares de preços.
 * **Componente da Marca e Favicon:**
   * Refatorar `src/components/Brand.tsx` para renderizar a marca "Casa Mia" com a porta em arco e o coração estilizado.
-  * Substituir favicons e ícones em `public/` pelos novos assets do Casa Mia.
+  * Substituir favicons e ícones em `public/` pelos novos assets do Casa Mia (feito: derivados do Nino).
   * Atualizar títulos de página e `public/site.webmanifest`.
 
 #### 1.2 Reconstrução Completa da Home Page (`src/components/LandingPage.tsx`)

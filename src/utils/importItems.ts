@@ -1,4 +1,4 @@
-import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH } from "../data";
+import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH, normalizeEnvironmentName } from "../data";
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity } from "../itemQuantity";
 import {
   DEFAULT_ITEM_STATUS,
@@ -368,7 +368,7 @@ export function parseImportRows(grid: unknown[][]): ImportParseResult {
     }
 
     const name = unguard(cellText(get(raw, "name")));
-    const categoryName = unguard(cellText(get(raw, "category")));
+    const categoryName = normalizeEnvironmentName(unguard(cellText(get(raw, "category"))));
     const missing = [
       !name && REQUIRED_LABELS.name,
       !categoryName && REQUIRED_LABELS.category,

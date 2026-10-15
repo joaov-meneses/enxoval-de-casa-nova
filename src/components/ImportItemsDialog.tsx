@@ -19,8 +19,8 @@ import {
 } from "../utils/importItems";
 import { Dialog } from "./Dialog";
 
-const MODEL_CSV = "/modelos/larume-modelo-importacao.csv";
-const MODEL_XLSX = "/modelos/larume-modelo-importacao.xlsx";
+const MODEL_CSV = "/modelos/casamia-modelo-importacao.csv";
+const MODEL_XLSX = "/modelos/casamia-modelo-importacao.xlsx";
 const PREVIEW_ROWS = 6;
 const LISTED_ISSUES = 15;
 

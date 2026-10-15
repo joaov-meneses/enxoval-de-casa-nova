@@ -1,3 +1,5 @@
+import type { SpendingTier, PriceCategory } from "../planning/spending";
+
 export type Moment = "casal" | "solo" | "amigos" | "troca";
 export type Housing = "apartamento" | "casa" | "studio";
 export type Owned = "nada" | "algumas" | "boa";
@@ -30,6 +32,8 @@ export interface Answers {
   /** Verdadeiro depois que a pessoa respondeu a pergunta da data (inclusive "ainda não sei"). */
   moveDateAnswered: boolean;
   state: string | null;
+  /** Cidade (id de `regions.ts`) que refina o estado; null para "outra cidade". */
+  city: string | null;
   housing: Housing | null;
   people: number | null;
   rooms: OptionalRoom[] | null;
@@ -50,6 +54,8 @@ export interface PlanItem {
   room: RoomKey;
   /** Precisa estar pronto na noite da mudança. */
   firstNight: boolean;
+  /** Melhor já na primeira semana na casa nova. */
+  soon: boolean;
 }
 
 export type ExcludeReason =
@@ -102,6 +108,8 @@ export interface PlanStats {
   estimateNowMaxCents: number;
   bigTicketDeferred: number;
   budgetFit: "within" | "tight" | "over" | "unknown";
+  /** Perfil de gasto que melhor combina com o orçamento informado. */
+  spendingTier: SpendingTier;
 }
 
 export interface GeneratedPlan {
@@ -112,5 +120,14 @@ export interface GeneratedPlan {
 
 /** Formato enviado ao servidor. */
 export interface PlanPayload {
-  categories: { name: string; items: { name: string; description: string }[] }[];
+  categories: {
+    name: string;
+    items: {
+      name: string;
+      description: string;
+      priceCategory: PriceCategory;
+      priority: "essential" | "optional";
+      timing: "first_night" | "first_week" | null;
+    }[];
+  }[];
 }
