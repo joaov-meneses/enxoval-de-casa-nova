@@ -3,8 +3,11 @@
  * mesmos números para explicar à pessoa o que aconteceu.
  */
 
-/** `founder`: contas que já existiam antes do freemium, com tudo liberado (sem cobrança). */
-export const ACCOUNT_PLANS = ['free', 'monthly', 'semiannual', 'annual', 'founder'] as const;
+/**
+ * `monthly`: assinatura mensal. `pass`: Passe da Casa Nova, pagamento único com 12 meses de acesso (vale só até a data de
+ * validade). `founder`: contas que já existiam antes do freemium, com tudo liberado (sem cobrança).
+ */
+export const ACCOUNT_PLANS = ['free', 'monthly', 'pass', 'founder'] as const;
 export type AccountPlan = (typeof ACCOUNT_PLANS)[number];
 
 export interface PlanLimits {
@@ -16,7 +19,7 @@ export interface PlanLimits {
   itemsPerEnvironment: number | null;
 }
 
-export const FREE_PLAN_LIMITS: PlanLimits = { enxovais: 1, environments: 2, itemsPerEnvironment: 5 };
+export const FREE_PLAN_LIMITS: PlanLimits = { enxovais: 1, environments: 2, itemsPerEnvironment: 10 };
 const UNLIMITED: PlanLimits = { enxovais: null, environments: null, itemsPerEnvironment: null };
 
 export function isAccountPlan(value: unknown): value is AccountPlan {
@@ -42,11 +45,18 @@ export interface PaidPlanOffer {
   billing: string;
   badge?: string;
   featured?: boolean;
+  /** Pagamento único (sem renovação automática) em vez de assinatura. */
+  oneTime?: boolean;
 }
 
-/** Preços previstos para o lançamento, na ordem em que aparecem (landing e convite para assinar). */
+/** Meses de acesso do Passe da Casa Nova. */
+export const PASS_MONTHS = 12;
+
+/**
+ * Preços do lançamento, na ordem em que aparecem (landing e convite para assinar). O mensal cheio é a âncora:
+ * a partir do quarto mês, o Passe sai mais barato.
+ */
 export const PAID_PLAN_OFFERS: PaidPlanOffer[] = [
-  { id: 'semiannual', name: 'Semestral', price: 'R$ 19,90', per: '/mês', billing: 'Cobrado R$ 119,40 a cada 6 meses', badge: 'Mais Escolhido', featured: true },
-  { id: 'annual', name: 'Anual', price: 'R$ 14,90', per: '/mês', billing: 'Cobrado R$ 178,80 por ano', badge: '50% de desconto' },
-  { id: 'monthly', name: 'Mensal', price: 'R$ 29,90', per: '/mês', billing: 'Flexibilidade total, mês a mês' },
+  { id: 'pass', name: 'Passe da Casa Nova', price: 'R$ 99', per: ' pagamento único', billing: `${PASS_MONTHS} meses de acesso, sem renovação automática. Equivale a 3 meses do plano mensal.`, badge: 'Melhor custo-benefício', featured: true, oneTime: true },
+  { id: 'monthly', name: 'Mensal', price: 'R$ 29,90', per: '/mês', billing: 'Flexibilidade total: cancele quando quiser' },
 ];

@@ -83,8 +83,7 @@ const PAID_FEATURES = [
 ];
 
 const PAID_CTA: Record<PaidPlanOffer["id"], string> = {
-  semiannual: "Quero o Semestral",
-  annual: "Quero o Anual",
+  pass: "Quero o Passe",
   monthly: "Quero o Mensal",
 };
 

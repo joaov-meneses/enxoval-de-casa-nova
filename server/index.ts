@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import { migrateDatabase } from "./migrations.ts";
+import { registerBillingWebhook } from "./billing.ts";
 import { registerApiRoutes } from "./routes.ts";
 import { startPriceTrackerScheduler } from "./workers/priceTrackerWorker.ts";
 import { startCatalogScheduler } from "./workers/catalogWorker.ts";
@@ -14,6 +15,8 @@ const isProduction =
   process.argv.includes("--production");
 
 app.set("trust proxy", 1);
+// O webhook da Stripe confere a assinatura sobre o corpo cru, então vem antes do parser de JSON.
+registerBillingWebhook(app);
 app.use(express.json({ limit: "1mb" }));
 
 await migrateDatabase();

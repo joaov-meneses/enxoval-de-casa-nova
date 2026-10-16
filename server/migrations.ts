@@ -196,8 +196,27 @@ export async function migrateDatabase() {
         ALTER TABLE users ALTER COLUMN plan SET DEFAULT 'free';
       END IF;
     END $$;
+    -- Planos semestral e anual deixaram de existir (nunca chegaram a ser vendidos); o mensal é o equivalente mais próximo.
+    UPDATE users SET plan = 'monthly' WHERE plan IN ('semiannual', 'annual');
     ALTER TABLE users DROP CONSTRAINT IF EXISTS users_plan_valid;
-    ALTER TABLE users ADD CONSTRAINT users_plan_valid CHECK (plan IN ('free', 'monthly', 'semiannual', 'annual', 'founder'));
+    ALTER TABLE users ADD CONSTRAINT users_plan_valid CHECK (plan IN ('free', 'monthly', 'pass', 'founder'));
+
+    -- Assinatura na Stripe. O plano da conta (users.plan) é consequência dela e só muda pelo webhook.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_renews_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_cancel_at_period_end boolean NOT NULL DEFAULT false;
+    -- Passe da Casa Nova (pagamento único): acesso até esta data. users.plan não guarda 'pass'; o plano em vigor sai de effectivePlanSql.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_expires_at timestamptz;
+    -- Momento do último evento da Stripe aplicado: eventos atrasados ou repetidos não desfazem um mais novo.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_event_at timestamptz;
+    CREATE UNIQUE INDEX IF NOT EXISTS users_stripe_customer_id_idx ON users(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS stripe_events (
+      id text PRIMARY KEY,
+      type text NOT NULL,
+      processed_at timestamptz NOT NULL DEFAULT now()
+    );
 
     CREATE TABLE IF NOT EXISTS enxoval_invitations (
       id uuid PRIMARY KEY,

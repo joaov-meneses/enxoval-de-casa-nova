@@ -1,4 +1,4 @@
-// Teste de integração com PostgreSQL real: travas do plano gratuito (1 enxoval, 2 ambientes, 5 itens por
+// Teste de integração com PostgreSQL real: travas do plano gratuito (1 enxoval, 2 ambientes, 10 itens por
 // ambiente), corte do conteúdo inicial, limites herdados do dono e contas antigas viram fundadoras.
 // Usa um schema descartável. Rodar: npm run test:freemium-db
 import assert from "node:assert/strict";
@@ -79,14 +79,14 @@ try {
   const ownerUser = await register(owner, "dona@example.invalid");
   assert.equal(ownerUser.plan, "free", "conta nova nasce no plano gratuito");
 
-  // O modelo padrão entra cortado: os 2 primeiros ambientes, com até 5 itens cada.
+  // O modelo padrão entra cortado: os 2 primeiros ambientes, com até 10 itens cada.
   const created1 = await owner("/enxovais", "POST", { name: "Casa", useDefaultTemplate: true });
   assert.equal(created1.status, 201, JSON.stringify(created1.data));
   const enxovalId = created1.data.enxoval.id;
   assert.equal(created1.data.categories.length, 2, "o modelo padrão entra com 2 ambientes");
   for (const category of created1.data.categories) {
     const count = created1.data.items.filter((item) => item.categoryId === category.id).length;
-    assert.ok(count <= 5, `${category.name}: ${count} itens, acima do limite`);
+    assert.ok(count <= 10, `${category.name}: ${count} itens, acima do limite`);
   }
 
   // Segundo enxoval é recusado.
@@ -104,15 +104,15 @@ try {
     "item que criaria um ambiente novo",
   );
 
-  // Enche o primeiro ambiente até 5 e esvazia o segundo.
+  // Enche o primeiro ambiente até 10 e esvazia o segundo.
   const itemsIn = async (categoryId) =>
     (await query("SELECT id FROM items WHERE category_id = $1 ORDER BY sort_order", [categoryId])).map((row) => row.id);
   await query("DELETE FROM items WHERE category_id = $1", [second.id]);
-  while ((await itemsIn(first.id)).length < 5) {
+  while ((await itemsIn(first.id)).length < 10) {
     const added = await owner("/items", "POST", { enxovalId, name: `Item ${randomUUID().slice(0, 6)}`, categoryId: first.id });
     assert.equal(added.status, 201, JSON.stringify(added.data));
   }
-  expectLimit(await owner("/items", "POST", { enxovalId, name: "Sexto", categoryId: first.id }), "LIMIT_REACHED_ITEMS", "sexto item");
+  expectLimit(await owner("/items", "POST", { enxovalId, name: "Décimo primeiro", categoryId: first.id }), "LIMIT_REACHED_ITEMS", "décimo primeiro item");
 
   // Mover um item para o ambiente cheio também é recusado; editar sem mudar de ambiente segue livre.
   const loose = await owner("/items", "POST", { enxovalId, name: "Solto", categoryId: second.id });
@@ -129,14 +129,14 @@ try {
   // Quem é convidado herda os limites de quem é dono do enxoval.
   const editor = person();
   const editorUser = await register(editor, "editor@example.invalid");
-  await query("UPDATE users SET plan = 'annual' WHERE id = $1", [editorUser.id]);
+  await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [editorUser.id]);
   await query("INSERT INTO enxoval_members (enxoval_id, user_id, role) VALUES ($1, $2, 'editor')", [enxovalId, editorUser.id]);
   expectLimit(await editor("/categories", "POST", { enxovalId, name: "Varanda" }), "LIMIT_REACHED_ENVIRONMENTS", "convidado com plano pago no enxoval de conta gratuita");
 
   // Plano pago libera tudo.
   await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [ownerUser.id]);
   assert.equal((await owner("/categories", "POST", { enxovalId, name: "Varanda" })).status, 201, "plano pago cria o terceiro ambiente");
-  assert.equal((await owner("/items", "POST", { enxovalId, name: "Sexto", categoryId: first.id })).status, 201, "plano pago cria o sexto item");
+  assert.equal((await owner("/items", "POST", { enxovalId, name: "Décimo primeiro", categoryId: first.id })).status, 201, "plano pago cria o décimo primeiro item");
   assert.equal((await owner("/enxovais", "POST", { name: "Casa de praia", useDefaultTemplate: false })).status, 201, "plano pago cria outro enxoval");
 
   // O plano do funil entra cortado para a conta gratuita.
@@ -170,8 +170,8 @@ try {
   );
   for (const category of fromPlan.data.categories) {
     const names = fromPlan.data.items.filter((item) => item.categoryId === category.id).map((item) => item.name);
-    const expected = plan.categories.find((planned) => planned.name === category.name).items.slice(0, 5).map((item) => item.name);
-    assert.deepEqual(names, expected, `${category.name}: entram os 5 primeiros itens`);
+    const expected = plan.categories.find((planned) => planned.name === category.name).items.slice(0, 10).map((item) => item.name);
+    assert.deepEqual(names, expected, `${category.name}: entram os 10 primeiros itens`);
   }
 
   // Contas que já existiam antes do freemium viram fundadoras uma única vez; as novas continuam gratuitas.

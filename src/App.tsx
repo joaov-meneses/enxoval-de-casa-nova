@@ -28,6 +28,7 @@ import {
   Percent,
   CalendarClock,
   MessageCircleHeart,
+  CreditCard,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -48,6 +49,7 @@ import {
   deleteEnxoval as deleteEnxovalRequest,
   deleteItem as deleteItemRequest,
   fetchBootstrap,
+  openBillingPortal,
   fetchEnxoval as fetchEnxovalRequest,
   fetchInvitations as fetchInvitationsRequest,
   inviteMember as inviteMemberRequest,
@@ -90,7 +92,7 @@ import { PurchasePlanView, type PlanningUpdates } from "./components/PurchasePla
 import { buildPurchasePlan } from "./planning/purchasePlan";
 import { measureTextWidth } from "./utils/textWidth";
 import { FeedbackDialog } from "./components/FeedbackDialog";
-import { PaywallDialog } from "./components/PaywallDialog";
+import { OPEN_PLANS_EVENT, PaywallDialog } from "./components/PaywallDialog";
 import {
   activeItems,
   discountApplies,
@@ -453,6 +455,24 @@ export default function App() {
       window.removeEventListener("resize", updateHeaderSize);
     };
   }, []);
+
+  /** Gratuito ou Passe: abre a tela de planos. Assinatura mensal: abre o portal da Stripe (cartão, faturas, cancelar). */
+  const openPlans = async () => {
+    if (user?.plan !== "monthly") {
+      window.dispatchEvent(new Event(OPEN_PLANS_EVENT));
+      return;
+    }
+    try {
+      const { url } = await openBillingPortal();
+      window.location.assign(url);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível abrir a assinatura agora.",
+      );
+    }
+  };
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -1964,6 +1984,20 @@ export default function App() {
                 </button>
               </>
             )}
+            {!user.isGuest && user.plan !== "founder" && (
+              <button
+                type="button"
+                className="button button-outline button-small"
+                onClick={() => void openPlans()}
+              >
+                <CreditCard size={16} />{" "}
+                {user.plan === "free"
+                  ? "Conhecer os planos"
+                  : user.plan === "pass"
+                    ? "Meu Passe"
+                    : "Gerenciar assinatura"}
+              </button>
+            )}
             <button
               type="button"
               className="button button-outline button-small help-entry"
@@ -3285,7 +3319,7 @@ export default function App() {
           </button>
         </form>
       </Dialog>
-      <PaywallDialog />
+      <PaywallDialog onPlanChanged={() => void handleRefresh()} />
     </div>
   );
 }

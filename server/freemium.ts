@@ -9,6 +9,15 @@ import { HttpError } from './security.ts';
  * juntas pelo mesmo limite.
  */
 
+/**
+ * Plano em vigor da conta, em SQL. O Passe vale só até `pass_expires_at`; depois dele a conta volta ao plano da
+ * assinatura (ou ao gratuito) sem nenhuma rotina de expiração: a data é conferida a cada leitura. Fundador manda sempre.
+ */
+export function effectivePlanSql(alias = '') {
+  const p = alias ? `${alias}.` : '';
+  return `(CASE WHEN ${p}plan = 'founder' THEN 'founder' WHEN ${p}pass_expires_at > now() THEN 'pass' ELSE ${p}plan END)`;
+}
+
 function asPlan(value: unknown): AccountPlan {
   return isAccountPlan(value) ? value : 'free';
 }
@@ -16,7 +25,7 @@ function asPlan(value: unknown): AccountPlan {
 /** Plano do dono do enxoval, com a linha do enxoval travada até o fim da transação. */
 export async function lockEnxovalLimits(client: PoolClient, enxovalId: string): Promise<PlanLimits> {
   const result = await client.query<{ plan: string }>(`
-    SELECT u.plan
+    SELECT ${effectivePlanSql('u')} AS plan
     FROM enxovais e
     INNER JOIN users u ON u.id = e.owner_id
     WHERE e.id = $1
@@ -58,7 +67,7 @@ export async function assertCanAddItem(client: PoolClient, enxovalId: string, ca
 
 /** Plano da própria conta, com a linha do usuário travada (criação de enxoval). */
 export async function lockUserLimits(client: PoolClient, userId: string): Promise<PlanLimits> {
-  const result = await client.query<{ plan: string }>('SELECT plan FROM users WHERE id = $1 FOR UPDATE', [userId]);
+  const result = await client.query<{ plan: string }>(`SELECT ${effectivePlanSql()} AS plan FROM users WHERE id = $1 FOR UPDATE`, [userId]);
   if (!result.rows[0]) throw new HttpError(401, 'Faça login para continuar.');
   return planLimits(asPlan(result.rows[0].plan));
 }

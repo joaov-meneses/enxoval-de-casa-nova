@@ -22,7 +22,14 @@ import type {
 import { isItemStatus, normalizeItemStatus } from "./itemStatus";
 import type { Answers, PlanPayload } from "./onboarding/types";
 import type { AdminFeedback, FeedbackInput, FeedbackStatus } from "./feedback";
-import { isLimitCode, type LimitCode } from "./plans";
+import {
+  isLimitCode,
+  type AccountPlan,
+  type LimitCode,
+  type PaidPlanOffer,
+} from "./plans";
+
+type PaidPlanId = PaidPlanOffer["id"];
 
 export class ApiError extends Error {
   status: number;
@@ -480,3 +487,41 @@ export type {
   EnxovalMember,
   EnxovalWorkspace,
 };
+
+export interface BillingStatus {
+  /** false quando o servidor ainda não tem as chaves da Stripe. */
+  available: boolean;
+  plan: AccountPlan;
+  status: string | null;
+  renewsAt: string | null;
+  cancelAtPeriodEnd: boolean;
+  /** Fim do Passe da Casa Nova em vigor (ISO), ou null. */
+  passExpiresAt: string | null;
+  /** Já existe cliente na Stripe, então o portal de assinatura pode abrir. */
+  canManage: boolean;
+}
+
+export function fetchBillingStatus() {
+  return request<BillingStatus>("/api/billing/status");
+}
+
+/** Devolve o endereço do checkout da Stripe para o plano escolhido. */
+export function startCheckout(plan: PaidPlanId) {
+  return request<{ url: string }>("/api/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+/** Devolve o endereço do portal da Stripe (trocar de plano, cartão, faturas, cancelar). */
+export function openBillingPortal() {
+  return request<{ url: string }>("/api/billing/portal", { method: "POST" });
+}
+
+/** Na volta do checkout: lê a assinatura na Stripe sem esperar o webhook. */
+export function syncBilling() {
+  return request<{ plan: AccountPlan; status: string | null }>(
+    "/api/billing/sync",
+    { method: "POST" },
+  );
+}

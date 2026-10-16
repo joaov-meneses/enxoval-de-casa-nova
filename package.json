@@ -35,6 +35,7 @@
     "test:ai-db": "node --import tsx tests/ai-db.mjs",
     "test:catalog": "node --import tsx --test tests/catalog.mjs",
     "test:catalog-db": "node --import tsx tests/catalog-db.mjs",
+    "test:billing-db": "node --import tsx tests/billing-db.mjs",
     "test:freemium-db": "node --import tsx tests/freemium-db.mjs",
     "test:shared-cache": "node --import tsx tests/shared-cache.mjs"
   },
@@ -54,6 +55,7 @@
     "react-dom": "^19.0.1",
     "read-excel-file": "^9.3.12",
     "redis": "^6.3.0",
+    "stripe": "^23.0.0",
     "vite": "^6.2.3",
     "write-excel-file": "^4.1.1"
   },

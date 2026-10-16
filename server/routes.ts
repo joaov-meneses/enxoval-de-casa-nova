@@ -21,7 +21,8 @@ import { isBuyWeek, MAX_BUY_WEEK, MIN_BUY_WEEK, type ItemPriority, type ItemTimi
 import { cityById, cityMatchesState } from '../src/onboarding/regions.ts';
 import { ScrapeError, rememberPreview, scrapeProduct } from './services/productScraper.ts';
 import { findOrCreateTrackedProduct, requireTrackableUrl } from './trackedProducts.ts';
-import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, trimToLimits } from './freemium.ts';
+import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, effectivePlanSql, trimToLimits } from './freemium.ts';
+import { registerBillingRoutes } from './billing.ts';
 import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
@@ -793,7 +794,7 @@ async function getCurrentUser(req: Request) {
   if (!token) return null;
 
   const result = await getPool().query<DbUserRow>(`
-    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password, u.is_guest, u.plan
+    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password, u.is_guest, ${effectivePlanSql('u')} AS plan
     FROM sessions s
     INNER JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = $1 AND s.expires_at > now() AND u.is_active = true
@@ -1138,6 +1139,7 @@ export function registerApiRoutes(app: Express) {
   registerFeedbackRoutes(router, requireCurrentUser);
   registerAiRoutes(router, { requireUser: requireCurrentUser, fetchItems, fetchCategories });
   registerCatalogRoutes(router, { requireUser: requireCurrentUser });
+  registerBillingRoutes(router, { requireUser: requireCurrentUser });
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true });
@@ -1599,7 +1601,7 @@ export function registerApiRoutes(app: Express) {
       `, [row.enxoval_id, userId, row.invited_by]);
       await client.query('DELETE FROM enxoval_invitations WHERE id = $1', [row.id]);
 
-      const user = await client.query<DbUserRow>('SELECT id, name, email, must_change_password, is_guest, plan FROM users WHERE id = $1', [userId]);
+      const user = await client.query<DbUserRow>(`SELECT id, name, email, must_change_password, is_guest, ${effectivePlanSql()} AS plan FROM users WHERE id = $1`, [userId]);
       return { user: mapUser(user.rows[0]), enxovalId: row.enxoval_id };
     }).catch(err => {
       // Alguém criou uma conta com esse e-mail entre a checagem e a gravação.

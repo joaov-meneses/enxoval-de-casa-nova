@@ -24,7 +24,7 @@
 * **Documentos de planejamento** das Fases 7 a 9 já escritos (links nas fases).
 
 ### O que ainda NÃO existe
-1. **Pagamentos:** nenhuma integração com a Stripe; o plano só muda direto no banco (Fase 2). Ainda faltam também o limite de 3 consultas mensais ao Nino e o bloqueio de convites e do Chá de Casa Nova no plano gratuito.
+1. **Pagamentos:** integração com a Stripe pronta (`server/billing.ts`): Checkout hospedado, Customer Portal e webhook assinado (`/api/billing/webhook`), o único caminho que muda o plano. Dois planos pagos: **Mensal** (R$ 29,90, assinatura em `users.plan`) e **Passe da Casa Nova** (R$ 99, pagamento único, 12 meses sem renovação, em `users.pass_expires_at`; o plano em vigor sai de `effectivePlanSql`, então o Passe expira sozinho). Comprar o Passe cancela o mensal e, se já houver Passe, soma 12 meses ao que resta. Limite gratuito: 1 enxoval, 2 ambientes, 10 itens por ambiente. Configuração em `.env.example` (`STRIPE_*`); teste: `npm run test:billing-db`. Ainda faltam também o limite de 3 consultas mensais ao Nino e o bloqueio de convites e do Chá de Casa Nova no plano gratuito, além de Pix e notas fiscais.
 2. **Chá de Casa Nova:** sem rotas públicas, tabela ou Pix (Fase 4).
 3. **Produção:** sem Dockerfile, domínio próprio, e-mails de boas-vindas/presente/resumo, NFS-e e depósito de marca (Fase 5).
 4. **Catálogo compartilhado (restante):** autocomplete do catálogo na importação por planilha (Fase 6).
