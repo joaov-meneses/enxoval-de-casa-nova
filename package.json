@@ -13,6 +13,7 @@
     "catalog:refresh": "tsx server/workers/catalog-refresh.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
+    "redis:up": "docker compose --profile cache up -d --wait redis",
     "db:logs": "docker compose logs -f db",
     "db:psql": "docker compose exec db psql",
     "preview": "vite preview",
@@ -34,7 +35,8 @@
     "test:ai-db": "node --import tsx tests/ai-db.mjs",
     "test:catalog": "node --import tsx --test tests/catalog.mjs",
     "test:catalog-db": "node --import tsx tests/catalog-db.mjs",
-    "test:freemium-db": "node --import tsx tests/freemium-db.mjs"
+    "test:freemium-db": "node --import tsx tests/freemium-db.mjs",
+    "test:shared-cache": "node --import tsx tests/shared-cache.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -51,6 +53,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "read-excel-file": "^9.3.12",
+    "redis": "^6.3.0",
     "vite": "^6.2.3",
     "write-excel-file": "^4.1.1"
   },

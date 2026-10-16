@@ -224,9 +224,14 @@ export interface PriceOpportunity {
   itemName: string;
   enxovalName: string;
   priceCents: number;
-  /** `lowest`: menor preço já visto; `target`: caiu até o valor que a pessoa pediu para ser avisada. */
-  reason: "lowest" | "target";
+  /**
+   * `lowest`: menor preço já visto; `target`: caiu até o valor que a pessoa pediu para ser avisada; `below_common`:
+   * está no preço mais baixo que outras listas costumam pagar (até o p10 da faixa comum do catálogo).
+   */
+  reason: "lowest" | "target" | "below_common";
   url: string;
+  /** Faixa comum do item (p10 a p90), vinda só de agregados de várias listas, quando há amostra suficiente. */
+  commonRange?: { p10: number; p90: number } | null;
 }
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -234,12 +239,20 @@ const brl = new Intl.NumberFormat("pt-BR", {
   currency: "BRL",
 });
 
+const REASON_TEXT: Record<PriceOpportunity["reason"], string> = {
+  lowest: "Menor preço histórico!",
+  target: "Chegou ao preço que você queria!",
+  below_common: "Mais barato do que outras listas costumam pagar!",
+};
+
 function opportunityLine(opportunity: PriceOpportunity) {
-  const reason =
-    opportunity.reason === "lowest"
-      ? "Menor preço histórico!"
-      : "Chegou ao preço que você queria!";
-  return `${opportunity.itemName} caiu para ${brl.format(opportunity.priceCents / 100)} (${reason})`;
+  const verb = opportunity.reason === "below_common" ? "está por" : "caiu para";
+  return `${opportunity.itemName} ${verb} ${brl.format(opportunity.priceCents / 100)} (${REASON_TEXT[opportunity.reason]})`;
+}
+
+function commonRangeText(opportunity: PriceOpportunity) {
+  const range = opportunity.commonRange;
+  return range ? `Faixa comum: ${brl.format(range.p10 / 100)} a ${brl.format(range.p90 / 100)}.` : "";
 }
 
 /** Aviso de preço: um e-mail por pessoa, com todos os itens que baixaram na mesma rodada. */
@@ -252,13 +265,15 @@ export function priceOpportunityEmail(input: {
   const many = input.opportunities.length > 1;
   const subject = many
     ? `${input.opportunities.length} itens do seu enxoval baixaram de preço`
-    : `${first.itemName} baixou de preço`;
+    : first.reason === "below_common"
+      ? `${first.itemName} está abaixo do preço comum`
+      : `${first.itemName} baixou de preço`;
   const lines = input.opportunities.map(opportunityLine);
   const text = `Olá, ${input.name}.
 
 ${many ? "Estes itens do seu enxoval baixaram de preço:" : "Uma boa notícia sobre o seu enxoval:"}
 
-${input.opportunities.map((opportunity, index) => `- ${lines[index]}\n  ${opportunity.url}`).join("\n")}
+${input.opportunities.map((opportunity, index) => `- ${lines[index]}${opportunity.commonRange ? `\n  ${commonRangeText(opportunity)}` : ""}\n  ${opportunity.url}`).join("\n")}
 
 Os preços mudam o tempo todo: confira na loja antes de comprar. Para parar de receber estes avisos, desligue "Avisar quando o preço cair" no item.`;
   const html = layout(
@@ -267,7 +282,7 @@ Os preços mudam o tempo todo: confira na loja antes de comprar. Para parar de r
 ${input.opportunities
   .map(
     (opportunity, index) =>
-      `<p style="margin:0 0 14px;line-height:1.5"><strong>${escapeHtml(lines[index])}</strong><br><span style="font-size:13px;color:#6a5648">${escapeHtml(opportunity.enxovalName)}</span><br><a href="${escapeHtml(opportunity.url)}" style="color:#b5532f;font-weight:600">Ver na loja</a></p>`,
+      `<p style="margin:0 0 14px;line-height:1.5"><strong>${escapeHtml(lines[index])}</strong><br><span style="font-size:13px;color:#6a5648">${escapeHtml(opportunity.enxovalName)}${opportunity.commonRange ? ` · ${escapeHtml(commonRangeText(opportunity))}` : ""}</span><br><a href="${escapeHtml(opportunity.url)}" style="color:#b5532f;font-weight:600">Ver na loja</a></p>`,
   )
   .join("\n")}
 <p style="margin:16px 0 0;line-height:1.6;font-size:14px;color:#6a5648">Os preços mudam o tempo todo: confira na loja antes de comprar. Para parar de receber estes avisos, desligue "Avisar quando o preço cair" no item.</p>`,

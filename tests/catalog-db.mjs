@@ -12,7 +12,9 @@ import { registerApiRoutes } from "../server/routes.ts";
 import { setJevTransportForTests } from "../server/services/jev.ts";
 import { flushCatalogMetrics, invalidateCatalogIndex, waitForCatalogQueue } from "../server/catalog/store.ts";
 import { runCatalogRefresh } from "../server/workers/catalogWorker.ts";
-import { CATALOG_SEED_VERSION } from "../server/catalog/seed.ts";
+import { runPriceTracker } from "../server/workers/priceTrackerWorker.ts";
+import { mailOutbox } from "../server/mailer.ts";
+import { CATALOG_SEED_VERSION, seedItems } from "../server/catalog/seed.ts";
 
 if (!process.env.DATABASE_URL) throw new Error("Configure DATABASE_URL para o teste PostgreSQL.");
 const originalUrl = new URL(process.env.DATABASE_URL);
@@ -117,12 +119,21 @@ try {
   // 1. Semente: catálogo pronto no primeiro boot, e idempotente nos seguintes.
   const count = async () => (await db.query("SELECT COUNT(*)::int AS n FROM catalog_items")).rows[0].n;
   const seeded = await count();
-  assert.ok(seeded >= 450, `semente com ${seeded} itens`);
+  assert.ok(seeded >= 1000, `semente com ${seeded} itens`);
   assert.equal((await db.query("SELECT version FROM catalog_seed_state")).rows[0].version, CATALOG_SEED_VERSION);
   await db.query("DELETE FROM catalog_items WHERE canonical_name = 'Pilão'");
   await migrateDatabase();
   assert.equal(await count(), seeded - 1, "rodar a migração de novo não duplica nem ressuscita o que a equipe apagou");
-  console.log(`PASS: semente com ${seeded} itens, idempotente.`);
+
+  // Banco semeado com a leva 1 (com um item apagado pela equipe) recebe só os itens da leva 2.
+  const v2Names = seedItems().filter((item) => item.since === 2).map((item) => item.name);
+  await db.query("DELETE FROM catalog_items WHERE canonical_name = ANY($1::text[])", [v2Names]);
+  await db.query("UPDATE catalog_seed_state SET version = 1");
+  assert.equal(await count(), seeded - 1 - v2Names.length);
+  await migrateDatabase();
+  assert.equal(await count(), seeded - 1, "a leva 2 entra inteira e o item apagado da leva 1 continua fora");
+  assert.equal((await db.query("SELECT 1 FROM catalog_items WHERE canonical_name = 'Pilão'")).rowCount, 0);
+  console.log(`PASS: semente com ${seeded} itens, idempotente e incremental por leva.`);
 
   const app = express();
   app.use(express.json());
@@ -303,6 +314,39 @@ try {
   assert.equal(assessed.status, 200, JSON.stringify(assessed.data));
   assert.deepEqual([assessed.data.catalogItem.priceRange.region, assessed.data.catalogItem.priceRange.p50], ["", stats[0].p50], "o formulário recebe a faixa comum");
   console.log("PASS: faixas de preço só com amostra mínima e sem extremos; itens frequentes viram sugestão de catálogo.");
+
+  // 6b. A faixa real chega ao planejamento (com o item) e ao alerta de preço.
+  const withPlan = Object.fromEntries((await call(`/items?enxovalId=${second.enxoval.id}`)).data.map((item) => [item.name, item]));
+  assert.deepEqual(
+    [withPlan["Geladeira"].catalog.priceRange.p50, withPlan["Geladeira"].catalog.priceRange.region],
+    [stats[0].p50, ""],
+    "o item leva a faixa do Brasil quando a UF dele não tem amostra",
+  );
+  const product = randomUUID();
+  await db.query(
+    `INSERT INTO tracked_products (id, url, domain, title, current_price_cents, lowest_price_cents, last_scrape_status)
+     VALUES ($1, 'https://loja-teste.com.br/geladeira', 'loja-teste.com.br', 'Geladeira', 260000, 200000, 'ok')`,
+    [product],
+  );
+  // Já houve preço menor na loja: as leituras abaixo não são recorde, então o motivo só pode ser "abaixo do comum".
+  await db.query(
+    "INSERT INTO product_price_snapshots (id, tracked_product_id, price_cents, captured_at) VALUES ($1, $2, 200000, now() - interval '3 days')",
+    [randomUUID(), product],
+  );
+  await db.query("UPDATE items SET tracked_product_id = $1 WHERE id = $2", [product, withPlan["Geladeira"].id]);
+  process.env.MAIL_DRIVER = "memory";
+  mailOutbox.length = 0;
+  const scrapeAt = (priceCents) => async (url) => ({ url, domain: "loja-teste.com.br", title: "Geladeira", currency: "BRL", inStock: true, priceCents, pixPriceCents: null });
+  const noSleep = async () => undefined;
+  // Acima do p10 (e sem alvo nem recorde): não avisa.
+  assert.equal((await runPriceTracker({ force: true, sleep: noSleep, scrape: scrapeAt(stats[0].p10 + 1000) })).alertsSent, 0);
+  // No p10 ou abaixo: mais barato que 90% das listas, avisa uma vez, com a faixa comum no e-mail.
+  assert.equal((await runPriceTracker({ force: true, sleep: noSleep, scrape: scrapeAt(stats[0].p10) })).alertsSent, 1);
+  assert.match(mailOutbox[0].subject, /Geladeira está abaixo do preço comum/);
+  assert.match(mailOutbox[0].text, /Mais barato do que outras listas costumam pagar/);
+  assert.match(mailOutbox[0].text, /Faixa comum: R\$/);
+  assert.equal((await runPriceTracker({ force: true, sleep: noSleep, scrape: scrapeAt(stats[0].p10) })).alertsSent, 0, "o mesmo preço não é avisado duas vezes");
+  console.log("PASS: a faixa real chega ao item e o alerta avisa quando a loja fica abaixo do comum.");
 
   // 7. Painel do /admin.
   assert.equal((await call("/admin/catalog/items?status=pending_review")).status, 401);

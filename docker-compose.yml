@@ -25,5 +25,21 @@ services:
       timeout: 5s
       retries: 10
 
+  # Redis opcional (cache compartilhado entre instâncias, Fase 6). Só sobe com: npm run redis:up
+  # Com ele, use REDIS_URL="redis://localhost:6380" no .env. Sem ele, o app usa o cache de cada processo.
+  redis:
+    image: redis:7-alpine
+    container_name: casamia_redis
+    profiles: ["cache"]
+    restart: unless-stopped
+    ports:
+      # Só localhost. 6380 evita conflito com outros Redis locais na 6379.
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   casamia_pgdata:

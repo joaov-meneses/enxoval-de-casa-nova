@@ -4,9 +4,11 @@
  * Camadas:
  *  - L1, em memória por processo: um índice de chaves e trigramas de todo o catálogo, com os apelidos e as faixas de
  *    preço. Resolve um nome em microssegundos, sem rede. Vale por `CATALOG_CACHE_TTL_MS` (padrão: 60 s) e é
- *    descartado na hora quando este processo grava algo; outras instâncias o recarregam ao vencer.
+ *    descartado na hora quando este processo grava algo. Com Redis, as outras instâncias são avisadas e descartam o
+ *    delas também; sem Redis, recarregam ao vencer.
  *  - L2, o Postgres: fonte durável e compartilhada (`catalog_items`, `catalog_item_aliases`, urgências e preços).
- *  - O cache de respostas do Jev (`server/services/jev.ts`) continua por trás de tudo, para o que ainda é novo.
+ *  - L3, um Redis opcional (`REDIS_URL`, ver `server/cache/shared.ts`): respostas do Jev e teto diário de chamadas
+ *    compartilhados entre instâncias, e o aviso de "o catálogo mudou".
  *
  * A similaridade é a mesma do pg_trgm (trigramas e Jaccard), calculada aqui em vez de no banco: o catálogo cabe na
  * memória, a normalização fica idêntica à do app (`src/catalog/normalize.ts`) e não depende de extensões do Postgres.
@@ -21,6 +23,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { getPool, type Queryable } from '../database.ts';
+import { isSharedCacheConfigured, publish, subscribe } from '../cache/shared.ts';
 import { compactKey, foldText, itemKey, slugify, trigrams, trigramSimilarity } from '../../src/catalog/normalize.ts';
 import type { RoomKey } from '../../src/onboarding/types.ts';
 import type { ItemPriority, ItemTiming } from '../../src/planning/purchasePlan.ts';
@@ -154,11 +157,26 @@ async function loadIndex(queryable: Queryable): Promise<CatalogIndex> {
   return next;
 }
 
+/** Identifica este processo nos avisos do Redis, para ele não reagir ao próprio aviso. */
+const INSTANCE_ID = randomUUID();
+const CHANGED_CHANNEL = 'catalog:changed';
+let listening = false;
+
+/** Com Redis, escuta os avisos de "o catálogo mudou" das outras instâncias (uma vez por processo). */
+function listenForChanges() {
+  if (listening || !isSharedCacheConfigured()) return;
+  listening = true;
+  void subscribe(CHANGED_CHANNEL, message => {
+    if (message !== INSTANCE_ID) index = null;
+  });
+}
+
 /**
  * O índice L1, recarregado do banco quando vence. Leituras simultâneas esperam a mesma carga. Sempre lê pelo pool,
  * nunca pelo cliente de uma transação: o índice é global, e não uma visão daquela transação.
  */
 export async function getCatalogIndex(): Promise<CatalogIndex> {
+  listenForChanges();
   if (index && Date.now() - index.loadedAt < cacheTtl()) return index;
   loading ??= loadIndex(getPool())
     .then(loaded => (index = loaded))
@@ -168,9 +186,13 @@ export async function getCatalogIndex(): Promise<CatalogIndex> {
   return loading;
 }
 
-/** Descarta o L1 deste processo (depois de gravar no catálogo). */
+/**
+ * Descarta o L1 deste processo depois de gravar no catálogo e, com Redis, avisa as outras instâncias para fazerem o
+ * mesmo. Sem Redis, as outras recarregam sozinhas quando o índice delas vence (`CATALOG_CACHE_TTL_MS`).
+ */
 export function invalidateCatalogIndex() {
   index = null;
+  if (isSharedCacheConfigured()) void publish(CHANGED_CHANNEL, INSTANCE_ID);
 }
 
 /* --------------------------------------------------------------- resolução */
@@ -614,7 +636,8 @@ export async function seedCatalog(pool: Pool) {
     // Lock da transação: duas instâncias subindo ao mesmo tempo não semeiam em dobro.
     await client.query('SELECT pg_advisory_xact_lock(726351905)');
     const state = await client.query<{ version: number }>('SELECT version FROM catalog_seed_state');
-    if ((state.rows[0]?.version ?? 0) >= CATALOG_SEED_VERSION) {
+    const seededVersion = state.rows[0]?.version ?? 0;
+    if (seededVersion >= CATALOG_SEED_VERSION) {
       await client.query('COMMIT');
       return;
     }
@@ -627,7 +650,8 @@ export async function seedCatalog(pool: Pool) {
     const newItems: { id: string; slug: string; key: string; item: (typeof items)[number] }[] = [];
     for (const item of items) {
       const key = itemKey(item.name);
-      if (!key || usedKeys.has(key)) continue;
+      // Só entram as levas mais novas que a do banco: o que a equipe apagou de uma leva antiga não volta.
+      if (!key || item.since <= seededVersion || usedKeys.has(key)) continue;
       usedKeys.add(key);
       let slug = slugify(item.name);
       for (let n = 2; usedSlugs.has(slug); n += 1) slug = `${slugify(item.name)}-${n}`;
@@ -700,6 +724,7 @@ export async function seedCatalog(pool: Pool) {
 /** Só para testes: esquece o índice e as métricas pendentes. */
 export function resetCatalogForTests() {
   index = null;
+  listening = false;
   pendingMetrics.clear();
   queue.clear();
 }

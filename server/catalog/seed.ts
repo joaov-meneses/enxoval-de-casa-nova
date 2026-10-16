@@ -4,18 +4,21 @@
  * de outro item). Tudo nasce com `source = curated` e `status = approved`.
  *
  * Os itens que as pessoas cadastram e o Jev descobre entram depois, pela cascata e pela rotina do catálogo
- * (ver `server/catalog/store.ts` e `server/workers/catalogWorker.ts`). Mudou esta lista? Suba `CATALOG_SEED_VERSION`:
- * a semente só roda de novo quando a versão gravada no banco é menor, para não ressuscitar o que a equipe
- * apagou ou mesclou no /admin.
+ * (ver `server/catalog/store.ts` e `server/workers/catalogWorker.ts`). Para acrescentar itens, crie uma leva nova
+ * (como `seed-v2.ts`) e suba `CATALOG_SEED_VERSION`: um banco já semeado recebe só os itens das levas mais novas que a
+ * dele, para não ressuscitar o que a equipe apagou ou mesclou no /admin.
  */
 import { itemKey } from '../../src/catalog/normalize.ts';
 import { CATALOG } from '../../src/onboarding/catalog.ts';
 import type { RoomKey } from '../../src/onboarding/types.ts';
 import type { ItemPriority, ItemTiming } from '../../src/planning/purchasePlan.ts';
+import { SEED_V2 } from './seed-v2.ts';
 
-export const CATALOG_SEED_VERSION = 1;
+export const CATALOG_SEED_VERSION = 2;
 
 export interface SeedItem {
+  /** Versão da semente em que o item entrou. */
+  since: number;
   name: string;
   room: RoomKey;
   priority: ItemPriority;
@@ -382,8 +385,9 @@ const FUNNEL_LEAD_TIME: Record<string, number> = {
   'Lava-louças': 3,
 };
 
-function toSeed(name: string, room: RoomKey, tier: 1 | 2 | 3 | 4, flags: string, aliases: string[], lead?: number): SeedItem {
+function toSeed(name: string, room: RoomKey, tier: 1 | 2 | 3 | 4, flags: string, aliases: string[], lead?: number, since = 1): SeedItem {
   return {
+    since,
     name,
     room,
     priority: flags.includes('E') ? 'essential' : 'optional',
@@ -395,7 +399,22 @@ function toSeed(name: string, room: RoomKey, tier: 1 | 2 | 3 | 4, flags: string,
   };
 }
 
-/** Todos os itens da semente, sem nomes repetidos (o primeiro vence: o funil antes da lista curada). */
+/** Lê uma linha compacta das levas novas: "Nome|faixa|marcas|apelido1;apelido2|semanas". */
+export function parseRow(row: string) {
+  const [name, tierText, flags = '', aliasText = '', leadText = ''] = row.split('|').map(part => part.trim());
+  const tier = Number(tierText);
+  if (!name || !(tier === 1 || tier === 2 || tier === 3 || tier === 4)) return null;
+  const lead = leadText ? Number(leadText) : undefined;
+  return {
+    name,
+    tier: tier as 1 | 2 | 3 | 4,
+    flags,
+    aliases: aliasText ? aliasText.split(';').map(alias => alias.trim()).filter(Boolean) : [],
+    lead: lead !== undefined && Number.isInteger(lead) && lead >= 0 ? lead : undefined,
+  };
+}
+
+/** Todos os itens da semente, sem nomes repetidos (o primeiro vence: o funil, depois as levas em ordem). */
 export function seedItems(): SeedItem[] {
   const byName = new Map<string, SeedItem>();
   for (const entry of CATALOG) {
@@ -408,21 +427,40 @@ export function seedItems(): SeedItem[] {
   for (const [room, name, tier, flags, aliases, lead] of EXTRA) {
     if (!byName.has(name)) byName.set(name, toSeed(name, room, tier, flags, aliases ?? [], lead));
   }
+  for (const [room, rows] of Object.entries(SEED_V2) as [RoomKey, string[]][]) {
+    for (const row of rows) {
+      const parsed = parseRow(row);
+      if (parsed && !byName.has(parsed.name)) {
+        byName.set(parsed.name, toSeed(parsed.name, room, parsed.tier, parsed.flags, parsed.aliases, parsed.lead, 2));
+      }
+    }
+  }
   for (const [group, names] of Object.entries(FUNCTION_GROUPS)) {
     for (const name of names) {
       const item = byName.get(name);
       if (item) item.functionGroup = group;
     }
   }
-  // Nomes diferentes com a mesma chave ("Travesseiros" e "Travesseiro") são o mesmo item: o segundo vira apelido.
-  const byKey = new Map<string, SeedItem>();
+  // Nomes diferentes com a mesma chave ("Travesseiros" e "Travesseiro") são o mesmo item, e um item novo cuja chave já
+  // é apelido de outro também: o segundo vira apelido do primeiro. Assim um banco novo e um já semeado com uma leva
+  // antiga chegam ao mesmo catálogo.
+  const owner = new Map<string, SeedItem>();
+  const accepted: SeedItem[] = [];
   for (const item of byName.values()) {
     const key = itemKey(item.name);
-    const first = byKey.get(key);
-    if (first) first.aliases.push(item.name, ...item.aliases);
-    else byKey.set(key, item);
+    const first = owner.get(key);
+    if (first) {
+      first.aliases.push(item.name, ...item.aliases);
+      continue;
+    }
+    accepted.push(item);
+    owner.set(key, item);
+    for (const alias of item.aliases) {
+      const aliasKey = itemKey(alias);
+      if (aliasKey && !owner.has(aliasKey)) owner.set(aliasKey, item);
+    }
   }
-  return [...byKey.values()];
+  return accepted;
 }
 
 /** Grupos de função conhecidos, para o Jev escolher um ao criar um item novo. */

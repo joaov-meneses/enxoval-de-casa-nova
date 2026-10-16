@@ -4,8 +4,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compactKey, foldText, itemKey, normalizeText, singular, slugify, trigrams, trigramSimilarity } from "../src/catalog/normalize.ts";
 import { categoryForRoom } from "../src/catalog/rooms.ts";
-import { planPurchases } from "../src/planning/purchasePlan.ts";
-import { CATALOG_SEED_VERSION, KNOWN_FUNCTION_GROUPS, seedItems } from "../server/catalog/seed.ts";
+import { buildPurchasePlan, itemBand, planPurchases } from "../src/planning/purchasePlan.ts";
+import { priceOpportunityEmail } from "../server/mailer.ts";
+import { CATALOG_SEED_VERSION, KNOWN_FUNCTION_GROUPS, parseRow, seedItems } from "../server/catalog/seed.ts";
 import { ALL_PROFILE_BUCKETS, bucketState, profileBucket } from "../server/services/jev.ts";
 import { isSharableName } from "../server/catalog/store.ts";
 
@@ -59,7 +60,10 @@ test("similaridade de trigramas separa variação de outro item", () => {
 test("semente: sem chaves repetidas, com apelidos e grupos de função", () => {
   assert.ok(CATALOG_SEED_VERSION >= 1);
   const items = seedItems();
-  assert.ok(items.length >= 450, `semente com ${items.length} itens`);
+  assert.ok(items.length >= 1000, `semente com ${items.length} itens`);
+  assert.ok(items.some((item) => item.since === 2), "a leva 2 da curadoria entra na semente");
+  assert.deepEqual(parseRow("Ilha de cozinha|4||ilha;bancada central|4"), { name: "Ilha de cozinha", tier: 4, flags: "", aliases: ["ilha", "bancada central"], lead: 4 });
+  assert.equal(parseRow("Sem faixa"), null);
   const keys = items.map((item) => itemKey(item.name));
   assert.equal(new Set(keys).size, keys.length, "cada item tem uma chave só");
   assert.ok(keys.every(Boolean));
@@ -101,6 +105,33 @@ test("ambiente do enxoval para um cômodo do catálogo", () => {
   assert.equal(categoryForRoom(categories, "sala")?.name, "Sala de Estar");
   assert.equal(categoryForRoom(categories, "banheiro"), undefined);
   assert.equal(categoryForRoom(categories, null), undefined);
+});
+
+test("faixa real de preço substitui a de referência, conforme o perfil de gasto", () => {
+  const priceRange = { p10: 100_000, p50: 150_000, p90: 250_000, samples: 12, region: "" };
+  const item = { id: "g", name: "Geladeira", category: "Cozinha", status: "needed", priceCents: null, discountCents: 0, catalog: { priceCategory: 4, priority: "essential", timing: null, leadTimeWeeks: 2, priceRange } };
+  assert.deepEqual(itemBand(item, "economico"), { band: { minCents: 100_000, maxCents: 150_000 }, source: "real" });
+  assert.deepEqual(itemBand(item, "equilibrado"), { band: { minCents: 100_000, maxCents: 250_000 }, source: "real" });
+  assert.deepEqual(itemBand(item, "confortavel"), { band: { minCents: 150_000, maxCents: 250_000 }, source: "real" });
+  assert.equal(itemBand(item, "premium").source, "reference", "premium fica acima do que as listas registram");
+  assert.equal(itemBand({ ...item, catalog: { ...item.catalog, priceRange: null } }, "equilibrado").source, "reference");
+
+  const plan = buildPurchasePlan([item, { ...item, id: "s", name: "Sofá", catalog: null }], { tier: "equilibrado" });
+  assert.equal(plan.byId.get("g").bandSource, "real");
+  assert.equal(plan.byId.get("s").bandSource, "reference");
+  assert.ok(plan.totals.band.minCents >= 100_000, "o total do enxoval soma a faixa real");
+});
+
+test("e-mail de preço abaixo do comum", () => {
+  const mail = priceOpportunityEmail({
+    to: "a@example.invalid",
+    name: "Ana",
+    opportunities: [{ itemName: "Geladeira", enxovalName: "Casa", priceCents: 99_000, reason: "below_common", url: "https://loja/g", commonRange: { p10: 100_000, p90: 250_000 } }],
+  });
+  assert.equal(mail.subject, "Geladeira está abaixo do preço comum");
+  assert.match(mail.text, /Geladeira está por R\$\s990,00 \(Mais barato do que outras listas costumam pagar!\)/);
+  assert.match(mail.text, /Faixa comum: R\$\s1\.000,00 a R\$\s2\.500,00\./);
+  assert.match(mail.html, /Faixa comum/);
 });
 
 test("planejamento usa o catálogo mestre e antecipa a compra pelo prazo de entrega", () => {

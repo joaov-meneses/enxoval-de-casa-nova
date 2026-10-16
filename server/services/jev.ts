@@ -10,6 +10,7 @@
 import { createHash } from 'node:crypto';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { foldText } from '../../src/catalog/normalize.ts';
+import { sharedGet, sharedIncrement, sharedSet } from '../cache/shared.ts';
 import { CATALOG, matchesWhere } from '../../src/onboarding/catalog.ts';
 import { NORDESTE, traitsOfCity } from '../../src/onboarding/regions.ts';
 import { stateInfo } from '../../src/onboarding/plan.ts';
@@ -104,28 +105,55 @@ export function setJevCallListener(listener: (() => void) | null) {
   callListener = listener;
 }
 
-/** Teto de chamadas por dia e por processo: um erro no cliente não vira uma conta inesperada. */
-function takeBudget() {
+/**
+ * Teto de chamadas por dia: um erro no cliente não vira uma conta inesperada. Com Redis, o teto é somado entre todas
+ * as instâncias; sem ele (ou com ele fora do ar), vale por processo.
+ */
+async function takeBudget() {
   const today = new Date().toISOString().slice(0, 10);
+  const limit = readPositiveInt('JEV_DAILY_LIMIT', 3000);
+  const shared = await sharedIncrement(`jev:budget:${today}`, 2 * 24 * 60 * 60);
+  if (shared !== null) return shared <= limit;
   if (budget.day !== today) {
     budget.day = today;
     budget.used = 0;
   }
-  if (budget.used >= readPositiveInt('JEV_DAILY_LIMIT', 3000)) return false;
+  if (budget.used >= limit) return false;
   budget.used += 1;
   return true;
+}
+
+/** Quanto tempo uma resposta do Jev fica no cache compartilhado (Redis), em segundos. Padrão: 1 dia. */
+function sharedCacheTtl() {
+  return readPositiveInt('JEV_SHARED_CACHE_TTL_S', 24 * 60 * 60);
+}
+
+function remember(key: string, answers: Record<string, JevAnswer>, now: number) {
+  if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string);
+  cache.set(key, { expires: now + CACHE_TTL_MS, answers });
 }
 
 async function ask(state: unknown, questions: Record<string, unknown>): Promise<Record<string, JevAnswer> | null> {
   const client = getTransport();
   if (!client) return null;
 
+  // L1 (memória do processo), depois L3 (Redis, compartilhado entre instâncias), e só então o Jev.
   const key = createHash('sha1').update(JSON.stringify({ state, questions })).digest('hex');
   const now = Date.now();
   const hit = cache.get(key);
   if (hit && hit.expires > now) return hit.answers;
+  const shared = await sharedGet(`jev:answer:${key}`);
+  if (shared) {
+    try {
+      const answers = JSON.parse(shared) as Record<string, JevAnswer>;
+      remember(key, answers, now);
+      return answers;
+    } catch {
+      // Valor corrompido: pergunta de novo e sobrescreve.
+    }
+  }
 
-  if (!takeBudget()) {
+  if (!(await takeBudget())) {
     console.warn('[jev] Limite diário de chamadas atingido; seguindo sem IA.');
     return null;
   }
@@ -133,8 +161,8 @@ async function ask(state: unknown, questions: Record<string, unknown>): Promise<
   try {
     callListener?.();
     const { answers } = await client.systemOne({ state, questions });
-    if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string);
-    cache.set(key, { expires: now + CACHE_TTL_MS, answers });
+    remember(key, answers, now);
+    void sharedSet(`jev:answer:${key}`, JSON.stringify(answers), sharedCacheTtl());
     return answers;
   } catch (err) {
     // Falha do Jev nunca derruba o app: quem chamou usa a regra de sempre.

@@ -150,7 +150,8 @@ function PlanRow({
   busy: boolean;
   onPickWeek: (id: string, week: number | null) => void;
 }) {
-  const { item, placement, band, overdue } = entry;
+  const { item, placement, band, bandSource, overdue } = entry;
+  const realBand = bandSource === "real";
   const manual = placement.source === "manual";
   const options = useMemo(
     () => weekOptions({ moveDate, week: placement.week, manual }),
@@ -180,7 +181,18 @@ function PlanRow({
       </div>
       <div className="pp-row-price">
         {price > 0 ? (
-          <strong>{money(price)}</strong>
+          <>
+            <strong>{money(price)}</strong>
+            {realBand && price > band.maxCents && (
+              <span className="pp-row-above" title={`Outras listas costumam pagar ${money(band.minCents)} a ${money(band.maxCents)} no seu perfil de gasto`}>
+                acima do comum
+              </span>
+            )}
+          </>
+        ) : realBand ? (
+          <span title="O que outras listas pagaram por este item, no seu perfil de gasto (só agregados, sem dados de ninguém)">
+            outras listas pagam {money(band.minCents)} a {money(band.maxCents)}
+          </span>
         ) : (
           <span title="Faixa esperada para o seu perfil de gasto">
             costuma ser {money(band.minCents)} a {money(band.maxCents)}

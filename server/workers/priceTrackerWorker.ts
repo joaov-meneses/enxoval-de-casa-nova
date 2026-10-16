@@ -66,6 +66,9 @@ interface AlertCandidate {
   price_basis: 'regular' | 'pix';
   target_price_cents: number | null;
   last_alert_price_cents: number | null;
+  /** Faixa comum do item no catálogo (a do estado do enxoval, se houver amostra; senão a do Brasil). */
+  common_p10: number | null;
+  common_p90: number | null;
   recipients: { name: string; email: string }[];
 }
 
@@ -79,6 +82,8 @@ async function alertCandidates(productId: string) {
       i.price_basis,
       i.target_price_cents,
       i.last_alert_price_cents,
+      cps.p10 AS common_p10,
+      cps.p90 AS common_p90,
       COALESCE((
         SELECT json_agg(json_build_object('name', u.name, 'email', u.email))
         FROM enxoval_members em
@@ -87,6 +92,12 @@ async function alertCandidates(productId: string) {
       ), '[]'::json) AS recipients
     FROM items i
     INNER JOIN enxovais e ON e.id = i.enxoval_id
+    LEFT JOIN LATERAL (
+      SELECT ps.p10, ps.p90 FROM catalog_price_stats ps
+      WHERE ps.item_id = i.catalog_item_id AND ps.region IN ('', COALESCE(e.state, ''))
+      ORDER BY ps.region DESC
+      LIMIT 1
+    ) cps ON true
     WHERE i.tracked_product_id = $1
       AND i.price_alert_enabled
       AND i.status IN ('needed', 'researching')
@@ -95,7 +106,8 @@ async function alertCandidates(productId: string) {
 }
 
 /**
- * Decide, para cada item do produto, se há uma oportunidade nova (preço no alvo ou menor da história) e a anota
+ * Decide, para cada item do produto, se há uma oportunidade nova (menor preço da história, preço no alvo ou abaixo do
+ * que outras listas costumam pagar) e a anota
  * para o e-mail. O mesmo preço não é avisado duas vezes; se o preço volta a subir, um novo recorde avisa de novo.
  */
 async function collectOpportunities(
@@ -111,10 +123,16 @@ async function collectOpportunities(
     if (current === null) continue;
     const previousLowest = candidate.price_basis === 'pix' ? outcome.previousLowestPixCents : outcome.previousLowestCents;
 
+    // Abaixo do comum: no p10 da faixa do catálogo ou menos, isto é, mais barato que 90% do que outras listas pagaram.
+    const belowCommon = candidate.common_p10 !== null && current <= candidate.common_p10;
     const reason: PriceOpportunity['reason'] | null =
       previousLowest !== null && current < previousLowest ? 'lowest'
         : candidate.target_price_cents !== null && current <= candidate.target_price_cents ? 'target'
-          : null;
+          : belowCommon ? 'below_common'
+            : null;
+    const commonRange = candidate.common_p10 !== null && candidate.common_p90 !== null
+      ? { p10: candidate.common_p10, p90: candidate.common_p90 }
+      : null;
     const alreadyTold = candidate.last_alert_price_cents !== null && current >= candidate.last_alert_price_cents;
 
     if (!reason) {
@@ -127,7 +145,7 @@ async function collectOpportunities(
 
     for (const person of candidate.recipients) {
       const entry = outbox.get(person.email) ?? { name: person.name, items: [] };
-      entry.items.push({ itemId: candidate.item_id, alertedPriceCents: current, itemName: candidate.item_name, enxovalName: candidate.enxoval_name, priceCents: current, reason, url: productUrl });
+      entry.items.push({ itemId: candidate.item_id, alertedPriceCents: current, itemName: candidate.item_name, enxovalName: candidate.enxoval_name, priceCents: current, reason, url: productUrl, commonRange });
       outbox.set(person.email, entry);
     }
   }

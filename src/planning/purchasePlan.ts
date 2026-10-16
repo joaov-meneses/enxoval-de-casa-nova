@@ -69,6 +69,29 @@ export interface CatalogItemMeta {
   timing: ItemTiming | null;
   /** Semanas entre comprar e ter o item pronto em casa (entrega, montagem, instalação). */
   leadTimeWeeks: number;
+  /**
+   * Faixa real de preço do item: o que outras listas registraram (p10, mediana e p90, em centavos), só com amostra
+   * mínima de enxovais distintos. `region` é a UF da amostra, ou vazio para o Brasil todo.
+   */
+  priceRange?: { p10: number; p50: number; p90: number; samples: number; region: string } | null;
+}
+
+export type BandSource = "real" | "reference";
+
+/**
+ * Faixa de preço esperada de um item no perfil de gasto escolhido. Com faixa real no catálogo, ela substitui a
+ * faixa genérica do perfil: o econômico fica na metade de baixo (p10 a mediana), o equilibrado na faixa comum
+ * inteira (p10 a p90) e o confortável na metade de cima (mediana a p90). O premium continua na faixa de referência:
+ * quem compra premium paga acima do que a maioria das listas registra, e a amostra não diz quanto.
+ */
+export function itemBand(item: PlannableItem, tier: SpendingTier, meta: ItemMeta = itemMeta(item)): { band: Band; source: BandSource } {
+  const range = item.catalog?.priceRange;
+  if (range && tier !== "premium" && range.p90 >= range.p10 && range.p10 > 0) {
+    const [minCents, maxCents] =
+      tier === "economico" ? [range.p10, range.p50] : tier === "confortavel" ? [range.p50, range.p90] : [range.p10, range.p90];
+    return { band: { minCents, maxCents }, source: "real" };
+  }
+  return { band: bandFor(tier, meta.priceCategory), source: "reference" };
 }
 
 /* ------------------------------------------------------------------ catálogo */
@@ -330,8 +353,8 @@ function baseWeekWithoutLeadTime(meta: ItemMeta, room: Room | null): { week: num
   };
 }
 
-function referenceMidCents(tier: SpendingTier, category: PriceCategory) {
-  const band = bandFor(tier, category);
+function referenceMidCents(item: PlannableItem, tier: SpendingTier, meta: ItemMeta) {
+  const { band } = itemBand(item, tier, meta);
   return Math.round((band.minCents + band.maxCents) / 2);
 }
 
@@ -360,7 +383,7 @@ export function planPurchases(
   items.forEach((item, order) => {
     if (isInactiveStatus(item.status)) return;
     const meta = itemMeta(item);
-    const cost = referenceMidCents(tier, meta.priceCategory);
+    const cost = referenceMidCents(item, tier, meta);
 
     if (isBuyWeek(item.buyWeek)) {
       placements.set(item.id, {
@@ -428,8 +451,10 @@ export interface PlannedItem<T extends PlannableItem = PlannableItem> {
   item: T;
   meta: ItemMeta;
   placement: Placement;
-  /** Faixa de referência do item no perfil de gasto escolhido. */
+  /** Faixa esperada do item no perfil de gasto escolhido. */
   band: Band;
+  /** `real`: vem do que outras listas pagaram pelo item; `reference`: faixa genérica do perfil de gasto. */
+  bandSource: BandSource;
   pending: boolean;
   /** A semana já acabou e o item continua pendente (só existe com a data da mudança). */
   overdue: boolean;
@@ -500,11 +525,13 @@ export function buildPurchasePlan<T extends PlannableItem>(
     const overdue = Boolean(
       moveDate && pending && weekRange(moveDate, placement.week).end < today,
     );
+    const expected = itemBand(item, tier, meta);
     const entry: PlannedItem<T> = {
       item,
       meta,
       placement,
-      band: bandFor(tier, meta.priceCategory),
+      band: expected.band,
+      bandSource: expected.source,
       pending,
       overdue,
     };
@@ -564,7 +591,7 @@ export function tierTotals(items: readonly PlannableItem[]): Record<SpendingTier
     SPENDING_TIERS.map((tier) => [
       tier,
       costing.reduce(
-        (sum, item) => addBands(sum, bandFor(tier, itemMeta(item).priceCategory)),
+        (sum, item) => addBands(sum, itemBand(item, tier).band),
         EMPTY_BAND,
       ),
     ]),

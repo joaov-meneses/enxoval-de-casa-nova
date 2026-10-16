@@ -29,6 +29,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
 
     env:
       DATABASE_URL: postgresql://casamia:casamia-ci@localhost:5432/casamia
@@ -57,3 +66,7 @@ jobs:
       - run: npm run test:freemium-db
       - run: npm run test:catalog
       - run: npm run test:catalog-db
+      # Só este passo usa o Redis: nos outros, uma resposta do Jev vinda do cache atrapalharia a contagem de chamadas.
+      - run: npm run test:shared-cache
+        env:
+          REDIS_URL: redis://127.0.0.1:6379

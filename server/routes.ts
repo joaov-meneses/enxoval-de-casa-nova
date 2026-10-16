@@ -103,6 +103,11 @@ interface ItemRow {
   catalog_priority: ItemPriority | null;
   catalog_timing: ItemTiming | null;
   catalog_lead_time_weeks: number | null;
+  catalog_p10: number | null;
+  catalog_p50: number | null;
+  catalog_p90: number | null;
+  catalog_samples: number | null;
+  catalog_region: string | null;
   updated_at: string | Date;
   created_at: string | Date;
   image_url: string | null;
@@ -275,7 +280,16 @@ function mapItem(row: ItemRow): EnxovalItem {
           priceCategory: isPriceCategory(Number(row.catalog_price_category)) ? Number(row.catalog_price_category) as PriceCategory : null,
           priority: row.catalog_priority ?? null,
           timing: row.catalog_timing ?? null,
-          leadTimeWeeks: Number(row.catalog_lead_time_weeks ?? 0)
+          leadTimeWeeks: Number(row.catalog_lead_time_weeks ?? 0),
+          priceRange: row.catalog_p50 === null || row.catalog_p50 === undefined
+            ? null
+            : {
+                p10: Number(row.catalog_p10),
+                p50: Number(row.catalog_p50),
+                p90: Number(row.catalog_p90),
+                samples: Number(row.catalog_samples),
+                region: row.catalog_region ?? ''
+              }
         }
       : null,
     createdAt: serializeTimestamp(row.created_at),
@@ -323,6 +337,11 @@ const ITEM_SELECT = `
     ci.priority AS catalog_priority,
     ci.timing AS catalog_timing,
     ci.lead_time_weeks AS catalog_lead_time_weeks,
+    cps.p10 AS catalog_p10,
+    cps.p50 AS catalog_p50,
+    cps.p90 AS catalog_p90,
+    cps.samples AS catalog_samples,
+    cps.region AS catalog_region,
     tp.url AS tracked_url,
     tp.domain AS tracked_domain,
     tp.in_stock AS tracked_in_stock,
@@ -336,6 +355,15 @@ const ITEM_SELECT = `
   INNER JOIN categories c ON c.id = i.category_id
   LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
   LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
+  -- Faixa real de preço do item: a do estado do enxoval quando há amostra, senão a do Brasil todo ('').
+  LEFT JOIN LATERAL (
+    SELECT ps.p10, ps.p50, ps.p90, ps.samples, ps.region
+    FROM catalog_price_stats ps
+    WHERE ps.item_id = i.catalog_item_id
+      AND ps.region IN ('', COALESCE((SELECT e.state FROM enxovais e WHERE e.id = i.enxoval_id), ''))
+    ORDER BY ps.region DESC
+    LIMIT 1
+  ) cps ON true
   LEFT JOIN LATERAL (
     SELECT MIN(v) AS low_cents, MAX(v) AS high_cents, COUNT(v)::int AS samples
     FROM (
