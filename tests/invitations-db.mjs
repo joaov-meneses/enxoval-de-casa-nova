@@ -78,6 +78,8 @@ try {
     // O cadastro cria só a conta; o enxoval nasce depois, já autenticado.
     const account = await person.call("/auth/register", "POST", { name, email, password });
     assert.equal(account.status, 201, JSON.stringify(account.data));
+    // Conta paga: este teste cobre convites, não as travas do plano gratuito (tests/freemium-db.mjs).
+    await getPool().query("UPDATE users SET plan = 'monthly' WHERE id = $1", [account.data.user.id]);
     const workspace = await person.call("/enxovais", "POST", {
       name: enxovalName, profile,
       plan: { categories: [{ name: "Cozinha", items: [{ name: "Panela", description: "Essencial" }] }] },

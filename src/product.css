@@ -5724,3 +5724,90 @@ button.price-badge:hover {
     margin-left: auto;
   }
 }
+
+/* Convite para os planos quando o plano gratuito chega ao limite. */
+.paywall {
+  display: grid;
+  gap: 16px;
+}
+.paywall-intro {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.paywall-intro .nino {
+  flex-shrink: 0;
+  width: 72px;
+  height: auto;
+}
+.paywall-intro p {
+  color: #564a41;
+  line-height: 1.5;
+}
+.paywall-unlocks {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: #432e24;
+}
+.paywall-unlocks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.paywall-unlocks svg {
+  color: #828e5a;
+  flex-shrink: 0;
+}
+.paywall-plans {
+  display: grid;
+  gap: 8px;
+}
+.paywall-plans li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 12px 14px;
+  border: 1px solid #eee2d1;
+  border-radius: 14px;
+  background: #fffefa;
+}
+.paywall-plans li.is-featured {
+  border-color: var(--cm-action);
+  box-shadow: 0 0 0 1px var(--cm-action) inset;
+}
+.paywall-plan-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #432e24;
+}
+.paywall-plan-name small {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f6e3d8;
+  color: #8f3f22;
+  font-size: 11px;
+  font-weight: 600;
+}
+.paywall-plan-price {
+  text-align: right;
+  font-size: 13px;
+  color: #695a4f;
+}
+.paywall-plan-price strong {
+  font-size: 17px;
+  color: #432e24;
+}
+.paywall-plan-billing {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: #695a4f;
+}
+.paywall-note {
+  font-size: 13px;
+  color: #695a4f;
+  line-height: 1.5;
+}

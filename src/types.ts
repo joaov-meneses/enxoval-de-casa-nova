@@ -1,6 +1,7 @@
 import type { ItemStatus } from './itemStatus';
 import type { PriceCategory, SpendingTier } from './planning/spending';
 import type { ItemPriority, ItemTiming } from './planning/purchasePlan';
+import type { AccountPlan } from './plans';
 
 export type { ItemStatus };
 export type Category = string;
@@ -183,6 +184,8 @@ export interface AuthUser {
   mustChangePassword?: boolean;
   /** Conta criada por convite: usa só os enxovais de quem convidou e não cria enxovais próprios. */
   isGuest?: boolean;
+  /** Plano da própria conta. Num enxoval compartilhado, valem os limites do plano de quem é dono. */
+  plan?: AccountPlan;
 }
 
 export interface AdminUser {
@@ -250,3 +253,4 @@ export interface ItemUrgencyResult {
   /** Itens pendentes que ficaram sem nota (limite por consulta, ou o Jev não respondeu). */
   unscored: number;
 }
+

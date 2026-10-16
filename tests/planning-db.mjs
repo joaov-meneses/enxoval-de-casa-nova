@@ -95,6 +95,8 @@ try {
     password: randomBytes(16).toString("base64url"),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
+  // Conta paga: este teste cobre o planejamento, não as travas do plano gratuito (tests/freemium-db.mjs).
+  await getPool().query("UPDATE users SET plan = 'monthly' WHERE id = $1", [registered.data.user.id]);
 
   // 1. O funil leva data, lugar e perfil de gasto para o enxoval, e os dados do catálogo para os itens.
   const funnel = await call("/enxovais", "POST", {

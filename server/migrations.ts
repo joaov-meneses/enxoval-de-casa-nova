@@ -184,6 +184,19 @@ export async function migrateDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
     -- Conta criada a partir de um convite: só usa enxovais de outras pessoas e não cria os seus.
     ALTER TABLE users ADD COLUMN IF NOT EXISTS is_guest boolean NOT NULL DEFAULT false;
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'plan'
+      ) THEN
+        -- Uma única vez: quem já tinha conta antes do freemium vira fundador, sem travas. Contas novas nascem no gratuito.
+        ALTER TABLE users ADD COLUMN plan text NOT NULL DEFAULT 'founder';
+        ALTER TABLE users ALTER COLUMN plan SET DEFAULT 'free';
+      END IF;
+    END $$;
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_plan_valid;
+    ALTER TABLE users ADD CONSTRAINT users_plan_valid CHECK (plan IN ('free', 'monthly', 'semiannual', 'annual', 'founder'));
 
     CREATE TABLE IF NOT EXISTS enxoval_invitations (
       id uuid PRIMARY KEY,

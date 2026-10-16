@@ -21,6 +21,7 @@ import {
 import { Brand } from "./Brand";
 import { HowItWorks } from "./HowItWorks";
 import { Nino } from "./Nino";
+import { FREE_PLAN_LIMITS, PAID_PLAN_OFFERS, type PaidPlanOffer } from "../plans";
 
 const FAQS = [
   [
@@ -33,7 +34,7 @@ const FAQS = [
   ],
   [
     "O plano gratuito tem prazo para acabar?",
-    "Não. Você começa agora, sem cartão, com 2 cômodos e até 10 itens em cada um. Quando a sua casa crescer, é só abrir as portas dos outros cômodos em um plano pago.",
+    "Não. Você começa agora, sem cartão, com 2 cômodos e até 5 itens em cada um. Quando a sua casa crescer, é só abrir as portas dos outros cômodos em um plano pago.",
   ],
   [
     "Posso montar a lista com outra pessoa?",
@@ -81,6 +82,12 @@ const PAID_FEATURES = [
   "Importar e exportar em Excel e CSV",
 ];
 
+const PAID_CTA: Record<PaidPlanOffer["id"], string> = {
+  semiannual: "Quero o Semestral",
+  annual: "Quero o Anual",
+  monthly: "Quero o Mensal",
+};
+
 const PLANS: Plan[] = [
   {
     id: "gratis",
@@ -90,42 +97,17 @@ const PLANS: Plan[] = [
     billing: "Para começar agora, sem cartão",
     cta: "Começar Grátis",
     features: [
-      "2 cômodos com até 10 itens cada",
+      `${FREE_PLAN_LIMITS.environments} cômodos com até ${FREE_PLAN_LIMITS.itemsPerEnvironment} itens cada`,
       "Lista do Primeiro Dia",
       "3 dicas do Nino por mês",
       "No celular e no computador",
     ],
   },
-  {
-    id: "semestral",
-    name: "Semestral",
-    price: "R$ 19,90",
-    per: "/mês",
-    billing: "Cobrado R$ 119,40 a cada 6 meses",
-    badge: "Mais Escolhido",
-    featured: true,
-    cta: "Quero o Semestral",
+  ...PAID_PLAN_OFFERS.map((offer) => ({
+    ...offer,
+    cta: PAID_CTA[offer.id],
     features: PAID_FEATURES,
-  },
-  {
-    id: "anual",
-    name: "Anual",
-    price: "R$ 14,90",
-    per: "/mês",
-    billing: "Cobrado R$ 178,80 por ano",
-    badge: "50% de desconto",
-    cta: "Quero o Anual",
-    features: PAID_FEATURES,
-  },
-  {
-    id: "mensal",
-    name: "Mensal",
-    price: "R$ 29,90",
-    per: "/mês",
-    billing: "Flexibilidade total, mês a mês",
-    cta: "Quero o Mensal",
-    features: PAID_FEATURES,
-  },
+  })),
 ];
 
 const MOCK_ITEMS = [

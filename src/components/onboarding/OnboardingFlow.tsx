@@ -61,6 +61,7 @@ import {
 } from "lucide-react";
 import { Brand } from "../Brand";
 import { createEnxovalFromOnboarding, fetchBootstrap } from "../../api";
+import { planLimits, type AccountPlan, type PlanLimits } from "../../plans";
 import { track } from "../../onboarding/analytics";
 import { detectStateFromDevice } from "../../onboarding/location";
 import {
@@ -319,6 +320,7 @@ export default function OnboardingFlow() {
   // O funil agora é a etapa pós-cadastro: exige conta criada (sem conta, cria em /login) e só
   // mostra as perguntas enquanto a conta ainda não tem nenhum enxoval (senão, já passou por aqui).
   const [gate, setGate] = useState<"checking" | "open">("checking");
+  const [accountPlan, setAccountPlan] = useState<AccountPlan>("free");
   useEffect(() => {
     let active = true;
     fetchBootstrap()
@@ -330,6 +332,7 @@ export default function OnboardingFlow() {
         }
         // O cadastro não pede o nome: sem ele a conta usa o começo do e-mail como nome provisório,
         // que não serve de sugestão. Só pré-preenche quando o nome é de verdade.
+        if (data.user.plan) setAccountPlan(data.user.plan);
         const provisional = data.user.email.split("@")[0];
         setAnswers((current) => ({
           ...current,
@@ -848,6 +851,7 @@ export default function OnboardingFlow() {
           <SaveStep
             answers={answers}
             plan={plan}
+            limits={planLimits(accountPlan)}
             first={first}
             reduced={reduced}
           />
@@ -2109,14 +2113,21 @@ const BENEFITS: { Icon: LucideIcon; text: string }[] = [
 function SaveStep({
   answers,
   plan,
+  limits,
   first,
   reduced,
 }: {
   answers: Answers;
   plan: GeneratedPlan;
+  limits: PlanLimits;
   first: string;
   reduced: boolean;
 }) {
+  // O servidor guarda só o que cabe no plano gratuito; a pessoa fica sabendo antes de confirmar.
+  const trimmed =
+    (limits.environments !== null && plan.categories.length > limits.environments) ||
+    (limits.itemsPerEnvironment !== null &&
+      plan.categories.some((category) => category.items.length > limits.itemsPerEnvironment!));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const payload = useMemo(() => toPayload(plan), [plan]);
@@ -2175,6 +2186,14 @@ function SaveStep({
           <ListChecks size={16} /> {plural(plan.stats.total, "item", "itens")} em{" "}
           {plural(plan.stats.rooms, "ambiente", "ambientes")}
         </p>
+        {trimmed && (
+          <p className="ob-sub ob-sub-center ob-save-limit">
+            No plano gratuito, entram os {limits.environments} primeiros
+            ambientes com até {limits.itemsPerEnvironment} itens cada. O
+            restante fica para quando você quiser abrir todos os cômodos em um
+            plano pago.
+          </p>
+        )}
       </div>
 
       <ul className="ob-benefits" aria-label="O que você ganha com a sua conta">

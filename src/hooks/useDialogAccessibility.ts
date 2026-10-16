@@ -25,6 +25,10 @@ export function useDialogAccessibility(
       )?.focus();
     });
     function keydown(e: KeyboardEvent) {
+      // Com uma janela aberta sobre outra (ex.: o convite para os planos sobre o formulário do item),
+      // só a de cima responde ao teclado.
+      const modals = document.querySelectorAll('[aria-modal="true"]');
+      if (ref.current && modals.length > 1 && modals[modals.length - 1] !== ref.current) return;
       if (e.key === "Escape") {
         e.preventDefault();
         closeRef.current();

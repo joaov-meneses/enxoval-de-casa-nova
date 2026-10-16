@@ -19,6 +19,8 @@ import { isBuyWeek, MAX_BUY_WEEK, MIN_BUY_WEEK, type ItemPriority, type ItemTimi
 import { cityById, cityMatchesState } from '../src/onboarding/regions.ts';
 import { ScrapeError, rememberPreview, scrapeProduct } from './services/productScraper.ts';
 import { findOrCreateTrackedProduct, requireTrackableUrl } from './trackedProducts.ts';
+import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, trimToLimits } from './freemium.ts';
+import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -38,6 +40,7 @@ interface DbUserRow {
   is_guest: boolean;
   must_change_password: boolean;
   password_reset_expires_at: Date | null;
+  plan: AccountPlan;
 }
 
 interface EnxovalRow {
@@ -151,13 +154,14 @@ function requireEnvironmentName(value: unknown) {
   return name;
 }
 
-function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password' | 'is_guest'>>): AuthUser {
+function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password' | 'is_guest' | 'plan'>>): AuthUser {
   return {
     id: row.id,
     name: row.name,
     email: row.email,
     mustChangePassword: row.must_change_password ?? false,
-    isGuest: row.is_guest ?? false
+    isGuest: row.is_guest ?? false,
+    plan: isAccountPlan(row.plan) ? row.plan : 'free'
   };
 }
 
@@ -450,6 +454,10 @@ async function findCategory(queryable: Queryable, userId: string, enxovalId: str
 async function findOrCreateCategory(client: PoolClient, userId: string, enxovalId: string, name: string, preferredOrder?: number) {
   await requireEnxovalMember(client, userId, enxovalId);
 
+  // Um ambiente com esse nome já existe: é o mesmo, não conta no limite do plano.
+  const existing = await client.query('SELECT 1 FROM categories WHERE enxoval_id = $1 AND name = $2', [enxovalId, name]);
+  if (!existing.rowCount) await assertCanCreateEnvironment(client, enxovalId);
+
   const orderResult = await client.query<{ next_order: number }>(`
     SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
     FROM categories
@@ -466,7 +474,7 @@ async function findOrCreateCategory(client: PoolClient, userId: string, enxovalI
   return mapCategory(result.rows[0]);
 }
 
-async function seedEnxovalDefaults(client: PoolClient, userId: string, enxovalId: string) {
+async function seedEnxovalDefaults(client: PoolClient, userId: string, enxovalId: string, limits: PlanLimits) {
   const templateResult = await client.query<TemplateRow>(`
     SELECT id
     FROM enxoval_templates
@@ -486,8 +494,9 @@ async function seedEnxovalDefaults(client: PoolClient, userId: string, enxovalId
   `, [templateId]);
 
   const categoryIds = new Map<string, string>();
+  const keptCategories = limits.environments === null ? templateCategories.rows : templateCategories.rows.slice(0, limits.environments);
 
-  for (const templateCategory of templateCategories.rows) {
+  for (const templateCategory of keptCategories) {
     const category = await findOrCreateCategory(client, userId, enxovalId, templateCategory.name, templateCategory.sort_order);
     categoryIds.set(templateCategory.id, category.id);
   }
@@ -499,9 +508,14 @@ async function seedEnxovalDefaults(client: PoolClient, userId: string, enxovalId
     ORDER BY sort_order ASC, name ASC
   `, [templateId]);
 
+  const itemsPerCategory = new Map<string, number>();
+
   for (const item of templateItems.rows) {
     const categoryId = categoryIds.get(item.category_id);
     if (!categoryId) continue;
+    const seeded = itemsPerCategory.get(categoryId) ?? 0;
+    if (limits.itemsPerEnvironment !== null && seeded >= limits.itemsPerEnvironment) continue;
+    itemsPerCategory.set(categoryId, seeded + 1);
 
     await client.query(`
       INSERT INTO items (id, user_id, enxoval_id, category_id, name, sort_order)
@@ -609,6 +623,7 @@ async function insertEnxoval(
   client: PoolClient,
   userId: string,
   name: string,
+  limits: PlanLimits,
   options: { useDefaultTemplate?: boolean; plan?: EnxovalPlan | null; profile?: OnboardingProfile | null } = {}
 ) {
   const enxovalId = randomUUID();
@@ -628,10 +643,11 @@ async function insertEnxoval(
     VALUES ($1, $2, 'owner')
   `, [enxovalId, userId]);
 
+  // No plano gratuito o conteúdo inicial já nasce dentro do limite: os primeiros ambientes, com os primeiros itens.
   if (options.plan) {
-    await seedEnxovalPlan(client, userId, enxovalId, options.plan);
+    await seedEnxovalPlan(client, userId, enxovalId, { categories: trimToLimits(options.plan.categories, limits) });
   } else if (options.useDefaultTemplate !== false) {
-    await seedEnxovalDefaults(client, userId, enxovalId);
+    await seedEnxovalDefaults(client, userId, enxovalId, limits);
   }
 
   return enxovalId;
@@ -653,7 +669,8 @@ async function createEnxovalForUser(
     if (options.userName) {
       await client.query('UPDATE users SET name = $1 WHERE id = $2', [options.userName, userId]);
     }
-    const enxovalId = await insertEnxoval(client, userId, name, options);
+    const limits = await assertCanCreateEnxoval(client, userId);
+    const enxovalId = await insertEnxoval(client, userId, name, limits, options);
     return fetchWorkspace(client, userId, enxovalId);
   });
 }
@@ -722,7 +739,7 @@ async function getCurrentUser(req: Request) {
   if (!token) return null;
 
   const result = await getPool().query<DbUserRow>(`
-    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password, u.is_guest
+    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password, u.is_guest, u.plan
     FROM sessions s
     INNER JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = $1 AND s.expires_at > now() AND u.is_active = true
@@ -824,6 +841,7 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     } else {
       throw new HttpError(400, 'Ambiente é obrigatório.');
     }
+    await assertCanAddItem(client, input.enxovalId, category.id);
 
     const orderResult = await client.query<{ next_order: number }>(`
       SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
@@ -867,8 +885,8 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
   return withTransaction(async client => {
     // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
-    const current = await client.query<{ enxoval_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null }>(`
-      SELECT i.enxoval_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity, i.tracked_product_id, i.initial_price_cents
+    const current = await client.query<{ enxoval_id: string; category_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null }>(`
+      SELECT i.enxoval_id, i.category_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity, i.tracked_product_id, i.initial_price_cents
       FROM items i
       INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
       WHERE i.id = $1 AND em.user_id = $2
@@ -948,6 +966,8 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     if (typeof updates.categoryId === 'string') {
       const category = await findCategory(client, userId, enxovalId, updates.categoryId);
       if (!category) throw new HttpError(404, 'Ambiente não encontrado.');
+      // Mover para outro ambiente conta como mais um item lá.
+      if (updates.categoryId !== current.rows[0].category_id) await assertCanAddItem(client, enxovalId, updates.categoryId);
       addUpdate('category_id', updates.categoryId);
     }
 
@@ -1088,7 +1108,7 @@ export function registerApiRoutes(app: Express) {
     }
 
     await createSession(res, userId);
-    res.status(201).json(await fetchBootstrap({ id: userId, name, email }));
+    res.status(201).json(await fetchBootstrap(mapUser({ id: userId, name, email, plan: 'free' })));
   }));
 
   router.post('/auth/login', loginRateLimit(), asyncHandler(async (req, res) => {
@@ -1509,7 +1529,7 @@ export function registerApiRoutes(app: Express) {
       `, [row.enxoval_id, userId, row.invited_by]);
       await client.query('DELETE FROM enxoval_invitations WHERE id = $1', [row.id]);
 
-      const user = await client.query<DbUserRow>('SELECT id, name, email, must_change_password, is_guest FROM users WHERE id = $1', [userId]);
+      const user = await client.query<DbUserRow>('SELECT id, name, email, must_change_password, is_guest, plan FROM users WHERE id = $1', [userId]);
       return { user: mapUser(user.rows[0]), enxovalId: row.enxoval_id };
     }).catch(err => {
       // Alguém criou uma conta com esse e-mail entre a checagem e a gravação.
@@ -1706,7 +1726,7 @@ export function registerApiRoutes(app: Express) {
 
   app.use('/api', (err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
     if (err instanceof HttpError) {
-      res.status(err.status).json({ error: err.message });
+      res.status(err.status).json(err.code ? { error: err.message, code: err.code } : { error: err.message });
       return;
     }
 

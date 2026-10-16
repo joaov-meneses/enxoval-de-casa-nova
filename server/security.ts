@@ -13,6 +13,8 @@ export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Código estável para o app reagir sem depender do texto (ex.: LIMIT_REACHED_ITEMS). */
+    public code?: string,
   ) {
     super(message);
   }

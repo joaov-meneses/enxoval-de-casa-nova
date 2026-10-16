@@ -72,6 +72,8 @@ try {
     password: randomBytes(16).toString("base64url"),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
+  // Conta paga: este teste cobre a situação dos itens, não as travas do plano gratuito (tests/freemium-db.mjs).
+  await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [registered.data.user.id]);
   // O cadastro não cria enxoval nenhum; o funil monta o primeiro depois, já autenticado.
   const funnelWorkspace = await call("/enxovais", "POST", {
     name: "Casa de teste",

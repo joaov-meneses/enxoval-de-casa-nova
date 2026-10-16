@@ -1840,3 +1840,7 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.ob-save-limit {
+  margin-top: 12px;
+  font-size: 14px;
+}

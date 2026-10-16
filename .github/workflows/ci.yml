@@ -54,3 +54,4 @@ jobs:
       - run: npm run test:price-tracking-db
       - run: npm run test:jev
       - run: npm run test:ai-db
+      - run: npm run test:freemium-db

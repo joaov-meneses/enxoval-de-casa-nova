@@ -71,6 +71,8 @@ try {
     // O cadastro não pede o nome: ele vem do funil, junto do plano.
     const registered = await post("/auth/register", { email, password });
     if (registered.status !== 201) return { registered, plan };
+    // Conta paga: aqui o plano do funil precisa entrar inteiro (o corte do gratuito está em tests/freemium-db.mjs).
+    await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [registered.data.user.id]);
     const workspace = await post("/enxovais", {
       name: plan.enxovalName,
       plan: toPayload(plan),

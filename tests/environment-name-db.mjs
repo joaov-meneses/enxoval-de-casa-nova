@@ -69,6 +69,8 @@ try {
     password: randomBytes(16).toString("base64url"),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
+  // Conta paga: este teste cobre nomes de ambiente, não as travas do plano gratuito (tests/freemium-db.mjs).
+  await getPool().query("UPDATE users SET plan = 'monthly' WHERE id = $1", [registered.data.user.id]);
   const workspace = await call("/enxovais", "POST", { name: "Casa", useDefaultTemplate: false });
   assert.equal(workspace.status, 201, JSON.stringify(workspace.data));
   const enxovalId = workspace.data.enxoval.id;

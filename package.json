@@ -30,7 +30,8 @@
     "test:environment-name-db": "node --import tsx tests/environment-name-db.mjs",
     "test:price-tracking-db": "node --import tsx tests/price-tracking-db.mjs",
     "test:jev": "node --import tsx --test tests/jev.mjs",
-    "test:ai-db": "node --import tsx tests/ai-db.mjs"
+    "test:ai-db": "node --import tsx tests/ai-db.mjs",
+    "test:freemium-db": "node --import tsx tests/freemium-db.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

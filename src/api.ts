@@ -19,16 +19,24 @@ import type {
 import { isItemStatus, normalizeItemStatus } from "./itemStatus";
 import type { Answers, PlanPayload } from "./onboarding/types";
 import type { AdminFeedback, FeedbackInput, FeedbackStatus } from "./feedback";
+import { isLimitCode, type LimitCode } from "./plans";
 
 export class ApiError extends Error {
   status: number;
+  /** Código estável do servidor, quando houver (ex.: LIMIT_REACHED_ITEMS). */
+  code?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
+
+/** Disparado quando o servidor recusa algo pelo limite do plano gratuito: o app abre o convite para os planos. */
+export const LIMIT_REACHED_EVENT = "casamia:limit-reached";
+export type LimitReachedDetail = { code: LimitCode; message: string };
 
 /**
  * Itens vindos de um servidor ainda sem `status` (ou de dados antigos) recebem a situação
@@ -64,6 +72,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
       error?: string;
+      code?: string;
     } | null;
     // Rota que o servidor não conhece (404 sem mensagem): em desenvolvimento quase sempre é um servidor que
     // ainda roda o código antigo. A dica some do build de produção, que usa a mensagem genérica.
@@ -71,12 +80,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       import.meta.env.DEV && !body?.error && response.status === 404
         ? "O servidor não reconheceu esta ação. Se você acabou de atualizar o código, reinicie o servidor (npm run dev)."
         : null;
-    throw new ApiError(
+    const error = new ApiError(
       body?.error ??
         staleServerHint ??
         "Não foi possível concluir a operação.",
       response.status,
+      body?.code,
     );
+    if (isLimitCode(body?.code))
+      window.dispatchEvent(
+        new CustomEvent<LimitReachedDetail>(LIMIT_REACHED_EVENT, {
+          detail: { code: body.code, message: error.message },
+        }),
+      );
+    throw error;
   }
 
   if (response.status === 204) {

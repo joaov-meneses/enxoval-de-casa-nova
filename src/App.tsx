@@ -90,6 +90,7 @@ import { PurchasePlanView, type PlanningUpdates } from "./components/PurchasePla
 import { buildPurchasePlan } from "./planning/purchasePlan";
 import { measureTextWidth } from "./utils/textWidth";
 import { FeedbackDialog } from "./components/FeedbackDialog";
+import { PaywallDialog } from "./components/PaywallDialog";
 import {
   activeItems,
   discountApplies,
@@ -3284,6 +3285,7 @@ export default function App() {
           </button>
         </form>
       </Dialog>
+      <PaywallDialog />
     </div>
   );
 }
