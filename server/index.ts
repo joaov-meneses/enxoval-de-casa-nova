@@ -4,6 +4,7 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import { migrateDatabase } from "./migrations.ts";
 import { registerApiRoutes } from "./routes.ts";
+import { startCatalogMaintenanceScheduler } from "./workers/catalogMaintenanceWorker.ts";
 import { startPriceTrackerScheduler } from "./workers/priceTrackerWorker.ts";
 
 const app = express();
@@ -56,4 +57,9 @@ app.listen(port, "0.0.0.0", () => {
 // lojas sem querer; PRICE_TRACKER=on liga e PRICE_TRACKER=off desliga em qualquer ambiente.
 if (process.env.PRICE_TRACKER === "on" || (isProduction && process.env.PRICE_TRACKER !== "off")) {
   startPriceTrackerScheduler();
+}
+
+// Manutenção diária do catálogo compartilhado (vínculos, faixas de preço). CATALOG_MAINTENANCE=on/off liga/desliga.
+if (process.env.CATALOG_MAINTENANCE === "on" || (isProduction && process.env.CATALOG_MAINTENANCE !== "off")) {
+  startCatalogMaintenanceScheduler();
 }

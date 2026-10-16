@@ -285,7 +285,8 @@ test("prioritizeItems: a nota do Jev vira urgência (nota + 1), ordenada, em par
   assert.equal(jev.calls[0].questions.i1.criteria.length, URGENCY_LEVELS);
   assert.deepEqual(jev.calls[0].questions.i1.criteria, URGENCY_SCALE.map((level) => level.criterion));
   assert.match(jev.calls[0].questions.i1.instructions.pergunta, /momento/);
-  assert.deepEqual(Object.keys(jev.calls[0].state).sort(), ["clima", "moradia", "moradores", "perfil_de_gasto", "semanas_ate_a_mudanca", "situacao"]);
+  assert.deepEqual(Object.keys(jev.calls[0].state).sort(), ["clima", "moradia", "moradores", "perfil_de_gasto", "situacao"]);
+  // O prazo até a mudança fica de fora: a nota vale para a faixa de perfil e é compartilhada entre enxovais.
   assert.equal(jev.calls[0].state.clima, "ameno");
   assert.ok(!JSON.stringify(jev.calls).includes("item-1"));
 });

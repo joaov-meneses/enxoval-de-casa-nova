@@ -116,6 +116,13 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           tipo de moradia, o número de moradores, o estado, o perfil de gasto e o prazo
           da mudança. Nunca enviamos o seu nome, e-mail ou senha.
         </p>
+        <p>
+          Para sugerir mais rápido e sem repetir consultas, mantemos um catálogo
+          compartilhado de itens de casa. Ele guarda apenas nomes de itens e dados
+          agregados (como a faixa de preço comum, publicada só quando há dados de
+          vários enxovais), sem ligação com você nem com o seu enxoval. Nomes que
+          parecem dados pessoais não entram nele.
+        </p>
       </>
     ),
   },

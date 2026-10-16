@@ -62,7 +62,7 @@ export const URGENCY_LEVELS = URGENCY_SCALE.length;
  * Versão da régua. Entra na chave das notas guardadas: ao mudar os níveis ou a pergunta, some a validade das notas
  * antigas e cada item é reavaliado na próxima consulta, em vez de misturar duas réguas na mesma lista.
  */
-export const URGENCY_RUBRIC_VERSION = 2;
+export const URGENCY_RUBRIC_VERSION = 3;
 
 /** Rótulo do nível mais próximo de uma nota (1 a `URGENCY_LEVELS`, com casas decimais). */
 export function urgencyLabel(urgency: number) {

@@ -224,6 +224,17 @@ export interface ItemAssessment {
   redundancy: { probability: number; overlapsWith: string | null } | null;
 }
 
+/** Sugestão do catálogo compartilhado para o autocomplete do nome do item. */
+export interface CatalogSuggestion {
+  id: string;
+  name: string;
+  room: string | null;
+  priority: "essential" | "optional";
+  priceCategory: number | null;
+  /** Faixa comum de preço entre outros enxovais; só existe com amostra suficiente. */
+  priceRange: { p10Cents: number; p50Cents: number; p90Cents: number } | null;
+}
+
 export interface NextItemRecommendation {
   available: boolean;
   recommendation: {
@@ -254,3 +265,26 @@ export interface ItemUrgencyResult {
   unscored: number;
 }
 
+/** Painel do catálogo compartilhado no /admin. */
+export interface AdminCatalogMetrics {
+  days: number;
+  resolveHits: number;
+  resolveMisses: number;
+  hitRate: number | null;
+  jevCalls: number;
+  jevCallsPerDay: number;
+  pendingReview: number;
+  itemsWithoutUrgency: number;
+}
+
+export interface AdminCatalogItem {
+  id: string;
+  canonicalName: string;
+  room: string | null;
+  priority: "essential" | "optional";
+  timing: "first_night" | "first_week" | null;
+  priceCategory: number | null;
+  functionGroup: string | null;
+  usage: number;
+  similar: { id: string; name: string; score: number }[];
+}

@@ -8,6 +8,9 @@ import type {
   EnxovalMember,
   EnxovalWorkspace,
   InvitationPreview,
+  AdminCatalogItem,
+  AdminCatalogMetrics,
+  CatalogSuggestion,
   ItemAssessment,
   ItemPriceHistory,
   ItemStatus,
@@ -412,6 +415,10 @@ export const assessItemDraft = (
     signal,
   });
 
+/** Autocomplete do catálogo compartilhado: responde do banco, sem consultar o Jev. */
+export const searchCatalog = (query: string, signal?: AbortSignal) =>
+  request<{ results: CatalogSuggestion[] }>(`/api/catalog/search?q=${encodeURIComponent(query)}`, { signal });
+
 export const recommendNextItem = (enxovalId: string, categoryId: string) =>
   request<NextItemRecommendation>("/api/ai/recommend", {
     method: "POST",
@@ -438,3 +445,27 @@ export type {
   EnxovalMember,
   EnxovalWorkspace,
 };
+
+export const fetchAdminCatalog = () =>
+  request<{ metrics: AdminCatalogMetrics; pending: AdminCatalogItem[] }>("/api/admin/catalog");
+
+export const approveAdminCatalogItem = (
+  id: string,
+  patch: { canonicalName?: string; room?: string | null; priority?: "essential" | "optional" },
+) =>
+  request<{ item: AdminCatalogItem }>(`/api/admin/catalog/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+
+export const mergeAdminCatalogItem = (id: string, targetId: string) =>
+  request<void>(`/api/admin/catalog/${encodeURIComponent(id)}/merge`, {
+    method: "POST",
+    body: JSON.stringify({ targetId }),
+  });
+
+export const completeAdminCatalogItem = (id: string) =>
+  request<{ inference: { room: string | null; priority: string | null } }>(
+    `/api/admin/catalog/${encodeURIComponent(id)}/complete`,
+    { method: "POST" },
+  );

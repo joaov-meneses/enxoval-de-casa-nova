@@ -1,29 +1,36 @@
 # Plano Faseado de Implementações Futuras: Casa Mia
 
 > **Objetivo:** Estabelecer o roteiro técnico e de produto para transformar a base de código atual no aplicativo comercial do **Casa Mia**, com arquitetura Freemium, integração de pagamentos Stripe, motor de IA Jev (TypeSafe AI), mascote Nino e a página pública de Chá de Casa Nova.
+>
+> **Este documento lista só o que falta fazer.** O que já foi entregue está resumido na seção 1.
 
 ---
 
-## 1. Diagnóstico do Estado Atual da Aplicação
+## 1. Estado Atual da Aplicação
 
-### O que já existe hoje no código
-* **Estrutura de Domínio de Enxoval:** cadastro de ambientes/cômodos (`src/components/EnvironmentList.tsx`, `WorkspaceOverview.tsx`), CRUD de itens com status e quantidades (`AddItemModal.tsx`, `ItemRow.tsx`, `data.ts`), cálculo básico de orçamento total e gasto.
-* **Ferramentas Utilitárias:** exportação e importação de listas em planilhas Excel e CSV (`src/utils/export.ts`, `src/utils/importItems.ts`).
-* **Onboarding Estruturado:** funil de boas-vindas com perfil de moradia, preferências e catálogo inicial de sugestões (`src/components/onboarding/OnboardingFlow.tsx`, `src/onboarding/catalog.ts`).
-* **Autenticação e Backend:** rotas de login, cadastro, recuperação de senha com tokens seguros, suporte a PostgreSQL e SQLite (`server/database.ts`, `server/routes.ts`, `server/security.ts`), envio de e-mails transacionais via Resend (`server/mailer.ts`).
-* **Área Administrativa:** gestão básica de contas e permissões (`src/components/AdminPage.tsx`, `server/admin.ts`).
+### Já entregue (não repetido abaixo)
+* **Base do produto:** ambientes e itens com status, quantidades e orçamento; exportação/importação Excel e CSV; funil de onboarding `/comecar` (rodando depois do cadastro em `/login`); autenticação com recuperação de senha, convite de membros por e-mail, área `/admin`; PostgreSQL e SQLite; e-mails transacionais via Resend (`server/mailer.ts`: recuperação, convite, senha alterada, feedback, oportunidade de preço).
+* **Fase 1 (completa):** paleta `--cm-*`, tipografia Nunito + Fraunces, `Brand`, favicons e manifest, mascote Nino (`src/components/Nino.tsx`, poses em `public/brand/`), nova Home (`LandingPage.tsx` + `landing.css`). Desvios aceitos: Nunito no lugar de DM Sans; botão secundário "Ver como funciona" (não há demonstração). A Home já cita cobrança e limite de dicas de IA, que só passam a existir de fato nas Fases 2 e 3 (os limites de cômodos e itens já valem).
+* **Fase 3 (base pronta):** `server/services/jev.ts` (cliente, cache de 10 min, teto diário `JEV_DAILY_LIMIT`, limiares de confiança) e `server/ai.ts` com `GET /api/ai/status`, `POST /api/ai/assess-item` (ambiente do item novo + aviso de compra redundante, numa só chamada), `POST /api/ai/recommend` e `POST /api/ai/prioritize` (régua de 8 níveis em `src/planning/purchaseUrgency.ts`, gravada em `items.ai_urgency`). Interface: `AddItemModal` e `NinoAssistant` no planejamento de compras. Fica desligada sem `TYPESAFE_API_KEY`; sem chave, erro ou confiança baixa tudo volta vazio. Também entregues: planejamento de compras e leitura de produtos/rastreio de preço.
+* **Fase 2 (travas do plano gratuito prontas, sem cobrança):** coluna `users.plan` (`free` | `monthly` | `semiannual` | `annual` | `founder`). Contas que já existiam viraram `founder` (tudo liberado), uma única vez, na migração; contas novas nascem `free`. Regras e preços ficam em `src/plans.ts`, compartilhado pela landing e pelo paywall. Travas em `server/freemium.ts`, aplicadas em `server/routes.ts`:
+  * Plano gratuito: **1 enxoval, 2 ambientes por enxoval e 5 itens por ambiente**. Recusas em `403` com `code`: `LIMIT_REACHED_ENXOVAIS`, `LIMIT_REACHED_ENVIRONMENTS` e `LIMIT_REACHED_ITEMS` (`HttpError` ganhou o campo `code`).
+  * Vale o plano do **dono** do enxoval: convidados herdam os limites ou a liberação dele.
+  * Sem contornos: criar item com um nome de ambiente novo conta como ambiente novo; mover um item para um ambiente cheio é recusado; repetir o nome de um ambiente existente não conta. A checagem trava a linha do enxoval na transação, então duas abas não passam juntas do limite.
+  * O funil `/comecar` e o modelo padrão entram cortados no gratuito (os 2 primeiros ambientes, com os 5 primeiros itens). O passo final do funil avisa o corte antes de confirmar (`AuthUser.plan` no bootstrap).
+  * Interface: `api.ts` dispara o evento `casamia:limit-reached` e o `PaywallDialog` (Nino, mensagem do plano, preços) abre por cima da janela atual, inclusive na importação de planilha. Sem Stripe, ainda não há botão de assinar: o texto diz que as assinaturas abrem em breve. `useDialogAccessibility` passou a responder ao teclado só na janela de cima.
+  * Landing corrigida para "2 cômodos com até 5 itens cada" (antes dizia 10).
+  * Teste: `npm run test:freemium-db` (no CI). Os testes de banco que cobrem outras funções põem as contas em plano pago.
+* **Fase 6 (base pronta):** catálogo mestre compartilhado no Postgres (`catalog_items`, `catalog_item_aliases`, `catalog_item_urgency`, `catalog_price_stats`, `catalog_metrics`, `items.catalog_item_id`), semeado com os 226 itens distintos do `CATALOG` do funil (`server/catalog.ts`); normalização única em `src/catalog/normalize.ts`; cascata exato → apelido → similaridade ≥ 0,8 (grava apelido) → dúvida (Jev escolhe entre candidatos) → item pendente de revisão; urgência guardada por faixa de perfil e compartilhada entre enxovais; faixas de preço (k ≥ 5, sem outliers, só agregados); `GET /api/catalog/search` com autocomplete no `AddItemModal`; rotas `/api/admin/catalog*` (fila de pendentes, aprovar, mesclar, completar com o Jev e métricas); job `npm run catalog:maintain`. Pendências na própria Fase 6.
+* **Documentos de planejamento** das Fases 7 a 9 já escritos (links nas fases).
 
-### O que NÃO existe e precisa ser implementado
-1. **Página Principal (Home Page):** a `LandingPage.tsx` precisa ser 100% reconstruída com a paleta terracota/creme, o mascote Nino, o conceito de enxoval inteligente e a nova tabela de planos.
-2. **Regras e Travas de Freemium:** atualmente qualquer usuário pode criar cômodos e itens ilimitados sem restrição.
-3. **Motor de Pagamentos:** não há conexão ativa com a Stripe para cobrança recorrente, checkout ou portal de autoatendimento do cliente.
-4. **Inteligência Artificial (Jev):** não há integração com a TypeSafe AI para recomendações determinísticas e cálculos de urgência.
-5. **Mascote Nino:** ausência de ilustrações e componentes de interface do Nino.
-6. **Página de Chá de Casa Nova:** não há suporte a rotas públicas para convidados visualizarem presentes e enviarem Pix.
-7. **Camada de cache e catálogo compartilhado de itens:** cada enxoval refaz sozinho o que outro já descobriu (o Jev reavalia "Geladeira" para cada pessoa), e não há busca rápida nem deduplicação de itens. Ver a Fase 6.
-8. **Analytics, atribuição de leads e reengajamento:** não há PostHog, GA4 nem Sentry; a origem do lead se perde entre a landing e o cadastro; não existe nenhum disparo de ciclo de vida. Ver a Fase 7.
-9. **Idiomas e preço por região:** o app é só em português e em reais (54 arquivos de interface, 130 mensagens de erro do servidor e 13 e-mails com texto fixo; geografia só do Brasil). Ver a Fase 8.
-10. **Dados de segurança e banimento:** o app não grava IP nem aparelho, não verifica e-mail e só consegue ligar/desligar uma conta. Ver a Fase 9.
+### O que ainda NÃO existe
+1. **Pagamentos:** nenhuma integração com a Stripe; o plano só muda direto no banco (Fase 2). Ainda faltam também o limite de 3 consultas mensais ao Nino e o bloqueio de convites e do Chá de Casa Nova no plano gratuito.
+2. **Chá de Casa Nova:** sem rotas públicas, tabela ou Pix (Fase 4).
+3. **Produção:** sem Dockerfile, domínio próprio, e-mails de boas-vindas/presente/resumo, NFS-e e depósito de marca (Fase 5).
+4. **Catálogo compartilhado e cache durável (restante):** curadoria até 1.000+ itens, índices `pg_trgm`, cache negativo e Redis (Fase 6).
+5. **Analytics, atribuição e reengajamento:** sem PostHog, GA4 nem Sentry (Fase 7).
+6. **Idiomas e preço por região:** app só em português e reais (Fase 8).
+7. **Segurança e banimento:** não grava IP nem aparelho, não verifica e-mail, só liga/desliga conta (Fase 9).
 
 ---
 
@@ -31,8 +38,7 @@
 
 ```mermaid
 flowchart LR
-    Fase1["Fase 1: Rebranding & Nova Home Page"] --> Fase2["Fase 2: Motor Freemium & Stripe"]
-    Fase2 --> Fase3["Fase 3: Mascote Nino & IA Jev"]
+    Fase2["Fase 2: Motor Freemium & Stripe"] --> Fase3["Fase 3: Pendências do Nino & Jev"]
     Fase3 --> Fase4["Fase 4: Chá de Casa Nova (Viral)"]
     Fase4 --> Fase5["Fase 5: Infraestrutura Railway & Go-to-Market"]
     Fase5 --> Fase6["Fase 6: Catálogo, Cache & Indexação"]
@@ -46,74 +52,24 @@ flowchart LR
 
 ---
 
-### FASE 1: Rebranding Visual & Reconstrução Total da Home Page
-
-> **Status: implementada.** Paleta oficial em tokens `--cm-*` (`src/index.css`) e migração das cores do app; tipografia **Nunito** (interface) + **Fraunces** (títulos e logotipo); `Brand` com o Nino em `<picture>` e tamanho em `em`; favicons, manifest e títulos; mascote **Nino** (`src/components/Nino.tsx`, arte final em `public/brand/nino*.png`, gerada em ícones por `scripts/generate-brand-assets.ts`); nova Home em `src/components/LandingPage.tsx` + `src/landing.css`, com cabeçalho de vidro fixo. Desvios do texto abaixo: a interface usa Nunito, e não DM Sans; o botão secundário do hero é "Ver como funciona" (não existe demonstração). Os limites do plano gratuito, a cobrança e as dicas de IA citados na página só passam a existir nas Fases 2 e 3.
-
-Esta fase alinha toda a experiência visual da aplicação ao manual de branding do **Casa Mia**.
-
-#### 1.1 Migração Global da Identidade Visual
-* **Tokens de Cores e CSS (`src/index.css` e `src/product.css`):**
-  * Atualizar as variáveis CSS com a paleta oficial:
-    * `--cm-bg: #FBF3E6;` (Creme Acolhedor)
-    * `--cm-text: #3B2A20;` (Café Tostado)
-    * `--cm-primary: #C2603F;` (Terracota Artesanal)
-    * `--cm-success: #5C6643;` (Oliva Natural)
-    * `--cm-accent: #244B66;` (Azulejo Noturno)
-* **Tipografia:**
-  * Importar a fonte **Fraunces** via Google Fonts para títulos e logotipo (`h1, h2, h3, .brand-title`).
-  * Manter **DM Sans** para interfaces, botões e dados tabulares de preços.
-* **Componente da Marca e Favicon:**
-  * Refatorar `src/components/Brand.tsx` para renderizar a marca "Casa Mia" com a porta em arco e o coração estilizado.
-  * Substituir favicons e ícones em `public/` pelos novos assets do Casa Mia (feito: derivados do Nino).
-  * Atualizar títulos de página e `public/site.webmanifest`.
-
-#### 1.2 Reconstrução Completa da Home Page (`src/components/LandingPage.tsx`)
-A página inicial precisa ser refeita do zero com forte apelo emocional e clareza de conversão:
-* **Header / Navegação:** Logotipo do Casa Mia, links de ancoragem (*"Como Funciona"*, *"O Nino"*, *"Chá de Casa Nova"*, *"Preços"*), botão de Login e botão de destaque *"Começar Grátis"*.
-* **Hero Section:**
-  * Headline: *"Transforme o sonho da casa nova em uma lista que dá para riscar, item por item."*
-  * Subheadline: *"Chega de planilhas estressantes e compras por impulso. O Casa Mia organiza seu enxoval, protege seu orçamento com inteligência artificial e celebra cada conquista do seu novo lar."*
-  * CTAs principais: Botão primário *"Criar Minha Lista Grátis (Sem Cartão)"* + Botão secundário *"Ver Demonstração"*.
-  * Ilustração/Mockup do app com a porta em arco abrindo e o mascote Nino acenando.
-* **Seção "Conheça o Nino":**
-  * Apresentação do mascote oficial: o conselheiro da mudança que segura a trena e calcula suas prioridades sem te julgar.
-* **Seção de Recursos de Produto:**
-  * *Organização por Cômodos:* Cozinha, quarto, sala, banheiro e lavanderia em cards táteis.
-  * *Inteligência de Compra (Jev):* Como a IA evita que você esqueça itens do "Primeiro Dia" e corta compras redundantes.
-  * *Lista a Dois:* Casais e moradores sincronizados em tempo real.
-* **Destaque do Chá de Casa Nova:**
-  * Apresentação da página pública para convidados presentearem com itens ou enviarem Pix sem intermediários.
-* **Tabela de Preços Transparente:**
-  * Card do **Plano Gratuito** (destacando que dá para começar imediatamente com 2 cômodos e 5 itens cada).
-  * Card do **Plano Semestral** com badge de **Mais Escolhido** (R$ 19,90/mês equivalente, cobrado R$ 119,40).
-  * Card do **Plano Anual** com badge de **50% de Desconto** (R$ 14,90/mês equivalente, cobrado R$ 178,80).
-  * Card do **Plano Mensal** (R$ 29,90/mês, flexibilidade total).
-* **Novo FAQ Humanizado & Footer Afetuoso.**
-
----
-
 ### FASE 2: Motor Freemium, Travas de Limite & Integração Stripe
 
-Esta fase monetiza a plataforma, implementando as regras de limite do plano gratuito e o fluxo de pagamento seguro via Stripe.
+Esta fase monetiza a plataforma: as travas do plano gratuito e o paywall já existem (ver seção 1); falta cobrar via Stripe.
 
-#### 2.1 Modelagem de Dados e Controle de Limites no Backend
-* **Campos na Tabela de Usuários/Assinaturas (`users` / `subscriptions`):**
-  * `plan`: `'free'` | `'monthly'` | `'semiannual'` | `'annual'`
+> **Já feito:** `users.plan`, travas de enxovais, ambientes e itens com os códigos `LIMIT_REACHED_*`, corte do conteúdo inicial, contas antigas como `founder` e o `PaywallDialog`. Pendências:
+
+#### 2.1 Dados da assinatura e travas restantes
+* **Campos que faltam (`users` ou tabela `subscriptions`):**
   * `subscription_status`: `'active'` | `'trialing'` | `'past_due'` | `'canceled'`
   * `stripe_customer_id`: string
   * `stripe_subscription_id`: string
-  * `nino_ai_credits_used`: integer (reseta mensalmente)
-* **Middleware de Verificação de Limites (`server/security.ts` ou `server/routes.ts`):**
-  * Ao criar novo ambiente (`POST /api/workspaces/:id/environments`): se o plano for `'free'` e o usuário já tiver 2 ambientes cadastrados, retornar `403 FORBIDDEN` com código `LIMIT_REACHED_ENVIRONMENTS`.
-  * Ao adicionar novo item (`POST /api/environments/:id/items`): se o plano for `'free'` e o ambiente já possuir 5 itens cadastrados, retornar `403 FORBIDDEN` com código `LIMIT_REACHED_ITEMS`.
-  * Ao consultar a IA do Nino: limitar a 3 consultas mensais para contas `'free'`.
+  * `nino_ai_credits_used`: integer (reseta mensalmente), para o limite de 3 consultas mensais do gratuito (ver 3.1).
+* **Colaboração no gratuito:** a landing diz que a lista a dois e o Chá de Casa Nova são dos planos pagos, mas convites ainda funcionam no gratuito. Decidir se bloqueia (e o que acontece com convidados de quem volta ao gratuito).
+* **Rebaixamento:** quando a assinatura cai (`customer.subscription.deleted`), o que já foi cadastrado acima do limite fica guardado e só a criação de novos é barrada (comportamento atual das travas). Confirmar se é isso que queremos.
 
-#### 2.2 Modal de Upgrade Acolhedor no Frontend
-* Interceptar os códigos `LIMIT_REACHED_*` no cliente e disparar o **Paywall Modal do Nino**:
-  * Ilustração do Nino com as chaves na mão.
-  * Mensagem afetuosa: *"Sua casa está crescendo! No plano gratuito, você pode testar até 2 cômodos com 5 itens cada. Vamos abrir as portas de todos os cômodos do seu lar?"*.
-  * Botões de seleção de plano (Mensal, Semestral com desconto, Anual) que redirecionam para a Stripe.
+#### 2.2 Botões de assinatura no paywall
+* Hoje o `PaywallDialog` mostra os preços com um "Entendi". Trocar por botões de plano (Mensal, Semestral com desconto, Anual) que chamam o checkout da Stripe.
+* Ilustração do Nino com as chaves na mão (hoje usa a pose `wave`).
 
 #### 2.3 Integração com Stripe Brasil
 * **Configuração no Stripe Dashboard:**
@@ -133,31 +89,17 @@ Esta fase monetiza a plataforma, implementando as regras de limite do plano grat
 
 Esta fase transforma o Casa Mia em um assistente proativo que pensa com inteligência prescritiva.
 
-> **Status:** a base está implementada e fica desligada até existir `TYPESAFE_API_KEY` no servidor.
-> * `server/services/jev.ts` (cliente, cache de 10 min, teto diário `JEV_DAILY_LIMIT`, limiares de confiança) e `server/ai.ts` (rotas).
-> * Rotas reais: `POST /api/ai/assess-item` (ambiente do item novo + aviso de compra redundante, numa só chamada), `POST /api/ai/recommend` (próximo item essencial do ambiente, escolhido entre itens do catálogo que faltam) e `POST /api/ai/prioritize` (prioridade de compra dos itens pendentes de um ambiente numa régua de 8 níveis, de "pode esperar mais de 6 meses" a "comprar já: leva tempo", definida em `src/planning/purchaseUrgency.ts`; a nota fica gravada em `items.ai_urgency` e só é inferida de novo para item novo, renomeado ou movido de ambiente). `GET /api/ai/status` diz ao app se o Jev está ligado.
-> * Interface: `AddItemModal` (sugere o ambiente e avisa de repetição) e `NinoAssistant`, no planejamento de compras (próximo item e itens por urgência).
-> * Sem chave, erro ou confiança baixa, tudo volta vazio e o app funciona como antes (o regex de `suggestCategory` continua valendo para links de lojas).
-> * **Ainda não feito:** limite de consultas por plano (depende do Freemium da Fase 2), estados visuais do Nino (pensativo/comemorando/descansando) e o balãozinho dentro do ambiente.
-> * Nomes das rotas diferem do planejado abaixo: `check-redundancy` virou parte de `assess-item`, para gastar uma chamada em vez de duas.
+> **Já feito:** rotas `assess-item`, `recommend` e `prioritize`, cliente `jev.ts` e `NinoAssistant` (ver seção 1). Pendências:
 
-#### 3.1 Setup do SDK TypeSafe AI
-* Adicionar a dependência do TypeSafe AI no backend Node.js (`server/`).
-* Configurar a chave de API segura no arquivo de variáveis de ambiente (`TYPESAFE_API_KEY`).
+#### 3.1 Limite de consultas por plano
+* Limitar o Nino/Jev a 3 consultas mensais em contas `'free'`, usando `nino_ai_credits_used` (depende da Fase 2). O teto diário global `JEV_DAILY_LIMIT` já existe.
 
-#### 3.2 Implementação das Rotas de Inteligência
-* **Recomendação Inteligente com `Choice` (`POST /api/ai/recommend`):**
-  * Envia o estado atual do morador (área do imóvel, número de moradores, animais de estimação e lista de itens já comprados no cômodo).
-  * O Jev retorna de forma atômica qual é o próximo item essencial faltante com grau de certeza (*confidence*).
-* **Priorização Orçamentária com `Score` (`POST /api/ai/prioritize`):**
-  * O Jev pontua a urgência de cada item de 1 a 5 considerando o orçamento total disponível e a data prevista de mudança.
-* **Guarda contra Redundâncias com `Noul` (`POST /api/ai/check-redundancy`):**
-  * Avalia se a inclusão de um novo item representa duplicidade de função em relação ao espaço disponível.
+#### 3.2 Estados visuais do Nino na interface
+* Três estados em `NinoAssistant`: *Pensativo* (com trena/prancheta), *Comemorando* (ao riscar itens), *Descansando no arco* (quando o cômodo atinge 100%). Hoje só há as poses de arte do componente `Nino`, sem ligação a esses eventos.
+* Balãozinho do Nino dentro da visualização do ambiente (hoje as dicas só aparecem no planejamento de compras).
 
-#### 3.3 Componente do Mascote Nino na Interface
-* Criação do componente `<NinoAssistant />` posicionado discretamente na visualização de cômodos:
-  * Exibe dicas calculadas pelo Jev com um balãozinho acolhedor.
-  * Três estados visuais: *Pensativo* (com trena/prancheta), *Comemorando* (ao riscar itens), *Descansando no arco* (quando o cômodo atinge 100%).
+#### 3.3 Chave em produção
+* Criar `TYPESAFE_API_KEY` no servidor para ligar o Jev (hoje desligado).
 
 ---
 
@@ -192,30 +134,36 @@ A funcionalidade que transforma convidados em novos clientes da plataforma.
 
 ### FASE 5: Infraestrutura Railway, Automação Fiscal e Lançamento
 
-Esta fase consolida a operação em ambiente de produção seguro e escalável.
+> **Já existe:** envio via Resend (`server/mailer.ts`) e variáveis `APP_URL`/`RESEND_API_KEY`/`MAIL_FROM` documentadas para Railway no README. Confirmar o que já está provisionado antes de fechar esta fase.
 
 #### 5.1 Hospedagem no Railway
-* Provisionar projeto no **Railway**:
-  * Serviço de Aplicação (Node.js/Fastify construído via Dockerfile).
-  * Serviço de Banco de Dados PostgreSQL dedicado com backups diários automáticos.
-* Configuração de domínios personalizados (`app.casamia.com.br` ou `casamiaapp.com.br`).
+* Dockerfile do serviço Node.js/Fastify (não existe no repositório).
+* PostgreSQL dedicado com backups diários automáticos.
+* Domínio personalizado (`app.casamia.com.br` ou `casamiaapp.com.br`).
 
 #### 5.2 E-mails Transacionais com Resend Pro
-* Configuração do domínio no painel do Resend com autenticação DNS (registros SPF, DKIM e DMARC).
-* Templates HTML responsivos com a assinatura do Nino:
-  * E-mail de Boas-Vindas e ativação de conta.
-  * Notificação de presente recebido no Chá de Casa Nova.
-  * Resumo mensal de conquistas do lar.
+* Autenticação DNS do domínio (SPF, DKIM e DMARC).
+* Templates novos com a assinatura do Nino: boas-vindas e ativação de conta, presente recebido no Chá de Casa Nova e resumo mensal de conquistas. (Os e-mails de recuperação, convite, senha alterada, feedback e oportunidade de preço já existem.)
 
 #### 5.3 Automação Fiscal e Registro de Marca
-* Integrar webhook da Stripe com serviço de NFS-e (Focus NFe ou PlugNotas) para emissão automática de Nota Fiscal de Serviço a cada mensalidade aprovada.
-* Submeter protocolo de depósito de marca mista no INPI nas classes 9, 35 e 42.
+* Integrar o webhook da Stripe com serviço de NFS-e (Focus NFe ou PlugNotas).
+* Depósito de marca mista no INPI nas classes 9, 35 e 42.
 
 ---
 
 ### FASE 6: Camada de Cache, Catálogo Compartilhado e Indexação de Itens
 
 > **Pode (e deve) ser antecipada:** depende só da Fase 3 e reduz o custo dela. A ordem na matriz é a de menor risco de produto, não a de menor valor.
+
+> **Já feito (ver seção 1):** tabelas, semeadura, normalização, cascata de resolução, urgência por faixa, faixas de preço, busca, autocomplete, API do admin e job de manutenção. **Pendências:**
+> * **Curadoria:** o catálogo tem 226 itens (os do funil), não 1.000+; ampliar a lista e os apelidos/`function_group` (hoje só 7 itens têm grupo; o aviso de redundância também usa "mesmo item do catálogo").
+> * **Itens novos sem inferência no cadastro:** na digitação, o item sem equivalente entra como `pending_review` com o cômodo do ambiente escolhido; cômodo, prioridade, prazo e grupo vêm da ação "completar com o Jev" do admin (`POST /api/admin/catalog/:id/complete`) e não de uma chamada extra enquanto a pessoa digita.
+> * **Painel no `/admin` (feito, básico):** seção "Catálogo de itens" com métricas e fila de pendentes (aprovar, completar com o Jev, mesclar com sugestão de parecidos). Falta histórico de decisões e desfazer mescla.
+> * **Índices do Postgres:** a busca e a similaridade rodam no índice em memória (30 s de validade); `pg_trgm`/`unaccent` + GIN só valem quando o catálogo passar de alguns milhares de itens.
+> * **Cache negativo e L3 (Redis):** não feitos; o teto diário do Jev e o cache de 10 minutos continuam por processo.
+> * **Preço por região e snapshots de lojas:** `catalog_price_stats` já tem `region`, mas o job só agrega `items.price_cents` e publica a faixa nacional.
+> * **Idiomas:** o `slug` por item e `catalog_item_translations` (Fase 8) ainda não existem; a chave é o nome normalizado em português.
+> * **Operação (feito):** a manutenção roda sozinha todo dia em produção (`CATALOG_MAINTENANCE=off` desliga), com trava no banco. O pré-cálculo de urgência com o Jev fica fora do agendamento por custo: ligar `CATALOG_PRECOMPUTE_URGENCY=on` ou rodar `npm run catalog:maintain -- --urgency` uma vez, com a chave do Jev.
 
 **Problema.** Hoje o conhecimento sobre um item morre dentro do enxoval que o gerou. A nota de urgência fica em `items.ai_urgency` (por item, por enxoval) e o cache de `server/services/jev.ts` é em memória, por processo, com 10 minutos de vida: reinicia no deploy e não é compartilhado entre instâncias. Se mil pessoas cadastram "Geladeira", o Jev é consultado mil vezes para chegar à mesma resposta. O catálogo do funil (`src/onboarding/catalog.ts`, 244 entradas) só é consultado por nome idêntico (`matchCatalog`), e a sugestão de ambiente de links de lojas é um conjunto de regex (`suggestCategory`).
 
@@ -324,9 +272,8 @@ Hoje o app **não grava IP nem user-agent**, as sessões não têm metadados, n�
 
 | Ordem | Entregável | Impacto Principal | Complexidade |
 |:---:|---|---|:---:|
-| **1º** | **Fase 1:** Rebranding visual global + Nova Home Page com a proposta Casa Mia | Autoridade e Conversão | Média |
-| **2º** | **Fase 2:** Regras do Freemium (2 cômodos / 5 itens) + Checkout Stripe | Monetização e Negócio | Média |
-| **3º** | **Fase 3:** Mascote Nino na interface + Chamadas de IA Jev (TypeSafe AI) | Retenção e Diferencial | Média-Alta |
+| **2º** | **Fase 2:** Checkout Stripe (travas do Freemium 2 cômodos / 5 itens já prontas) | Monetização e Negócio | Média |
+| **3º** | **Fase 3 (restante):** Limite por plano, estados do Nino e balão no ambiente, chave do Jev em produção | Retenção e Diferencial | Média-Alta |
 | **4º** | **Fase 4:** Página pública de Chá de Casa Nova com Pix e Reservas | Crescimento Viral | Média |
 | **5º** | **Fase 5:** Deploy Railway + Resend Pro + Emissão Fiscal Automática | Escala e Estabilidade | Média |
 | **6º** | **Fase 6:** Catálogo mestre de 1.000+ itens, faixas de preço reais, deduplicação e busca indexada (Jev só para o que não existe) | Custo de IA, Velocidade e Qualidade dos Dados | Média-Alta |

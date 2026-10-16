@@ -11,6 +11,7 @@ import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken,
 import { registerAdminRoutes } from './admin.ts';
 import { registerFeedbackRoutes } from './feedback.ts';
 import { registerAiRoutes } from './ai.ts';
+import { registerCatalogRoutes } from './catalog.ts';
 import { urgencyKey } from './services/jev.ts';
 import { appBaseUrl, canDeliverMail, invitationEmail, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
@@ -1068,6 +1069,7 @@ export function registerApiRoutes(app: Express) {
   registerAdminRoutes(router);
   registerFeedbackRoutes(router, requireCurrentUser);
   registerAiRoutes(router, { requireUser: requireCurrentUser, fetchItems, fetchCategories });
+  registerCatalogRoutes(router, { requireUser: requireCurrentUser });
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true });

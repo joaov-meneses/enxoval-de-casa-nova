@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { DEFAULT_ENXOVAL_TEMPLATE_NAME, DEFAULT_TEMPLATE_CATEGORIES, DEFAULT_TEMPLATE_ITEMS } from '../src/data.ts';
+import { seedCatalog } from './catalog.ts';
 import { getPool } from './database.ts';
 
 interface UserRow {
@@ -420,6 +421,76 @@ export async function migrateDatabase() {
     CREATE INDEX IF NOT EXISTS template_items_template_id_idx ON template_items(template_id);
     CREATE INDEX IF NOT EXISTS template_items_category_id_idx ON template_items(category_id);
   `);
+
+  // Catálogo compartilhado (Fase 6): só nomes de itens e agregados, nenhum dado de pessoa ou de enxoval.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS catalog_items (
+      id uuid PRIMARY KEY,
+      canonical_name text NOT NULL,
+      normalized_name text NOT NULL UNIQUE,
+      room text,
+      priority text NOT NULL DEFAULT 'optional',
+      timing text,
+      lead_time_weeks integer,
+      price_category smallint,
+      function_group text,
+      source text NOT NULL DEFAULT 'jev',
+      status text NOT NULL DEFAULT 'pending_review',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT catalog_items_priority_valid CHECK (priority IN ('essential', 'optional')),
+      CONSTRAINT catalog_items_timing_valid CHECK (timing IS NULL OR timing IN ('first_night', 'first_week')),
+      CONSTRAINT catalog_items_price_category_valid CHECK (price_category IS NULL OR price_category BETWEEN 1 AND 4),
+      CONSTRAINT catalog_items_source_valid CHECK (source IN ('curated', 'users', 'jev')),
+      CONSTRAINT catalog_items_status_valid CHECK (status IN ('approved', 'pending_review'))
+    );
+    CREATE INDEX IF NOT EXISTS catalog_items_room_idx ON catalog_items(room);
+    CREATE INDEX IF NOT EXISTS catalog_items_function_group_idx ON catalog_items(function_group) WHERE function_group IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS catalog_items_status_idx ON catalog_items(status);
+
+    CREATE TABLE IF NOT EXISTS catalog_item_aliases (
+      alias_normalized text PRIMARY KEY,
+      item_id uuid NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+      source text NOT NULL DEFAULT 'curated',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT catalog_item_aliases_source_valid CHECK (source IN ('curated', 'similarity', 'jev', 'admin'))
+    );
+    CREATE INDEX IF NOT EXISTS catalog_item_aliases_item_id_idx ON catalog_item_aliases(item_id);
+
+    -- Urgência por faixa de perfil (moradia x clima x situação), e não por item de cada enxoval.
+    CREATE TABLE IF NOT EXISTS catalog_item_urgency (
+      item_id uuid NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+      profile_bucket text NOT NULL,
+      urgency real NOT NULL,
+      confidence real NOT NULL DEFAULT 0,
+      rubric_version integer NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (item_id, profile_bucket)
+    );
+
+    CREATE TABLE IF NOT EXISTS catalog_price_stats (
+      item_id uuid NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+      region text NOT NULL DEFAULT '',
+      p10_cents integer NOT NULL,
+      p50_cents integer NOT NULL,
+      p90_cents integer NOT NULL,
+      samples integer NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (item_id, region)
+    );
+
+    -- Contadores por dia para a taxa de acerto do catálogo e as consultas ao Jev.
+    CREATE TABLE IF NOT EXISTS catalog_metrics (
+      day date NOT NULL,
+      kind text NOT NULL,
+      total integer NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, kind)
+    );
+
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS catalog_item_id uuid REFERENCES catalog_items(id) ON DELETE SET NULL;
+    CREATE INDEX IF NOT EXISTS items_catalog_item_id_idx ON items(catalog_item_id);
+  `);
+  await seedCatalog(pool);
 
   await seedDefaultTemplate(pool);
 

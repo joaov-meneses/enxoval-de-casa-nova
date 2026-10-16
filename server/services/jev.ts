@@ -9,6 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
+import { normalizeName } from '../../src/catalog/normalize.ts';
 import { CATALOG, matchesWhere } from '../../src/onboarding/catalog.ts';
 import { NORDESTE, traitsOfCity } from '../../src/onboarding/regions.ts';
 import { stateInfo } from '../../src/onboarding/plan.ts';
@@ -28,7 +29,11 @@ export const JEV_THRESHOLDS = {
   /** Confiança a partir da qual há um favorito claro para o próximo item; abaixo, o app mostra as melhores opções. */
   recommendation: 0.5,
   /** Abaixo disto a nota de urgência é só uma estimativa: o app guarda e mostra, mas avisa que é incerta. */
-  urgency: 0.5
+  urgency: 0.5,
+  /** Confiança para tratar um nome da faixa de dúvida como o mesmo item do catálogo (e gravar o apelido). */
+  sameItem: 0.8,
+  /** Confiança mínima para cada campo que o Jev preenche ao criar um item novo no catálogo. */
+  catalogField: 0.6
 } as const;
 
 const NONE = '__nenhum__';
@@ -56,6 +61,12 @@ export interface JevTransport {
 }
 
 let transport: JevTransport | null | undefined;
+let onCall: (() => void) | null = null;
+
+/** Avisa a cada chamada que de fato sai para o Jev (cache e limite não contam); usado para as métricas do catálogo. */
+export function setJevCallObserver(observer: (() => void) | null) {
+  onCall = observer;
+}
 
 function readPositiveInt(name: string, fallback: number) {
   const value = Number(process.env[name]);
@@ -124,6 +135,7 @@ async function ask(state: unknown, questions: Record<string, unknown>): Promise<
   }
 
   try {
+    onCall?.();
     const { answers } = await client.systemOne({ state, questions });
     if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string);
     cache.set(key, { expires: now + CACHE_TTL_MS, answers });
@@ -136,8 +148,7 @@ async function ask(state: unknown, questions: Record<string, unknown>): Promise<
 }
 
 const unique = <T>(values: T[]) => [...new Set(values)];
-const normalize = (value: string) =>
-  value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const normalize = normalizeName;
 
 /* --------------------------------------------------------------------- perfil */
 
@@ -156,13 +167,13 @@ export interface JevProfile {
 
 const CLIMATE_LABEL = { hot: 'quente', mild: 'ameno', cold: 'frio' } as const;
 
-function profileState(profile: JevProfile) {
+function profileState(profile: JevProfile, options: { weeks?: boolean } = {}) {
   return {
     moradia: profile.housing,
     moradores: profile.people,
     situacao: profile.moment,
     clima: CLIMATE_LABEL[stateInfo(profile.uf).climate],
-    ...(profile.weeksToMove === null ? {} : { semanas_ate_a_mudanca: profile.weeksToMove }),
+    ...(profile.weeksToMove === null || options.weeks === false ? {} : { semanas_ate_a_mudanca: profile.weeksToMove }),
     perfil_de_gasto: profile.spendingTier
   };
 }
@@ -412,7 +423,7 @@ const URGENCY_QUESTION =
   '(1) se, sem ele, a pessoa não consegue dormir, tomar banho, comer ou guardar comida nos primeiros dias; ' +
   '(2) se é grande, caro ou tem entrega e montagem demoradas, o que obriga a comprar com semanas de antecedência; ' +
   '(3) se é conforto, decoração ou uso eventual, que pode esperar a casa funcionar; ' +
-  '(4) a moradia, quem mora, o clima e quanto tempo falta para a mudança. ' +
+  '(4) a moradia, quem mora e o clima. ' +
   'Julgue pelo tipo de item e pelo papel dele na rotina, não pelo preço.';
 
 export async function prioritizeItems(input: { items: UrgencyInput[]; profile: JevProfile }): Promise<ItemUrgency[] | null> {
@@ -435,7 +446,8 @@ export async function prioritizeItems(input: { items: UrgencyInput[]; profile: J
           criteria: URGENCY_SCALE.map(level => level.criterion)
         };
       }
-      const answers = await ask(profileState(input.profile), questions);
+      // Sem o prazo até a mudança: a nota vale para toda a faixa de perfil e é compartilhada entre enxovais.
+      const answers = await ask(profileState(input.profile, { weeks: false }), questions);
       if (!answers) return null;
       const scored: ItemUrgency[] = [];
       for (const [index, item] of chunk.entries()) {
@@ -451,4 +463,92 @@ export async function prioritizeItems(input: { items: UrgencyInput[]; profile: J
   // Se todas as partes falharam, não há o que mostrar; se só algumas falharam, mostra o que veio.
   if (results.every(result => result === null)) return null;
   return results.flat().filter((entry): entry is ItemUrgency => entry !== null).sort((a, b) => b.urgency - a.urgency);
+}
+
+/* ------------------------------------------------------------- 4. catálogo compartilhado */
+
+/**
+ * Desempate de deduplicação: o nome digitado é o mesmo item de algum dos candidatos parecidos do catálogo? Só é
+ * chamado na faixa de dúvida da similaridade. Devolve o nome do candidato, ou `null` para "nenhum deles".
+ */
+export async function chooseSameItem(name: string, candidates: string[]): Promise<string | null> {
+  const options = unique(candidates);
+  if (options.length === 0) return null;
+  const answers = await ask(
+    { item_digitado: name },
+    {
+      mesmo_item: {
+        type: 'choice',
+        instructions: 'Qual dos itens do catálogo é exatamente o mesmo objeto de `item_digitado`, só com outro nome? Itens parecidos mas de uso diferente (ex.: panela e panela de pressão) não são o mesmo. Escolha a opção de nenhum quando não houver equivalente.',
+        criteria: { ...Object.fromEntries(options.map(option => [option, null])), [NONE]: 'Nenhum deles é o mesmo item' }
+      }
+    }
+  );
+  const answer = answers?.mesmo_item;
+  if (!answer?.choice || answer.choice === NONE || !options.includes(answer.choice)) return null;
+  return (answer.confidence ?? 0) >= JEV_THRESHOLDS.sameItem ? answer.choice : null;
+}
+
+export interface CatalogInference {
+  room: RoomKey | null;
+  priority: 'essential' | 'optional' | null;
+  timing: 'first_night' | 'first_week' | null;
+  functionGroup: string | null;
+}
+
+const ROOM_LABELS: Record<RoomKey, string> = {
+  cozinha: 'Cozinha (utensílios, louças, panelas)',
+  eletro: 'Eletrodomésticos da cozinha',
+  sala: 'Sala de estar e jantar',
+  quarto: 'Quarto principal',
+  quartoExtra: 'Quarto extra ou de hóspedes',
+  banheiro: 'Banheiro',
+  servico: 'Área de serviço e limpeza',
+  externa: 'Varanda, quintal ou área externa',
+  escritorio: 'Escritório ou home office'
+};
+
+/**
+ * Uma única inferência quando um item realmente novo entra no catálogo: cômodo, prioridade, prazo e grupo de função
+ * (entre os grupos que já existem). Cada campo só vale com confiança suficiente; o resto fica vazio para a revisão.
+ */
+export async function inferCatalogEntry(name: string, groups: string[]): Promise<CatalogInference | null> {
+  const questions: Record<string, unknown> = {
+    comodo: {
+      type: 'choice',
+      instructions: 'Em qual cômodo `item` é mais usado numa casa?',
+      criteria: Object.fromEntries(Object.entries(ROOM_LABELS))
+    },
+    prioridade: {
+      type: 'choice',
+      instructions: 'Para quem está montando a casa, `item` é essencial ou opcional?',
+      criteria: { essential: 'Essencial: a casa não funciona bem sem ele', optional: 'Opcional: conforto, decoração ou uso eventual' }
+    },
+    prazo: {
+      type: 'choice',
+      instructions: 'Quando `item` costuma fazer falta depois da mudança?',
+      criteria: { first_night: 'Já na primeira noite', first_week: 'Na primeira semana', later: 'Só depois, quando a casa estiver funcionando' }
+    }
+  };
+  const knownGroups = unique(groups);
+  if (knownGroups.length > 0) {
+    questions.grupo = {
+      type: 'choice',
+      instructions: 'Qual destes grupos de função `item` cumpre? Itens do mesmo grupo se substituem (comprar um dispensa o outro). Escolha a opção de nenhum quando não couber.',
+      criteria: { ...Object.fromEntries(knownGroups.map(group => [group, null])), [NONE]: 'Não se encaixa em nenhum grupo' }
+    };
+  }
+  const answers = await ask({ item: name }, questions);
+  if (!answers) return null;
+  const sure = (answer?: JevAnswer) => (answer?.confidence ?? 0) >= JEV_THRESHOLDS.catalogField ? answer?.choice : undefined;
+  const room = sure(answers.comodo);
+  const priority = sure(answers.prioridade);
+  const timing = sure(answers.prazo);
+  const group = sure(answers.grupo);
+  return {
+    room: room && room in ROOM_LABELS ? (room as RoomKey) : null,
+    priority: priority === 'essential' || priority === 'optional' ? priority : null,
+    timing: timing === 'first_night' || timing === 'first_week' ? timing : null,
+    functionGroup: group && group !== NONE && knownGroups.includes(group) ? group : null
+  };
 }

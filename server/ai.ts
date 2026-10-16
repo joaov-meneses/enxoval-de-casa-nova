@@ -2,15 +2,29 @@
 // ambiente e urgência dos itens pendentes. Cada rota é uma ajuda opcional: sem chave do Jev, ou com confiança baixa,
 // a resposta vem vazia e o app segue como sempre (ver server/services/jev.ts).
 import type { Request, Router } from 'express';
+import {
+  createPendingItem,
+  learnAlias,
+  loadBucketUrgencies,
+  lookupExact,
+  profileBucket,
+  recordMetric,
+  resolveItem,
+  roomMatches,
+  saveBucketUrgency,
+  type CatalogItem
+} from './catalog.ts';
 import { getPool, Queryable } from './database.ts';
 import { asyncHandler, HttpError, rateLimit } from './security.ts';
 import {
   assessItem,
   candidatesFor,
+  chooseSameItem,
   isJevConfigured,
   MAX_URGENCY_ITEMS,
   prioritizeItems,
   recommendNext,
+  setJevCallObserver,
   urgencyKey,
   type JevProfile
 } from './services/jev.ts';
@@ -67,6 +81,8 @@ function requireString(value: unknown, label: string) {
 
 export function registerAiRoutes(router: Router, deps: AiDependencies) {
   const { requireUser, fetchItems, fetchCategories } = deps;
+  // Cada chamada que de fato chega ao Jev entra nas métricas do catálogo (custo por dia).
+  setJevCallObserver(() => void recordMetric('jev_call'));
   // As rotas que a pessoa dispara sozinha (ao digitar) têm um teto maior que as de botão.
   const typing = rateLimit(60, 10 * 60_000, 'Muitas consultas seguidas. Aguarde um instante.');
   const button = rateLimit(20, 10 * 60_000, 'Muitas consultas seguidas. Aguarde um instante.');
@@ -100,23 +116,69 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
       fetchItems(getPool(), user.id, enxovalId),
       loadProfile(getPool(), enxovalId)
     ]);
-    const assessment = await assessItem({
-      name,
-      environments: categories.map(category => category.name),
-      classify: req.body?.classify === true,
-      existing: items.filter(item => !isInactiveStatus(item.status)).map(item => ({ name: item.name, environment: item.category })),
-      profile
-    });
+    const active = items.filter(item => !isInactiveStatus(item.status));
 
-    const category = assessment?.environment
-      ? categories.find(candidate => candidate.name === assessment.environment!.name)
+    // Cascata: catálogo primeiro (exato, apelido, similar); o Jev só desempata dúvida ou cobre o que o catálogo não sabe.
+    let resolution = await resolveItem(getPool(), name);
+    if (resolution.kind === 'doubt') {
+      const chosen = await chooseSameItem(name, resolution.candidates.map(candidate => candidate.item.canonicalName));
+      const picked = resolution.candidates.find(candidate => candidate.item.canonicalName === chosen);
+      if (picked) {
+        await learnAlias(getPool(), picked.item.id, name, 'jev');
+        resolution = { kind: 'match', item: picked.item, via: 'alias', score: 1 };
+      }
+    }
+    const known = resolution.kind === 'match' ? resolution.item : null;
+
+    // Ambiente: o cômodo do item no catálogo, quando a pessoa tem um ambiente desse cômodo.
+    const fromCatalog = known && req.body?.classify === true
+      ? categories.find(category => roomMatches(known.room, roomOfCategory(category.name)))
       : undefined;
+
+    // Redundância: outro item da lista que é o mesmo do catálogo (ou do mesmo grupo de função) responde sem Jev.
+    let overlap: string | null = null;
+    let redundancyKnown = false;
+    if (known) {
+      for (const item of active) {
+        const other = await lookupExact(getPool(), item.name);
+        if (other && (other.id === known.id || (known.functionGroup && other.functionGroup === known.functionGroup))) {
+          overlap = item.name;
+          break;
+        }
+      }
+      redundancyKnown = overlap !== null || known.functionGroup !== null;
+    }
+
+    const askEnvironment = req.body?.classify === true && !fromCatalog;
+    let assessment = null;
+    if (askEnvironment || !redundancyKnown) {
+      assessment = await assessItem({
+        name,
+        environments: categories.map(category => category.name),
+        classify: askEnvironment,
+        existing: redundancyKnown ? [] : active.map(item => ({ name: item.name, environment: item.category })),
+        profile
+      });
+    }
+
+    const category = fromCatalog
+      ?? (assessment?.environment ? categories.find(candidate => candidate.name === assessment!.environment!.name) : undefined);
+    const confidence = fromCatalog ? 1 : assessment?.environment?.confidence ?? 0;
+    const redundancy = overlap
+      ? { probability: 1, overlapsWith: overlap }
+      : redundancyKnown ? null : assessment?.redundancy ?? null;
+
+    // Aprendizado: o que o catálogo ainda não conhece vira item pendente de revisão, para o próximo enxoval já achar.
+    void recordMetric(known ? 'resolve_hit' : 'resolve_miss');
+    if (!known) {
+      void createPendingItem(getPool(), name, { room: category ? roomOfCategory(category.name) : null, source: 'users' })
+        .catch(err => console.warn('[catalog] Item novo não gravado:', err instanceof Error ? err.message : err));
+    }
+
     res.json({
       available: true,
-      environment: category && assessment?.environment
-        ? { id: category.id, name: category.name, confidence: assessment.environment.confidence }
-        : null,
-      redundancy: assessment?.redundancy ?? null
+      environment: category ? { id: category.id, name: category.name, confidence } : null,
+      redundancy
     });
   }));
 
@@ -161,8 +223,9 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
     });
   }));
 
-  // Urgência (1 a 5) dos itens pendentes de um ambiente. Cada nota é inferida uma vez e guardada no item: as próximas
-  // consultas só gastam o Jev com itens novos, ou renomeados e movidos de ambiente (a nota guardada deixa de valer).
+  // Urgência dos itens pendentes de um ambiente. A nota é inferida uma vez por faixa de perfil e guardada no catálogo
+  // compartilhado: o Jev só é consultado para itens que nenhum enxoval do mesmo perfil já avaliou. O item guarda um
+  // espelho da nota (leitura rápida), que deixa de valer se ele for renomeado ou movido de ambiente.
   router.post('/ai/prioritize', button, asyncHandler(async (req, res) => {
     const user = await requireUser(req);
     const enxovalId = requireString(req.body?.enxovalId, 'Enxoval');
@@ -187,7 +250,33 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
     for (const item of pending) {
       if (typeof item.aiUrgency === 'number') scores.set(item.id, { urgency: item.aiUrgency, confidence: item.aiUrgencyConfidence ?? 0 });
     }
-    const cached = scores.size;
+    let cached = scores.size;
+
+    // Liga cada item ao catálogo (exato, apelido ou similaridade alta; sem Jev).
+    const catalogOf = new Map<string, CatalogItem>();
+    for (const item of pending) {
+      const resolution = await resolveItem(getPool(), item.name);
+      if (resolution.kind === 'match') catalogOf.set(item.id, resolution.item);
+    }
+
+    const bucket = profileBucket(profile);
+    const shared = await loadBucketUrgencies(getPool(), [...new Set([...catalogOf.values()].map(entry => entry.id))], bucket);
+    const mirror = (item: EnxovalItem, urgency: number, confidence: number) => getPool().query(
+      `UPDATE items SET ai_urgency = $3, ai_urgency_confidence = $4, ai_urgency_key = $5, catalog_item_id = COALESCE($6, catalog_item_id)
+       WHERE id = $1 AND enxoval_id = $2`,
+      // O nome e o ambiente entram na chave: se o item mudar depois, a nota guardada deixa de valer.
+      [item.id, enxovalId, Math.min(URGENCY_LEVELS, Math.max(1, urgency)), confidence, urgencyKey(item.name, item.category), catalogOf.get(item.id)?.id ?? null]
+    );
+
+    for (const item of pending) {
+      if (scores.has(item.id)) continue;
+      const known = catalogOf.get(item.id);
+      const hit = known ? shared.get(known.id) : undefined;
+      if (!hit) continue;
+      await mirror(item, hit.urgency, hit.confidence);
+      scores.set(item.id, hit);
+      cached += 1;
+    }
 
     const missing = pending.filter(item => !scores.has(item.id)).slice(0, MAX_URGENCY_ITEMS);
     let inferred = 0;
@@ -200,21 +289,33 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
       for (const result of results ?? []) {
         const item = names.get(result.id);
         if (!item) continue;
-        // O nome e o ambiente entram na chave: se o item mudar depois, a nota guardada deixa de valer.
-        await getPool().query(
-          `UPDATE items SET ai_urgency = $3, ai_urgency_confidence = $4, ai_urgency_key = $5
-           WHERE id = $1 AND enxoval_id = $2`,
-          [item.id, enxovalId, Math.min(URGENCY_LEVELS, Math.max(1, result.urgency)), result.confidence, urgencyKey(item.name, item.category)]
-        );
+        // Item que o catálogo não conhecia entra como pendente de revisão, para o próximo enxoval já achar a nota.
+        let entry = catalogOf.get(item.id);
+        if (!entry) {
+          const created = await createPendingItem(getPool(), item.name, { room: roomOfCategory(item.category), source: 'users' });
+          if (created) catalogOf.set(item.id, (entry = created));
+        }
+        await mirror(item, result.urgency, result.confidence);
+        if (entry) await saveBucketUrgency(getPool(), entry.id, bucket, result.urgency, result.confidence);
         scores.set(item.id, { urgency: result.urgency, confidence: result.confidence });
         inferred += 1;
       }
     }
+    void recordMetric('resolve_hit', cached);
+    void recordMetric('resolve_miss', inferred);
+
+    // Prazo: item com entrega e montagem demoradas, com a mudança dentro da antecedência necessária, vira "comprar já".
+    // É feito aqui, na resposta, porque a nota guardada é compartilhada e não conhece a data de ninguém.
+    const urgent = (item: EnxovalItem, urgency: number) => {
+      const lead = catalogOf.get(item.id)?.leadTimeWeeks;
+      return lead && profile.weeksToMove !== null && profile.weeksToMove <= lead + 1 ? URGENCY_LEVELS : urgency;
+    };
+    const byId = new Map(pending.map(item => [item.id, item]));
 
     res.json({
       available: true,
       categoryId,
-      scores: [...scores].map(([id, score]) => ({ id, ...score })),
+      scores: [...scores].map(([id, score]) => ({ id, ...score, urgency: byId.has(id) ? urgent(byId.get(id)!, score.urgency) : score.urgency })),
       inferred,
       cached,
       unscored: pending.length - scores.size

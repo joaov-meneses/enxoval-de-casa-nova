@@ -10,6 +10,7 @@ import { getPool } from "../server/database.ts";
 import { migrateDatabase } from "../server/migrations.ts";
 import { registerApiRoutes } from "../server/routes.ts";
 import { setJevTransportForTests } from "../server/services/jev.ts";
+import { URGENCY_RUBRIC_VERSION } from "../src/planning/purchaseUrgency.ts";
 
 if (!process.env.DATABASE_URL)
   throw new Error("Configure DATABASE_URL para o teste PostgreSQL.");
@@ -161,9 +162,19 @@ try {
   assert.deepEqual((await call("/ai/status")).data, { enabled: true });
   console.log("PASS: status mostra o Jev ligado para quem está logado.");
 
-  // 2. Item novo: ambiente e redundância numa única chamada ao Jev.
+  // 2a. Nome que o catálogo conhece (apelido de "Air fryer"): ambiente e redundância saem do banco, sem Jev.
   received.length = 0;
-  const assessed = await call("/ai/assess-item", "POST", { enxovalId, name: "Fritadeira elétrica", classify: true });
+  const known = await call("/ai/assess-item", "POST", { enxovalId, name: "Fritadeira elétrica", classify: true });
+  assert.equal(known.status, 200, JSON.stringify(known.data));
+  assert.equal(known.data.available, true);
+  assert.equal(known.data.environment.id, kitchen.id, "eletrodoméstico entra no ambiente da cozinha");
+  assert.deepEqual(known.data.redundancy, { probability: 1, overlapsWith: "Airfryer" });
+  assert.equal(received.length, 0, "o catálogo responde sozinho: zero consulta ao Jev");
+  console.log("PASS: item do catálogo (por apelido) é resolvido sem consultar o Jev.");
+
+  // 2b. Item que o catálogo não conhece: ambiente e redundância numa única chamada ao Jev.
+  received.length = 0;
+  const assessed = await call("/ai/assess-item", "POST", { enxovalId, name: "Máquina de costura", classify: true });
   assert.equal(assessed.status, 200, JSON.stringify(assessed.data));
   assert.equal(assessed.data.available, true);
   assert.equal(assessed.data.environment.id, kitchen.id);
@@ -173,7 +184,7 @@ try {
   assert.equal(received[0].url, "/v1/systemone");
   assert.equal(received[0].auth, "Bearer chave-de-teste");
   const sent = received[0].body;
-  assert.equal(sent.state.novo_item, "Fritadeira elétrica");
+  assert.equal(sent.state.novo_item, "Máquina de costura");
   assert.equal(sent.state.moradia, "apartamento");
   assert.equal(sent.state.moradores, 2);
   assert.deepEqual(sent.state.itens_por_ambiente.Cozinha.sort(), ["Airfryer", "Jogo de panelas"]);
@@ -181,7 +192,11 @@ try {
   // Nada pessoal sai do servidor.
   const wire = JSON.stringify(sent);
   assert.ok(!wire.includes(OWNER_EMAIL) && !wire.includes(OWNER_NAME) && !wire.includes("Marina"), "nome e e-mail ficam em casa");
-  console.log("PASS: assess-item sugere o ambiente e avisa da redundância, sem enviar dados pessoais.");
+  // O que o catálogo não sabia vira item pendente de revisão (e fora do autocomplete até a equipe aprovar).
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const pendingRow = await getPool().query("SELECT status, source FROM catalog_items WHERE normalized_name = 'maquina costura'");
+  assert.deepEqual(pendingRow.rows, [{ status: "pending_review", source: "users" }]);
+  console.log("PASS: item novo consulta o Jev uma vez, sem dados pessoais, e entra no catálogo como pendente.");
 
   // 3. Ambiente já escolhido pela pessoa: o Jev nem é perguntado sobre o ambiente.
   received.length = 0;
@@ -209,6 +224,9 @@ try {
   assert.ok(!offered.includes("Jogo de panelas") && !offered.includes("Airfryer"), "itens que a pessoa já tem não são oferecidos");
   assert.ok(offered.includes("__nenhum__"));
   console.log("PASS: recommend escolhe entre itens do catálogo que ainda faltam.");
+
+  // Este teste cria mais ambientes do que o plano gratuito permite: não é ele que verifica as travas do freemium.
+  await getPool().query("UPDATE users SET plan = 'founder'");
 
   // Ambiente que o catálogo não conhece não consulta o Jev.
   const garage = await call("/categories", "POST", { enxovalId, name: "Garagem" });
@@ -246,6 +264,18 @@ try {
   assert.equal(stored["Cama de casal"].aiUrgency, null, "outros ambientes seguem sem nota");
   console.log("PASS: a nota fica gravada no item e não é inferida de novo.");
 
+  // Outro enxoval com o mesmo perfil herda as notas do catálogo compartilhado: nenhuma consulta ao Jev.
+  const second = await call("/enxovais", "POST", { name: "Casa do Paulo", plan, profile, userName: OWNER_NAME });
+  assert.equal(second.status, 201, JSON.stringify(second.data));
+  const secondKitchen = second.data.categories.find((category) => category.name === "Cozinha");
+  received.length = 0;
+  const shared = await call("/ai/prioritize", "POST", { enxovalId: second.data.enxoval.id, categoryId: secondKitchen.id });
+  assert.equal(shared.status, 200, JSON.stringify(shared.data));
+  assert.deepEqual([shared.data.inferred, shared.data.cached, shared.data.unscored], [0, 2, 0]);
+  assert.ok(shared.data.scores.every((entry) => entry.urgency === 4.2 && entry.confidence === 0.8));
+  assert.equal(received.length, 0, "o que um enxoval descobriu vale para o outro");
+  console.log("PASS: a urgência descoberta num enxoval vale para outro de mesmo perfil, sem Jev.");
+
   // Item novo: só ele é avaliado.
   const added = await call("/items", "POST", { enxovalId, categoryId: kitchen.id, name: "Tábua de corte" });
   assert.equal(added.status, 201, JSON.stringify(added.data));
@@ -260,22 +290,23 @@ try {
   received.length = 0;
   assert.equal((await urgencyIn(kitchen.id)).data.inferred, 0);
   assert.equal(received.length, 0);
-  const renamed = await call(`/items/${airfryerId}`, "PATCH", { name: "Airfryer 5 litros" });
+  const renamed = await call(`/items/${airfryerId}`, "PATCH", { name: "Torradeira" });
   assert.equal(renamed.data.aiUrgency, null, "renomear descarta a nota");
   received.length = 0;
   await urgencyIn(kitchen.id);
-  assert.deepEqual(asked(), ["Airfryer 5 litros"]);
+  assert.deepEqual(asked(), ["Torradeira"]);
 
   // Notas gravadas com uma versão antiga da régua não valem: o item é reavaliado em vez de misturar duas réguas.
   const tabua = withNew.data.scores.find((entry) => entry.id === added.data.item.id);
   assert.ok(tabua);
   await getPool().query("UPDATE items SET ai_urgency_key = $2 WHERE id = $1", [added.data.item.id, "v1|tabua de corte|cozinha"]);
+  await getPool().query("UPDATE catalog_item_urgency SET rubric_version = 1"); // a nota compartilhada também é da régua antiga
   const reassessed = await urgencyIn(kitchen.id);
   // (A pergunta é idêntica à anterior, então o cache de 10 minutos do serviço pode responder sem chamar o Jev.)
   assert.equal(reassessed.data.inferred, 1, "nota de régua antiga é inferida de novo");
   assert.equal(
     (await getPool().query("SELECT ai_urgency_key FROM items WHERE id = $1", [added.data.item.id])).rows[0].ai_urgency_key,
-    "v2|tabua de corte|cozinha",
+    `v${URGENCY_RUBRIC_VERSION}|tabua corte|cozinha`,
     "e regravada com a chave da régua atual",
   );
 

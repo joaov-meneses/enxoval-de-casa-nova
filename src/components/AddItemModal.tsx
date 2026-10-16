@@ -5,11 +5,12 @@ import type {
   EnxovalItem,
   ItemStatus,
   ItemTrackingInput,
+  CatalogSuggestion,
   ItemAssessment,
   PriceBasis,
   ScrapedProductPreview,
 } from "../types";
-import { assessItemDraft, extractProduct } from "../api";
+import { assessItemDraft, extractProduct, searchCatalog } from "../api";
 import { useJevEnabled } from "../hooks/useJevEnabled";
 import { storeLabel } from "../priceTracking";
 import {
@@ -135,6 +136,33 @@ export function AddItemModal({
     environmentName: string | null;
   } | null>(null);
   const lastAssessedName = useRef("");
+  // Autocomplete do catálogo compartilhado: vem do banco do servidor, sem Jev, e some se a busca falhar.
+  const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([]);
+
+  useEffect(() => {
+    const draft = name.trim();
+    if (!isOpen || draft.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const { results } = await searchCatalog(draft, controller.signal);
+        if (!controller.signal.aborted) setSuggestions(results);
+      } catch {
+        // Sem sugestões o campo funciona como sempre.
+      }
+    }, 200);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [name, isOpen]);
+
+  const commonRange = suggestions.find(
+    (suggestion) => suggestion.name.toLowerCase() === name.trim().toLowerCase(),
+  )?.priceRange;
 
   useEffect(() => {
     if (!isOpen || !jevEnabled || !enxovalId) return;
@@ -615,9 +643,24 @@ export function AddItemModal({
             maxLength={MAX_ITEM_NAME_LENGTH}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            list="new-item-name-suggestions"
+            autoComplete="off"
             placeholder="Ex: Jogo de Taças"
             className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
           />
+          <datalist id="new-item-name-suggestions">
+            {suggestions
+              .filter((suggestion) => suggestion.name.length <= MAX_ITEM_NAME_LENGTH)
+              .map((suggestion) => (
+                <option key={suggestion.id} value={suggestion.name} />
+              ))}
+          </datalist>
+          {commonRange && (
+            <p className="mt-2 text-sm text-stone-600">
+              Faixa comum: {money.format(commonRange.p10Cents / 100)} a{" "}
+              {money.format(commonRange.p90Cents / 100)}
+            </p>
+          )}
           {ninoTip?.redundancy && (
             <p
               role="status"
