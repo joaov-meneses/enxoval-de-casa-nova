@@ -1,6 +1,9 @@
 import type {
+  AdminCatalogItem,
+  AdminCatalogOverview,
   AuthUser,
   AdminUser,
+  CatalogSearchResult,
   BootstrapData,
   EnxovalCategory,
   EnxovalInvitation,
@@ -8,9 +11,6 @@ import type {
   EnxovalMember,
   EnxovalWorkspace,
   InvitationPreview,
-  AdminCatalogItem,
-  AdminCatalogMetrics,
-  CatalogSuggestion,
   ItemAssessment,
   ItemPriceHistory,
   ItemStatus,
@@ -401,6 +401,45 @@ export const updateAdminFeedbackStatus = (id: string, status: FeedbackStatus) =>
     body: JSON.stringify({ status }),
   });
 
+/** Autocomplete do catálogo mestre: prefixo, apelidos e similaridade. Não usa IA e responde em milissegundos. */
+export const searchCatalog = (query: string, signal?: AbortSignal) =>
+  request<{ results: CatalogSearchResult[] }>(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=6`, { signal });
+
+export const fetchAdminCatalogOverview = () =>
+  request<AdminCatalogOverview>("/api/admin/catalog/overview");
+
+export const fetchAdminCatalogItems = (filter: { status?: AdminCatalogItem["status"]; q?: string }) => {
+  const params = new URLSearchParams();
+  if (filter.status) params.set("status", filter.status);
+  if (filter.q) params.set("q", filter.q);
+  return request<{ items: AdminCatalogItem[] }>(`/api/admin/catalog/items?${params}`);
+};
+
+export const updateAdminCatalogItem = (
+  id: string,
+  changes: Partial<Pick<AdminCatalogItem, "name" | "room" | "priority" | "timing" | "leadTimeWeeks" | "priceCategory" | "functionGroup" | "status">>,
+) =>
+  request<AdminCatalogItem>(`/api/admin/catalog/items/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+
+export const mergeAdminCatalogItem = (id: string, targetId: string) =>
+  request<AdminCatalogItem>(`/api/admin/catalog/items/${encodeURIComponent(id)}/merge`, {
+    method: "POST",
+    body: JSON.stringify({ targetId }),
+  });
+
+export const deleteAdminCatalogItem = (id: string) =>
+  request<void>(`/api/admin/catalog/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/** Pede ao Jev (uma consulta) os dados que faltam num item do catálogo. A equipe ainda revisa e aprova. */
+export const completeAdminCatalogItem = (id: string) =>
+  request<AdminCatalogItem>(`/api/admin/catalog/items/${encodeURIComponent(id)}/complete`, { method: "POST" });
+
+export const deleteAdminCatalogAlias = (key: string) =>
+  request<void>(`/api/admin/catalog/aliases/${encodeURIComponent(key)}`, { method: "DELETE" });
+
 /** O servidor tem a chave do Jev? Sem ela, a ajuda do Nino não aparece. */
 export const fetchAiStatus = () => request<{ enabled: boolean }>("/api/ai/status");
 
@@ -414,10 +453,6 @@ export const assessItemDraft = (
     body: JSON.stringify(input),
     signal,
   });
-
-/** Autocomplete do catálogo compartilhado: responde do banco, sem consultar o Jev. */
-export const searchCatalog = (query: string, signal?: AbortSignal) =>
-  request<{ results: CatalogSuggestion[] }>(`/api/catalog/search?q=${encodeURIComponent(query)}`, { signal });
 
 export const recommendNextItem = (enxovalId: string, categoryId: string) =>
   request<NextItemRecommendation>("/api/ai/recommend", {
@@ -445,27 +480,3 @@ export type {
   EnxovalMember,
   EnxovalWorkspace,
 };
-
-export const fetchAdminCatalog = () =>
-  request<{ metrics: AdminCatalogMetrics; pending: AdminCatalogItem[] }>("/api/admin/catalog");
-
-export const approveAdminCatalogItem = (
-  id: string,
-  patch: { canonicalName?: string; room?: string | null; priority?: "essential" | "optional" },
-) =>
-  request<{ item: AdminCatalogItem }>(`/api/admin/catalog/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-
-export const mergeAdminCatalogItem = (id: string, targetId: string) =>
-  request<void>(`/api/admin/catalog/${encodeURIComponent(id)}/merge`, {
-    method: "POST",
-    body: JSON.stringify({ targetId }),
-  });
-
-export const completeAdminCatalogItem = (id: string) =>
-  request<{ inference: { room: string | null; priority: string | null } }>(
-    `/api/admin/catalog/${encodeURIComponent(id)}/complete`,
-    { method: "POST" },
-  );

@@ -10,7 +10,7 @@
     "start": "node dist/server.js --production",
     "db:migrate": "tsx server/migrate.ts",
     "track-prices": "tsx server/workers/track-prices.ts",
-    "catalog:maintain": "tsx server/workers/maintain-catalog.ts",
+    "catalog:refresh": "tsx server/workers/catalog-refresh.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f db",

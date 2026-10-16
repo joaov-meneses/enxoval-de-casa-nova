@@ -1,17 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Sparkles, LoaderCircle, PackageCheck, PackageX, X } from "lucide-react";
 import type {
+  CatalogSearchResult,
   EnxovalCategory,
   EnxovalItem,
   ItemStatus,
   ItemTrackingInput,
-  CatalogSuggestion,
   ItemAssessment,
   PriceBasis,
   ScrapedProductPreview,
 } from "../types";
 import { assessItemDraft, extractProduct, searchCatalog } from "../api";
-import { useJevEnabled } from "../hooks/useJevEnabled";
+import { categoryForRoom } from "../catalog/rooms";
 import { storeLabel } from "../priceTracking";
 import {
   DEFAULT_ITEM_STATUS,
@@ -54,6 +54,9 @@ interface AddItemModalProps {
 /** Quanto tempo a pessoa precisa parar de digitar o nome para o Nino analisar o item. */
 const NINO_DELAY_MS = 1000;
 const NINO_MIN_NAME_LENGTH = 3;
+/** Espera curta entre teclas antes de buscar no catálogo (a busca é local no servidor, sem IA). */
+const SUGGEST_DELAY_MS = 150;
+const SUGGEST_MIN_LENGTH = 2;
 
 /** Texto que parece o endereço de um site (com ou sem "https://"), sem espaços. */
 function looksLikeUrl(text: string) {
@@ -129,43 +132,78 @@ export function AddItemModal({
   const importTicket = useRef(0);
   // Último endereço já lido, para o campo "Link do produto" não buscar a mesma loja de novo ao perder o foco.
   const lastImportedUrl = useRef("");
-  // Nino (Jev): só existe quando o servidor tem a chave; a análise é uma ajuda, nunca bloqueia o formulário.
-  const jevEnabled = useJevEnabled();
+  // Nino: o catálogo mestre responde sozinho para itens conhecidos e o Jev (quando o servidor tem a chave) cuida do
+  // resto. A análise é uma ajuda, nunca bloqueia o formulário.
   const [ninoTip, setNinoTip] = useState<{
     redundancy: ItemAssessment["redundancy"];
     environmentName: string | null;
+    catalogItem: ItemAssessment["catalogItem"];
   } | null>(null);
   const lastAssessedName = useRef("");
-  // Autocomplete do catálogo compartilhado: vem do banco do servidor, sem Jev, e some se a busca falhar.
-  const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([]);
+  // Autocomplete do catálogo: só aparece enquanto a pessoa digita, e nunca para um nome que veio de um link.
+  const [suggestions, setSuggestions] = useState<CatalogSearchResult[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const [pickedItem, setPickedItem] = useState<CatalogSearchResult | null>(null);
+  const nameTyped = useRef(false);
 
   useEffect(() => {
-    const draft = name.trim();
-    if (!isOpen || draft.length < 2) {
+    const query = name.trim();
+    if (!isOpen || !nameTyped.current || query.length < SUGGEST_MIN_LENGTH) {
       setSuggestions([]);
       return;
     }
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const { results } = await searchCatalog(draft, controller.signal);
-        if (!controller.signal.aborted) setSuggestions(results);
+        const { results } = await searchCatalog(query, controller.signal);
+        if (controller.signal.aborted) return;
+        // Só o próprio texto digitado não é sugestão.
+        const useful = results.filter((result) => plain(result.name) !== plain(query));
+        setSuggestions(useful);
+        setActiveSuggestion(-1);
+        setSuggestionsOpen(useful.length > 0);
       } catch {
-        // Sem sugestões o campo funciona como sempre.
+        // Sem sugestões o campo continua igual.
       }
-    }, 200);
+    }, SUGGEST_DELAY_MS);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
   }, [name, isOpen]);
 
-  const commonRange = suggestions.find(
-    (suggestion) => suggestion.name.toLowerCase() === name.trim().toLowerCase(),
-  )?.priceRange;
+  const pickSuggestion = (result: CatalogSearchResult) => {
+    nameTyped.current = false;
+    setName(result.name.slice(0, MAX_ITEM_NAME_LENGTH));
+    setPickedItem(result);
+    setSuggestions([]);
+    setSuggestionsOpen(false);
+    if (!categoryTouched.current) {
+      const category = categoryForRoom(categories, result.room);
+      if (category) setCategoryId(category.id);
+    }
+  };
+
+  const handleNameKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!suggestionsOpen || suggestions.length === 0) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActiveSuggestion((current) => (current + step + suggestions.length) % suggestions.length);
+    } else if (event.key === "Enter" && activeSuggestion >= 0) {
+      event.preventDefault();
+      pickSuggestion(suggestions[activeSuggestion]);
+    } else if (event.key === "Escape") {
+      // Fecha só a lista, e não o diálogo inteiro.
+      event.preventDefault();
+      event.stopPropagation();
+      setSuggestionsOpen(false);
+    }
+  };
 
   useEffect(() => {
-    if (!isOpen || !jevEnabled || !enxovalId) return;
+    if (!isOpen || !enxovalId) return;
     const draft = name.trim();
     if (draft.length < NINO_MIN_NAME_LENGTH) {
       lastAssessedName.current = "";
@@ -192,7 +230,7 @@ export function AddItemModal({
           setCategoryId(result.environment.id);
           environmentName = result.environment.name;
         }
-        setNinoTip({ redundancy: result.redundancy, environmentName });
+        setNinoTip({ redundancy: result.redundancy, environmentName, catalogItem: result.catalogItem ?? null });
       } catch {
         // Sem a ajuda do Nino o formulário continua igual.
       }
@@ -201,12 +239,16 @@ export function AddItemModal({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [name, isOpen, jevEnabled, enxovalId, categories.length]);
+  }, [name, isOpen, enxovalId, categories.length]);
 
   useEffect(() => {
     if (!isOpen) return;
     lastAssessedName.current = "";
     setNinoTip(null);
+    nameTyped.current = false;
+    setSuggestions([]);
+    setSuggestionsOpen(false);
+    setPickedItem(null);
     importTicket.current += 1;
     lastImportedUrl.current = "";
     setImportUrl("");
@@ -238,6 +280,11 @@ export function AddItemModal({
     ? Math.min(Number(discountText.replace(/\D/g, "")) || 0, draftPrice)
     : 0;
   const draftFinal = draftPrice - draftDiscount;
+  // Faixa comum de preço do item, vinda do que outras listas registraram (só agregados, com amostra mínima).
+  const priceRange =
+    (pickedItem && plain(pickedItem.name) === plain(name.trim()) ? pickedItem.priceRange : null) ??
+    ninoTip?.catalogItem?.priceRange ??
+    null;
 
   const applyPreview = (data: ScrapedProductPreview) => {
     setPreview(data);
@@ -258,7 +305,8 @@ export function AddItemModal({
     if (!link.trim()) setLink(data.url);
     if (!description.trim() && data.title.length > MAX_ITEM_NAME_LENGTH) setDescription(data.title);
     if (!categoryTouched.current) {
-      const suggested = matchCategory(categories, data.suggestedCategory);
+      // O cômodo do catálogo vale mais que a regra de palavras do título; ela fica como reserva.
+      const suggested = categoryForRoom(categories, data.suggestedRoom)?.id ?? matchCategory(categories, data.suggestedCategory);
       if (suggested) setCategoryId(suggested);
     }
   };
@@ -636,31 +684,59 @@ export function AddItemModal({
               {name.length}/{MAX_ITEM_NAME_LENGTH}
             </span>
           </div>
-          <input
-            type="text"
-            id="new-item-name"
-            required
-            maxLength={MAX_ITEM_NAME_LENGTH}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            list="new-item-name-suggestions"
-            autoComplete="off"
-            placeholder="Ex: Jogo de Taças"
-            className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-          />
-          <datalist id="new-item-name-suggestions">
-            {suggestions
-              .filter((suggestion) => suggestion.name.length <= MAX_ITEM_NAME_LENGTH)
-              .map((suggestion) => (
-                <option key={suggestion.id} value={suggestion.name} />
-              ))}
-          </datalist>
-          {commonRange && (
-            <p className="mt-2 text-sm text-stone-600">
-              Faixa comum: {money.format(commonRange.p10Cents / 100)} a{" "}
-              {money.format(commonRange.p90Cents / 100)}
-            </p>
-          )}
+          <div className="relative">
+            <input
+              type="text"
+              id="new-item-name"
+              required
+              maxLength={MAX_ITEM_NAME_LENGTH}
+              value={name}
+              onChange={(e) => {
+                nameTyped.current = true;
+                setName(e.target.value);
+              }}
+              onKeyDown={handleNameKeyDown}
+              onBlur={() => setSuggestionsOpen(false)}
+              placeholder="Ex: Jogo de Taças"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={suggestionsOpen}
+              aria-controls="new-item-suggestions"
+              aria-activedescendant={activeSuggestion >= 0 ? `new-item-suggestion-${activeSuggestion}` : undefined}
+              autoComplete="off"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+            {suggestionsOpen && suggestions.length > 0 && (
+              <ul
+                id="new-item-suggestions"
+                role="listbox"
+                aria-label="Itens do catálogo"
+                className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+              >
+                {suggestions.map((result, index) => (
+                  <li
+                    key={result.id}
+                    id={`new-item-suggestion-${index}`}
+                    role="option"
+                    aria-selected={index === activeSuggestion}
+                    // mousedown, e não click: o campo perderia o foco (e a lista fecharia) antes do clique.
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      pickSuggestion(result);
+                    }}
+                    className={`flex cursor-pointer items-baseline justify-between gap-3 px-4 py-2 text-sm ${index === activeSuggestion ? "bg-stone-100" : "hover:bg-stone-50"}`}
+                  >
+                    <span className="text-stone-800">{result.name}</span>
+                    {result.priceRange && (
+                      <span className="shrink-0 text-xs text-stone-500">
+                        ~{moneyText(result.priceRange.p50)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           {ninoTip?.redundancy && (
             <p
               role="status"
@@ -772,8 +848,18 @@ export function AddItemModal({
               }}
               placeholder="R$ 0,00"
               disabled={isSubmitting}
+              aria-describedby={priceRange ? "new-item-price-range" : undefined}
               className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
             />
+            {priceRange && (
+              <p id="new-item-price-range" className="mt-1 text-xs text-stone-500">
+                Faixa comum: {moneyText(priceRange.p10)} a {moneyText(priceRange.p90)}
+                {priceRange.region ? ` em ${priceRange.region}` : ""}.
+                {draftPrice > priceRange.p90 && (
+                  <span className="block font-medium text-amber-800">Este preço está acima do comum.</span>
+                )}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="new-item-discount" className="block text-sm font-medium text-stone-700 mb-1">

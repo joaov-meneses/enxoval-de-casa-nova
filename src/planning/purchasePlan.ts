@@ -9,6 +9,7 @@
  * e cada período tem uma faixa de gasto de referência, que depende do perfil de gasto do enxoval. O
  * verificador compara o que a pessoa já registrou em cada período com essa faixa.
  */
+import { foldText } from "../catalog/normalize";
 import { CATALOG, type CatalogEntry } from "../onboarding/catalog";
 import {
   addBands,
@@ -57,18 +58,22 @@ export interface PlannableItem {
   priceCategory?: PriceCategory | null;
   priority?: ItemPriority | null;
   timing?: ItemTiming | null;
+  /** O que o catálogo mestre sabe do item, quando ele está ligado a um. */
+  catalog?: CatalogItemMeta | null;
+}
+
+/** Estimativas do catálogo mestre (servidor), herdadas por todo item ligado a ele. */
+export interface CatalogItemMeta {
+  priceCategory: PriceCategory | null;
+  priority: ItemPriority | null;
+  timing: ItemTiming | null;
+  /** Semanas entre comprar e ter o item pronto em casa (entrega, montagem, instalação). */
+  leadTimeWeeks: number;
 }
 
 /* ------------------------------------------------------------------ catálogo */
 
-function normalizeName(name: string) {
-  return name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
+const normalizeName = foldText;
 
 const CATALOG_BY_NAME = (() => {
   const map = new Map<string, CatalogEntry>();
@@ -105,20 +110,30 @@ export interface ItemMeta {
   priceCategory: PriceCategory;
   priority: ItemPriority;
   timing: ItemTiming | null;
+  /** Semanas de entrega e montagem, segundo o catálogo mestre (0 quando não se sabe). */
+  leadTimeWeeks: number;
   /** Os dados vieram do catálogo ou do preço, e não gravados no item. */
   inferred: boolean;
 }
 
-/** Dados gravados no item quando existem; senão o catálogo; senão o valor informado pela pessoa. */
+/**
+ * Dados gravados no item quando existem; senão o catálogo mestre (servidor); senão o catálogo do funil pelo nome;
+ * senão o valor informado pela pessoa.
+ */
 export function itemMeta(item: PlannableItem): ItemMeta {
+  const master = item.catalog ?? null;
   const match = matchCatalog(item.name);
   const storedCategory = isPriceCategory(item.priceCategory) ? item.priceCategory : null;
   const priceCategory =
-    storedCategory ?? match?.tier ?? categoryFromPrice(item.priceCents);
+    storedCategory ??
+    (isPriceCategory(master?.priceCategory) ? master.priceCategory : null) ??
+    match?.tier ??
+    categoryFromPrice(item.priceCents);
   const priority: ItemPriority =
-    item.priority ?? (match?.flags.includes("E") ? "essential" : "optional");
+    item.priority ?? master?.priority ?? (match?.flags.includes("E") ? "essential" : "optional");
   const timing: ItemTiming | null =
     item.timing ??
+    master?.timing ??
     (match?.flags.includes("I")
       ? "first_night"
       : match?.flags.includes("U")
@@ -128,6 +143,7 @@ export function itemMeta(item: PlannableItem): ItemMeta {
     priceCategory,
     priority,
     timing,
+    leadTimeWeeks: Math.max(0, master?.leadTimeWeeks ?? 0),
     inferred: !storedCategory || !item.priority,
   };
 }
@@ -272,7 +288,24 @@ export interface Placement {
   spread?: boolean;
 }
 
+/**
+ * O prazo de entrega do catálogo antecipa a compra de quem tem data: o item precisa estar pronto na semana em que é
+ * usado, então a compra vem `leadTimeWeeks` antes. Só puxa para mais cedo, nunca adia.
+ */
 function baseWeek(meta: ItemMeta, room: Room | null): { week: number; reason: string } {
+  const base = baseWeekWithoutLeadTime(meta, room);
+  const { leadTimeWeeks } = meta;
+  const needed = meta.timing === "first_night" ? 0 : meta.timing === "first_week" || meta.priority === "essential" ? 1 : null;
+  if (leadTimeWeeks <= 0 || needed === null) return base;
+  const latest = needed - 1 - leadTimeWeeks;
+  if (latest >= base.week) return base;
+  return {
+    week: latest,
+    reason: `${base.reason} Entrega e montagem levam cerca de ${leadTimeWeeks === 1 ? "1 semana" : `${leadTimeWeeks} semanas`}.`,
+  };
+}
+
+function baseWeekWithoutLeadTime(meta: ItemMeta, room: Room | null): { week: number; reason: string } {
   const { priority, priceCategory, timing } = meta;
   if (timing === "first_night") {
     return { week: FIRST_NIGHT_WEEK, reason: "Precisa estar pronto na primeira noite." };

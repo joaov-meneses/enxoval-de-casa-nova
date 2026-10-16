@@ -1,70 +1,109 @@
 /**
- * Normalização de nomes de itens e similaridade entre eles. Uma só implementação para o catálogo, a deduplicação
- * e a busca, no servidor e na tela.
+ * Normalização de nomes de itens, num único lugar (app, servidor, catálogo e Jev).
  *
- * `normalizeName` produz a chave que o catálogo compara: sem acento nem caixa, sem pontuação, sem palavras vazias,
- * sem qualificadores de tamanho, voltagem e público ("5L", "110V", "de casal") e com cada palavra no singular.
- * A normalização é conservadora de propósito: "panela" e "panela de pressão" continuam diferentes.
+ * Três níveis, do mais leve ao mais agressivo:
+ *  - `foldText`: sem acento, minúsculas e espaços simples. "Geladeira " e "geladeira" são o mesmo texto.
+ *  - `normalizeText`: além disso, sem pontuação. Serve para cabeçalhos de planilha e comparações soltas.
+ *  - `itemKey`: a identidade do item no catálogo. Tira palavras vazias, qualificadores que não mudam o que
+ *    o item é (tamanho, voltagem, "de casal", cor, marca) e passa cada palavra para o singular. "Travesseiros",
+ *    "travesseiro" e "Travesseiro de casal" viram "travesseiro". É conservadora de propósito: "panela" e
+ *    "panela de pressão" continuam diferentes (quem decide a dúvida é a cascata do catálogo).
  */
 
-const STOP_WORDS = new Set(["de", "da", "do", "das", "dos", "para", "pra", "com", "e", "a", "o", "as", "os", "um", "uma", "em", "no", "na"]);
-/** Palavras que só qualificam o item (quem usa ou o tamanho) e não mudam o que ele é. */
-const QUALIFIERS = new Set([
-  "casal", "solteiro", "queen", "king", "grande", "pequeno", "pequena", "medio", "media",
-  "litro", "litros", "volt", "volts", "watt", "watts", "polegada", "polegadas", "quilo", "quilos",
-]);
-/** Medidas coladas ou não ao número: 5l, 110v, 2m, 500ml, 3kg, 1,5l. */
-const MEASURE = /^\d+([.,]\d+)?(l|lt|lts|ml|v|w|kg|g|m|cm|mm|pcs|pecas|un)?$/;
+const COMBINING_MARKS = /[̀-ͯ]/g;
 
-/** Plural → singular para o português, só nos casos regulares; o que não reconhece fica como está. */
-function singular(word: string) {
+export function foldText(value: string) {
+  return value.normalize("NFD").replace(COMBINING_MARKS, "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Minúsculas, sem acentos nem pontuação: "Situação" e "situacao" viram a mesma coisa. */
+export function normalizeText(value: string) {
+  return foldText(value).replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+const STOPWORDS = new Set([
+  "a", "o", "as", "os", "de", "da", "do", "das", "dos", "d", "e", "em", "na", "no", "nas", "nos",
+  "para", "pra", "p", "com", "c", "um", "uma", "ou",
+]);
+
+/** Qualificadores que descrevem uma variação, e não outro item. */
+const QUALIFIERS = new Set([
+  "casal", "solteiro", "queen", "king", "viuva", "grande", "pequeno", "pequena", "medio", "media", "mini",
+  "novo", "nova", "bivolt", "branco", "branca", "preto", "preta", "inox", "cinza", "colorido", "colorida",
+  "premium", "basico", "basica", "simples", "unidade", "unidades", "un", "pecas", "peca", "pcs",
+]);
+
+/** Marcas comuns em títulos de lojas: não mudam o que o item é. */
+const BRANDS = new Set([
+  "mondial", "philco", "electrolux", "brastemp", "consul", "arno", "britania", "tramontina", "oster", "samsung",
+  "lg", "midea", "philips", "walita", "cadence", "wap", "karcher", "tefal", "rochedo", "fischer", "panasonic",
+  "continental", "esmaltec", "suggar", "elgin", "agratto", "multilaser", "ortobom", "castor", "probel", "etna",
+  "camesa", "buddemeyer", "santista", "altenburg", "oxford", "nespresso", "dolce", "gusto", "xiaomi", "positivo",
+]);
+
+/** Medidas como "5l", "220v", "1200w", "30cm", "12kg", "1,5l" ou um número solto. */
+const MEASURE = /^\d+([.,]\d+)?(l|lt|ml|kg|g|cm|mm|m|w|v|litros|x\d+)?$/;
+
+/** Plural para singular em português, só nas terminações regulares; o resto fica como está. */
+export function singular(word: string) {
   if (word.length <= 3) return word;
   if (word.endsWith("oes") || word.endsWith("aes")) return `${word.slice(0, -3)}ao`;
-  if (word.endsWith("ais") || word.endsWith("eis") || word.endsWith("ois")) return `${word.slice(0, -2)}l`;
+  if (word.endsWith("eis") && word.length > 4) return `${word.slice(0, -3)}el`;
+  if (word.endsWith("ais")) return `${word.slice(0, -3)}al`;
+  if (word.endsWith("ois")) return `${word.slice(0, -3)}ol`;
   if (word.endsWith("ns")) return `${word.slice(0, -2)}m`;
-  if (word.endsWith("res") || word.endsWith("zes")) return word.slice(0, -2);
-  if (word.endsWith("ss") || word.endsWith("us") || word.endsWith("is")) return word;
-  if (word.endsWith("s")) return word.slice(0, -1);
+  if (/(r|z)es$/.test(word) && word.length > 4) return word.slice(0, -2);
+  if (word.endsWith("s") && !word.endsWith("ss") && !word.endsWith("us") && !word.endsWith("is")) return word.slice(0, -1);
   return word;
 }
 
-export function stripAccents(value: string) {
-  return value.normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
+/** Unidades escritas por extenso depois de um número ("5 litros", "2 portas", "3 lugares"). Sozinhas, ficam. */
+const UNITS = new Set([
+  "litro", "litros", "ml", "kg", "g", "cm", "mm", "m", "w", "v", "volt", "volts", "watt", "watts", "polegada",
+  "polegadas", "lugar", "lugares", "porta", "portas", "boca", "bocas", "gaveta", "gavetas", "peca", "pecas", "un",
+]);
 
-export function normalizeName(value: string) {
-  const words = stripAccents(value)
-    .toLowerCase()
-    .replace(/\(.*?\)/g, " ")
-    .replace(/[^a-z0-9,. ]+/g, " ")
-    .replace(/\.(?!\d)|,(?!\d)/g, " ")
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter(word => !STOP_WORDS.has(word) && !QUALIFIERS.has(word) && !MEASURE.test(word))
-    .map(singular);
-  return words.join(" ");
-}
-
-/** Trigramas como no `pg_trgm`: cada palavra com dois espaços antes e um depois. */
-export function trigrams(value: string) {
-  const set = new Set<string>();
-  for (const word of value.split(" ").filter(Boolean)) {
-    const padded = `  ${word} `;
-    for (let i = 0; i + 3 <= padded.length; i += 1) set.add(padded.slice(i, i + 3));
+/** Identidade do item no catálogo. Pode ficar vazia (só palavras vazias ou medidas): quem chama trata. */
+export function itemKey(value: string) {
+  const words = normalizeText(value.replace(/\(.*?\)/g, " ")).split(" ");
+  const kept: string[] = [];
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i];
+    if (MEASURE.test(word)) {
+      if (UNITS.has(words[i + 1] ?? "")) i += 1;
+      continue;
+    }
+    if (word && !STOPWORDS.has(word) && !QUALIFIERS.has(word) && !BRANDS.has(word)) kept.push(singular(word));
   }
-  return set;
+  return kept.join(" ");
 }
 
-/** Interseção sobre união de dois conjuntos de trigramas (0 a 1). */
-export function jaccard(left: Set<string>, right: Set<string>) {
-  if (left.size === 0 || right.size === 0) return 0;
+/** A chave sem espaços: "air fryer" e "airfryer" se encontram. */
+export const compactKey = (key: string) => key.replace(/ /g, "");
+
+/** Identificador estável e legível para URLs e traduções ("jogo-cama"). */
+export function slugify(value: string) {
+  return (itemKey(value) || normalizeText(value)).replace(/ /g, "-").slice(0, 80) || "item";
+}
+
+/* ----------------------------------------------------------- similaridade */
+
+/** Trigramas no estilo do pg_trgm: cada palavra com dois espaços antes e um depois. */
+export function trigrams(key: string): Set<string> {
+  const result = new Set<string>();
+  for (const word of key.split(" ")) {
+    if (!word) continue;
+    const padded = `  ${word} `;
+    for (let i = 0; i + 3 <= padded.length; i += 1) result.add(padded.slice(i, i + 3));
+  }
+  return result;
+}
+
+/** Coeficiente de Jaccard entre dois conjuntos de trigramas (0 a 1), como `similarity()` do pg_trgm. */
+export function trigramSimilarity(a: ReadonlySet<string>, b: ReadonlySet<string>) {
+  if (a.size === 0 || b.size === 0) return 0;
   let shared = 0;
-  for (const gram of left) if (right.has(gram)) shared += 1;
-  return shared / (left.size + right.size - shared);
-}
-
-/** Similaridade de 0 a 1 entre dois nomes já normalizados. */
-export function similarity(a: string, b: string) {
-  if (a === b) return a ? 1 : 0;
-  return jaccard(trigrams(a), trigrams(b));
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  for (const gram of small) if (large.has(gram)) shared += 1;
+  return shared / (a.size + b.size - shared);
 }
