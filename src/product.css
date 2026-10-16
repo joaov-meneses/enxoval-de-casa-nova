@@ -5735,6 +5735,9 @@ button.price-badge:hover {
   align-items: center;
   gap: 14px;
 }
+.paywall-intro > :first-child {
+  flex: 0 0 auto;
+}
 .paywall-intro .nino {
   flex-shrink: 0;
   width: 72px;
@@ -5824,4 +5827,113 @@ button.price-badge:hover {
   font-size: 13px;
   color: #695a4f;
   line-height: 1.5;
+}
+
+/* Paywall: espiada no que está trancado e linha do tempo do Passe. */
+.paywall-peek {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #eee2d1;
+  border-radius: 16px;
+  background: #fffefa;
+}
+.paywall-peek-now {
+  font-size: 14px;
+  color: #564a41;
+}
+.paywall-peek-now strong {
+  color: #432e24;
+}
+.paywall-locked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.paywall-locked li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px dashed #d9c9b4;
+  border-radius: 999px;
+  background: #f8f1e6;
+  color: #6b5c51;
+  font-size: 13px;
+  font-weight: 600;
+}
+.paywall-locked li svg {
+  flex-shrink: 0;
+  color: #8f3f22;
+}
+.paywall-locked li small {
+  font-size: 12px;
+  font-weight: 400;
+  color: #695a4f;
+}
+.paywall-peek-total {
+  font-size: 13px;
+  color: #8f3f22;
+  font-weight: 600;
+}
+.paywall-timeline {
+  display: grid;
+  gap: 0;
+  padding-left: 2px;
+}
+.paywall-timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+.paywall-timeline li:last-child {
+  padding-bottom: 0;
+}
+.paywall-timeline li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: #eee2d1;
+}
+.paywall-timeline-dot {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f6e3d8;
+  color: #8f3f22;
+}
+.paywall-timeline strong {
+  display: block;
+  font-size: 14px;
+  color: #432e24;
+}
+.paywall-timeline p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #695a4f;
+}
+/* Celular estreito: o botão de cada plano ocupa a linha inteira, em vez de espremer nome e preço. */
+@media (max-width: 480px) {
+  .paywall-plans li {
+    grid-template-columns: 1fr auto;
+  }
+  .paywall-plan-action {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    justify-self: stretch;
+    margin-top: 4px;
+  }
+  .paywall-plan-billing {
+    grid-column: 1 / -1;
+  }
+  .paywall-intro .nino {
+    width: 56px;
+  }
 }

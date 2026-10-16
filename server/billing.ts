@@ -285,8 +285,8 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
       locale: 'pt-BR',
       metadata: { userId: user.id, plan },
       ...(plan === 'monthly' ? { subscription_data: { metadata: { userId: user.id } } } : {}),
-      success_url: `${baseUrl}/?assinatura=sucesso&plano=${plan}`,
-      cancel_url: `${baseUrl}/?assinatura=cancelada`
+      success_url: `${baseUrl}/app?assinatura=sucesso&plano=${plan}`,
+      cancel_url: `${baseUrl}/app?assinatura=cancelada`
     });
     if (!session.url) throw new HttpError(502, 'Não foi possível abrir o pagamento agora. Tente novamente.');
     res.json({ url: session.url });
@@ -301,7 +301,7 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
     if (!baseUrl) throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
     const session = await getStripe().billingPortal.sessions.create({
       customer: row.stripe_customer_id,
-      return_url: `${baseUrl}/`
+      return_url: `${baseUrl}/app`
     });
     res.json({ url: session.url });
   }));

@@ -168,7 +168,7 @@ try {
   assert.equal(calls.checkouts[0].client_reference_id, user.id);
   assert.equal(calls.checkouts[0].subscription_data.metadata.userId, user.id);
   assert.equal(calls.checkouts[0].customer, "cus_1");
-  assert.match(calls.checkouts[0].success_url, /^https:\/\/casamia\.test\/\?assinatura=sucesso/);
+  assert.match(calls.checkouts[0].success_url, /^https:\/\/casamia\.test\/app\?assinatura=sucesso/);
 
   // Passe: pagamento único, sem dados de assinatura, com o preço do Passe.
   const pass = await owner("/billing/checkout", "POST", { plan: "pass" });
