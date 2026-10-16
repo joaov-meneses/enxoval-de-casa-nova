@@ -1,6 +1,9 @@
 import type {
+  AdminCatalogItem,
+  AdminCatalogOverview,
   AuthUser,
   AdminUser,
+  CatalogSearchResult,
   BootstrapData,
   EnxovalCategory,
   EnxovalInvitation,
@@ -380,6 +383,41 @@ export const updateAdminFeedbackStatus = (id: string, status: FeedbackStatus) =>
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
+
+/** Autocomplete do catálogo mestre: prefixo, apelidos e similaridade. Não usa IA e responde em milissegundos. */
+export const searchCatalog = (query: string, signal?: AbortSignal) =>
+  request<{ results: CatalogSearchResult[] }>(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=6`, { signal });
+
+export const fetchAdminCatalogOverview = () =>
+  request<AdminCatalogOverview>("/api/admin/catalog/overview");
+
+export const fetchAdminCatalogItems = (filter: { status?: AdminCatalogItem["status"]; q?: string }) => {
+  const params = new URLSearchParams();
+  if (filter.status) params.set("status", filter.status);
+  if (filter.q) params.set("q", filter.q);
+  return request<{ items: AdminCatalogItem[] }>(`/api/admin/catalog/items?${params}`);
+};
+
+export const updateAdminCatalogItem = (
+  id: string,
+  changes: Partial<Pick<AdminCatalogItem, "name" | "room" | "priority" | "timing" | "leadTimeWeeks" | "priceCategory" | "functionGroup" | "status">>,
+) =>
+  request<AdminCatalogItem>(`/api/admin/catalog/items/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
+
+export const mergeAdminCatalogItem = (id: string, targetId: string) =>
+  request<AdminCatalogItem>(`/api/admin/catalog/items/${encodeURIComponent(id)}/merge`, {
+    method: "POST",
+    body: JSON.stringify({ targetId }),
+  });
+
+export const deleteAdminCatalogItem = (id: string) =>
+  request<void>(`/api/admin/catalog/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const deleteAdminCatalogAlias = (key: string) =>
+  request<void>(`/api/admin/catalog/aliases/${encodeURIComponent(key)}`, { method: "DELETE" });
 
 /** O servidor tem a chave do Jev? Sem ela, a ajuda do Nino não aparece. */
 export const fetchAiStatus = () => request<{ enabled: boolean }>("/api/ai/status");

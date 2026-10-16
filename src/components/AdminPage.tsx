@@ -35,6 +35,7 @@ import type { AdminUser } from "../types";
 import { Brand } from "./Brand";
 import { Dialog } from "./Dialog";
 import { AdminFeedbackList } from "./AdminFeedback";
+import { AdminCatalog } from "./AdminCatalog";
 
 const date = (value: string | null) =>
   value
@@ -503,6 +504,7 @@ export function AdminPage() {
           </p>
         </section>
         <AdminFeedbackList onError={(err) => setError(handleError(err))} />
+        <AdminCatalog onError={(err) => setError(handleError(err))} />
       </main>
       <Dialog
         isOpen={Boolean(action)}

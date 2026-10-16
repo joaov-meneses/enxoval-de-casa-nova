@@ -9,6 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
+import { foldText } from '../../src/catalog/normalize.ts';
 import { CATALOG, matchesWhere } from '../../src/onboarding/catalog.ts';
 import { NORDESTE, traitsOfCity } from '../../src/onboarding/regions.ts';
 import { stateInfo } from '../../src/onboarding/plan.ts';
@@ -96,6 +97,12 @@ const CACHE_TTL_MS = 10 * 60_000;
 const CACHE_MAX_ENTRIES = 500;
 const cache = new Map<string, { expires: number; answers: Record<string, JevAnswer> }>();
 const budget = { day: '', used: 0 };
+let callListener: (() => void) | null = null;
+
+/** Avisa a cada chamada que de fato sai para o Jev (acertos do cache não contam). Usado nas métricas do catálogo. */
+export function setJevCallListener(listener: (() => void) | null) {
+  callListener = listener;
+}
 
 /** Teto de chamadas por dia e por processo: um erro no cliente não vira uma conta inesperada. */
 function takeBudget() {
@@ -124,6 +131,7 @@ async function ask(state: unknown, questions: Record<string, unknown>): Promise<
   }
 
   try {
+    callListener?.();
     const { answers } = await client.systemOne({ state, questions });
     if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string);
     cache.set(key, { expires: now + CACHE_TTL_MS, answers });
@@ -136,8 +144,7 @@ async function ask(state: unknown, questions: Record<string, unknown>): Promise<
 }
 
 const unique = <T>(values: T[]) => [...new Set(values)];
-const normalize = (value: string) =>
-  value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const normalize = foldText;
 
 /* --------------------------------------------------------------------- perfil */
 
@@ -415,7 +422,14 @@ const URGENCY_QUESTION =
   '(4) a moradia, quem mora, o clima e quanto tempo falta para a mudança. ' +
   'Julgue pelo tipo de item e pelo papel dele na rotina, não pelo preço.';
 
-export async function prioritizeItems(input: { items: UrgencyInput[]; profile: JevProfile }): Promise<ItemUrgency[] | null> {
+/**
+ * Notas de urgência. Com `profile`, a casa inteira da pessoa entra no estado (inclusive o prazo até a mudança); com
+ * `state`, quem chama manda um estado já reduzido, como o de uma faixa de perfil (`bucketState`), para a nota valer
+ * para todos os enxovais daquela faixa.
+ */
+export async function prioritizeItems(input: { items: UrgencyInput[]; profile?: JevProfile; state?: Record<string, unknown> }): Promise<ItemUrgency[] | null> {
+  const state = input.state ?? (input.profile ? profileState(input.profile) : null);
+  if (!state) return null;
   const items = input.items.slice(0, MAX_URGENCY_ITEMS);
   if (items.length === 0) return null;
 
@@ -435,7 +449,7 @@ export async function prioritizeItems(input: { items: UrgencyInput[]; profile: J
           criteria: URGENCY_SCALE.map(level => level.criterion)
         };
       }
-      const answers = await ask(profileState(input.profile), questions);
+      const answers = await ask(state, questions);
       if (!answers) return null;
       const scored: ItemUrgency[] = [];
       for (const [index, item] of chunk.entries()) {
@@ -451,4 +465,191 @@ export async function prioritizeItems(input: { items: UrgencyInput[]; profile: J
   // Se todas as partes falharam, não há o que mostrar; se só algumas falharam, mostra o que veio.
   if (results.every(result => result === null)) return null;
   return results.flat().filter((entry): entry is ItemUrgency => entry !== null).sort((a, b) => b.urgency - a.urgency);
+}
+
+/* ------------------------------------------------- 4. catálogo compartilhado */
+
+/** Situação na faixa de perfil: casal, quem mora só e os demais arranjos (amigos, troca de casa). */
+export type BucketSituation = 'casal' | 'solo' | 'outros';
+export const BUCKET_HOUSINGS = ['apartamento', 'casa', 'studio'] as const;
+export const BUCKET_CLIMATES = ['hot', 'mild', 'cold'] as const;
+export const BUCKET_SITUATIONS: readonly BucketSituation[] = ['casal', 'solo', 'outros'];
+
+/**
+ * Faixa de perfil de uma casa: moradia × clima × situação ("apartamento|hot|casal"). A urgência de um item depende
+ * disso, e não da pessoa: a nota vale para todos os enxovais da mesma faixa. O prazo até a mudança fica de fora e
+ * é combinado em código com o prazo de entrega do catálogo.
+ */
+export function profileBucket(profile: Pick<JevProfile, 'housing' | 'moment' | 'uf'>) {
+  const housing = (BUCKET_HOUSINGS as readonly string[]).includes(profile.housing) ? profile.housing : 'apartamento';
+  const situation: BucketSituation = profile.moment === 'casal' ? 'casal' : profile.moment === 'solo' ? 'solo' : 'outros';
+  return `${housing}|${stateInfo(profile.uf).climate}|${situation}`;
+}
+
+const SITUATION_LABEL: Record<BucketSituation, string> = {
+  casal: 'casal',
+  solo: 'pessoa morando sozinha',
+  outros: 'pessoas dividindo a casa'
+};
+
+/** O estado que o Jev recebe para uma faixa de perfil. */
+export function bucketState(bucket: string) {
+  const [housing, climate, situation] = bucket.split('|');
+  return {
+    moradia: housing,
+    clima: CLIMATE_LABEL[climate as keyof typeof CLIMATE_LABEL] ?? 'ameno',
+    situacao: SITUATION_LABEL[situation as BucketSituation] ?? SITUATION_LABEL.outros
+  };
+}
+
+export const ALL_PROFILE_BUCKETS = BUCKET_HOUSINGS.flatMap(housing =>
+  BUCKET_CLIMATES.flatMap(climate => BUCKET_SITUATIONS.map(situation => `${housing}|${climate}|${situation}`)));
+
+/** Confiança mínima para tratar um nome digitado como outro jeito de escrever um item do catálogo. */
+export const SAME_ITEM_THRESHOLD = 0.7;
+
+/**
+ * Deduplicação na faixa de dúvida: entre os itens do catálogo mais parecidos, algum é o mesmo produto? Devolve o nome
+ * escolhido ou null (nenhum deles, Jev indisponível ou confiança baixa).
+ */
+export async function chooseSameItem(name: string, candidates: string[]): Promise<{ name: string; confidence: number } | null> {
+  const options = unique(candidates).slice(0, 5);
+  if (options.length === 0) return null;
+  const answers = await ask(
+    { nome_digitado: name },
+    {
+      mesmo_item: {
+        type: 'choice',
+        instructions: 'Qual destes itens do catálogo é o mesmo produto que `nome_digitado`, só escrito de outro jeito (sinônimo, abreviação, plural, tamanho ou marca)? Itens parecidos mas de uso diferente (ex.: panela e panela de pressão) não são o mesmo: nesse caso escolha a opção de nenhum.',
+        criteria: { ...Object.fromEntries(options.map(option => [option, null])), [NONE]: 'Nenhum deles é o mesmo produto' }
+      }
+    }
+  );
+  const answer = answers?.mesmo_item;
+  if (!answer?.choice || answer.choice === NONE || !options.includes(answer.choice)) return null;
+  const confidence = answer.confidence ?? 0;
+  return confidence >= SAME_ITEM_THRESHOLD ? { name: answer.choice, confidence } : null;
+}
+
+export const CATALOG_ROOM_LABELS: Record<RoomKey, string> = {
+  cozinha: 'Cozinha: louça, panelas, utensílios e organização',
+  eletro: 'Eletrodomésticos e eletroportáteis da cozinha',
+  sala: 'Sala de estar e de jantar',
+  quarto: 'Quarto principal, roupa de cama e guarda-roupa',
+  quartoExtra: 'Quarto de hóspedes ou extra',
+  banheiro: 'Banheiro',
+  servico: 'Área de serviço, lavanderia, limpeza e ferramentas',
+  externa: 'Varanda, quintal e área externa',
+  escritorio: 'Home office'
+};
+
+const PRICE_TIERS = {
+  '1': 'Até cerca de R$ 80',
+  '2': 'Entre R$ 80 e R$ 250',
+  '3': 'Entre R$ 250 e R$ 1.200',
+  '4': 'Acima de R$ 1.200'
+} as const;
+
+const LEAD_TIMES = {
+  '0': 'Leva para casa na hora ou chega em poucos dias, sem montagem',
+  '1': 'Cerca de uma semana entre a compra e o uso',
+  '2': 'Duas a três semanas (entrega agendada ou instalação)',
+  '4': 'Um mês ou mais (sob medida, montagem ou instalação demorada)'
+} as const;
+
+const TIMINGS = {
+  first_night: 'Precisa estar em casa na primeira noite',
+  first_week: 'Faz falta já na primeira semana',
+  later: 'Pode esperar a casa estar funcionando'
+} as const;
+
+export interface CatalogInference {
+  /** Falso quando o Jev tem certeza de que o nome não é um item de casa (vira cache negativo). */
+  isHomeItem: boolean;
+  room: RoomKey | null;
+  priority: 'essential' | 'optional';
+  timing: 'first_night' | 'first_week' | null;
+  leadTimeWeeks: number;
+  priceCategory: 1 | 2 | 3 | 4;
+  functionGroup: string | null;
+}
+
+/** Abaixo disto o "é um item de casa?" não basta para criar o item no catálogo. */
+const HOME_ITEM_THRESHOLD = 0.5;
+/** Abaixo disto o nome vai para o cache negativo. */
+const NOT_HOME_ITEM_THRESHOLD = 0.2;
+
+/**
+ * Uma única chamada para um item que o catálogo não conhece: é um item de casa, em que cômodo, se é essencial, quando
+ * precisa estar em casa, quanto demora para chegar, faixa de preço e se repete a função de um grupo conhecido.
+ * Devolve null quando o Jev não respondeu ou ficou em dúvida sobre ser um item de casa.
+ */
+export async function inferCatalogItem(name: string, functionGroups: Record<string, string>): Promise<CatalogInference | null> {
+  const groups = Object.entries(functionGroups).slice(0, MAX_OVERLAP_OPTIONS);
+  const questions: Record<string, unknown> = {
+    item_de_casa: {
+      type: 'noul',
+      instructions: '`nome` é um móvel, eletrodoméstico, utensílio, peça de enxoval ou item que alguém compra para montar ou manter uma casa?',
+      criteria: { true: 'É um item de casa', false: 'Não é um item de casa (comida, serviço, texto sem sentido...)' }
+    },
+    comodo: {
+      type: 'choice',
+      instructions: 'Em qual ambiente da casa `nome` é mais usado ou guardado?',
+      criteria: CATALOG_ROOM_LABELS
+    },
+    essencial: {
+      type: 'noul',
+      instructions: 'Quase toda casa precisa de `nome` para funcionar no dia a dia (dormir, comer, tomar banho, limpar, guardar)?',
+      criteria: { true: 'Essencial', false: 'Conforto, decoração ou uso eventual' }
+    },
+    quando: {
+      type: 'choice',
+      instructions: 'Em que momento `nome` precisa estar na casa nova?',
+      criteria: TIMINGS
+    },
+    prazo: {
+      type: 'choice',
+      instructions: 'Quanto tempo costuma passar entre comprar `nome` e ele estar pronto para uso (entrega, montagem, instalação)?',
+      criteria: LEAD_TIMES
+    },
+    preco: {
+      type: 'choice',
+      instructions: 'Em qual faixa costuma ficar o preço de `nome` no Brasil, numa versão comum?',
+      criteria: PRICE_TIERS
+    }
+  };
+  if (groups.length > 0) {
+    questions.grupo = {
+      type: 'choice',
+      instructions: 'Comprar `nome` repete o trabalho de algum destes grupos (um substitui o outro)? Itens de uso diferente, mesmo parecidos, não entram no grupo.',
+      criteria: { ...Object.fromEntries(groups), [NONE]: 'Não substitui nenhum deles' }
+    };
+  }
+
+  const answers = await ask({ nome: name }, questions);
+  if (!answers) return null;
+  const home = answers.item_de_casa?.noul;
+  if (typeof home !== 'number') return null;
+  if (home < NOT_HOME_ITEM_THRESHOLD) {
+    return { isHomeItem: false, room: null, priority: 'optional', timing: null, leadTimeWeeks: 0, priceCategory: 2, functionGroup: null };
+  }
+  if (home < HOME_ITEM_THRESHOLD) return null;
+
+  const roomChoice = answers.comodo?.choice;
+  const room = roomChoice && roomChoice in CATALOG_ROOM_LABELS && (answers.comodo?.confidence ?? 0) >= JEV_THRESHOLDS.environment
+    ? roomChoice as RoomKey
+    : null;
+  const when = answers.quando?.choice;
+  const lead = Number(answers.prazo?.choice);
+  const tier = Number(answers.preco?.choice);
+  const group = answers.grupo?.choice;
+  return {
+    isHomeItem: true,
+    room,
+    priority: (answers.essencial?.noul ?? 0) >= 0.5 ? 'essential' : 'optional',
+    timing: when === 'first_night' || when === 'first_week' ? when : null,
+    leadTimeWeeks: Number.isInteger(lead) && lead >= 0 ? lead : 0,
+    priceCategory: tier === 1 || tier === 2 || tier === 3 || tier === 4 ? tier : 2,
+    functionGroup: group && group !== NONE && functionGroups[group] && (answers.grupo?.confidence ?? 0) >= JEV_THRESHOLDS.environment ? group : null
+  };
 }

@@ -6,14 +6,27 @@ import { getPool, Queryable } from './database.ts';
 import { asyncHandler, HttpError, rateLimit } from './security.ts';
 import {
   assessItem,
+  bucketState,
   candidatesFor,
+  CATALOG_ROOM_LABELS,
   isJevConfigured,
   MAX_URGENCY_ITEMS,
   prioritizeItems,
+  profileBucket,
   recommendNext,
   urgencyKey,
   type JevProfile
 } from './services/jev.ts';
+import {
+  catalogUrgencies,
+  findRedundancy,
+  getCatalogIndex,
+  matchName,
+  priceRangeOf,
+  recordMetric,
+  saveCatalogUrgencies
+} from './catalog/store.ts';
+import { categoryForRoom } from '../src/catalog/rooms.ts';
 import { MAX_ITEM_NAME_LENGTH } from '../src/data.ts';
 import { isDoneStatus, isInactiveStatus } from '../src/itemStatus.ts';
 import { weeksUntil } from '../src/onboarding/plan.ts';
@@ -84,27 +97,58 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
     const name = requireString(req.body?.name, 'Nome do item');
     if (name.length > MAX_ITEM_NAME_LENGTH) throw new HttpError(400, `O nome do item pode ter no máximo ${MAX_ITEM_NAME_LENGTH} caracteres.`);
 
-    const empty = { environment: null, redundancy: null };
-    if (!isJevConfigured()) {
-      await fetchCategories(getPool(), user.id, enxovalId);
-      res.json({ available: false, ...empty });
-      return;
-    }
+    const empty = { environment: null, redundancy: null, catalogItem: null };
     if (name.length < MIN_NAME_LENGTH) {
-      res.json({ available: true, ...empty });
+      await fetchCategories(getPool(), user.id, enxovalId);
+      res.json({ available: isJevConfigured(), ...empty });
       return;
     }
 
-    const [categories, items, profile] = await Promise.all([
+    const [categories, items, profile, catalog] = await Promise.all([
       fetchCategories(getPool(), user.id, enxovalId),
       fetchItems(getPool(), user.id, enxovalId),
-      loadProfile(getPool(), enxovalId)
+      loadProfile(getPool(), enxovalId),
+      getCatalogIndex()
     ]);
+    const classify = req.body?.classify === true;
+    const active = items.filter(item => !isInactiveStatus(item.status));
+
+    // 1º o catálogo: item conhecido tem cômodo e grupo de função gravados, e a resposta sai do banco, sem Jev.
+    const known = matchName(catalog, name).item;
+    if (known) {
+      recordMetric('assess_catalog');
+      const overlapsWith = findRedundancy(catalog, known, name, active.map(item => ({ name: item.name, catalogItemId: item.catalogItemId ?? null })));
+      let environment: { id: string; name: string; confidence: number } | null = null;
+      if (classify) {
+        const category = categoryForRoom(categories, known.room);
+        if (category) environment = { id: category.id, name: category.name, confidence: 1 };
+        else if (isJevConfigured() && categories.length >= 2) {
+          // O catálogo não sabe o cômodo, ou o enxoval não tem esse ambiente: só o ambiente vai ao Jev.
+          const assessment = await assessItem({ name, environments: categories.map(c => c.name), classify: true, existing: [], profile });
+          const chosen = assessment?.environment ? categories.find(c => c.name === assessment.environment!.name) : undefined;
+          if (chosen && assessment?.environment) environment = { id: chosen.id, name: chosen.name, confidence: assessment.environment.confidence };
+        }
+      }
+      res.json({
+        available: true,
+        source: 'catalog',
+        catalogItem: { id: known.id, name: known.name, priceRange: priceRangeOf(catalog, known.id, profile.uf) },
+        environment,
+        redundancy: overlapsWith ? { probability: 1, overlapsWith } : null
+      });
+      return;
+    }
+
+    if (!isJevConfigured()) {
+      res.json({ available: false, ...empty });
+      return;
+    }
+    recordMetric('assess_jev');
     const assessment = await assessItem({
       name,
       environments: categories.map(category => category.name),
-      classify: req.body?.classify === true,
-      existing: items.filter(item => !isInactiveStatus(item.status)).map(item => ({ name: item.name, environment: item.category })),
+      classify,
+      existing: active.map(item => ({ name: item.name, environment: item.category })),
       profile
     });
 
@@ -113,6 +157,8 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
       : undefined;
     res.json({
       available: true,
+      source: 'jev',
+      catalogItem: null,
       environment: category && assessment?.environment
         ? { id: category.id, name: category.name, confidence: assessment.environment.confidence }
         : null,
@@ -189,34 +235,72 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
     }
     const cached = scores.size;
 
-    const missing = pending.filter(item => !scores.has(item.id)).slice(0, MAX_URGENCY_ITEMS);
+    // O nome e o ambiente entram na chave: se o item mudar depois, a nota guardada no item deixa de valer.
+    const mirror = async (item: EnxovalItem, score: { urgency: number; confidence: number }) => {
+      await getPool().query(
+        `UPDATE items SET ai_urgency = $3, ai_urgency_confidence = $4, ai_urgency_key = $5
+         WHERE id = $1 AND enxoval_id = $2`,
+        [item.id, enxovalId, Math.min(URGENCY_LEVELS, Math.max(1, score.urgency)), score.confidence, urgencyKey(item.name, item.category)]
+      );
+      scores.set(item.id, score);
+    };
+
+    // Itens do catálogo: a nota é da faixa de perfil (moradia × clima × situação) e vale para todos os enxovais. O
+    // Jev só é chamado para a faixa que ainda não tem nota; `items.ai_urgency` vira um espelho de leitura rápida.
+    const missing = pending.filter(item => !scores.has(item.id));
+    const linked = missing.filter(item => item.catalogItemId);
+    const bucket = profileBucket(profile);
+    const catalogIds = [...new Set(linked.map(item => item.catalogItemId!))];
+    const shared = await catalogUrgencies(getPool(), catalogIds, bucket);
+    let fromCatalog = 0;
     let inferred = 0;
-    if (missing.length > 0) {
+    const absent = catalogIds.filter(id => !shared.has(id)).slice(0, MAX_URGENCY_ITEMS);
+    if (absent.length > 0) {
+      const catalog = await getCatalogIndex();
       const results = await prioritizeItems({
-        items: missing.map(item => ({ id: item.id, name: item.name, environment: item.category })),
+        items: absent.map(id => {
+          const entry = catalog.items.get(id);
+          const sample = linked.find(item => item.catalogItemId === id)!;
+          return { id, name: entry?.name ?? sample.name, environment: entry?.room ? CATALOG_ROOM_LABELS[entry.room] : sample.category };
+        }),
+        state: bucketState(bucket)
+      });
+      await saveCatalogUrgencies(getPool(), bucket, results ?? []);
+      for (const result of results ?? []) shared.set(result.id, { urgency: result.urgency, confidence: result.confidence });
+      inferred += results?.length ?? 0;
+    }
+    for (const item of linked) {
+      const score = shared.get(item.catalogItemId!);
+      if (!score) continue;
+      await mirror(item, score);
+      fromCatalog += 1;
+    }
+    recordMetric('urgency_catalog', fromCatalog);
+
+    // Itens livres (sem par no catálogo): nota por item, com a casa inteira da pessoa, como antes.
+    const free = missing.filter(item => !item.catalogItemId).slice(0, MAX_URGENCY_ITEMS);
+    if (free.length > 0) {
+      const results = await prioritizeItems({
+        items: free.map(item => ({ id: item.id, name: item.name, environment: item.category })),
         profile
       });
-      const names = new Map(missing.map(item => [item.id, item]));
+      const byId = new Map(free.map(item => [item.id, item]));
       for (const result of results ?? []) {
-        const item = names.get(result.id);
+        const item = byId.get(result.id);
         if (!item) continue;
-        // O nome e o ambiente entram na chave: se o item mudar depois, a nota guardada deixa de valer.
-        await getPool().query(
-          `UPDATE items SET ai_urgency = $3, ai_urgency_confidence = $4, ai_urgency_key = $5
-           WHERE id = $1 AND enxoval_id = $2`,
-          [item.id, enxovalId, Math.min(URGENCY_LEVELS, Math.max(1, result.urgency)), result.confidence, urgencyKey(item.name, item.category)]
-        );
-        scores.set(item.id, { urgency: result.urgency, confidence: result.confidence });
+        await mirror(item, { urgency: result.urgency, confidence: result.confidence });
         inferred += 1;
       }
     }
 
+    recordMetric('urgency_jev', inferred);
     res.json({
       available: true,
       categoryId,
       scores: [...scores].map(([id, score]) => ({ id, ...score })),
       inferred,
       cached,
+      shared: fromCatalog,
       unscored: pending.length - scores.size
     });
   }));

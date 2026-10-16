@@ -3,6 +3,7 @@
  * O funil já aplica essas regras ao gerar o plano; aqui elas servem para enxovais existentes, quando a
  * pessoa informa ou muda a cidade depois.
  */
+import { foldText } from "../catalog/normalize";
 import { CATALOG, matchesWhere, type CatalogEntry } from "../onboarding/catalog";
 import { NORDESTE, cityById, traitsOfCity } from "../onboarding/regions";
 
@@ -14,13 +15,7 @@ export interface RegionalSuggestion {
   note: string;
 }
 
-const normalize = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
+const normalize = foldText;
 
 /** Itens que o catálogo só recomenda para quem mora aqui: por estado, cidade ou característica da cidade. */
 function isRegional(entry: CatalogEntry) {

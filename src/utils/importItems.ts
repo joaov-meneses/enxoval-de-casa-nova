@@ -1,3 +1,4 @@
+import { normalizeText } from "../catalog/normalize";
 import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH, normalizeEnvironmentName } from "../data";
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity } from "../itemQuantity";
 import {
@@ -108,15 +109,7 @@ const HEADER_ALIASES: Record<string, Field> = {
   anotacoes: "description",
 };
 
-/** Minúsculas, sem acentos nem pontuação: "Situação" e "situacao" viram a mesma coisa. */
-export function normalizeText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
+export { normalizeText };
 
 function normalizeHeader(value: string) {
   return normalizeText(value.replace(/\(.*?\)/g, " "));

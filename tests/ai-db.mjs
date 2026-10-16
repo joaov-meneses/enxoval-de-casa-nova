@@ -110,6 +110,8 @@ const plan = {
 
 try {
   fakeJev = await startFakeJev();
+  // A cascata completa do catálogo (que também chama o Jev) tem teste próprio: tests/catalog-db.mjs.
+  process.env.CATALOG_RESOLUTION = "off";
   process.env.TYPESAFE_API_KEY = "chave-de-teste";
   process.env.TYPESAFE_BASE_URL = `http://127.0.0.1:${fakeJev.address().port}`;
   setJevTransportForTests(undefined);
@@ -161,11 +163,23 @@ try {
   assert.deepEqual((await call("/ai/status")).data, { enabled: true });
   console.log("PASS: status mostra o Jev ligado para quem está logado.");
 
-  // 2. Item novo: ambiente e redundância numa única chamada ao Jev.
+  // 2a. Item que o catálogo conhece: ambiente e redundância saem do banco, sem nenhuma chamada ao Jev.
   received.length = 0;
-  const assessed = await call("/ai/assess-item", "POST", { enxovalId, name: "Fritadeira elétrica", classify: true });
+  const fromCatalog = await call("/ai/assess-item", "POST", { enxovalId, name: "Fritadeira elétrica", classify: true });
+  assert.equal(fromCatalog.status, 200, JSON.stringify(fromCatalog.data));
+  assert.equal(fromCatalog.data.source, "catalog");
+  assert.equal(fromCatalog.data.catalogItem.name, "Fritadeira elétrica");
+  assert.deepEqual(fromCatalog.data.environment, { id: kitchen.id, name: "Cozinha", confidence: 1 });
+  assert.deepEqual(fromCatalog.data.redundancy, { probability: 1, overlapsWith: "Airfryer" }, "mesmo grupo de função da Airfryer");
+  assert.equal(received.length, 0, "o catálogo responde sem consultar o Jev");
+  console.log("PASS: item conhecido pelo catálogo tem ambiente e aviso de repetição sem Jev.");
+
+  // 2b. Item novo para o catálogo: ambiente e redundância numa única chamada ao Jev.
+  received.length = 0;
+  const assessed = await call("/ai/assess-item", "POST", { enxovalId, name: "Fritadeira de imersão", classify: true });
   assert.equal(assessed.status, 200, JSON.stringify(assessed.data));
   assert.equal(assessed.data.available, true);
+  assert.equal(assessed.data.source, "jev");
   assert.equal(assessed.data.environment.id, kitchen.id);
   assert.equal(assessed.data.environment.name, "Cozinha");
   assert.deepEqual(assessed.data.redundancy, { probability: 0.95, overlapsWith: "Airfryer" });
@@ -173,7 +187,7 @@ try {
   assert.equal(received[0].url, "/v1/systemone");
   assert.equal(received[0].auth, "Bearer chave-de-teste");
   const sent = received[0].body;
-  assert.equal(sent.state.novo_item, "Fritadeira elétrica");
+  assert.equal(sent.state.novo_item, "Fritadeira de imersão");
   assert.equal(sent.state.moradia, "apartamento");
   assert.equal(sent.state.moradores, 2);
   assert.deepEqual(sent.state.itens_por_ambiente.Cozinha.sort(), ["Airfryer", "Jogo de panelas"]);
@@ -185,14 +199,14 @@ try {
 
   // 3. Ambiente já escolhido pela pessoa: o Jev nem é perguntado sobre o ambiente.
   received.length = 0;
-  const chosen = await call("/ai/assess-item", "POST", { enxovalId, name: "Forno elétrico", classify: false });
+  const chosen = await call("/ai/assess-item", "POST", { enxovalId, name: "Forno de convecção", classify: false });
   assert.equal(chosen.data.environment, null);
   assert.ok(chosen.data.redundancy);
   assert.ok(!("ambiente" in received[0].body.questions));
   // Nome curto demais não gasta chamada.
   received.length = 0;
   const short = await call("/ai/assess-item", "POST", { enxovalId, name: "ab", classify: true });
-  assert.deepEqual(short.data, { available: true, environment: null, redundancy: null });
+  assert.deepEqual(short.data, { available: true, environment: null, redundancy: null, catalogItem: null });
   assert.equal(received.length, 0);
   console.log("PASS: só pergunta o ambiente quando a pessoa ainda não escolheu; nomes curtos não consultam.");
 
@@ -220,20 +234,28 @@ try {
   assert.equal((await call("/ai/recommend", "POST", { enxovalId, categoryId: randomUUID() })).status, 404);
   console.log("PASS: ambiente desconhecido não gasta chamada; ambiente de outro enxoval dá 404.");
 
-  // 5. Urgência por ambiente: cada nota é inferida uma vez e fica gravada no item.
+  // 5. Urgência por ambiente. Itens do catálogo recebem a nota da faixa de perfil (moradia × clima × situação), que
+  // vale para todos os enxovais; o item guarda só um espelho.
   const urgencyIn = async (categoryId) => call("/ai/prioritize", "POST", { enxovalId, categoryId });
   const asked = () => received.flatMap((entry) => Object.values(entry.body.questions).map((question) => question.instructions.item.nome));
   const byName = (list) => Object.fromEntries(list.map((entry) => [entry.name, entry]));
+  const linkedItems = byName((await call(`/items?enxovalId=${enxovalId}`)).data);
+  assert.ok(linkedItems["Airfryer"].catalogItemId, "itens do funil nascem ligados ao catálogo");
+  assert.ok(linkedItems["Cama de casal"].catalogItemId);
+  assert.equal(linkedItems["Cama de casal"].catalog.leadTimeWeeks, 3, "e herdam o prazo de entrega");
 
   received.length = 0;
   const first = await urgencyIn(kitchen.id);
   assert.equal(first.status, 200, JSON.stringify(first.data));
   assert.equal(first.data.scores.length, 2);
   assert.ok(first.data.scores.every((entry) => entry.urgency === 4.2 && entry.confidence === 0.8));
-  assert.deepEqual([first.data.inferred, first.data.cached, first.data.unscored], [2, 0, 0]);
-  assert.deepEqual(asked().sort(), ["Airfryer", "Jogo de panelas"], "só os itens do ambiente pedido");
+  assert.deepEqual([first.data.inferred, first.data.cached, first.data.shared, first.data.unscored], [2, 0, 2, 0]);
+  assert.deepEqual(asked().sort(), ["Air fryer", "Jogo de panelas"], "só os itens do ambiente pedido, pelo nome do catálogo");
+  assert.deepEqual(received[0].body.state, { moradia: "apartamento", clima: "quente", situacao: "casal" }, "a faixa de perfil, sem prazo nem dados da pessoa");
   assert.ok(!JSON.stringify(received.map((entry) => entry.body)).includes(funnel.data.items[0].id), "ids internos não vão para o Jev");
-  console.log("PASS: prioritize avalia só os itens pendentes do ambiente pedido.");
+  const sharedRows = await getPool().query("SELECT profile_bucket FROM catalog_item_urgency");
+  assert.deepEqual([...new Set(sharedRows.rows.map((row) => row.profile_bucket))], ["apartamento|hot|casal"]);
+  console.log("PASS: prioritize avalia só os itens pendentes do ambiente pedido e guarda a nota para a faixa de perfil.");
 
   // Segunda consulta ao mesmo ambiente: tudo vem do banco, sem tocar no Jev.
   received.length = 0;
@@ -261,18 +283,29 @@ try {
   assert.equal((await urgencyIn(kitchen.id)).data.inferred, 0);
   assert.equal(received.length, 0);
   const renamed = await call(`/items/${airfryerId}`, "PATCH", { name: "Airfryer 5 litros" });
-  assert.equal(renamed.data.aiUrgency, null, "renomear descarta a nota");
+  assert.equal(renamed.data.aiUrgency, null, "renomear descarta a nota guardada no item");
+  assert.equal(renamed.data.catalogItemId, linkedItems["Airfryer"].catalogItemId, "mas o nome novo é o mesmo item do catálogo");
   received.length = 0;
-  await urgencyIn(kitchen.id);
-  assert.deepEqual(asked(), ["Airfryer 5 litros"]);
+  const afterRename = await urgencyIn(kitchen.id);
+  assert.equal(received.length, 0, "a nota da faixa já existe: o Jev não é consultado de novo");
+  assert.deepEqual([afterRename.data.inferred, afterRename.data.shared], [0, 1]);
 
-  // Notas gravadas com uma versão antiga da régua não valem: o item é reavaliado em vez de misturar duas réguas.
+  // Um item livre (que o catálogo não conhece) segue com nota própria, inferida com a casa inteira da pessoa.
+  const free = await call("/items", "POST", { enxovalId, categoryId: kitchen.id, name: "Panquequeira" });
+  assert.equal(free.data.item.catalogItemId, null);
+  received.length = 0;
+  const withFree = await urgencyIn(kitchen.id);
+  assert.deepEqual(asked(), ["Panquequeira"]);
+  assert.equal(received[0].body.state.semanas_ate_a_mudanca !== undefined, true, "item livre leva o prazo até a mudança");
+  assert.equal(withFree.data.inferred, 1);
+  await call(`/items/${free.data.item.id}`, "DELETE");
+
+  // Notas gravadas com uma versão antiga da régua não valem: o espelho é refeito a partir da nota da faixa.
   const tabua = withNew.data.scores.find((entry) => entry.id === added.data.item.id);
   assert.ok(tabua);
   await getPool().query("UPDATE items SET ai_urgency_key = $2 WHERE id = $1", [added.data.item.id, "v1|tabua de corte|cozinha"]);
   const reassessed = await urgencyIn(kitchen.id);
-  // (A pergunta é idêntica à anterior, então o cache de 10 minutos do serviço pode responder sem chamar o Jev.)
-  assert.equal(reassessed.data.inferred, 1, "nota de régua antiga é inferida de novo");
+  assert.equal(reassessed.data.shared, 1, "nota de régua antiga é trocada pela da faixa, sem Jev");
   assert.equal(
     (await getPool().query("SELECT ai_urgency_key FROM items WHERE id = $1", [added.data.item.id])).rows[0].ai_urgency_key,
     "v2|tabua de corte|cozinha",
@@ -317,15 +350,18 @@ try {
   fakeJev = undefined;
   setJevTransportForTests(undefined);
   process.env.TYPESAFE_BASE_URL = "http://127.0.0.1:9";
-  const down = await call("/ai/assess-item", "POST", { enxovalId, name: "Torradeira nova", classify: true });
+  const down = await call("/ai/assess-item", "POST", { enxovalId, name: "Panquequeira", classify: true });
   assert.equal(down.status, 200, JSON.stringify(down.data));
-  assert.deepEqual(down.data, { available: true, environment: null, redundancy: null });
+  assert.deepEqual(down.data, { available: true, source: "jev", catalogItem: null, environment: null, redundancy: null });
   console.log("PASS: se o Jev não responde, a rota devolve vazio e o app segue.");
 
   // 8. Sem chave: a ajuda some, nada é chamado.
   setJevTransportForTests(null);
   assert.deepEqual((await call("/ai/status")).data, { enabled: false });
-  assert.deepEqual((await call("/ai/assess-item", "POST", { enxovalId, name: "Torradeira", classify: true })).data, { available: false, environment: null, redundancy: null });
+  assert.deepEqual((await call("/ai/assess-item", "POST", { enxovalId, name: "Panquequeira", classify: true })).data, { available: false, environment: null, redundancy: null, catalogItem: null });
+  const offline = await call("/ai/assess-item", "POST", { enxovalId, name: "Torradeira", classify: true });
+  assert.equal(offline.data.source, "catalog", "o catálogo continua ajudando sem a chave do Jev");
+  assert.equal(offline.data.environment.id, kitchen.id);
   assert.deepEqual((await call("/ai/recommend", "POST", { enxovalId, categoryId: kitchen.id })).data, { available: false, recommendation: null, reason: "unavailable" });
   assert.deepEqual((await call("/ai/prioritize", "POST", { enxovalId, categoryId: kitchen.id })).data, { available: false, categoryId: kitchen.id, scores: [], inferred: 0, cached: 0, unscored: 0 });
   console.log("PASS: sem chave do Jev o app funciona como antes.");

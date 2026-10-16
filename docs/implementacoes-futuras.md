@@ -20,7 +20,7 @@
 4. **Inteligência Artificial (Jev):** não há integração com a TypeSafe AI para recomendações determinísticas e cálculos de urgência.
 5. **Mascote Nino:** ausência de ilustrações e componentes de interface do Nino.
 6. **Página de Chá de Casa Nova:** não há suporte a rotas públicas para convidados visualizarem presentes e enviarem Pix.
-7. **Camada de cache e catálogo compartilhado de itens:** cada enxoval refaz sozinho o que outro já descobriu (o Jev reavalia "Geladeira" para cada pessoa), e não há busca rápida nem deduplicação de itens. Ver a Fase 6.
+7. **Camada de cache e catálogo compartilhado de itens:** cada enxoval refaz sozinho o que outro já descobriu (o Jev reavalia "Geladeira" para cada pessoa), e não há busca rápida nem deduplicação de itens. Ver a Fase 6. **(Base implementada: catálogo mestre, cascata de deduplicação, urgência por faixa de perfil, faixas de preço e busca.)**
 8. **Analytics, atribuição de leads e reengajamento:** não há PostHog, GA4 nem Sentry; a origem do lead se perde entre a landing e o cadastro; não existe nenhum disparo de ciclo de vida. Ver a Fase 7.
 9. **Idiomas e preço por região:** o app é só em português e em reais (54 arquivos de interface, 130 mensagens de erro do servidor e 13 e-mails com texto fixo; geografia só do Brasil). Ver a Fase 8.
 10. **Dados de segurança e banimento:** o app não grava IP nem aparelho, não verifica e-mail e só consegue ligar/desligar uma conta. Ver a Fase 9.
@@ -216,6 +216,24 @@ Esta fase consolida a operação em ambiente de produção seguro e escalável.
 ### FASE 6: Camada de Cache, Catálogo Compartilhado e Indexação de Itens
 
 > **Pode (e deve) ser antecipada:** depende só da Fase 3 e reduz o custo dela. A ordem na matriz é a de menor risco de produto, não a de menor valor.
+
+> **Status: implementada (base).** O que existe e onde:
+> * **Normalização única** em `src/catalog/normalize.ts` (`foldText`, `normalizeText`, `itemKey`, trigramas): substitui as cópias de `purchasePlan.ts`, `regional.ts`, `importItems.ts` e `jev.ts`. `itemKey` tira acento, caixa, palavras vazias, medidas ("5 litros", "2 portas"), qualificadores ("de casal", cor) e marcas, e passa para o singular.
+> * **Tabelas** (`server/migrations.ts`): `catalog_items` (com `slug` e `translations` para a Fase 8), `catalog_item_aliases`, `catalog_item_urgency`, `catalog_price_stats`, `catalog_negative_cache`, `catalog_metrics_daily`, `catalog_seed_state` e `items.catalog_item_id`.
+> * **Semente** (`server/catalog/seed.ts`): **482 itens** aprovados (os do funil mais uma lista curada), 230+ apelidos e 23 grupos de função. Roda uma vez por `CATALOG_SEED_VERSION`, sem ressuscitar o que a equipe apagou ou mesclou.
+> * **Cascata** (`server/catalog/store.ts`): exato → similaridade ≥ 0,8 (vira apelido) → faixa 0,4–0,8, em que o Jev escolhe entre 5 candidatos ou "nenhum" (vira apelido) → nada parecido, em que o Jev infere tudo numa única chamada e o item nasce `pending_review` (ou vai para o cache negativo de 30 dias). Os passos 1 e 2 rodam no cadastro e na edição de itens e no funil. Os passos 3 e 4 rodam numa fila fora da requisição (nunca enquanto a pessoa digita).
+> * **Ajuda do Nino sem Jev para itens conhecidos:** `POST /api/ai/assess-item` responde pelo catálogo (cômodo e compra repetida por grupo de função ou mesmo item) e devolve a faixa de preço. O Jev só entra para nomes desconhecidos. `POST /api/ai/prioritize` usa a nota da **faixa de perfil** (moradia × clima × situação, 27 faixas); `items.ai_urgency` virou espelho. Itens livres seguem com nota própria.
+> * **Planejamento:** o item herda faixa de preço, prioridade, momento e **prazo de entrega** do catálogo, e o prazo antecipa a semana de compra (ex.: cama com 3 semanas de entrega é comprada 4 semanas antes).
+> * **Busca:** `GET /api/catalog/search?q=` (prefixo do nome, apelidos e trigramas) alimenta o autocomplete do `AddItemModal`, que também mostra "Faixa comum: R$ X a R$ Y" e avisa preço acima do comum. A leitura de link de loja usa o cômodo do catálogo (`suggestedRoom`), e o regex de `suggestCategory` ficou como reserva.
+> * **Rotina** (`server/workers/catalogWorker.ts`, a cada 6 h em produção, ou `npm run catalog:refresh`): liga itens antigos, promove itens que aparecem em ≥ 5 enxovais (`source = users`, aguardando revisão) e publica faixas de preço p10/p50/p90 por UF e Brasil (um valor por enxoval, extremos fora pela regra do IQR, só com k ≥ 5, só agregados). `--urgency` pré-calcula as notas por faixa em lote (chama o Jev, com `--limit`).
+> * **/admin:** métricas (itens resolvidos sem Jev, urgências vindas do catálogo, consultas ao Jev por pessoa ativa, itens sem estimativa) e fila de revisão com aprovar, corrigir, mesclar, recusar e desfazer apelidos.
+> * **Testes:** `npm run test:catalog` (sem banco) e `npm run test:catalog-db` (cascata com Jev falso, urgência compartilhada entre dois enxovais, preços, rotina e /admin).
+>
+> **Desvios do texto abaixo:**
+> * **Similaridade em memória, e não com `pg_trgm`/`unaccent`.** O catálogo cabe na memória (L1, recarregado a cada 60 s ou na hora em que este processo grava), a similaridade é a mesma do pg_trgm (trigramas e Jaccard) e a normalização fica idêntica à do app. Também não depende de extensões, que quebram nos schemas descartáveis dos testes. Se o catálogo passar de dezenas de milhares de itens, vale migrar para `pg_trgm`.
+> * **Faixas de preço recalculadas por inteiro** a cada rodada, e não de forma incremental: barato nesse volume.
+>
+> **Ainda não feito:** Redis (L3), que só faz sentido com mais de uma instância; uso da faixa real de preço no planejamento (no lugar das faixas genéricas por perfil de gasto) e no alerta de preço; autocomplete na importação por planilha; chegar aos **1.000+ itens** (a semente tem 482, e o resto vem das listas e do Jev, com revisão no /admin); página de privacidade citando o catálogo.
 
 **Problema.** Hoje o conhecimento sobre um item morre dentro do enxoval que o gerou. A nota de urgência fica em `items.ai_urgency` (por item, por enxoval) e o cache de `server/services/jev.ts` é em memória, por processo, com 10 minutos de vida: reinicia no deploy e não é compartilhado entre instâncias. Se mil pessoas cadastram "Geladeira", o Jev é consultado mil vezes para chegar à mesma resposta. O catálogo do funil (`src/onboarding/catalog.ts`, 244 entradas) só é consultado por nome idêntico (`matchCatalog`), e a sugestão de ambiente de links de lojas é um conjunto de regex (`suggestCategory`).
 

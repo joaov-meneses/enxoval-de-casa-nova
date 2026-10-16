@@ -12,6 +12,8 @@ import { registerAdminRoutes } from './admin.ts';
 import { registerFeedbackRoutes } from './feedback.ts';
 import { registerAiRoutes } from './ai.ts';
 import { urgencyKey } from './services/jev.ts';
+import { findItemInTitle, linkItemsToCatalog, queueResolution } from './catalog/store.ts';
+import { registerCatalogRoutes } from './catalog/routes.ts';
 import { appBaseUrl, canDeliverMail, invitationEmail, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 import { isPriceCategory, isSpendingTier, type PriceCategory, type SpendingTier } from '../src/planning/spending.ts';
@@ -93,6 +95,11 @@ interface ItemRow {
   price_category: number | null;
   priority: ItemPriority | null;
   timing: ItemTiming | null;
+  catalog_item_id: string | null;
+  catalog_price_category: number | null;
+  catalog_priority: ItemPriority | null;
+  catalog_timing: ItemTiming | null;
+  catalog_lead_time_weeks: number | null;
   updated_at: string | Date;
   created_at: string | Date;
   image_url: string | null;
@@ -257,6 +264,16 @@ function mapItem(row: ItemRow): EnxovalItem {
     priceCategory: isPriceCategory(Number(row.price_category)) ? Number(row.price_category) as PriceCategory : null,
     priority: row.priority ?? null,
     timing: row.timing ?? null,
+    catalogItemId: row.catalog_item_id ?? null,
+    // O que o catálogo sabe do item vale quando o próprio item não diz nada (ver `itemMeta`).
+    catalog: row.catalog_item_id
+      ? {
+          priceCategory: isPriceCategory(Number(row.catalog_price_category)) ? Number(row.catalog_price_category) as PriceCategory : null,
+          priority: row.catalog_priority ?? null,
+          timing: row.catalog_timing ?? null,
+          leadTimeWeeks: Number(row.catalog_lead_time_weeks ?? 0)
+        }
+      : null,
     createdAt: serializeTimestamp(row.created_at),
     updatedAt: serializeTimestamp(row.updated_at),
     imageUrl: row.image_url,
@@ -297,6 +314,11 @@ const ITEM_SELECT = `
     i.target_price_cents,
     i.price_alert_enabled,
     i.price_basis,
+    i.catalog_item_id,
+    ci.price_category AS catalog_price_category,
+    ci.priority AS catalog_priority,
+    ci.timing AS catalog_timing,
+    ci.lead_time_weeks AS catalog_lead_time_weeks,
     tp.url AS tracked_url,
     tp.domain AS tracked_domain,
     tp.in_stock AS tracked_in_stock,
@@ -309,6 +331,7 @@ const ITEM_SELECT = `
   FROM items i
   INNER JOIN categories c ON c.id = i.category_id
   LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
+  LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
   LEFT JOIN LATERAL (
     SELECT MIN(v) AS low_cents, MAX(v) AS high_cents, COUNT(v)::int AS samples
     FROM (
@@ -633,6 +656,9 @@ async function insertEnxoval(
   } else if (options.useDefaultTemplate !== false) {
     await seedEnxovalDefaults(client, userId, enxovalId);
   }
+  // Os itens do funil e do modelo já são do catálogo: o vínculo é só a resolução barata, sem consultar o Jev.
+  const seeded = await client.query<{ id: string; name: string }>('SELECT id, name FROM items WHERE enxoval_id = $1', [enxovalId]);
+  await linkItemsToCatalog(client, seeded.rows);
 
   return enxovalId;
 }
@@ -811,7 +837,7 @@ function parseTrackingInput(body: unknown): ItemTrackingInput {
 }
 
 async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string; status?: ItemStatus; discountCents?: unknown; quantity?: number; buyWeek?: number | null; tracking?: ItemTrackingInput }) {
-  return withTransaction(async client => {
+  const created = await withTransaction(async client => {
     await requireEnxovalMember(client, input.userId, input.enxovalId);
 
     let category: EnxovalCategory | null = null;
@@ -852,12 +878,17 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
       itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, discount.value, input.link ?? '', input.description ?? '', status, isDoneStatus(status), quantity,
       trackedProductId, initialPriceCents, trackedProductId ? (tracking.targetPriceCents ?? null) : null, tracking.selectedVariation ?? null, tracking.imageUrl ?? null, tracking.priceAlertEnabled ?? true, tracking.priceBasis ?? 'regular', input.buyWeek ?? null
     ]);
+    const { unresolved } = await linkItemsToCatalog(client, [{ id: itemId, name: input.name }]);
 
     return {
       item: await fetchItemRow(client, itemId, input.enxovalId),
-      category
+      category,
+      unresolved
     };
   });
+  // Item que o catálogo ainda não conhece: a cascata completa (com o Jev) roda depois, sem segurar a resposta.
+  queueResolution(created.unresolved);
+  return { item: created.item, category: created.category };
 }
 
 async function updateItemForUser(userId: string, itemId: string, body: unknown) {
@@ -865,7 +896,9 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     throw new HttpError(400, 'Dados inválidos.');
   }
 
-  return withTransaction(async client => {
+  let renamedTo: string | null = null;
+  let unresolved: { id: string; name: string }[] = [];
+  const updated = await withTransaction(async client => {
     // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
     const current = await client.query<{ enxoval_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null }>(`
       SELECT i.enxoval_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity, i.tracked_product_id, i.initial_price_cents
@@ -896,6 +929,11 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
       if (name !== current.rows[0].name && name.length > MAX_ITEM_NAME_LENGTH)
         throw new HttpError(400, `O nome do item pode ter no máximo ${MAX_ITEM_NAME_LENGTH} caracteres.`);
       addUpdate('name', name);
+      // Outro nome pode ser outro item: o vínculo com o catálogo é refeito depois de gravar.
+      if (name !== current.rows[0].name) {
+        addUpdate('catalog_item_id', null);
+        renamedTo = name;
+      }
     }
 
     let status = current.rows[0].status;
@@ -981,8 +1019,11 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     `, values);
 
     if (!result.rowCount) throw new HttpError(404, 'Item não encontrado.');
+    if (renamedTo) ({ unresolved } = await linkItemsToCatalog(client, [{ id: itemId, name: renamedTo }]));
     return fetchItemRow(client, itemId, enxovalId);
   });
+  queueResolution(unresolved);
+  return updated;
 }
 async function deleteItemForUser(userId: string, itemId: string) {
   const result = await getPool().query<{ id: string }>(`
@@ -1048,6 +1089,7 @@ export function registerApiRoutes(app: Express) {
   registerAdminRoutes(router);
   registerFeedbackRoutes(router, requireCurrentUser);
   registerAiRoutes(router, { requireUser: requireCurrentUser, fetchItems, fetchCategories });
+  registerCatalogRoutes(router, { requireUser: requireCurrentUser });
 
   router.get('/health', (_req, res) => {
     res.json({ ok: true });
@@ -1653,7 +1695,9 @@ export function registerApiRoutes(app: Express) {
       const preview = await scrapeProduct(url, { allowPartial: true });
       // Resultado parcial (só o nome tirado do link) não é um dado confiável da loja: não vira produto acompanhado.
       if (!preview.partial) rememberPreview(preview);
-      res.json(preview);
+      // O catálogo sabe o cômodo de quase todo item; o regex de `suggestCategory` fica só como reserva.
+      const catalogItem = preview.title ? await findItemInTitle(preview.title).catch(() => null) : null;
+      res.json({ ...preview, suggestedRoom: catalogItem?.room ?? null });
     } catch (err) {
       if (err instanceof ScrapeError) throw new HttpError(err.code === 'invalid_url' ? 400 : 422, err.message);
       throw err;

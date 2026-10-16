@@ -1,6 +1,50 @@
 import type { ItemStatus } from './itemStatus';
 import type { PriceCategory, SpendingTier } from './planning/spending';
-import type { ItemPriority, ItemTiming } from './planning/purchasePlan';
+import type { CatalogItemMeta, ItemPriority, ItemTiming } from './planning/purchasePlan';
+import type { RoomKey } from './onboarding/types';
+
+/** Item do catálogo mestre devolvido pela busca rápida (autocomplete). */
+export interface CatalogSearchResult {
+  id: string;
+  name: string;
+  room: RoomKey | null;
+  /** Faixa comum de preço, em centavos, quando há amostra suficiente (p10, mediana e p90). */
+  priceRange: { p10: number; p50: number; p90: number; samples: number; region: string } | null;
+}
+
+/** Item do catálogo mestre como o /admin vê: com apelidos, origem e quantos itens de enxovais usam. */
+export interface AdminCatalogItem {
+  id: string;
+  slug: string;
+  name: string;
+  normalizedName: string;
+  room: RoomKey | null;
+  priority: ItemPriority | null;
+  timing: ItemTiming | null;
+  leadTimeWeeks: number;
+  priceCategory: 1 | 2 | 3 | 4 | null;
+  functionGroup: string | null;
+  source: "curated" | "users" | "jev";
+  status: "approved" | "pending_review";
+  createdAt: string;
+  aliases: { alias: string; key: string; source: string }[];
+  usage: number;
+}
+
+export interface AdminCatalogOverview {
+  days: number;
+  daily: { day: string; metric: string; count: number }[];
+  totals: Record<string, number>;
+  /** Parte das resoluções de item atendidas pelo catálogo, sem Jev (0 a 1). */
+  hitRate: number | null;
+  /** Parte das notas de urgência atendidas pelo catálogo, sem Jev (0 a 1). */
+  urgencyHitRate: number | null;
+  jevCalls: number;
+  activeUsers: number;
+  jevCallsPerActiveUser: number | null;
+  catalog: { status: string; source: string; total: number }[];
+  gaps: { unlinked: number; linked: number; without_urgency: number; aliases: number; price_ranges: number };
+}
 
 export type { ItemStatus };
 export type Category = string;
@@ -108,6 +152,8 @@ export interface ScrapedProductPreview {
   };
   /** Ambiente sugerido pelo nome do produto: Cozinha, Quarto, Banheiro, Sala ou Área de Serviço. */
   suggestedCategory?: string;
+  /** Cômodo do item do catálogo achado no título do produto (vale mais que `suggestedCategory`). */
+  suggestedRoom?: RoomKey | null;
   /** A loja não deixou ler a página: só o nome (tirado do próprio link) é confiável; preço e foto ficam por conta da pessoa. */
   partial?: boolean;
 }
@@ -167,6 +213,10 @@ export interface EnxovalItem {
   priceCategory: PriceCategory | null;
   priority: ItemPriority | null;
   timing: ItemTiming | null;
+  /** Item do catálogo mestre a que este item corresponde (nulo: item livre, ainda sem par no catálogo). */
+  catalogItemId?: string | null;
+  /** O que o catálogo sabe do item. Vale quando os campos do próprio item estão vazios. */
+  catalog?: CatalogItemMeta | null;
   updatedAt: string;
   createdAt?: string;
   /** Foto do produto, quando o item veio do link de uma loja. */
@@ -219,6 +269,10 @@ export interface ItemAssessment {
   available: boolean;
   environment: { id: string; name: string; confidence: number } | null;
   redundancy: { probability: number; overlapsWith: string | null } | null;
+  /** De onde veio a resposta: do catálogo mestre (sem IA) ou do Jev. */
+  source?: "catalog" | "jev";
+  /** Item do catálogo que corresponde ao nome digitado, com a faixa comum de preço quando houver. */
+  catalogItem?: Pick<CatalogSearchResult, "id" | "name" | "priceRange"> | null;
 }
 
 export interface NextItemRecommendation {
