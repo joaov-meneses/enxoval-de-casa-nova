@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
-import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH, normalizeEnvironmentName } from '../src/data.ts';
+import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH, normalizeEnvironmentName, normalizeEnxovalName } from '../src/data.ts';
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity, quantityFromDescription } from '../src/itemQuantity.ts';
 import { DEFAULT_ITEM_STATUS, isDoneStatus, isItemStatus, resolveDiscountCents, statusFromChecked, type ItemStatus } from '../src/itemStatus.ts';
 import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalInvitation, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace, InvitationPreview, ItemPriceHistory, ItemPriceTracking, ItemTrackingInput, PriceBasis, TrackingStatus } from '../src/types.ts';
@@ -1299,7 +1299,7 @@ export function registerApiRoutes(app: Express) {
   router.post('/enxovais', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
     if (user.isGuest) throw new HttpError(403, 'Contas de convidado usam apenas os enxovais para os quais foram convidadas.');
-    const name = requireText(req.body?.name, 'Nome do enxoval');
+    const name = normalizeEnxovalName(requireText(req.body?.name, 'Nome do enxoval'));
 
     // O enxoval do funil /comecar chega com o plano gerado e as respostas; sem plano, segue o
     // fluxo normal de "criar novo enxoval" (com ou sem o template padrão).
@@ -1331,7 +1331,7 @@ export function registerApiRoutes(app: Express) {
 
     if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
       if (role !== 'owner') throw new HttpError(403, 'Apenas o dono pode alterar esse enxoval.');
-      addUpdate('name', requireText(updates.name, 'Nome do enxoval'));
+      addUpdate('name', normalizeEnxovalName(requireText(updates.name, 'Nome do enxoval')));
     }
 
     if (Object.prototype.hasOwnProperty.call(updates, 'discountCents')) {

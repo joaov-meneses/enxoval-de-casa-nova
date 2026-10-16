@@ -423,6 +423,11 @@ export async function migrateDatabase() {
     );
     CREATE INDEX IF NOT EXISTS items_tracked_product_id_idx ON items(tracked_product_id);
 
+    -- Nome de enxoval começa com letra maiúscula ("apartamento" vira "Apartamento"); o app já grava assim e isto
+    -- corrige os nomes antigos. Só toca nos que ainda começam com minúscula.
+    UPDATE enxovais SET name = upper(left(name, 1)) || substr(name, 2), updated_at = now()
+    WHERE left(name, 1) <> upper(left(name, 1));
+
     -- Uma única vez: a primeira versão do catálogo (sem slug) chegou a ser publicada em homologação. Tudo nela é
     -- derivado (semente, apelidos, notas e faixas) e é refeito pela semente e pela rotina do catálogo; os itens das
     -- pessoas continuam, só perdem o vínculo até a próxima rodada.

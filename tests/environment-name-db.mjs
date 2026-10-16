@@ -112,6 +112,19 @@ try {
   const rows = (await getPool().query("SELECT name FROM categories WHERE enxoval_id = $1", [enxovalId])).rows;
   assert.ok(rows.every((row) => !/[\n\r\t]|\s{2}/.test(row.name)), "nada com quebra de linha ou espaço duplo no banco");
   console.log("PASS: renomear e criar item seguem a mesma regra.");
+
+  // Nome de enxoval: primeira letra maiúscula, o resto como foi digitado, ao criar e ao renomear.
+  const lower = await call("/enxovais", "POST", { name: "  apartamento\n da praia ", useDefaultTemplate: false });
+  assert.equal(lower.status, 201, JSON.stringify(lower.data));
+  assert.equal(lower.data.enxoval.name, "Apartamento da praia");
+  const accented = await call(`/enxovais/${lower.data.enxoval.id}`, "PATCH", { name: "ótima casa da Ana" });
+  assert.equal(accented.status, 200, JSON.stringify(accented.data));
+  assert.equal(accented.data.name, "Ótima casa da Ana");
+  // Nomes antigos gravados em minúscula são corrigidos pela migração.
+  await getPool().query("UPDATE enxovais SET name = 'teste' WHERE id = $1", [lower.data.enxoval.id]);
+  await migrateDatabase();
+  assert.equal((await getPool().query("SELECT name FROM enxovais WHERE id = $1", [lower.data.enxoval.id])).rows[0].name, "Teste");
+  console.log("PASS: nome de enxoval sempre começa com letra maiúscula, inclusive os antigos.");
 } finally {
   if (server)
     await new Promise((resolve, reject) =>

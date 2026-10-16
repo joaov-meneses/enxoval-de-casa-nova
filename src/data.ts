@@ -12,6 +12,15 @@ export function normalizeEnvironmentName(value: string) {
   return value.replace(CONTROL_CHARACTERS, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Nome de enxoval como é gravado: uma linha só, espaços simples e a primeira letra maiúscula ("apartamento" vira
+ * "Apartamento"). O resto fica como a pessoa escreveu ("casa da Praia" continua "Casa da Praia").
+ */
+export function normalizeEnxovalName(value: string) {
+  const name = value.replace(CONTROL_CHARACTERS, ' ').replace(/\s+/g, ' ').trim();
+  return name.charAt(0).toLocaleUpperCase('pt-BR') + name.slice(1);
+}
+
 /** Para o campo enquanto se digita ou cola: tira quebras de linha e tabulações, sem apagar os espaços digitados. */
 export function sanitizeEnvironmentNameInput(value: string) {
   return value.replace(CONTROL_CHARACTERS, ' ').slice(0, MAX_ENVIRONMENT_NAME_LENGTH);
