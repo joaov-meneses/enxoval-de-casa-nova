@@ -3335,7 +3335,11 @@ export default function App() {
           </button>
         </form>
       </Dialog>
-      <PaywallDialog onPlanChanged={() => void handleRefresh()} />
+      <PaywallDialog
+        onPlanChanged={() => void handleRefresh()}
+        categories={categories}
+        items={items}
+      />
     </div>
   );
 }

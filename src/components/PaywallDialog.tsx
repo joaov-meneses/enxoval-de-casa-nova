@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { Dialog } from "./Dialog";
 import { Nino } from "./Nino";
+import {
+  PaywallPeek,
+  PaywallTimeline,
+  readPaywallVariant,
+} from "./PaywallExtras";
 import {
   fetchBillingStatus,
   LIMIT_REACHED_EVENT,
@@ -39,7 +44,12 @@ const UNLOCKS = [
  */
 export function PaywallDialog({
   onPlanChanged,
+  categories = [],
+  items = [],
 }: {
+  /** O que a pessoa já montou: a espiada mostra o que está por trás do limite. */
+  categories?: { id: string; name: string }[];
+  items?: { categoryId: string }[];
   /** A assinatura mudou o plano da conta: o app relê os dados para liberar os limites. */
   onPlanChanged?: () => void;
 }) {
@@ -53,6 +63,7 @@ export function PaywallDialog({
   const [boughtPass, setBoughtPass] = useState(false);
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const isOpen = limit !== null || isPlansOpen;
+  const variant = useMemo(() => readPaywallVariant(), []);
 
   // Ao abrir a tela de planos, lê a situação da conta (Passe em vigor e até quando).
   useEffect(() => {
@@ -174,20 +185,33 @@ export function PaywallDialog({
       <div className="paywall">
         <div className="paywall-intro">
           <Nino pose="wave" size={96} />
-          <p>
-            No plano gratuito, você pode testar até{" "}
-            {FREE_PLAN_LIMITS.environments} cômodos com{" "}
-            {FREE_PLAN_LIMITS.itemsPerEnvironment} itens cada. Vamos abrir as
-            portas de todos os cômodos do seu lar?
-          </p>
+          {variant === "peek" ? (
+            <p>Vamos abrir as portas de todos os cômodos do seu lar?</p>
+          ) : (
+            <p>
+              No plano gratuito, você pode testar até{" "}
+              {FREE_PLAN_LIMITS.environments} cômodos com{" "}
+              {FREE_PLAN_LIMITS.itemsPerEnvironment} itens cada. Vamos abrir as
+              portas de todos os cômodos do seu lar?
+            </p>
+          )}
         </div>
-        <ul className="paywall-unlocks" aria-label="O que os planos pagos liberam">
-          {UNLOCKS.map((text) => (
-            <li key={text}>
-              <Check size={15} aria-hidden="true" /> {text}
-            </li>
-          ))}
-        </ul>
+        {variant === "peek" && (
+          <PaywallPeek categories={categories} items={items} />
+        )}
+        {variant === "timeline" && <PaywallTimeline />}
+        {variant === "control" && (
+          <ul
+            className="paywall-unlocks"
+            aria-label="O que os planos pagos liberam"
+          >
+            {UNLOCKS.map((text) => (
+              <li key={text}>
+                <Check size={15} aria-hidden="true" /> {text}
+              </li>
+            ))}
+          </ul>
+        )}
         <ul className="paywall-plans" aria-label="Planos">
           {PAID_PLAN_OFFERS.filter(
             (offer) => !(hasPass && offer.id === "monthly"),
@@ -243,7 +267,6 @@ export function PaywallDialog({
           type="button"
           className="button button-outline"
           onClick={close}
-          data-dialog-autofocus
         >
           Agora não
         </button>
