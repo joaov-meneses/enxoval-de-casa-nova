@@ -3,16 +3,20 @@ import {
   ArrowRight,
   BedDouble,
   Bath,
+  CalendarClock,
   Check,
   ChevronDown,
   Coffee,
   Gift,
   HeartHandshake,
-  Lightbulb,
+  LayoutGrid,
+  Link2,
   ListChecks,
   Menu,
   MessageCircleHeart,
+  PiggyBank,
   QrCode,
+  Ruler,
   ShieldCheck,
   Sofa,
   WashingMachine,
@@ -60,6 +64,40 @@ const ROOMS = [
   { icon: Sofa, name: "Sala" },
   { icon: Bath, name: "Banheiro" },
   { icon: WashingMachine, name: "Lavanderia" },
+];
+
+const FEATURES = [
+  {
+    icon: LayoutGrid,
+    title: "Organização por cômodos",
+    text: "Cada canto da casa ganha a sua lista, com cards fáceis de tocar e o progresso de cada espaço à vista.",
+    rooms: true,
+  },
+  {
+    icon: Ruler,
+    title: "Um plano do tamanho da sua casa",
+    text: "Poucas perguntas e o Casa Mia monta a lista pelo clima, pela casa e por quem mora nela, sem o que você não precisa comprar.",
+  },
+  {
+    icon: CalendarClock,
+    title: "Cada coisa no seu tempo",
+    text: "A semana certa de cada item, a partir da data da mudança, e a faixa de gasto esperada. Você ajusta como preferir.",
+  },
+  {
+    icon: Link2,
+    title: "Cole o link, a gente preenche",
+    text: "Traga um produto do Mercado Livre, da Amazon ou do Magalu e o Casa Mia busca nome, foto e preço.",
+  },
+  {
+    icon: PiggyBank,
+    title: "O dinheiro sempre à vista",
+    text: "Quanto você já investiu, quanto falta e quanto economizou com descontos e cashback, tudo num só olhar.",
+  },
+  {
+    icon: HeartHandshake,
+    title: "Lista a dois",
+    text: "Casais e moradores na mesma lista, em tempo real. Cada conquista aparece para todo mundo.",
+  },
 ];
 
 type Plan = {
@@ -335,6 +373,7 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
         </section>
 
         <HowItWorks />
+
         <section className="cm-nino" id="nino">
           <div className="cm-wrap cm-nino-grid">
             <div className="cm-nino-figure">
@@ -379,40 +418,24 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
             <h2>Tudo o que a sua casa nova pede, no lugar certo.</h2>
           </div>
           <div className="cm-features">
-            <article className="cm-card">
-              <h3>Organização por cômodos</h3>
-              <p>
-                Cada canto da casa ganha a sua lista, com cards fáceis de tocar
-                e o progresso de cada espaço à vista.
-              </p>
-              <ul className="cm-rooms">
-                {ROOMS.map((room) => (
-                  <li key={room.name}>
-                    <room.icon size={18} strokeWidth={1.7} /> {room.name}
-                  </li>
-                ))}
-              </ul>
-            </article>
-            <article className="cm-card">
-              <span className="cm-card-icon">
-                <Lightbulb size={22} strokeWidth={1.7} />
-              </span>
-              <h3>Inteligência de compra</h3>
-              <p>
-                A IA do Jev avisa se faltou algo do Primeiro Dia e corta compras
-                redundantes, para você gastar o mínimo e morar bem.
-              </p>
-            </article>
-            <article className="cm-card">
-              <span className="cm-card-icon">
-                <HeartHandshake size={22} strokeWidth={1.7} />
-              </span>
-              <h3>Lista a dois</h3>
-              <p>
-                Casais e moradores na mesma lista, em tempo real. Cada conquista
-                aparece para todo mundo.
-              </p>
-            </article>
+            {FEATURES.map((feature) => (
+              <article className="cm-card" key={feature.title}>
+                <span className="cm-card-icon">
+                  <feature.icon size={24} strokeWidth={1.7} aria-hidden="true" />
+                </span>
+                <h3>{feature.title}</h3>
+                <p>{feature.text}</p>
+                {feature.rooms && (
+                  <ul className="cm-rooms">
+                    {ROOMS.map((room) => (
+                      <li key={room.name}>
+                        <room.icon size={16} strokeWidth={1.7} /> {room.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+            ))}
           </div>
         </section>
 

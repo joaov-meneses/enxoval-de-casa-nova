@@ -37,6 +37,7 @@
     "test:catalog-db": "node --import tsx tests/catalog-db.mjs",
     "test:billing-db": "node --import tsx tests/billing-db.mjs",
     "test:freemium-db": "node --import tsx tests/freemium-db.mjs",
+    "test:item-images-db": "node --import tsx tests/item-images-db.mjs",
     "test:shared-cache": "node --import tsx tests/shared-cache.mjs"
   },
   "dependencies": {
@@ -55,6 +56,7 @@
     "react-dom": "^19.0.1",
     "read-excel-file": "^9.3.12",
     "redis": "^6.3.0",
+    "sharp": "^0.35.5",
     "stripe": "^23.0.0",
     "vite": "^6.2.3",
     "write-excel-file": "^4.1.1"
@@ -72,7 +74,6 @@
     "imagetracerjs": "^1.2.6",
     "jimp": "^1.6.1",
     "prettier": "^3.9.9",
-    "sharp": "^0.35.5",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

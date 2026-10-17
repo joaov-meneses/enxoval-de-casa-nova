@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   Eye,
   EyeOff,
   Heart,
@@ -11,8 +10,10 @@ import {
 } from "lucide-react";
 import { login, register } from "../api";
 import type { BootstrapData } from "../types";
+import { AuthShowcase } from "./AuthShowcase";
 import { Brand } from "./Brand";
 import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
+import { Nino } from "./Nino";
 
 type AuthMode = "login" | "register";
 
@@ -21,9 +22,24 @@ const MODE_PATH: Record<AuthMode, string> = {
   register: "/cadastro",
 };
 
+/** Abaixo disso a tela vira "celular e tablet": a cúpula da porta mostra o app no lugar do Nino. */
+const COMPACT_QUERY = "(max-width: 959px)";
+
 /** `/cadastro` abre a tela já na aba de criar conta (usado pelo CTA "Começar Grátis" da landing). */
 function initialMode(): AuthMode {
   return window.location.pathname === MODE_PATH.register ? "register" : "login";
+}
+
+function useMatchMedia(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const onChange = () => setMatches(list.matches);
+    onChange();
+    list.addEventListener("change", onChange);
+    return () => list.removeEventListener("change", onChange);
+  }, [query]);
+  return matches;
 }
 
 export function AuthPage({
@@ -35,6 +51,7 @@ export function AuthPage({
   ) => void;
 }) {
   const [mode, setModeState] = useState<AuthMode>(initialMode);
+  const compact = useMatchMedia(COMPACT_QUERY);
   // Ao trocar de aba, a URL acompanha (para recarregar ou compartilhar manter a aba). Na abertura
   // ela não muda, para não perder o endereço de quem chegou aqui vindo de outra rota.
   const setMode = (next: AuthMode) => {
@@ -49,51 +66,28 @@ export function AuthPage({
   }, [mode]);
 
   return (
-    <main className="auth-page">
-      <section className="auth-story">
-        <img
-          src="/images/casamia-home.webp"
-          alt="Seu próximo lar, acolhedor e cheio de possibilidades"
-        />
-        <div className="auth-story-top">
+    <main className="auth-shell">
+      <div className="auth-hero">
+        <header className="auth-topbar">
           <a href="/" className="brand-link">
-            <Brand light />
-          </a>
-          <span>SEU LAR COMEÇA AQUI</span>
-        </div>
-        <div className="auth-story-copy">
-          <Heart size={28} strokeWidth={1.2} />
-          <h2>
-            O melhor de uma
-            <br />
-            casa é o que você
-            <br />
-            <em>vai viver nela.</em>
-          </h2>
-          <p>
-            Organize os detalhes.
-            <br />
-            Abra espaço para as histórias.
-          </p>
-          <div className="auth-story-tags">
-            <span>
-              <Check size={14} /> Planeje com calma
-            </span>
-            <span>
-              <Check size={14} /> Conquiste junto
-            </span>
-          </div>
-        </div>
-      </section>
-      <section className="auth-panel">
-        <a href="/" className="auth-back">
-          <ArrowLeft size={16} /> Voltar ao início
-        </a>
-        <div className="auth-form-wrap">
-          <a href="/" className="brand-link auth-mobile-brand">
             <Brand />
           </a>
-          <div className="auth-tabs" role="tablist" aria-label="Entrar ou criar conta">
+          <a href="/" className="auth-back">
+            <ArrowLeft size={16} aria-hidden="true" /> Voltar ao início
+          </a>
+        </header>
+      </div>
+
+      <div className="auth-door">
+        {/* Desktop: o Nino espia por cima do cartão. Celular e tablet: as telas do app sobem por trás dele. */}
+        {compact ? <AuthShowcase /> : <Nino pose="wave" size={104} className="auth-nino" />}
+        <div className="auth-card">
+          <div
+            className="auth-tabs"
+            data-mode={mode}
+            role="tablist"
+            aria-label="Entrar ou criar conta"
+          >
             <button
               type="button"
               role="tab"
@@ -120,14 +114,33 @@ export function AuthPage({
           {mode === "login" ? (
             <LoginPanel onAuthenticated={onAuthenticated} onSwitchToRegister={() => setMode("register")} />
           ) : (
-            <RegisterPanel />
+            <RegisterPanel onSwitchToLogin={() => setMode("login")} />
           )}
         </div>
-        <span className="auth-bottom">
-          Pequenos planos. Grandes começos. <Heart size={12} />
-        </span>
-      </section>
+        <p className="auth-footnote">
+          Pequenos planos. Grandes começos. <Heart size={12} aria-hidden="true" />
+        </p>
+      </div>
     </main>
+  );
+}
+
+function PasswordToggle({
+  visible,
+  onToggle,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
+      aria-pressed={visible}
+      onClick={onToggle}
+    >
+      {visible ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+    </button>
   );
 }
 
@@ -176,15 +189,17 @@ function LoginPanel({
   return (
     <section
       id="auth-panel-login"
+      className="auth-panel"
       role="tabpanel"
       aria-labelledby="auth-tab-login"
     >
-      <span className="eyebrow">UM CANTINHO PARA OS SEUS PLANOS</span>
-      <h1>Entre, a casa é sua.</h1>
-      <p>Seu próximo capítulo está esperando por você.</p>
-      <form onSubmit={submit} className="auth-form">
-        <label htmlFor="auth-email">
-          Seu e-mail
+      <header className="auth-heading">
+        <h1>Entre, a casa é sua.</h1>
+        <p>Seu próximo capítulo está esperando por você.</p>
+      </header>
+      <form onSubmit={submit} className="auth-form auth-fields">
+        <div className="auth-field">
+          <label htmlFor="auth-email">Seu e-mail</label>
           <input
             type="email"
             id="auth-email"
@@ -192,11 +207,31 @@ function LoginPanel({
             onChange={(e) => setEmail(e.target.value)}
             placeholder="voce@exemplo.com"
             autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
             required
           />
-        </label>
-        <label htmlFor="auth-password">
-          Sua senha
+        </div>
+        <div className="auth-field">
+          <div className="auth-field-head">
+            <label htmlFor="auth-password">Sua senha</label>
+            <a
+              className="auth-forgot"
+              href="/esqueci-senha"
+              onClick={() => {
+                // Leva o e-mail já digitado para a próxima tela (fica só na sessão, nunca na URL).
+                try {
+                  if (email.trim())
+                    sessionStorage.setItem(FORGOT_EMAIL_KEY, email.trim());
+                } catch {
+                  /* Sem armazenamento, a pessoa digita o e-mail de novo. */
+                }
+              }}
+            >
+              Esqueci minha senha
+            </a>
+          </div>
           <span className="password-field">
             <input
               type={visible ? "text" : "password"}
@@ -207,30 +242,9 @@ function LoginPanel({
               autoComplete="current-password"
               required
             />
-            <button
-              type="button"
-              aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
-              onClick={() => setVisible(!visible)}
-            >
-              {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+            <PasswordToggle visible={visible} onToggle={() => setVisible(!visible)} />
           </span>
-        </label>
-        <a
-          className="auth-forgot"
-          href="/esqueci-senha"
-          onClick={() => {
-            // Leva o e-mail já digitado para a próxima tela (fica só na sessão, nunca na URL).
-            try {
-              if (email.trim())
-                sessionStorage.setItem(FORGOT_EMAIL_KEY, email.trim());
-            } catch {
-              /* Sem armazenamento, a pessoa digita o e-mail de novo. */
-            }
-          }}
-        >
-          Esqueci minha senha
-        </a>
+        </div>
         {error && (
           <div className="form-error" role="alert">
             {error}
@@ -242,11 +256,11 @@ function LoginPanel({
           className="button button-dark"
         >
           {submitting ? (
-            <LoaderCircle size={18} className="animate-spin" />
+            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
           ) : (
             "Entrar no meu enxoval"
           )}
-          {!submitting && <ArrowRight size={18} />}
+          {!submitting && <ArrowRight size={18} aria-hidden="true" />}
         </button>
       </form>
       <p className="auth-switch">
@@ -256,19 +270,20 @@ function LoginPanel({
         </button>
       </p>
       <p className="auth-note">
-        <ShieldCheck size={15} /> Sem cartão de crédito. No seu tempo.
+        <ShieldCheck size={15} aria-hidden="true" /> Sem cartão de crédito. No seu tempo.
       </p>
     </section>
   );
 }
 
-function RegisterPanel() {
+function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const mismatch = confirmation !== "" && confirmation !== password;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -295,15 +310,17 @@ function RegisterPanel() {
   return (
     <section
       id="auth-panel-register"
+      className="auth-panel"
       role="tabpanel"
       aria-labelledby="auth-tab-register"
     >
-      <span className="eyebrow">COMECE EM POUCOS MINUTOS</span>
-      <h1>Crie sua conta grátis.</h1>
-      <p>Depois de criar a conta, você monta o plano da sua casa nova.</p>
-      <form onSubmit={submit} className="auth-form">
-        <label htmlFor="register-email">
-          Seu e-mail
+      <header className="auth-heading">
+        <h1>Crie sua conta grátis.</h1>
+        <p>Depois de criar a conta, você monta o plano da sua casa nova.</p>
+      </header>
+      <form onSubmit={submit} className="auth-form auth-fields">
+        <div className="auth-field">
+          <label htmlFor="register-email">Seu e-mail</label>
           <input
             type="email"
             id="register-email"
@@ -311,11 +328,14 @@ function RegisterPanel() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="voce@exemplo.com"
             autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
             required
           />
-        </label>
-        <label htmlFor="register-password">
-          Crie uma senha
+        </div>
+        <div className="auth-field">
+          <label htmlFor="register-password">Crie uma senha</label>
           <span className="password-field">
             <input
               type={visible ? "text" : "password"}
@@ -327,20 +347,18 @@ function RegisterPanel() {
               }}
               placeholder="6 ou mais caracteres"
               autoComplete="new-password"
+              aria-describedby="register-password-hint"
               minLength={6}
               required
             />
-            <button
-              type="button"
-              aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
-              onClick={() => setVisible(!visible)}
-            >
-              {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+            <PasswordToggle visible={visible} onToggle={() => setVisible(!visible)} />
           </span>
-        </label>
-        <label htmlFor="register-password-confirmation">
-          Confirme a senha
+          <p className="auth-hint" id="register-password-hint">
+            Use 6 caracteres ou mais.
+          </p>
+        </div>
+        <div className="auth-field">
+          <label htmlFor="register-password-confirmation">Confirme a senha</label>
           <span className="password-field">
             <input
               type={visible ? "text" : "password"}
@@ -352,11 +370,17 @@ function RegisterPanel() {
               }}
               placeholder="Repita a senha"
               autoComplete="new-password"
-              aria-invalid={confirmation !== "" && confirmation !== password}
+              aria-invalid={mismatch}
+              aria-describedby={mismatch ? "register-password-mismatch" : undefined}
               required
             />
           </span>
-        </label>
+          {mismatch && (
+            <p className="auth-hint is-error" id="register-password-mismatch" role="status">
+              As senhas ainda não são iguais.
+            </p>
+          )}
+        </div>
         {error && (
           <div className="form-error" role="alert">
             {error}
@@ -368,13 +392,19 @@ function RegisterPanel() {
           className="button button-dark"
         >
           {submitting ? (
-            <LoaderCircle size={18} className="animate-spin" />
+            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
           ) : (
             "Criar conta e montar meu plano"
           )}
-          {!submitting && <ArrowRight size={18} />}
+          {!submitting && <ArrowRight size={18} aria-hidden="true" />}
         </button>
       </form>
+      <p className="auth-switch">
+        Já tem conta?{" "}
+        <button type="button" className="auth-switch-link" onClick={onSwitchToLogin}>
+          Entre por aqui
+        </button>
+      </p>
       <p className="auth-privacy">
         Ao criar a conta, você concorda com a nossa{" "}
         <a href="/privacidade" target="_blank" rel="noopener">
@@ -383,7 +413,7 @@ function RegisterPanel() {
         .
       </p>
       <p className="auth-note">
-        <ShieldCheck size={15} /> Sem cartão de crédito. Seus dados ficam só com você.
+        <ShieldCheck size={15} aria-hidden="true" /> Sem cartão de crédito. Seus dados ficam só com você.
       </p>
     </section>
   );

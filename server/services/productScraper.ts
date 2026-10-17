@@ -90,7 +90,7 @@ export function isBlockedAddress(address: string): boolean {
 }
 
 /** Barra o que não é uma página pública da web: outros protocolos, credenciais na URL, portas incomuns e hosts locais. */
-function assertAllowedUrl(url: URL) {
+export function assertAllowedUrl(url: URL) {
   const invalid = () => new ScrapeError('invalid_url', 'O link informado não pode ser lido. Use o endereço de um produto de uma loja online.');
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw invalid();
   if (url.username || url.password) throw invalid();
@@ -109,7 +109,7 @@ function assertAllowedUrl(url: URL) {
 // ---------------------------------------------------------------------------------------------
 
 // Valida o IP que será de fato usado na conexão (e não só o nome), o que fecha a brecha de DNS rebinding.
-const safeLookup: LookupFunction = (hostname, options, callback) => {
+export const safeLookup: LookupFunction = (hostname, options, callback) => {
   dnsLookup(hostname, { ...options, all: true }, (error, addresses) => {
     if (error) {
       callback(error, '', 4);

@@ -25,6 +25,7 @@ import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { Dialog } from "./Dialog";
 import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
+import { ItemImageField } from "./ItemImageField";
 
 const NEW_CATEGORY_VALUE = "__new_category__";
 const money = new Intl.NumberFormat("pt-BR", {
@@ -121,6 +122,8 @@ export function AddItemModal({
   const [importError, setImportError] = useState("");
   const [preview, setPreview] = useState<ScrapedProductPreview | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  // Imagem do item: a da loja (vinda da importação), um arquivo enviado ou o link de uma imagem.
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [priceBasis, setPriceBasis] = useState<PriceBasis>("regular");
   const [voltage, setVoltage] = useState("");
   const [color, setColor] = useState("");
@@ -128,6 +131,8 @@ export function AddItemModal({
   // Só preenche sozinho o que a pessoa ainda não mexeu.
   const autoName = useRef("");
   const autoPrice = useRef("");
+  // Imagem que a importação por link colocou sozinha: só ela pode ser trocada por outra importação.
+  const autoImage = useRef("");
   const categoryTouched = useRef(false);
   const importTicket = useRef(0);
   // Último endereço já lido, para o campo "Link do produto" não buscar a mesma loja de novo ao perder o foco.
@@ -256,6 +261,8 @@ export function AddItemModal({
     setImportError("");
     setPreview(null);
     setImageFailed(false);
+    setImageUrl(null);
+    autoImage.current = "";
     setPriceBasis("regular");
     setVoltage("");
     setColor("");
@@ -289,6 +296,9 @@ export function AddItemModal({
   const applyPreview = (data: ScrapedProductPreview) => {
     setPreview(data);
     setImageFailed(false);
+    const previousAutoImage = autoImage.current;
+    autoImage.current = data.imageUrl ?? "";
+    setImageUrl((current) => (!current || current === previousAutoImage ? (data.imageUrl ?? null) : current));
     setPriceBasis("regular");
     setColor("");
     setVoltage(data.variations?.voltage?.length === 1 ? data.variations.voltage[0] : "");
@@ -321,6 +331,8 @@ export function AddItemModal({
     const ticket = ++importTicket.current;
     lastImportedUrl.current = url;
     setImportUrl(url);
+    // O link já vale para o item mesmo que a loja barre a leitura do produto.
+    if (!link.trim()) setLink(url);
     setImportStatus("loading");
     setImportError("");
     try {
@@ -354,6 +366,9 @@ export function AddItemModal({
     setImportStatus("idle");
     setImportError("");
     setPreview(null);
+    const autoImageUrl = autoImage.current;
+    autoImage.current = "";
+    setImageUrl((current) => (current === autoImageUrl ? null : current));
     setVoltage("");
     setColor("");
     setTargetText("");
@@ -416,6 +431,7 @@ export function AddItemModal({
           link: link.trim(),
           description: description.trim(),
           status,
+          ...(imageUrl ? { imageUrl } : {}),
           ...(preview && importStatus === "done"
             ? {
                 trackedProductUrl: preview.url,
@@ -424,7 +440,6 @@ export function AddItemModal({
                   (priceBasis === "pix" ? preview.pixPriceCents : preview.priceCents) ?? priceValue,
                 targetPriceCents: Number(targetText.replace(/\D/g, "")) || null,
                 selectedVariation: [voltage, color].filter(Boolean).join(" · ") || null,
-                imageUrl: preview.imageUrl ?? null,
                 priceBasis,
               }
             : {}),
@@ -448,14 +463,13 @@ export function AddItemModal({
       isOpen={isOpen}
       onClose={onClose}
       busy={isSubmitting}
+      className="add-item-dialog"
     >
-      <form
-        onSubmit={handleSubmit}
-        className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4"
-      >
+      <form onSubmit={handleSubmit} className="add-item-form">
+        <div className="add-item-form-body">
         <section
           aria-labelledby="import-link-title"
-          className="rounded-2xl border border-brand-wood/20 bg-brand-wood/5 p-3.5 space-y-3"
+          className="add-item-import rounded-2xl border border-brand-wood/20 bg-brand-wood/5 p-3.5 space-y-3"
         >
           <div>
             <h3 id="import-link-title" className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
@@ -673,7 +687,7 @@ export function AddItemModal({
           </div>
         </section>
 
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Sobre o item</h3>
+        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500">Sobre o item</h3>
 
         <div>
           <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -758,7 +772,7 @@ export function AddItemModal({
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="add-item-row grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="new-item-category" className="block text-sm font-medium text-stone-700 mb-1">
               Ambiente
@@ -830,9 +844,9 @@ export function AddItemModal({
           </div>
         )}
 
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Valores</h3>
+        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Valores</h3>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="add-item-row add-item-row-values grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="new-item-price" className="block text-sm font-medium text-stone-700 mb-1">
               Preço
@@ -902,7 +916,7 @@ export function AddItemModal({
             </p>
           </div>
           <div
-            className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-3"
+            className="add-item-final rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-3"
             aria-live="polite"
           >
             <span className="block text-sm font-medium text-stone-700">
@@ -921,8 +935,9 @@ export function AddItemModal({
           </div>
         </div>
 
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Detalhes</h3>
+        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Detalhes</h3>
 
+        <div className="add-item-pair">
         <div>
           <label htmlFor="new-item-link" className="block text-sm font-medium text-stone-700 mb-1">
             Link do produto
@@ -952,7 +967,7 @@ export function AddItemModal({
             disabled={isSubmitting}
             className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
           />
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="add-item-link-hint mt-1 text-xs text-stone-500">
             Cole o link e preenchemos nome, preço e foto automaticamente.
           </p>
         </div>
@@ -971,21 +986,29 @@ export function AddItemModal({
             className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood resize-none"
           />
         </div>
+        </div>
 
-        {error && (
-          <p
-            role="alert"
-            className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
-          >
-            {error}
-          </p>
-        )}
+        <ItemImageField
+          enxovalId={enxovalId}
+          value={imageUrl}
+          onChange={setImageUrl}
+          disabled={isSubmitting}
+        />
+        </div>
 
-        <div className="pt-2">
+        <div className="add-item-form-footer">
+          {error && (
+            <p
+              role="alert"
+              className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
+            >
+              {error}
+            </p>
+          )}
           <button
             type="submit"
             disabled={!name.trim() || isSubmitting}
-            className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="add-item-submit w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Salvando..." : "Adicionar à lista"}
           </button>

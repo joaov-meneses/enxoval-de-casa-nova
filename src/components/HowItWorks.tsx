@@ -1,17 +1,17 @@
 import { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 
-const STEPS = [
+export const STEPS = [
   {
     title: "Conte como é a sua casa",
-    text: "Poucas perguntas, em cerca de 2 minutos: com quem você mora, o tipo de moradia e a data da mudança. Sem e-mail por enquanto.",
+    text: "Poucas perguntas, em cerca de 2 minutos: com quem você mora, o tipo de moradia e a data da mudança.",
     bullets: [
       "Apartamento, casa ou kitnet",
       "Você escolhe quais cômodos entram no plano",
       "Sem data da mudança? Tudo bem, dá para começar assim",
     ],
     image: "/images/como-funciona/passo-1-conte.webp",
-    alt: "Tela do Casa Mia perguntando quais espaços da casa você quer equipar, com Cozinha, Banheiro, Sala de estar e Quarto principal marcados e o número de itens de cada um.",
+    alt: "Tela do Casa Mia perguntando quais espaços da casa você quer equipar, com Cozinha, Banheiro, Sala de estar, Quarto principal e Área de serviço marcados e o número de itens de cada um.",
   },
   {
     title: "Receba um plano feito para o seu lar",
@@ -22,7 +22,7 @@ const STEPS = [
       "Ordene por pendentes ou por mais avançados",
     ],
     image: "/images/como-funciona/passo-2-plano.webp",
-    alt: "Visão geral do Casa Mia mostrando 42% conquistado, o resumo de valores investidos e a lista de ambientes (Cozinha, Quarto, Banheiro, Sala de Estar e Área de Serviço) com a barra de progresso de cada um.",
+    alt: "Visão geral do Casa Mia mostrando 42% conquistado, o resumo de valores investidos e a lista de ambientes (Quarto, Banheiro, Cozinha e Eletrodomésticos) com a barra de progresso e o valor a investir em cada um.",
   },
   {
     title: "Conquiste e risque, item por item",
@@ -33,7 +33,7 @@ const STEPS = [
       "Importe ou exporte tudo em planilha",
     ],
     image: "/images/como-funciona/passo-3-conquiste.webp",
-    alt: "Lista do ambiente Cozinha no Casa Mia, com 50% conquistado, itens riscados como Jogo de panelas e Jogo de pratos de cerâmica e itens a comprar com preço.",
+    alt: "Lista do ambiente Cozinha no Casa Mia, com 49% conquistado, itens riscados como Jogo de panelas e Frigideira antiaderente e itens a comprar com preço.",
   },
   {
     title: "Organizem juntos, no mesmo ritmo",

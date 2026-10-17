@@ -9,6 +9,8 @@ interface DialogProps {
   children: ReactNode;
   tone?: "default" | "danger";
   busy?: boolean;
+  /** Classe extra no diálogo, para telas que precisam de largura ou rolagem próprias. */
+  className?: string;
 }
 
 export function Dialog({
@@ -18,6 +20,7 @@ export function Dialog({
   children,
   tone = "default",
   busy = false,
+  className = "",
 }: DialogProps) {
   const titleId = useId();
   const close = () => {
@@ -36,7 +39,7 @@ export function Dialog({
         aria-busy={busy}
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`casamia-dialog ${tone === "danger" ? "dialog-danger" : ""}`}
+        className={`casamia-dialog ${tone === "danger" ? "dialog-danger" : ""} ${className}`.trim()}
       >
         <div className="dialog-heading">
           <h2 id={titleId}>{title}</h2>

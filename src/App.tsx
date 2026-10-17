@@ -210,6 +210,8 @@ export default function App() {
   const [showOnlyUnpricedItems, setShowOnlyUnpricedItems] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ItemStatus | "all">("all");
   const [itemSortMode, setItemSortMode] = useState<ItemSortMode>("manual");
+  // Item recém-criado: na lista de todos os ambientes (agrupada por ambiente) ele aparece no topo de tudo, até a pessoa mudar de lista.
+  const [justAddedItemId, setJustAddedItemId] = useState<string | null>(null);
   const [categorySwipeOffset, setCategorySwipeOffset] = useState(0);
   const [categorySwipeDirection, setCategorySwipeDirection] =
     useState<CategorySwipeDirection | null>(null);
@@ -263,6 +265,9 @@ export default function App() {
   const [error, setError] = useState("");
   const pullStartYRef = useRef<number | null>(null);
   const pullLastDistanceRef = useRef(0);
+  useEffect(() => {
+    setJustAddedItemId(null);
+  }, [activeCategoryId, itemSortMode, activeEnxoval?.id]);
   const categorySwipeRef = useRef<{
     pointerId: number;
     startX: number;
@@ -668,6 +673,10 @@ export default function App() {
     return [...narrowedItems].sort((firstItem, secondItem) => {
       if (itemSortMode === "manual")
         return (
+          (isAllEnvironments && justAddedItemId
+            ? Number(secondItem.id === justAddedItemId) -
+              Number(firstItem.id === justAddedItemId)
+            : 0) ||
           (isAllEnvironments
             ? (categoryPosition.get(firstItem.categoryId) ?? 0) -
               (categoryPosition.get(secondItem.categoryId) ?? 0)
@@ -699,6 +708,7 @@ export default function App() {
     isShowingLatestChanges,
     itemSortMode,
     items,
+    justAddedItemId,
     normalizedSearchQuery,
     showOnlyCheckedItems,
     showOnlyPricedItems,
@@ -1034,6 +1044,7 @@ export default function App() {
       payload.targetPriceCents = updates.targetPriceCents;
     if (typeof updates.priceAlertEnabled === "boolean")
       payload.priceAlertEnabled = updates.priceAlertEnabled;
+    if (updates.imageUrl !== undefined) payload.imageUrl = updates.imageUrl;
 
     if (Object.keys(payload).length === 0) return;
 
@@ -1116,7 +1127,14 @@ export default function App() {
       );
     });
 
-    setItems((current) => [...current, result.item]);
+    // O item novo vem no topo do ambiente (o servidor o grava antes dos demais) e, em "Todos", no topo da lista.
+    setItems((current) => [result.item, ...current]);
+    setJustAddedItemId(result.item.id);
+    window.requestAnimationFrame(() =>
+      document
+        .querySelector(`[data-item-id="${result.item.id}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+    );
     // Na lista de todos os ambientes continua nela; a categoria só muda quando já havia uma ativa.
     setActiveCategoryId((current) => (current ? result.category.id : ""));
   };
@@ -1749,6 +1767,7 @@ export default function App() {
       }
       showUpdatedAt={isShowingLatestChanges}
       updatedAtLabel={formatUpdatedAt(item.updatedAt)}
+      enxovalId={activeEnxoval?.id}
       onUpdate={updateItem}
       onDelete={openDeleteItem}
     />
@@ -2388,20 +2407,17 @@ export default function App() {
             <CalendarClock size={19} />
             Planejamento
           </button>
-          <button
-            type="button"
-            className="mobile-nav-add"
-            aria-label="Adicionar item ou ambiente"
-            aria-haspopup="dialog"
-            onClick={() => setIsAddChoiceOpen(true)}
-            disabled={!hasEnxoval}
-          >
-            <span className="mobile-nav-add-icon" aria-hidden="true">
-              <Plus size={22} strokeWidth={2.5} />
-            </span>
-            Adicionar
-          </button>
         </nav>
+        <button
+          type="button"
+          className="mobile-fab-add"
+          aria-label="Adicionar item ou ambiente"
+          aria-haspopup="dialog"
+          onClick={() => setIsAddChoiceOpen(true)}
+          disabled={!hasEnxoval}
+        >
+          <Plus size={26} strokeWidth={2.5} aria-hidden="true" />
+        </button>
       </div>
       <FeedbackDialog
         open={isFeedbackOpen}

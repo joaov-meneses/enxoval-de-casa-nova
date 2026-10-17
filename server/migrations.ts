@@ -423,6 +423,24 @@ export async function migrateDatabase() {
     );
     CREATE INDEX IF NOT EXISTS items_tracked_product_id_idx ON items(tracked_product_id);
 
+    -- Imagens dos itens (enviadas ou importadas por link): já reduzidas e convertidas para WebP pelo servidor.
+    -- O item guarda só o endereço interno (/api/item-images/<id>). A mesma imagem não se repete dentro do enxoval.
+    CREATE TABLE IF NOT EXISTS item_images (
+      id uuid PRIMARY KEY,
+      enxoval_id uuid NOT NULL REFERENCES enxovais(id) ON DELETE CASCADE,
+      created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      content_type text NOT NULL DEFAULT 'image/webp',
+      data bytea NOT NULL,
+      width integer NOT NULL,
+      height integer NOT NULL,
+      byte_size integer NOT NULL,
+      sha256 text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT item_images_type_valid CHECK (content_type = 'image/webp'),
+      CONSTRAINT item_images_size_valid CHECK (byte_size > 0 AND byte_size <= 1048576)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS item_images_enxoval_sha_unique ON item_images(enxoval_id, sha256);
+
     -- Nome de enxoval começa com letra maiúscula ("apartamento" vira "Apartamento"); o app já grava assim e isto
     -- corrige os nomes antigos. Só toca nos que ainda começam com minúscula.
     UPDATE enxovais SET name = upper(left(name, 1)) || substr(name, 2), updated_at = now()

@@ -137,7 +137,11 @@ export const protectMutationOrigin: RequestHandler = (req, res, next) => {
     res.status(403).json({ error: "Origem da solicitação não permitida." });
     return;
   }
-  if (!req.get("content-type")?.toLowerCase().startsWith("application/json")) {
+  const contentType = req.get("content-type")?.toLowerCase() ?? "";
+  // O envio de imagem manda o arquivo cru. Tipos image/* também não passam em pedido cruzado sem autorização
+  // prévia do navegador (CORS), então a defesa é a mesma do JSON.
+  const isImageUpload = req.path === "/item-images" && contentType.startsWith("image/");
+  if (!contentType.startsWith("application/json") && !isImageUpload) {
     res.status(415).json({ error: "Envie os dados no formato JSON." });
     return;
   }

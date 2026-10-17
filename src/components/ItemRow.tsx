@@ -39,6 +39,7 @@ import {
 import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
 import { QuantityStepper } from "./QuantityStepper";
+import { ItemImageField } from "./ItemImageField";
 import { Select } from "./Select";
 import { weekOptions } from "../planning/weekOptions";
 import { weekLabel } from "../planning/purchasePlan";
@@ -60,6 +61,8 @@ interface ItemRowProps {
   updatedAtLabel?: string;
   dragHandle?: ReactNode;
   buyPlan?: ItemBuyPlan;
+  /** Enxoval do item: é onde a imagem enviada fica guardada. Sem ele a edição não mostra o campo de imagem. */
+  enxovalId?: string;
   onUpdate: (
     id: string,
     updates: Partial<EnxovalItem> & ItemTrackingInput,
@@ -89,6 +92,7 @@ export function ItemRow({
   updatedAtLabel,
   dragHandle,
   buyPlan,
+  enxovalId,
   onUpdate,
   onDelete,
 }: ItemRowProps) {
@@ -104,6 +108,7 @@ export function ItemRow({
   const [weekValue, setWeekValue] = useState("auto");
   const [targetText, setTargetText] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
+  const [imageValue, setImageValue] = useState<string | null>(item.imageUrl ?? null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -129,6 +134,7 @@ export function ItemRow({
         : "",
     );
     setAlertEnabled(item.priceTracking?.priceAlertEnabled ?? true);
+    setImageValue(item.imageUrl ?? null);
     setError("");
   }, [item, expanded]);
   useEffect(() => setThumbFailed(false), [item.imageUrl]);
@@ -194,6 +200,8 @@ export function ItemRow({
         description: description.trim(),
         categoryId,
         status,
+        // A imagem só vai no pedido quando a pessoa trocou ou removeu.
+        ...(imageValue !== (item.imageUrl ?? null) ? { imageUrl: imageValue } : {}),
         // A semana só vai no pedido quando a pessoa mexeu nela.
         ...(weekValue !== (item.buyWeek === null ? "auto" : String(item.buyWeek))
           ? { buyWeek: weekValue === "auto" ? null : Number(weekValue) }
@@ -220,6 +228,7 @@ export function ItemRow({
   }
   return (
     <div
+      data-item-id={item.id}
       className={`item-row ${item.checked ? "checked" : ""} ${isInactiveStatus(item.status) ? "inactive" : ""} ${expanded ? "expanded" : ""}`}
     >
       <div className="item-row-inner">
@@ -608,6 +617,13 @@ export function ItemRow({
                   disabled={busy}
                 />
               </label>
+              <ItemImageField
+                className="item-inline-wide"
+                enxovalId={enxovalId}
+                value={imageValue}
+                onChange={setImageValue}
+                disabled={busy}
+              />
               <label htmlFor={`${id}-description`} className="item-inline-wide item-field-notes">
                 Observações
                 <textarea

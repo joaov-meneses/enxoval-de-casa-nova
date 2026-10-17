@@ -9,3 +9,6 @@ tmp/
 *.log
 .env*
 !.env.example
+
+# Capturas brutas do inventário de telas (podem conter dados pessoais)
+design/inventario/capturas-brutas/

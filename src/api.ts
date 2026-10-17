@@ -342,6 +342,8 @@ export function createItem(input: {
   discountCents?: number;
   quantity?: number;
   buyWeek?: number | null;
+  /** "top" (padrão): o item novo entra no topo do ambiente. "end": no fim, para manter a ordem de uma planilha importada. */
+  placement?: "top" | "end";
 } & ItemTrackingInput) {
   return request<{ item: EnxovalItem; category: EnxovalCategory }>(
     "/api/items",
@@ -382,6 +384,28 @@ export function extractProduct(url: string) {
   return request<ScrapedProductPreview>("/api/products/extract", {
     method: "POST",
     body: JSON.stringify({ url }),
+  });
+}
+
+/** Envia o arquivo de uma imagem do item: o servidor confere, reduz, guarda no banco e devolve o endereço dela. */
+export function uploadItemImage(enxovalId: string, image: Blob) {
+  return request<{ imageUrl: string }>(
+    `/api/item-images?enxovalId=${encodeURIComponent(enxovalId)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": image.type.startsWith("image/") ? image.type : "image/jpeg",
+      },
+      body: image,
+    },
+  );
+}
+
+/** Importa a imagem de um endereço público: o servidor baixa, reduz e guarda no banco, como no envio de arquivo. */
+export function importItemImageFromUrl(enxovalId: string, url: string) {
+  return request<{ imageUrl: string }>("/api/item-images/from-url", {
+    method: "POST",
+    body: JSON.stringify({ enxovalId, url }),
   });
 }
 

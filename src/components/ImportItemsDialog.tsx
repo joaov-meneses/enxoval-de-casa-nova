@@ -197,6 +197,8 @@ function ImportItemsDialog({
             : {}),
           link: row.link,
           description: row.description,
+          // A planilha mantém a ordem das linhas: sem isso cada item novo passaria na frente do anterior.
+          placement: "end",
         });
         ok++;
       } catch (err) {

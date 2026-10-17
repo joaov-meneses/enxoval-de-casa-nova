@@ -63,8 +63,7 @@ textarea:focus-visible {
   background: #ead8bf;
   color: #432e24;
 }
-.marketing-page,
-.auth-page {
+.marketing-page {
   font-family: var(--sans);
   color: var(--ink);
   background: var(--paper);
@@ -133,12 +132,6 @@ textarea:focus-visible {
 }
 .brand-stacked .brand-symbol {
   height: 2.6em;
-}
-.auth-story-top .brand-word {
-  color: #fff;
-}
-.auth-story-top .brand {
-  filter: drop-shadow(0 1px 3px #2924203d);
 }
 .brand-link {
   display: inline-flex;
@@ -367,113 +360,6 @@ h2 {
   color: #5f5147;
 }
 /* Account entry */
-.auth-page {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  min-height: 100dvh;
-}
-.auth-story {
-  position: relative;
-  min-height: 100%;
-  isolation: isolate;
-  color: white;
-}
-.auth-story > img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 53% center;
-  z-index: -2;
-}
-.auth-story:after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, #a34c3035, #291c16e3);
-  z-index: -1;
-}
-.auth-story-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 40px 46px;
-  gap: 20px;
-}
-.auth-story-top > span {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: #fff9;
-}
-.auth-story-copy {
-  padding: 140px 65px 60px;
-}
-.auth-story-copy > svg {
-  color: #a34c30;
-}
-.auth-story-copy h2 {
-  font-size: clamp(35px, 4.3vw, 61px);
-  line-height: 1.2;
-  font-weight: 400;
-  letter-spacing: -1.5px;
-  margin: 24px 0;
-}
-.auth-story-copy h2 em {
-  color: #a34c30;
-}
-.auth-story-copy > p {
-  font-size: 14px;
-  line-height: 1.9;
-  color: #ede8d8;
-}
-.auth-story-tags {
-  display: flex;
-  gap: 23px;
-  border-top: 1px solid #ffffff26;
-  margin-top: 45px;
-  padding-top: 24px;
-}
-.auth-story-tags > span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: #e2d6c3;
-}
-.auth-panel {
-  display: flex;
-  flex-direction: column;
-  padding: 35px 48px;
-  min-height: 100dvh;
-}
-.auth-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #5d5249;
-  width: fit-content;
-}
-.auth-form-wrap {
-  width: 100%;
-  max-width: 365px;
-  margin: auto;
-  padding-block: 48px;
-}
-.auth-form-wrap h1 {
-  font-family: var(--serif);
-  font-size: 33px;
-  line-height: 1.3;
-  font-weight: 400;
-  letter-spacing: -1px;
-  margin: 12px 0;
-}
-.auth-form-wrap p {
-  font-size: 13px;
-  color: #5c5148;
-  line-height: 1.7;
-}
 .auth-form {
   display: flex;
   flex-direction: column;
@@ -531,46 +417,6 @@ h2 {
   font-size: 13px;
   line-height: 1.6;
   padding: 12px;
-}
-.auth-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: #5c5048;
-  white-space: nowrap;
-  margin: 26px 0;
-}
-.auth-divider:before,
-.auth-divider:after {
-  content: "";
-  height: 1px;
-  background: #ede2d1;
-  flex: 1;
-}
-.auth-form-wrap > .button {
-  width: 100%;
-  font-size: 13px;
-}
-.auth-form-wrap .auth-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  font-size: 12px;
-  color: #605349;
-  margin-top: 18px;
-}
-.auth-bottom {
-  font-size: 12px;
-  color: #605349;
-  display: flex;
-  justify-content: center;
-  gap: 7px;
-  align-items: center;
-}
-.auth-mobile-brand {
-  display: none;
 }
 /* The planner */
 .workspace-app {
@@ -1387,34 +1233,6 @@ h2 {
   .step p {
     font-size: 13px;
   }
-  .auth-story-top {
-    padding: 30px;
-  }
-  .auth-story-top > span {
-    display: none;
-  }
-  .auth-story-copy {
-    padding: 110px 35px 40px;
-  }
-  .auth-story-copy h2 {
-    font-size: 41px;
-  }
-  .auth-panel {
-    padding: 30px;
-  }
-  .auth-form-wrap h1 {
-    font-size: 30px;
-  }
-  .auth-story-tags {
-    flex-direction: column;
-    gap: 13px;
-  }
-  .auth-form-wrap .eyebrow {
-    font-size: 11px;
-  }
-  .auth-form-wrap p {
-    font-size: 13px;
-  }
 }
 @media (max-width: 600px) {
   html {
@@ -1479,55 +1297,6 @@ h2 {
     max-width: 400px;
     margin-inline: 8px;
     order: 2;
-  }
-  .auth-page {
-    grid-template-columns: 1fr;
-  }
-  .auth-story {
-    display: none;
-  }
-  .auth-panel {
-    padding: 24px;
-    min-height: 100dvh;
-  }
-  .auth-back {
-    font-size: 13px;
-  }
-  .auth-form-wrap {
-    padding-block: 40px;
-    max-width: 390px;
-  }
-  .auth-mobile-brand {
-    display: flex;
-    margin-bottom: 35px;
-  }
-  .auth-form-wrap .eyebrow {
-    font-size: 11px;
-  }
-  .auth-form-wrap h1 {
-    font-size: 32px;
-  }
-  .auth-form-wrap p {
-    font-size: 13px;
-  }
-  .auth-tabs {
-    margin-bottom: 20px;
-  }
-  .auth-form label {
-    font-size: 13px;
-  }
-  .auth-form input {
-    font-size: 16px;
-  }
-  .auth-form input::placeholder {
-    font-size: 13px;
-  }
-  .auth-form-wrap .auth-note {
-    font-size: 12px;
-  }
-  .auth-bottom {
-    font-size: 12px;
-    padding-bottom: 10px;
   }
   .mobile-app-brand {
     padding-inline: 17px;
@@ -1755,15 +1524,6 @@ h2 {
   }
 }
 
-.auth-story-tags > span {
-  color: #e2d6c3;
-}
-.auth-story-copy h2 em {
-  color: #e0c2a1;
-}
-.auth-story-copy > svg {
-  color: #ebd7b9;
-}
 
 .workspace-navigation button {
   font-size: 14px;
@@ -3201,57 +2961,6 @@ button.reorder-handle:disabled {
   overflow-wrap: anywhere;
 }
 
-/* Tela de entrar: abas para Entrar e Criar conta */
-.auth-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 26px;
-  background: #f3ece1;
-  border-radius: 10px;
-}
-.auth-tab {
-  flex: 1;
-  padding: 10px 12px;
-  min-height: 40px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #5c5148;
-  border-radius: 7px;
-  text-align: center;
-}
-.auth-tab[aria-selected="true"] {
-  background: #fffdf9;
-  color: var(--ink);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-.auth-switch {
-  margin-top: 18px;
-  font-size: 13px;
-  line-height: 1.6;
-  text-align: center;
-  color: #5c5148;
-}
-.auth-switch a,
-.auth-switch-link {
-  color: #a34c30;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.auth-privacy {
-  margin-top: 16px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #5c5148;
-}
-.auth-privacy a {
-  color: #a34c30;
-  font-weight: 600;
-}
-.auth-form-wrap .auth-form {
-  margin-top: 28px;
-}
 
 /* A busca já tem o próprio botão de limpar: esconde o "x" nativo do navegador */
 .list-search input[type="search"]::-webkit-search-cancel-button,
@@ -4181,22 +3890,6 @@ button.reorder-handle:disabled {
   }
 }
 
-/* Esqueci minha senha */
-.auth-form .auth-forgot {
-  align-self: flex-end;
-  margin-top: -8px;
-  padding: 6px 2px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #a34c30;
-  text-decoration: underline;
-  text-decoration-color: #cdb8a3;
-  text-underline-offset: 3px;
-}
-.auth-form .auth-forgot:hover {
-  color: #422d24;
-  text-decoration-color: currentColor;
-}
 .account-access-card .account-cta {
   width: 100%;
   min-height: 48px;
@@ -4286,25 +3979,25 @@ button.reorder-handle:disabled {
     padding-bottom: 2px;
   }
   .workspace-app .environment-chips .environment-row {
-    min-height: 34px;
-    padding: 1px 9px 1px 3px;
+    min-height: 42px;
+    padding: 2px 12px 2px 4px;
     gap: 2px;
   }
   .workspace-app .environment-chips .environment-select {
-    min-height: 30px;
+    min-height: 38px;
     padding: 2px;
     gap: 6px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .workspace-app .environment-chips .environment-select > small {
-    padding: 1px 6px;
+    padding: 2px 8px;
     font-size: 11px;
     line-height: 1.5;
   }
   .workspace-app .environment-chips .reorder-handle {
     width: 20px;
     min-width: 20px;
-    height: 30px;
+    height: 38px;
   }
   .workspace-app .environment-chips .reorder-handle svg {
     width: 14px;
@@ -4315,21 +4008,21 @@ button.reorder-handle:disabled {
     padding-bottom: 2px;
   }
   .workspace-app .environment-chips-row > .environment-row.environment-all {
-    min-height: 34px;
-    padding: 1px 9px 1px 12px;
+    min-height: 42px;
+    padding: 2px 12px 2px 16px;
     gap: 2px;
   }
   .workspace-app
     .environment-chips-row
     > .environment-row.environment-all
     .environment-select {
-    min-height: 30px;
+    min-height: 38px;
     padding: 2px;
     gap: 6px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .workspace-app .environment-chips-row > .environment-row.environment-all small {
-    padding: 1px 6px;
+    padding: 2px 8px;
     font-size: 11px;
     line-height: 1.5;
   }
@@ -4487,8 +4180,9 @@ button.reorder-handle:disabled {
     gap: 6px;
   }
   .workspace-app .list-heading-actions .export-menu-trigger {
-    width: 38px;
     min-height: 38px;
+    padding: 0 14px;
+    white-space: nowrap;
   }
   .workspace-app .list-search {
     margin-bottom: 8px;
@@ -4616,37 +4310,34 @@ button.reorder-handle:disabled {
   }
 }
 
-/* Barra inferior: o ＋ central adiciona item (no lugar do botão flutuante, que cobria a lista) */
+/* Botão flutuante de adicionar: fica acima da barra inferior, no canto direito */
+.mobile-fab-add {
+  display: none;
+}
 @media (max-width: 1023px) {
-  .workspace-app .mobile-bottom-nav button.mobile-nav-add {
-    /* Mesma largura dos demais, para os quatro itens ficarem igualmente distribuídos e centralizados. */
-    flex: 1 1 0;
-    min-width: 0;
-    color: #4f362b;
-    font-weight: 600;
-    background: transparent;
-    box-shadow: none;
-  }
-  .mobile-nav-add-icon {
+  .mobile-fab-add {
+    position: fixed;
+    right: 16px;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    z-index: 31;
     display: grid;
     place-items: center;
-    width: 42px;
-    height: 42px;
-    margin-top: -16px;
+    width: 56px;
+    height: 56px;
+    padding: 0;
     color: #fff;
     background: #c2603f;
     border-radius: 50%;
     box-shadow:
       0 0 0 4px #fdfcf8,
-      0 5px 14px #422d2438;
+      0 8px 20px #422d2447;
     transition: transform 0.15s;
   }
-  .mobile-nav-add:active .mobile-nav-add-icon {
+  .mobile-fab-add:active {
     transform: scale(0.94);
   }
-  .workspace-app .mobile-nav-add-icon svg {
-    width: 22px;
-    height: 22px;
+  .mobile-fab-add:disabled {
+    opacity: 0.5;
   }
 }
 
@@ -5011,6 +4702,59 @@ button.reorder-handle:disabled {
     align-self: center;
   }
 }
+/* Celular: Importar/Exportar viram botões só com ícone */
+@media (max-width: 767px) {
+  .workspace-app .list-heading-actions .export-menu-trigger {
+    width: 38px;
+    padding: 0;
+  }
+}
+
+/* Tablet: preço e situação ganham colunas próprias à direita, sem invadir o título */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .workspace-app .item-row-inner {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    column-gap: 14px;
+    align-items: center;
+  }
+  .workspace-app .item-row-inner:has(> .reorder-handle) {
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  }
+  .workspace-app .item-row-inner > .reorder-handle,
+  .workspace-app .item-row-inner > .item-check {
+    align-self: center;
+  }
+  .workspace-app .item-row-inner .item-title-button {
+    grid-column: 2 / 3;
+    align-self: end;
+  }
+  .workspace-app .item-row-inner:has(> .reorder-handle) .item-title-button {
+    grid-column: 3 / 4;
+  }
+  .workspace-app .item-row-inner .item-meta {
+    align-self: start;
+  }
+  .workspace-app .item-row-inner > .item-price {
+    grid-column: -3;
+    grid-row: 1;
+    min-width: 0;
+    justify-self: end;
+    align-self: end;
+  }
+  .workspace-app .item-row-inner > .item-status {
+    grid-column: -3;
+    grid-row: 2;
+    justify-self: end;
+    align-self: start;
+    margin-top: 4px;
+  }
+  .workspace-app .item-row-inner > .item-actions {
+    grid-column: -2;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+}
+
 /* Telas de 344 px (Z Fold fechado): 36 caracteres em MAIÚSCULAS ainda cabem na linha do título */
 @media (max-width: 389px) {
   .workspace-app .item-name {
@@ -5824,4 +5568,157 @@ button.price-badge:hover {
   font-size: 13px;
   color: #695a4f;
   line-height: 1.5;
+}
+
+/* Novo item: cabeçalho e rodapé fixos, rolagem só no miolo; no desktop os campos ficam lado a lado */
+.casamia-dialog.add-item-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.add-item-dialog .dialog-heading {
+  flex: none;
+}
+.casamia-dialog.add-item-dialog > form.add-item-form {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+.add-item-form-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #d6c4a8 transparent;
+}
+.add-item-form-body::-webkit-scrollbar {
+  width: 12px;
+}
+.add-item-form-body::-webkit-scrollbar-thumb {
+  background: #d6c4a8;
+  border: 3px solid #fdfcf8;
+  border-radius: 999px;
+}
+.add-item-pair {
+  display: contents;
+}
+.add-item-form-footer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #eee2d1;
+  background: #fdfcf8;
+}
+@media (min-width: 768px) {
+  .casamia-dialog.add-item-dialog {
+    width: min(680px, calc(100vw - 48px));
+    max-height: min(780px, calc(100dvh - 32px));
+  }
+  .add-item-dialog .dialog-heading {
+    padding: 8px 14px 8px 24px;
+  }
+  .add-item-dialog .dialog-heading h2 {
+    font-size: 22px;
+  }
+  .add-item-dialog .dialog-close {
+    width: 36px;
+    min-height: 36px;
+    height: 36px;
+  }
+  .add-item-form-body {
+    gap: 8px;
+    padding: 12px 24px 10px;
+  }
+  .add-item-import {
+    padding: 10px 14px;
+  }
+  /* A dica do campo de link repete o bloco de importação logo acima */
+  .add-item-link-hint {
+    display: none;
+  }
+  .add-item-import button {
+    min-height: 40px;
+  }
+  .add-item-import > * + * {
+    margin-top: 8px;
+  }
+  /* Os rótulos dos campos já dizem tudo; os subtítulos só ocupariam linhas */
+  .add-item-heading {
+    display: none;
+  }
+  .add-item-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
+  }
+  .add-item-row-values {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .add-item-final {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 14px;
+  }
+  .add-item-final strong {
+    font-size: 18px;
+  }
+  .add-item-final span:last-child {
+    margin-left: auto;
+  }
+  .add-item-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  .add-item-pair textarea {
+    height: 62px;
+    min-height: 62px;
+  }
+  .add-item-dialog input:not([type="checkbox"]),
+  .add-item-dialog textarea {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 14.5px;
+  }
+  .add-item-dialog button.casamia-select-trigger {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+  .add-item-dialog .quantity-stepper button {
+    width: 40px;
+    min-height: 40px;
+  }
+  .add-item-dialog .quantity-stepper-buttons,
+  .add-item-dialog .quantity-stepper {
+    gap: 6px;
+  }
+  .add-item-form-footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 10px 24px;
+  }
+  .add-item-form-footer > p {
+    flex: 1;
+    margin: 0;
+  }
+  .casamia-dialog .add-item-submit {
+    width: auto;
+    min-width: 220px;
+    min-height: 40px;
+    padding: 10px 20px;
+    font-size: 15px;
+  }
 }
