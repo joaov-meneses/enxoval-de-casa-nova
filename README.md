@@ -6,6 +6,10 @@ O Casa Mia ajuda quem está montando a casa nova a planejar o enxoval por ambien
 
 A estratégia de marca, o tom de voz, a paleta e o modelo de negócio estão em [docs/branding-casa-mia.md](docs/branding-casa-mia.md). O roteiro do que ainda falta construir está em [docs/implementacoes-futuras.md](docs/implementacoes-futuras.md).
 
+A integração opcional de análise de uso com PostHog, suas variáveis, eventos e sugestões de painéis estão em [docs/analytics.md](docs/analytics.md).
+
+Os logs estruturados do backend e o envio filtrado ao PostHog Logs estão em [docs/logs.md](docs/logs.md).
+
 ## Sumário
 
 - [Rotas](#rotas)
@@ -205,4 +209,33 @@ npm start
 
 ## Escopo comercial desta versão
 
-Os planos e preços da landing page são **ilustrativos**. Não existem cobrança, checkout, assinatura nem limites de plano aplicados. A recuperação de senha pode ser feita pela própria pessoa, por e-mail, ou assistida pelo administrador. Confirmação de e-mail no cadastro, pagamentos, o motor de IA e a página pública de Chá de Casa Nova ainda não estão implementados: o plano para isso está em [docs/implementacoes-futuras.md](docs/implementacoes-futuras.md).
+O checkout, a assinatura mensal com trial e o Passe são processados pela Stripe. O acesso é validado no servidor, com sincronização por webhook e recuperação de pagamentos aprovados. A recuperação de senha pode ser feita pela própria pessoa, por e-mail, ou assistida pelo administrador.
+
+
+### Trial e cobrança
+
+O login expira após 48 horas sem atividade ou, no máximo, 7 dias desde a autenticação. Os limites são verificados no servidor. O navegador registra interações em memória e envia atividade no máximo uma vez por minuto; consultas automáticas de assinatura não renovam a sessão. Tokens continuam em cookie HttpOnly, com apenas o hash no banco. A migração limita também sessões antigas, sem estender sua validade. Validação: `npm run test:session-db` e, com o app aberto, `node tests/session-ui.mjs`.
+
+Novas contas concluem primeiro o onboarding. O plano completo fica salvo na conta antes do cadastro do cartão, sem iniciar o trial. Em seguida, a pessoa escolhe Mensal ou Passe em uma tela com os preços consultados na Stripe. O Mensal tem trial de 48 horas e renovação mensal; o Passe é pagamento único imediato por 12 meses, sem trial ou renovação automática. Após a confirmação do cartão ou pagamento na Stripe, o app abre diretamente o enxoval com todos os itens do onboarding. No Mensal, a Stripe concede 2 dias completos (48 horas) de acesso e faz a cobrança mensal automaticamente após o trial. O modal usa o preço da assinatura confirmada; no Passe, mostra o total efetivamente pago (incluindo descontos) e a validade. A escolha informada na URL nunca concede acesso nem determina o valor exibido. O trial só pode ser usado uma vez por conta; reativação é cobrada sem novo período gratuito. Checkouts abertos são reutilizados para evitar assinaturas duplicadas em duas abas.
+
+O aviso de início do trial aparece em um modal no primeiro acesso ao enxoval, sem faixa permanente. A confirmação é salva na conta por assinatura, evitando repetição ao recarregar ou trocar de dispositivo. O lembrete das últimas 24 horas também aparece uma única vez. O gerenciamento e o cancelamento ficam em **Meu perfil → Assinatura**, com confirmação antes de encerrar o acesso. O perfil é acessado pelo menu suspenso do desktop, pelo menu do celular ou pelo cartão de usuário na lateral.
+
+O servidor envia o aviso inicial e um lembrete quando restam 24 horas, pela rotina de notificações executada a cada minuto. Configure `RESEND_API_KEY`, `MAIL_FROM`, `APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY` e `STRIPE_WEBHOOK_SECRET`. Em produção, o início do checkout exige envio de e-mail configurado. Mantenha o serviço em execução para os lembretes serem enviados no horário. O webhook deve receber `customer.subscription.created`, `customer.subscription.updated` e `customer.subscription.deleted`; os eventos de checkout existentes continuam atendendo os Passes já comprados.
+
+O cancelamento no app é imediato: bloqueia titular e convidados, inclusive leitura, importação e exportação, preservando contas, vínculos e dados. Assinaturas canceladas pelo portal também são bloqueadas pelo webhook, mesmo quando o cancelamento está agendado. Passes em vigor e contas fundadoras mantêm o acesso existente.
+
+Em desenvolvimento, o checkout retorna à mesma origem que o iniciou: `localhost` e o IP da rede têm cookies separados. Em produção, use o endereço canônico de `APP_URL` para entrar no app e no checkout. O retorno confirma a assinatura na Stripe sem encerrar a sessão.
+
+Validação: `npm run test:billing-db`, `npm run lint` e `npm run build`. Para o teste visual, execute `npm exec vite preview -- --port 4173`, depois `node tests/trial-ui.mjs` (ou informe `TRIAL_UI_URL`).
+
+### Perfil e informações do lar
+
+**Meu perfil** permite alterar o nome pelo ícone de lápis, atualizar a foto pelo avatar e solicitar redefinição de senha. O avatar abre opções de tirar, enviar ou remover foto; celular/tablet usam a captura nativa quando disponível e desktop usa a webcam com prévia antes de confirmar. A câmera exige HTTPS ou localhost e é desligada ao sair. Os nomes do perfil e do lar começam bloqueados até o clique no lápis. O e-mail de acesso é apresentado apenas para consulta. A foto é validada pelos bytes, convertida para WebP sem metadados e armazenada no banco; a leitura exige a sessão do próprio usuário. As informações pessoais continuam disponíveis mesmo sem assinatura ativa.
+
+**Meu lar** permite ao titular alterar nome, data da mudança, estado, cidade de referência e perfil de gasto, usando as permissões já aplicadas ao enxoval. Convidados podem consultar os dados, mas não alterá-los. **Assinatura** reúne situação do plano, término do trial ou validade do Passe, renovação, portal da Stripe e cancelamento.
+
+Validação: `npm run test:profile-db` e, com o app aberto, `node tests/profile-ui.mjs` (opcionalmente `PROFILE_UI_URL`).
+
+Na edição de um item, um link novo ou alterado oferece buscar os dados da loja antes de consultar. A prévia permite usar o nome da loja ou definir um nome próprio; preço e foto encontrados ficam no rascunho até salvar. Erros e leituras parciais permitem continuar manualmente. Os links do produto e da imagem têm botão de copiar; imagens por URL são carregadas ao sair do campo ou pressionar Enter. A miniatura fica ao lado das informações no celular e no tablet. `node tests/item-links-ui.mjs` verifica o fluxo com API simulada e larguras de 320 a 1920 pixels.
+
+`node tests/item-layout-ui.mjs` compara as dimensões e o alinhamento dos mesmos itens em Todos e nos ambientes, com e sem foto, verifica a reordenação pelo teclado e a barra de ambientes em 320, 375, 768 e 1440 pixels. No celular, a alça compartilha a coluna do checkbox e as ações da barra ocupam uma linha própria, com alvos de toque de 44 pixels.

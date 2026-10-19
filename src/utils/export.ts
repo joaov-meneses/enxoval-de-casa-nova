@@ -1,4 +1,5 @@
 import type { EnxovalItem } from "../types";
+import { capture } from '../analytics';
 import { normalizeQuantity } from "../itemQuantity";
 import { discountApplies, statusLabel } from "../itemStatus";
 
@@ -123,10 +124,12 @@ export async function exportItems(
   const base = fileBaseName(name);
   if (format === "xlsx") {
     download(await createXlsxBlob(items), `${base}.xlsx`);
+    capture('items_exported', { format, count: items.length });
     return;
   }
   download(
     new Blob([createCsv(items)], { type: "text/csv;charset=utf-8;" }),
     `${base}.csv`,
   );
+  capture('items_exported', { format, count: items.length });
 }

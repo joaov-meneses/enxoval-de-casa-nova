@@ -1,4 +1,7 @@
+import { httpErrorHandler } from './httpLogging.ts';
+import { getLogger, setLogUser } from './logger.ts';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
 import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH, normalizeEnvironmentName, normalizeEnxovalName } from '../src/data.ts';
@@ -21,14 +24,15 @@ import { isBuyWeek, MAX_BUY_WEEK, MIN_BUY_WEEK, type ItemPriority, type ItemTimi
 import { cityById, cityMatchesState } from '../src/onboarding/regions.ts';
 import { ScrapeError, rememberPreview, scrapeProduct } from './services/productScraper.ts';
 import { findOrCreateTrackedProduct, requireTrackableUrl } from './trackedProducts.ts';
-import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, effectivePlanSql, trimToLimits } from './freemium.ts';
-import { registerBillingRoutes } from './billing.ts';
+import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, effectivePlanSql, subscriptionRequired, trimToLimits } from './freemium.ts';
+import { registerBillingRoutes, recoverBillingAccess } from './billing.ts';
+import { registerProfileRoutes } from './profile.ts';
 import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
 import { MAX_IMAGE_UPLOAD_BYTES, internalImageId } from '../src/itemImages.ts';
 import { imageBelongsToEnxoval, importImageFromUrl, isExternalImageUrl, processImage, purgeUnusedImages, storeImage, type ProcessedImage } from './services/itemImages.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const RESET_TOKEN_TTL_MS = 60 * 60_000;
 const RESET_REQUEST_COOLDOWN_SECONDS = 60;
 const INVITATION_TTL_DAYS = 7;
@@ -405,6 +409,8 @@ async function requireEnxovalMember(queryable: Queryable, userId: string, enxova
   `, [enxovalId, userId]);
 
   if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
+  const owner = await queryable.query<{plan: string}>(`SELECT ${effectivePlanSql('u')} AS plan FROM enxovais e JOIN users u ON u.id = e.owner_id WHERE e.id = $1`, [enxovalId]);
+  if (owner.rows[0]?.plan === 'free') throw subscriptionRequired();
   return result.rows[0].role;
 }
 async function requireEnxovalOwner(queryable: Queryable, userId: string, enxovalId: string) {
@@ -476,10 +482,17 @@ async function fetchWorkspace(queryable: Queryable, userId: string, enxovalId: s
 
 async function fetchBootstrap(user: AuthUser, requestedEnxovalId?: string): Promise<BootstrapData> {
   if (user.mustChangePassword) return { user, enxovais: [], activeEnxoval: null, members: [], categories: [], items: [] };
+  if (user.plan === 'free' && !user.isGuest) {
+    const recovered = await recoverBillingAccess(user.id);
+    if (isAccountPlan(recovered.plan)) user = { ...user, plan: recovered.plan };
+  }
+  const state = await getPool().query<{ onboarding_completed_at: Date | null; trial_used: boolean; avatar_version: string | null }>('SELECT onboarding_completed_at, trial_used, avatar_version FROM users WHERE id = $1', [user.id]);
+  user = { ...user, onboardingCompleted: Boolean(state.rows[0]?.onboarding_completed_at), trialUsed: state.rows[0]?.trial_used ?? false, avatarUrl: state.rows[0]?.avatar_version ? `/api/profile/avatar?v=${state.rows[0].avatar_version}` : null };
   const enxovais = await fetchEnxovais(getPool(), user.id);
   // Um enxoval pedido que a pessoa não acessa mais (ex.: ela foi removida como convidada) cai no primeiro da lista.
   const activeEnxovalId = enxovais.find(enxoval => enxoval.id === requestedEnxovalId)?.id ?? enxovais[0]?.id;
-  const workspace = activeEnxovalId
+  const access = activeEnxovalId ? await getPool().query<{plan: string}>(`SELECT ${effectivePlanSql('u')} AS plan FROM enxovais e JOIN users u ON u.id = e.owner_id WHERE e.id = $1`, [activeEnxovalId]) : null;
+  const workspace = activeEnxovalId && access?.rows[0]?.plan !== 'free'
     ? await fetchWorkspace(getPool(), user.id, activeEnxovalId)
     : null;
 
@@ -604,7 +617,7 @@ const MAX_PLAN_CATEGORIES = 15;
 const MAX_PLAN_ITEMS = 400;
 
 /** Plano gerado pelo funil de onboarding: ambientes e itens, com limites para não virar um vetor de abuso. */
-function parsePlan(value: unknown): EnxovalPlan | null {
+export function parseOnboardingPlan(value: unknown, allowEmptyItems = false): EnxovalPlan | null {
   if (value === undefined || value === null) return null;
   const categories = (value as { categories?: unknown })?.categories;
   if (!Array.isArray(categories) || categories.length === 0 || categories.length > MAX_PLAN_CATEGORIES) {
@@ -642,7 +655,8 @@ function parsePlan(value: unknown): EnxovalPlan | null {
   if (new Set(parsed.map(category => category.name)).size !== parsed.length) {
     throw new HttpError(400, 'Plano com ambientes repetidos.');
   }
-  if (totalItems === 0) throw new HttpError(400, 'Plano sem itens.');
+  if (totalItems === 0 && !allowEmptyItems) throw new HttpError(400, 'Plano sem itens.');
+  if (totalItems > 0 && allowEmptyItems) throw new HttpError(400, 'A escolha sem itens deve criar apenas os ambientes.');
 
   return { categories: parsed };
 }
@@ -717,6 +731,15 @@ function parseUserName(value: unknown): string | null {
   return name;
 }
 
+async function saveOnboardingDraft(userId: string, name: string, plan: EnxovalPlan, profile: OnboardingProfile, userName: string | null) {
+  await withTransaction(async client => {
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    const existing = await client.query('SELECT id FROM enxovais WHERE owner_id = $1 LIMIT 1', [userId]);
+    if (existing.rows.length) throw new HttpError(409, 'Você já tem um enxoval. Acesse o aplicativo para continuar.');
+    await client.query(`UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, now()), onboarding_draft = $2::jsonb, name = COALESCE($3, name) WHERE id = $1`, [userId, JSON.stringify({ name, plan, profile }), userName]);
+  });
+}
+
 async function createEnxovalForUser(
   userId: string,
   name: string,
@@ -748,6 +771,14 @@ async function createSession(res: Response, userId: string, queryable: Queryable
   });
 }
 
+async function recordUserIpEvent(queryable: Queryable, userId: string, ip: string | undefined, event: 'signup' | 'login' | 'invitation_signup') {
+  if (!ip || !isIP(ip)) return;
+  await queryable.query(`
+    INSERT INTO user_ip_events (id, user_id, ip, event)
+    VALUES ($1, $2, $3::inet, $4)
+  `, [randomUUID(), userId, ip, event]);
+}
+
 /**
  * Cria o link de redefinição e o envia por e-mail. Roda depois de a resposta já ter saído, então o tempo de resposta
  * não revela se o e-mail tem conta. Só o hash do token vai para o banco.
@@ -760,7 +791,7 @@ async function issuePasswordReset(email: string) {
 
   const base = appBaseUrl();
   if (!base) {
-    console.error('Redefinição de senha: configure APP_URL (ex.: https://seu-dominio.com) para montar o link do e-mail.');
+    getLogger().error({ event: 'password_reset.configuration_missing' }, 'Redefinição de senha: configure APP_URL para montar o link do e-mail.');
     return;
   }
 
@@ -800,10 +831,13 @@ async function getCurrentUser(req: Request) {
     FROM sessions s
     INNER JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = $1 AND s.expires_at > now() AND u.is_active = true
+      AND s.created_at > now() - interval '7 days'
+      AND s.last_activity_at > now() - interval '48 hours'
       AND (NOT u.must_change_password OR u.password_reset_expires_at > now())
     LIMIT 1
   `, [hashSessionToken(token)]);
 
+  if (result.rows[0]) setLogUser(result.rows[0].id);
   return result.rows[0] ? mapUser(result.rows[0]) : null;
 }
 
@@ -1172,11 +1206,54 @@ export function registerApiRoutes(app: Express) {
   const router = express.Router();
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(protectMutationOrigin);
+  router.use(asyncHandler(async (req, _res, next) => {
+    if (/^\/(auth(?:\/|$)|profile(?:\/|$)|onboarding\/complete$|billing(?:\/|$)|admin(?:\/|$)|bootstrap$|health$|invitations(?:\/|$)|feedback(?:\/|$))/.test(req.path)) return next();
+    // Older onboarding screens post the draft here. The handler saves it without granting access.
+    if (req.method === 'POST' && req.path === '/enxovais' && req.body?.plan !== undefined) return next();
+    const user = await requireCurrentUser(req);
+    const candidate = req.query.enxovalId ?? req.body?.enxovalId ?? req.path.match(/^\/enxovais\/([^/]+)/)?.[1];
+    if (typeof candidate === 'string') await requireEnxovalMember(getPool(), user.id, candidate);
+    else {
+      // Image URLs carry only the image ID: check the owner of that image's workspace.
+      const imageId = req.path.match(/^\/item-images\/([0-9a-f-]+)$/i)?.[1];
+      if (imageId) {
+        const image = await getPool().query<{enxoval_id: string}>('SELECT enxoval_id FROM item_images WHERE id = $1', [imageId]);
+        if (!image.rows[0]) throw new HttpError(404, 'Imagem não encontrada.');
+        await requireEnxovalMember(getPool(), user.id, image.rows[0].enxoval_id);
+      } else if (user.plan === 'free') throw subscriptionRequired();
+    }
+    next();
+  }));
   registerAdminRoutes(router);
+  registerProfileRoutes(router, requireCurrentUser);
   registerFeedbackRoutes(router, requireCurrentUser);
   registerAiRoutes(router, { requireUser: requireCurrentUser, fetchItems, fetchCategories });
   registerCatalogRoutes(router, { requireUser: requireCurrentUser });
-  registerBillingRoutes(router, { requireUser: requireCurrentUser });
+  registerBillingRoutes(router, {
+    requireUser: requireCurrentUser,
+    ensureDefaultEnxoval: userId => withTransaction(async client => {
+      const limits = await assertCanCreateEnxoval(client, userId);
+      const existing = await client.query<{ id: string }>('SELECT id FROM enxovais WHERE owner_id = $1 ORDER BY created_at, id LIMIT 1', [userId]);
+      if (existing.rows[0]) return existing.rows[0].id;
+      const saved = await client.query<{ onboarding_draft: { name: string; plan: EnxovalPlan; profile: OnboardingProfile } | null }>('SELECT onboarding_draft FROM users WHERE id = $1', [userId]);
+      const draft = saved.rows[0]?.onboarding_draft;
+      const id = await insertEnxoval(client, userId, draft?.name ?? 'Enxoval de Casa Nova', limits, draft ? { plan: draft.plan, profile: draft.profile } : { useDefaultTemplate: true });
+      await client.query('UPDATE users SET onboarding_draft = NULL WHERE id = $1', [userId]);
+      return id;
+    })
+  });
+
+  router.post('/onboarding/complete', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req);
+    if (user.isGuest) throw new HttpError(403, 'Contas de convidados usam o enxoval do titular.');
+    const name = normalizeEnxovalName(requireText(req.body?.name, 'Nome do enxoval'));
+    const profile = parseOnboardingProfile(req.body?.profile);
+    const plan = parseOnboardingPlan(req.body?.plan, profile.style === 'none');
+    if (!plan) throw new HttpError(400, 'Conclua o planejamento antes de continuar.');
+    const userName = parseUserName(req.body?.userName);
+    await saveOnboardingDraft(user.id, name, plan, profile, userName);
+    res.json({ completed: true });
+  }));
 
   // Imagens dos itens. Enviar um arquivo (corpo cru, `Content-Type: image/*`) ou importar por link: nos dois casos o
   // servidor confere, reduz e converte a imagem, guarda no banco e devolve o endereço interno para usar no item.
@@ -1254,10 +1331,13 @@ export function registerApiRoutes(app: Express) {
     const userId = randomUUID();
 
     try {
-      await getPool().query(`
-        INSERT INTO users (id, name, email, password_hash, last_login_at)
-        VALUES ($1, $2, $3, $4, now())
-      `, [userId, name, email, passwordHash]);
+      await withTransaction(async client => {
+        await client.query(`
+          INSERT INTO users (id, name, email, password_hash, last_login_at)
+          VALUES ($1, $2, $3, $4, now())
+        `, [userId, name, email, passwordHash]);
+        await recordUserIpEvent(client, userId, req.ip, 'signup');
+      });
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
         throw new HttpError(409, 'Já existe uma conta com esse e-mail.');
@@ -1286,6 +1366,7 @@ export function registerApiRoutes(app: Express) {
       }
       await client.query('DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()', [row.id]);
       await client.query('UPDATE users SET last_login_at = now() WHERE id = $1', [row.id]);
+      await recordUserIpEvent(client, row.id, req.ip, 'login');
       await createSession(res, row.id, client);
       return mapUser(row);
     });
@@ -1322,7 +1403,7 @@ export function registerApiRoutes(app: Express) {
     // A resposta é a mesma exista ou não uma conta com esse e-mail: ninguém descobre quem tem cadastro.
     res.json({ ok: true });
     void issuePasswordReset(email).catch(err =>
-      console.error('Falha ao preparar a redefinição de senha:', err instanceof Error ? err.message : err));
+      getLogger().error({ event: 'password_reset.failed', err }, 'Falha ao preparar a redefinição de senha.'));
   }));
 
   router.post('/auth/reset-password/check', loginRateLimit(30), asyncHandler(async (req, res) => {
@@ -1364,7 +1445,19 @@ export function registerApiRoutes(app: Express) {
     });
     res.json({ ok: true });
     void sendMail(passwordChangedEmail({ to: user.email, name: user.name })).catch(err =>
-      console.error('Falha ao enviar o aviso de senha alterada:', err instanceof Error ? err.message : err));
+      getLogger().error({ event: 'password_changed.notification_failed', err }, 'Falha ao enviar o aviso de senha alterada.'));
+  }));
+
+  // Only explicit browser activity extends the idle window. Polling and reads never do.
+  router.post('/auth/activity', asyncHandler(async (req, res) => {
+    await requireCurrentUser(req, true);
+    const tokenHash = hashSessionToken(getCookie(req, SESSION_COOKIE));
+    const updated = await getPool().query(`UPDATE sessions SET last_activity_at = now()
+      WHERE token_hash = $1 AND expires_at > now()
+        AND created_at > now() - interval '7 days'
+        AND last_activity_at > now() - interval '48 hours'`, [tokenHash]);
+    if (!updated.rowCount) throw new HttpError(401, 'Sua sessão expirou. Faça login novamente.');
+    res.status(204).end();
   }));
 
   router.post('/auth/logout', asyncHandler(async (req, res) => {
@@ -1389,11 +1482,17 @@ export function registerApiRoutes(app: Express) {
 
     // O enxoval do funil /comecar chega com o plano gerado e as respostas; sem plano, segue o
     // fluxo normal de "criar novo enxoval" (com ou sem o template padrão).
-    const plan = parsePlan(req.body?.plan);
-    const profile = plan ? parseOnboardingProfile(req.body?.profile) : null;
+    const profile = req.body?.plan != null ? parseOnboardingProfile(req.body?.profile) : null;
+    const plan = parseOnboardingPlan(req.body?.plan, profile?.style === 'none');
     const useDefaultTemplate = req.body?.useDefaultTemplate !== false;
     // O cadastro não pede o nome; o funil pergunta e ele chega aqui, junto do plano.
     const userName = plan ? parseUserName(req.body?.userName) : null;
+
+    if (user.plan === 'free' && plan && profile) {
+      await saveOnboardingDraft(user.id, name, plan, profile, userName);
+      res.status(202).json({ completed: true, requiresCheckout: true });
+      return;
+    }
 
     const workspace = await createEnxovalForUser(user.id, name, { useDefaultTemplate, plan, profile, userName });
     res.status(201).json(workspace);
@@ -1501,7 +1600,7 @@ export function registerApiRoutes(app: Express) {
 
     const base = appBaseUrl();
     if (!base || !canDeliverMail()) {
-      console.error('Convite: configure APP_URL, RESEND_API_KEY e MAIL_FROM para enviar o e-mail do convite.');
+      getLogger().error({ event: 'invitation.configuration_missing' }, 'Convite: configure APP_URL, RESEND_API_KEY e MAIL_FROM para enviar o e-mail do convite.');
       throw new HttpError(503, 'O envio de e-mails não está configurado. Tente novamente mais tarde.');
     }
 
@@ -1557,7 +1656,7 @@ export function registerApiRoutes(app: Express) {
       }));
     } catch (err) {
       await getPool().query('DELETE FROM enxoval_invitations WHERE id = $1', [invitation.id]);
-      console.error('Falha ao enviar o e-mail do convite:', err instanceof Error ? err.message : err);
+      getLogger().error({ event: 'invitation.email_failed', err }, 'Falha ao enviar o e-mail do convite.');
       throw new HttpError(502, 'Não foi possível enviar o e-mail do convite. Tente novamente em instantes.');
     }
 
@@ -1677,6 +1776,7 @@ export function registerApiRoutes(app: Express) {
           INSERT INTO users (id, name, email, password_hash, is_guest, last_login_at)
           VALUES ($1, $2, $3, $4, true, now())
         `, [userId, name, row.email, await hashPassword(password)]);
+        await recordUserIpEvent(client, userId, req.ip, 'invitation_signup');
         await createSession(res, userId, client);
       }
 
@@ -1884,13 +1984,6 @@ export function registerApiRoutes(app: Express) {
 
   app.use('/api', router);
 
-  app.use('/api', (err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
-    if (err instanceof HttpError) {
-      res.status(err.status).json(err.code ? { error: err.message, code: err.code } : { error: err.message });
-      return;
-    }
+  app.use('/api', httpErrorHandler);
 
-    console.error(err);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
-  });
 }

@@ -69,7 +69,11 @@ async function loadProfile(queryable: Queryable, enxovalId: string): Promise<Jev
     uf: row?.state ?? (typeof onboarding.state === 'string' ? onboarding.state : null),
     city: row?.city ?? null,
     spendingTier: row?.spending_tier ?? 'equilibrado',
-    weeksToMove: row?.move_date ? weeksUntil(row.move_date) : null
+    weeksToMove: row?.move_date ? weeksUntil(row.move_date) : null,
+    worries: Array.isArray(onboarding.worries) ? onboarding.worries.filter((value): value is string => typeof value === 'string' && ['start', 'waste', 'forget', 'budget', 'time'].includes(value)) : [],
+    usage: Array.isArray(onboarding.usage) ? onboarding.usage.filter((value): value is string => typeof value === 'string' && ['buy', 'spend', 'links', 'share'].includes(value)) : [],
+    owned: typeof onboarding.owned === 'string' && ['nada', 'algumas', 'boa'].includes(onboarding.owned) ? onboarding.owned : undefined,
+    style: typeof onboarding.style === 'string' && ['full', 'min', 'none'].includes(onboarding.style) ? onboarding.style : undefined
   };
 }
 

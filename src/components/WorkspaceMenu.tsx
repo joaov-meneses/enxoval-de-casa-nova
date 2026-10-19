@@ -9,6 +9,7 @@ import {
   X,
   ListChecks,
   MessageCircleHeart,
+  UserRound,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -22,6 +23,7 @@ import { Select } from "./Select";
 import { EnvironmentList } from "./EnvironmentList";
 import { activeItems } from "../itemStatus";
 import { enxovalSelectOptions } from "../enxovais";
+import { UserAvatar } from './UserAvatar';
 
 interface WorkspaceMenuProps {
   open: boolean;
@@ -50,6 +52,7 @@ interface WorkspaceMenuProps {
   onLogout: () => void;
   /** Abre a central de ajuda (relatar problema ou sugerir melhoria). */
   onHelp: () => void;
+  onProfile: () => void;
 }
 
 export function WorkspaceMenu(props: WorkspaceMenuProps) {
@@ -245,6 +248,9 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               </button>
             </div>
           )}
+          <div className="workspace-menu-subscription">
+            <button className="button button-outline button-small profile-entry-mobile" type="button" onClick={() => run(props.onProfile)}><UserRound size={18} /> Meu perfil</button>
+          </div>
           <div className="workspace-menu-help">
             <button type="button" onClick={() => run(props.onHelp)}>
               <span className="workspace-menu-help-icon" aria-hidden="true">
@@ -258,9 +264,7 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           </div>
         </div>
         <div className="workspace-menu-account">
-          <span className="workspace-menu-avatar">
-            {props.user.name.slice(0, 1).toUpperCase()}
-          </span>
+          <UserAvatar name={props.user.name} src={props.user.avatarUrl} className="workspace-menu-avatar" />
           <div>
             <strong>{props.user.name}</strong>
             <span>{props.user.email}</span>

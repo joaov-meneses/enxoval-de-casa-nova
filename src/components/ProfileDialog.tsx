@@ -1,0 +1,578 @@
+import { useEffect, useId, useState, type FormEvent } from "react";
+import { Pencil, LockKeyhole, CreditCard, Home, ShieldCheck, UserRound } from "lucide-react";
+import { Dialog } from "./Dialog";
+import { ProfilePhotoEditor } from "./ProfilePhotoEditor";
+import { Select } from "./Select";
+import {
+  cancelSubscription,
+  fetchBillingStatus,
+  fetchProfile,
+  openBillingPortal,
+  removeProfileAvatar,
+  requestPasswordReset,
+  formatBillingAmount,
+  updateEnxoval,
+  updateProfile,
+  uploadProfileAvatar,
+  type BillingStatus,
+  type ProfileData,
+} from "../api";
+import type { AuthUser, EnxovalSummary } from "../types";
+import { imageFileProblem, prepareImageForUpload } from "../imageUpload";
+import { STATES } from "../onboarding/plan";
+import { citiesOfState } from "../onboarding/regions";
+import type { SpendingTier } from "../planning/spending";
+import "./profile.css";
+
+type Section = "profile" | "home" | "billing";
+const sections = [
+  { id: "profile", label: "Meu perfil", Icon: UserRound },
+  { id: "home", label: "Meu lar", Icon: Home },
+  { id: "billing", label: "Assinatura", Icon: CreditCard },
+] as const;
+const dateLabel = (value: string | null | undefined) =>
+  value
+    ? new Date(value).toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        dateStyle: "long",
+        timeStyle: "short",
+      })
+    : "";
+
+export function ProfileDialog({
+  open,
+  onClose,
+  user,
+  enxoval,
+  onUserChanged,
+  onChanged,
+}: {
+  open: boolean;
+  onClose: () => void;
+  user: AuthUser;
+  enxoval: EnxovalSummary | null;
+  onUserChanged: (profile: ProfileData) => void;
+  onChanged: () => void;
+}) {
+  const id = useId();
+  const [editingName, setEditingName] = useState(false);
+  const [editingHome, setEditingHome] = useState(false);
+  const [section, setSection] = useState<Section>("profile");
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [name, setName] = useState(user.name);
+  const [homeName, setHomeName] = useState("");
+  const [moveDate, setMoveDate] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+  const [tier, setTier] = useState<SpendingTier>("equilibrado");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setSection("profile");
+    setLoading(true);
+    setError("");
+    setMessage("");
+    setConfirmCancel(false);
+    setEditingName(false); setEditingHome(false);
+    setHomeName(enxoval?.name ?? "");
+    setMoveDate(enxoval?.moveDate ?? "");
+    setState(enxoval?.state ?? "");
+    setCity(enxoval?.city ?? "");
+    setTier(enxoval?.spendingTier ?? "equilibrado");
+    Promise.all([fetchProfile(), fetchBillingStatus()])
+      .then(([account, status]) => {
+        if (!active) return;
+        setProfile(account);
+        setName(account.name);
+        setBilling(status);
+      })
+      .catch((err) => {
+        if (active)
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível carregar seu perfil.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, enxoval?.id]);
+
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await action();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível salvar. Tente novamente.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const acceptProfile = (next: ProfileData) => {
+    setProfile(next);
+    setName(next.name);
+    onUserChanged(next);
+  };
+  const saveProfile = (event: FormEvent) => {
+    event.preventDefault();
+    void run(async () => {
+      acceptProfile(await updateProfile(name));
+      setEditingName(false);
+      setMessage("Seu perfil foi atualizado.");
+    });
+  };
+  const saveHome = (event: FormEvent) => {
+    event.preventDefault();
+    if (!enxoval) return;
+    void run(async () => {
+      await updateEnxoval(enxoval.id, {
+        name: homeName,
+        moveDate: moveDate || null,
+        state: state || null,
+        city: city || null,
+        spendingTier: tier,
+      });
+      onChanged();
+      setEditingHome(false);
+      setMessage("As informações do seu lar foram atualizadas.");
+    });
+  };
+  const canCancel =
+    billing?.plan === "monthly" &&
+    ["active", "trialing", "past_due"].includes(billing.status ?? "") &&
+    !billing.cancelAtPeriodEnd;
+  const planName = user.isGuest
+    ? "Acesso por convite"
+    : billing?.status === "trialing" && billing.plan === "monthly"
+      ? "Teste de 2 dias"
+      : {
+          monthly: "Mensal",
+          pass: "Passe da Casa Nova",
+          founder: "Acesso fundador",
+          free: "Sem assinatura ativa",
+        }[billing?.plan ?? "free"];
+
+  return (
+    <>
+      <Dialog
+        title="Meu perfil"
+        isOpen={open}
+        onClose={onClose}
+        busy={busy}
+        className="profile-dialog"
+      >
+        <div className="profile-content">
+          <div className="profile-summary" tabIndex={-1} data-dialog-autofocus>
+            <ProfilePhotoEditor
+              name={profile?.name ?? user.name}
+              src={profile ? profile.avatarUrl : user.avatarUrl}
+              disabled={busy || loading}
+              onUpload={async file => {
+                const problem = imageFileProblem(file);
+                if (problem) throw new Error(problem);
+                setBusy(true); setError(''); setMessage('');
+                try {
+                  acceptProfile(await uploadProfileAvatar(await prepareImageForUpload(file)));
+                  setMessage('Foto de perfil atualizada.');
+                } finally { setBusy(false); }
+              }}
+              onRemove={async () => {
+                setBusy(true); setError(''); setMessage('');
+                try { acceptProfile(await removeProfileAvatar()); setMessage('Foto removida.'); }
+                finally { setBusy(false); }
+              }}
+            />
+            <div>
+              <strong>{profile?.name ?? user.name}</strong>
+              <span>{user.email}</span>
+            </div>
+          </div>
+          <div
+            className="profile-tabs"
+            role="tablist"
+            aria-label="Configurações do perfil"
+          >
+            {sections.map(({ id: tab, label, Icon }, index) => (
+              <button
+                key={tab}
+                type="button"
+                id={`${id}-tab-${tab}`}
+                role="tab"
+                aria-selected={section === tab}
+                aria-controls={`${id}-panel`}
+                tabIndex={section === tab ? 0 : -1}
+                onClick={() => {
+                  setSection(tab);
+                  setError("");
+                  setMessage("");
+                }}
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === "ArrowRight"
+                      ? (index + 1) % 3
+                      : event.key === "ArrowLeft"
+                        ? (index + 2) % 3
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? 2
+                            : null;
+                  if (next !== null) {
+                    event.preventDefault();
+                    setSection(sections[next].id);
+                    document
+                      .getElementById(`${id}-tab-${sections[next].id}`)
+                      ?.focus();
+                  }
+                }}
+              >
+                <Icon size={17} aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+          {loading ? (
+            <p role="status">Carregando suas informações…</p>
+          ) : (
+            <div
+              role="tabpanel"
+              id={`${id}-panel`}
+              aria-labelledby={`${id}-tab-${section}`}
+            >
+              {section === "profile" && (
+                <>
+                  <form className="profile-form" onSubmit={saveProfile}>
+                    <label htmlFor={`${id}-name`}>Seu nome</label>
+                    <div className="profile-editable-field">
+                      <input id={`${id}-name`} value={name} onChange={event => setName(event.target.value)} minLength={2} maxLength={80} autoComplete="name" required disabled={busy || !editingName} />
+                      <button type="button" aria-label="Alterar seu nome" title="Alterar seu nome" disabled={busy || editingName} onClick={() => { setEditingName(true); requestAnimationFrame(() => document.getElementById(`${id}-name`)?.focus()); }}><Pencil size={18} aria-hidden="true" /></button>
+                    </div>
+                    <span id={`${id}-email-label`} className="profile-field-label">E-mail de acesso</span>
+                    <div className="profile-email-info" aria-labelledby={`${id}-email-label`}><LockKeyhole size={16} aria-hidden="true" /><span>{user.email}</span></div>
+                    <small>
+                      Seu e-mail identifica a conta e recebe os avisos da
+                      assinatura.
+                    </small>
+                    <button
+                      className="button button-dark"
+                      type="submit"
+                      disabled={busy || !editingName || name.trim().length < 2}
+                    >
+                      {busy ? "Salvando…" : "Salvar perfil"}
+                    </button>
+                  </form>
+                  <section className="profile-security">
+                    <h3>
+                      <ShieldCheck size={18} />
+                      Segurança da conta
+                    </h3>
+                    <p>
+                      Receba no seu e-mail um link para criar uma nova senha.
+                    </p>
+                    <button
+                      className="button button-outline button-small"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await requestPasswordReset(user.email);
+                          setMessage(
+                            "Enviamos as instruções para redefinir sua senha. Confira seu e-mail.",
+                          );
+                        })
+                      }
+                    >
+                      Redefinir senha por e-mail
+                    </button>
+                    {profile?.createdAt && (
+                      <small>
+                        Conta criada em{" "}
+                        {new Date(profile.createdAt).toLocaleDateString(
+                          "pt-BR",
+                        )}
+                        .
+                      </small>
+                    )}
+                  </section>
+                </>
+              )}
+              {section === "home" &&
+                (enxoval ? (
+                  <form className="profile-form" onSubmit={saveHome}>
+                    <p className="profile-description">
+                      As informações ajudam a organizar o planejamento da sua
+                      casa.
+                    </p>
+                    {enxoval.role !== "owner" && (
+                      <p className="profile-info">
+                        Somente o titular pode alterar os dados deste lar.
+                      </p>
+                    )}
+                    <fieldset disabled={busy || enxoval.role !== "owner"}>
+                      <label htmlFor={`${id}-home`}>Nome do lar</label>
+                      <div className="profile-editable-field">
+                        <input id={`${id}-home`} value={homeName} onChange={event => setHomeName(event.target.value)} maxLength={100} required disabled={!editingHome} />
+                        <button type="button" aria-label="Alterar nome do lar" title="Alterar nome do lar" disabled={editingHome} onClick={() => { setEditingHome(true); requestAnimationFrame(() => document.getElementById(`${id}-home`)?.focus()); }}><Pencil size={18} aria-hidden="true" /></button>
+                      </div>
+                      <label htmlFor={`${id}-date`}>Data da mudança</label>
+                      <input
+                        id={`${id}-date`}
+                        type="date"
+                        value={moveDate}
+                        onChange={(event) => setMoveDate(event.target.value)}
+                      />
+                      <div className="profile-field-grid">
+                        <div>
+                          <label htmlFor={`${id}-state`}>Estado</label>
+                          <Select
+                            id={`${id}-state`}
+                            value={state}
+                            onChange={(value) => {
+                              setState(value);
+                              setCity("");
+                            }}
+                            disabled={busy || enxoval.role !== "owner"}
+                            options={[
+                              { value: "", label: "Não informado" },
+                              ...STATES.map((item) => ({
+                                value: item.uf,
+                                label: item.name,
+                              })),
+                            ]}
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor={`${id}-city`}>
+                            Cidade de referência
+                          </label>
+                          <Select
+                            id={`${id}-city`}
+                            value={city}
+                            onChange={setCity}
+                            disabled={
+                              busy || !state || enxoval.role !== "owner"
+                            }
+                            options={[
+                              { value: "", label: "Não informada" },
+                              ...citiesOfState(state).map((item) => ({
+                                value: item.id,
+                                label: item.name,
+                              })),
+                            ]}
+                          />
+                        </div>
+                      </div>
+                      <label htmlFor={`${id}-tier`}>Perfil de gasto</label>
+                      <Select
+                        id={`${id}-tier`}
+                        value={tier}
+                        onChange={(value) => setTier(value as SpendingTier)}
+                        disabled={busy || enxoval.role !== "owner"}
+                        options={[
+                          { value: "economico", label: "Econômico" },
+                          { value: "equilibrado", label: "Equilibrado" },
+                          { value: "confortavel", label: "Confortável" },
+                          { value: "premium", label: "Premium" },
+                        ]}
+                      />
+                    </fieldset>
+                    {enxoval.role === "owner" && (
+                      <button
+                        className="button button-dark"
+                        type="submit"
+                        disabled={busy || !homeName.trim()}
+                      >
+                        {busy ? "Salvando…" : "Salvar informações do lar"}
+                      </button>
+                    )}
+                  </form>
+                ) : (
+                  <p className="profile-description">
+                    Seu lar aparecerá aqui após a liberação do enxoval.
+                  </p>
+                ))}
+              {section === "billing" && (
+                <section className="profile-billing">
+                  <span className="profile-plan-badge">{planName}</span>
+                  {user.isGuest ? (
+                    <p>
+                      O acesso a cada enxoval depende da assinatura de quem
+                      convidou você. Somente o titular pode gerenciar essa
+                      assinatura.
+                    </p>
+                  ) : (
+                    <>
+                      {billing?.plan === "monthly" && (
+                        <>
+                          <h3>Casa Mia completo</h3>
+                          <p>{formatBillingAmount(billing.monthlyPrice)} por mês, com renovação automática. Eventuais descontos seguem as condições do checkout.</p>
+                          {billing.status === "trialing" ? (
+                            <p>
+                              Seu teste termina em{" "}
+                              <strong>
+                                {dateLabel(billing.trialEndsAt)} (Brasília)
+                              </strong>
+                              . Depois desse horário, a mensalidade será cobrada
+                              automaticamente no cartão. Cancele antes para
+                              evitar a cobrança.
+                            </p>
+                          ) : (
+                            billing.renewsAt && (
+                              <p>
+                                Próxima renovação: {dateLabel(billing.renewsAt)}{" "}
+                                (Brasília).
+                              </p>
+                            )
+                          )}
+                        </>
+                      )}
+                      {billing?.plan === "pass" && (
+                        <>
+                          <h3>Seu Passe está ativo</h3>
+                          <p>
+                            Acesso completo até{" "}
+                            {dateLabel(billing.passExpiresAt)} (Brasília), sem
+                            renovação automática.
+                          </p>
+                        </>
+                      )}
+                      {billing?.plan === "founder" && (
+                        <p>Sua conta tem acesso completo, sem cobrança.</p>
+                      )}
+                      {billing?.plan === "free" && (
+                        <p>
+                          Sua conta e seus dados estão preservados. Ative a
+                          assinatura para liberar o enxoval novamente.
+                        </p>
+                      )}
+                      <div className="profile-billing-actions">
+                        {billing?.canManage && (
+                          <button
+                            className="button button-dark"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(async () => {
+                                const result = await openBillingPortal();
+                                window.location.assign(result.url);
+                              })
+                            }
+                          >
+                            Gerenciar assinatura e cartão
+                          </button>
+                        )}
+                        {billing?.plan === "free" && (
+                          <button
+                            className="button button-dark"
+                            disabled={busy || !billing.available}
+                            onClick={() =>
+                              void run(async () => {
+                                onClose();
+                                window.location.assign("/app");
+                              })
+                            }
+                          >
+                            Escolher plano
+                          </button>
+                        )}
+                        {canCancel && (
+                          <button
+                            className="button button-outline profile-cancel-button"
+                            disabled={busy}
+                            onClick={() => setConfirmCancel(true)}
+                          >
+                            Cancelar assinatura
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </section>
+              )}
+            </div>
+          )}
+          {error && (
+            <p className="profile-error" role="alert">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p className="profile-success" role="status">
+              {message}
+            </p>
+          )}
+        </div>
+      </Dialog>
+      <Dialog
+        title="Cancelar assinatura?"
+        isOpen={open && confirmCancel}
+        onClose={() => setConfirmCancel(false)}
+        busy={busy}
+        tone="danger"
+      >
+        <div className="subscription-cancel-content">
+          <p>
+            O acesso será encerrado imediatamente para você e seus convidados,
+            inclusive importação e exportação. Sua conta e seus dados ficam
+            preservados.
+          </p>
+          {billing?.status === "trialing" && (
+            <p>
+              Cancelando antes de {dateLabel(billing.trialEndsAt)} (Brasília),
+              não haverá cobrança da mensalidade.
+            </p>
+          )}
+          {error && (
+            <p className="profile-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="subscription-dialog-actions">
+            <button
+              className="button button-outline"
+              disabled={busy}
+              onClick={() => setConfirmCancel(false)}
+              data-dialog-autofocus
+            >
+              Continuar usando
+            </button>
+            <button
+              className="button button-dark"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await cancelSubscription();
+                  setBilling(await fetchBillingStatus());
+                  setConfirmCancel(false);
+                  setMessage(
+                    "Assinatura cancelada. Sua conta e seus dados estão preservados.",
+                  );
+                  window.dispatchEvent(
+                    new Event("casamia:subscription-required"),
+                  );
+                  onChanged();
+                })
+              }
+            >
+              {busy ? "Cancelando…" : "Confirmar cancelamento"}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+    </>
+  );
+}

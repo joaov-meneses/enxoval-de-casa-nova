@@ -315,7 +315,7 @@ export function AdminPage() {
         (filter === "active" && user.isActive) ||
         (filter === "inactive" && !user.isActive) ||
         (filter === "reset" && user.mustChangePassword)) &&
-      `${user.name} ${user.email}`
+      `${user.name} ${user.email} ${(user.ipAddresses ?? []).join(" ")}`
         .toLocaleLowerCase("pt-BR")
         .includes(normalized),
   );
@@ -386,7 +386,7 @@ export function AdminPage() {
               <input
                 aria-label="Buscar usuários"
                 type="search"
-                placeholder="Busque por nome ou e-mail"
+                placeholder="Busque por nome, e-mail ou IP"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -460,6 +460,9 @@ export function AdminPage() {
                   <small>
                     {user.workspaceCount}{" "}
                     {user.workspaceCount === 1 ? "enxoval" : "enxovais"}
+                  </small>
+                  <small>
+                    IPs (6 meses): {user.ipAddresses?.length ? user.ipAddresses.join(", ") : "Nenhum registrado"}
                   </small>
                 </div>
                 <div className="admin-user-actions">

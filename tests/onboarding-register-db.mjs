@@ -1,5 +1,5 @@
-// Teste de integração com PostgreSQL real: o cadastro cria só a conta, e o funil /comecar monta o
-// primeiro enxoval depois, já autenticado, em POST /enxovais. Usa um schema descartável e nunca toca
+// Teste de integração com PostgreSQL real: o cadastro cria só a conta; o funil salva o plano até o
+// checkout ou cria o enxoval de uma conta paga. Usa um schema descartável e nunca toca
 // em contas existentes. Rodar: npm run test:onboarding-db
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -71,7 +71,7 @@ try {
     // O cadastro não pede o nome: ele vem do funil, junto do plano.
     const registered = await post("/auth/register", { email, password });
     if (registered.status !== 201) return { registered, plan };
-    // Conta paga: aqui o plano do funil precisa entrar inteiro (o corte do gratuito está em tests/freemium-db.mjs).
+    // Conta paga: o plano do funil entra inteiro; os limites de acesso estão em tests/freemium-db.mjs.
     await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [registered.data.user.id]);
     const workspace = await post("/enxovais", {
       name: plan.enxovalName,
@@ -308,10 +308,23 @@ try {
   assert.equal(rejectedEnxovais, 0, "nenhuma das rejeições deixou um enxoval pela metade");
   console.log(`PASS: ${rejections.length} planos recusados em POST /enxovais (plano ou respostas inválidos) não deixam rastro.`);
 
-  // depois de tudo isso, o mesmo usuário ainda consegue montar o plano normalmente
+  // Após as rejeições, a conta gratuita salva o plano como rascunho até concluir o checkout.
   const finalAttempt = await post("/enxovais", validPlanBody());
-  assert.equal(finalAttempt.status, 201, JSON.stringify(finalAttempt.data));
-  console.log("PASS: depois das rejeições, um plano válido ainda é aceito na mesma conta.");
+  assert.equal(finalAttempt.status, 202, JSON.stringify(finalAttempt.data));
+  assert.deepEqual(finalAttempt.data, { completed: true, requiresCheckout: true });
+  const [savedDraft] = await query(
+    "SELECT plan, onboarding_completed_at, onboarding_draft FROM users WHERE id = $1",
+    [rejectUserId],
+  );
+  assert.equal(savedDraft.plan, 'free', 'salvar o rascunho não libera acesso pago');
+  assert.ok(savedDraft.onboarding_completed_at);
+  assert.deepEqual(savedDraft.onboarding_draft.plan, validPlanBody().plan);
+  const [{ n: activeEnxovais }] = await query(
+    "SELECT count(*)::int AS n FROM enxovais WHERE owner_id = $1",
+    [rejectUserId],
+  );
+  assert.equal(activeEnxovais, 0, 'o enxoval só é criado após ativar o acesso');
+  console.log("PASS: depois das rejeições, um plano válido é salvo até concluir o checkout.");
 } finally {
   if (server)
     await new Promise((resolve, reject) =>

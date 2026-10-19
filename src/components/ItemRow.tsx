@@ -25,7 +25,10 @@ import type {
   EnxovalItem,
   ItemStatus,
   ItemTrackingInput,
+  ScrapedProductPreview,
 } from "../types";
+import { extractProduct } from "../api";
+import { CopyableLinkInput } from "./CopyableLinkInput";
 import { priceChange } from "../priceTracking";
 import { PriceHistoryDialog } from "./PriceHistoryDialog";
 import {
@@ -40,6 +43,7 @@ import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
 import { QuantityStepper } from "./QuantityStepper";
 import { ItemImageField } from "./ItemImageField";
+import { ItemCompletionDialog } from "./ItemCompletionDialog";
 import { Select } from "./Select";
 import { weekOptions } from "../planning/weekOptions";
 import { weekLabel } from "../planning/purchasePlan";
@@ -96,6 +100,13 @@ export function ItemRow({
   onUpdate,
   onDelete,
 }: ItemRowProps) {
+  const [importStep, setImportStep] = useState<'idle' | 'ask' | 'loading' | 'choose' | 'done' | 'error'>('idle');
+  const [productPreview, setProductPreview] = useState<ScrapedProductPreview | null>(null);
+  const [importError, setImportError] = useState('');
+  const [previewImageFailed, setPreviewImageFailed] = useState(false);
+  const importTicket = useRef(0);
+  const reviewedLink = useRef(item.link.trim());
+  const currentLink = useRef(item.link);
   const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState(item.name);
   const [priceText, setPriceText] = useState("");
@@ -110,11 +121,21 @@ export function ItemRow({
   const [alertEnabled, setAlertEnabled] = useState(true);
   const [imageValue, setImageValue] = useState<string | null>(item.imageUrl ?? null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [completionOpen, setCompletionOpen] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
+  const imageBusyRef = useRef(false);
   const [error, setError] = useState("");
   const id = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!['ask', 'choose'].includes(importStep)) return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(`${id}-import`)?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [importStep, id]);
   useEffect(() => {
     if (expanded) return;
     setName(item.name);
@@ -124,6 +145,10 @@ export function ItemRow({
       item.discountCents > 0 ? money.format(item.discountCents / 100) : "",
     );
     setLinkText(item.link);
+    currentLink.current = item.link;
+    reviewedLink.current = item.link.trim();
+    importTicket.current++;
+    setImportStep('idle'); setProductPreview(null); setImportError('');
     setDescription(item.description);
     setCategoryId(item.categoryId);
     setStatus(item.status);
@@ -137,6 +162,7 @@ export function ItemRow({
     setImageValue(item.imageUrl ?? null);
     setError("");
   }, [item, expanded]);
+  useEffect(() => () => { importTicket.current++; }, []);
   useEffect(() => setThumbFailed(false), [item.imageUrl]);
   // O preço da linha já considera o desconto/cashback registrado (itens ganhos mantêm o valor cheio).
   const price = netPriceCents(item);
@@ -159,14 +185,53 @@ export function ItemRow({
       ? new Date(item.createdAt).toLocaleDateString("pt-BR")
       : null;
   function toggle() {
-    if (!busy) setExpanded((value) => !value);
+    if (!busy && !imageBusy) setExpanded((value) => !value);
   }
   function close() {
     setExpanded(false);
     toggleRef.current?.focus();
   }
+  const offerImport = () => {
+    const url = safeLink(linkText);
+    if (!url || reviewedLink.current === url || url === safeLink(item.link)) return false;
+    reviewedLink.current = url;
+    setImportStep('ask'); setProductPreview(null); setImportError('');
+    return true;
+  };
+  const readProduct = async () => {
+    const url = safeLink(linkText);
+    const ticket = ++importTicket.current;
+    setImportStep('loading'); setImportError('');
+    try {
+      const preview = await extractProduct(url);
+      if (ticket !== importTicket.current || safeLink(currentLink.current) !== url) return;
+      setProductPreview(preview); setPreviewImageFailed(false); setImportStep('choose');
+    } catch (err) {
+      if (ticket !== importTicket.current) return;
+      setImportError(err instanceof Error ? err.message : 'Não foi possível ler este produto. Você pode preencher os dados manualmente.');
+      setImportStep('error');
+    }
+  };
+  const applyProduct = (useStoreName: boolean) => {
+    if (!productPreview) return;
+    if (useStoreName && productPreview.title.trim()) setName(productPreview.title.replace(/\s+/g, ' ').trim().slice(0, MAX_ITEM_NAME_LENGTH));
+    if (!productPreview.partial) {
+      if (typeof productPreview.priceCents === 'number' && productPreview.priceCents >= 0 && productPreview.currency?.toUpperCase() === 'BRL') {
+        setPriceText(money.format(productPreview.priceCents / 100));
+        setDiscountText('');
+      }
+      if (productPreview.imageUrl) setImageValue(productPreview.imageUrl);
+    }
+    setImportStep('done');
+    if (!useStoreName) requestAnimationFrame(() => {
+      const input = document.getElementById(`${id}-name`) as HTMLInputElement | null;
+      input?.focus(); input?.select();
+    });
+  };
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (imageBusyRef.current) return;
+    if (offerImport() || ['ask', 'loading', 'choose'].includes(importStep)) return;
     setBusy(true);
     setError("");
     const digits = priceText.replace(/\D/g, "");
@@ -200,6 +265,14 @@ export function ItemRow({
         description: description.trim(),
         categoryId,
         status,
+        // Trocar o link não mantém o acompanhamento da loja anterior.
+        ...(linkText.trim() !== item.link.trim() && tracking ? { trackedProductUrl: null } : {}),
+        ...(importStep === 'done' && productPreview && !productPreview.partial ? {
+          trackedProductUrl: productPreview.url,
+          initialPriceCents: productPreview.priceCents,
+          priceBasis: 'regular' as const,
+          selectedVariation: null,
+        } : {}),
         // A imagem só vai no pedido quando a pessoa trocou ou removeu.
         ...(imageValue !== (item.imageUrl ?? null) ? { imageUrl: imageValue } : {}),
         // A semana só vai no pedido quando a pessoa mexeu nela.
@@ -232,22 +305,24 @@ export function ItemRow({
       className={`item-row ${item.checked ? "checked" : ""} ${isInactiveStatus(item.status) ? "inactive" : ""} ${expanded ? "expanded" : ""}`}
     >
       <div className="item-row-inner">
-        {dragHandle}
+        <div className="item-row-controls">
         <button
           type="button"
           role="checkbox"
           aria-checked={item.checked}
-          aria-label={`${item.checked ? "Desmarcar" : "Marcar como comprado"}: ${item.name}`}
+          aria-label={`${item.checked ? "Desmarcar" : "Marcar como conquistado"}: ${item.name}`}
+          aria-haspopup={item.checked ? undefined : 'dialog'}
           className="item-check"
           disabled={busy}
-          onClick={() =>
-            void Promise.resolve(
-              onUpdate(item.id, { checked: !item.checked }),
-            ).catch(() => undefined)
-          }
+          onClick={() => {
+            if (!item.checked) { setCompletionOpen(true); return; }
+            void Promise.resolve(onUpdate(item.id, { checked: false })).catch(() => undefined);
+          }}
         >
           <Check size={13} strokeWidth={2.5} />
         </button>
+        {dragHandle}
+        </div>
         {thumbnail && (
           <img
             className="item-thumb"
@@ -606,22 +681,40 @@ export function ItemRow({
                 </>
               )}
               <h4 className="item-inline-section item-inline-wide">Detalhes</h4>
-              <label htmlFor={`${id}-link`} className="item-inline-wide item-field-link">
-                Link do produto
-                <input
-                  id={`${id}-link`}
-                  type="url"
-                  value={linkText}
-                  onChange={(event) => setLinkText(event.target.value)}
-                  placeholder="https://..."
-                  disabled={busy}
-                />
-              </label>
+              <div className="item-inline-wide item-field-link">
+                <label htmlFor={`${id}-link`}>Link do produto</label>
+                <CopyableLinkInput id={`${id}-link`} type="url" value={linkText} copyLabel="Copiar link do produto"
+                  onChange={event => { currentLink.current = event.target.value; setLinkText(event.target.value); importTicket.current++; setImportStep('idle'); setProductPreview(null); setImportError(''); }}
+                  onBlur={() => { offerImport(); }}
+                  onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); offerImport(); } }}
+                  placeholder="https://..." disabled={busy} />
+              </div>
+              {importStep !== 'idle' && <div id={`${id}-import`} className="item-link-import item-inline-wide" aria-busy={importStep === 'loading'}>
+                {importStep === 'ask' && <>
+                  <h5>Quer aproveitar os dados deste link?</h5>
+                  <p>Podemos buscar o nome, o preço e a imagem na loja para ajudar a preencher este item. Você revisa tudo antes de salvar.</p>
+                  <div className="item-link-import-actions"><button type="button" className="button button-dark" onClick={() => void readProduct()}>Buscar dados do produto</button><button type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Preencher manualmente</button></div>
+                </>}
+                {importStep === 'loading' && <><p className="item-link-import-loading" role="status"><LoaderCircle size={18} className="animate-spin" />Buscando informações na loja…</p><button type="button" className="button button-outline" onClick={() => { importTicket.current++; setImportStep('idle'); }}>Continuar manualmente</button></>}
+                {importStep === 'choose' && productPreview && <>
+                  <h5>Como prefere chamar este item?</h5>
+                  <div className="item-link-import-preview">
+                    {!productPreview.partial && productPreview.imageUrl && !previewImageFailed && <img src={productPreview.imageUrl} alt="" referrerPolicy="no-referrer" onError={() => setPreviewImageFailed(true)} />}
+                    <div><strong>{productPreview.title || 'A loja não informou um nome'}</strong>{!productPreview.partial && productPreview.currency?.toUpperCase() === 'BRL' && productPreview.priceCents !== null && <span>{money.format(productPreview.priceCents / 100)}</span>}</div>
+                  </div>
+                  <p>{productPreview.partial ? 'A loja limitou a leitura. Encontramos apenas uma sugestão de nome pelo endereço; confira os outros dados manualmente.' : 'O preço e a imagem encontrados serão preenchidos. Para o nome, escolha uma das opções abaixo. Seus dados só serão gravados ao salvar as alterações.'}</p>
+                  <div className="item-link-import-actions"><button type="button" className="button button-dark" disabled={!productPreview.title.trim()} onClick={() => applyProduct(true)}>Usar nome da loja</button><button type="button" className="button button-outline" onClick={() => applyProduct(false)}>Definir meu próprio nome</button></div>
+                  <button type="button" className="button button-outline" onClick={() => { setProductPreview(null); setImportStep('idle'); }}>Manter meus dados atuais</button>
+                </>}
+                {importStep === 'done' && <p role="status">{productPreview?.partial ? 'Nome revisado. Confira os demais dados antes de salvar.' : 'Dados preenchidos. Revise as informações e salve quando estiver tudo certo.'}</p>}
+                {importStep === 'error' && <><p role="alert">{importError}</p><p>O link foi mantido. Você pode continuar preenchendo manualmente.</p><div className="item-link-import-actions"><button type="button" className="button button-outline" onClick={() => void readProduct()}>Tentar buscar novamente</button><button type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Continuar manualmente</button></div></>}
+              </div>}
               <ItemImageField
                 className="item-inline-wide"
                 enxovalId={enxovalId}
                 value={imageValue}
                 onChange={setImageValue}
+                onBusyChange={value => { imageBusyRef.current = value; setImageBusy(value); }}
                 disabled={busy}
               />
               <label htmlFor={`${id}-description`} className="item-inline-wide item-field-notes">
@@ -657,7 +750,7 @@ export function ItemRow({
               <button
                 className="button button-dark"
                 type="submit"
-                disabled={busy || !name.trim()}
+                disabled={busy || imageBusy || !name.trim() || ['loading', 'choose'].includes(importStep)}
               >
                 {busy ? (
                   <LoaderCircle size={17} className="animate-spin" />
@@ -676,6 +769,12 @@ export function ItemRow({
           onClose={() => setHistoryOpen(false)}
         />
       )}
+      {completionOpen && <ItemCompletionDialog itemName={item.name} onClose={() => setCompletionOpen(false)} onConfirm={async next => {
+        // Confirme antes de aplicar à lista; uma falha não pode tachar nem ocultar o item nos filtros.
+        await onUpdate(item.id, { status: next, checked: true });
+        setStatus(next);
+        if (!discountApplies(next)) setDiscountText('');
+      }} />}
     </div>
   );
 }

@@ -114,6 +114,7 @@ export function AddItemModal({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ItemStatus>(DEFAULT_ITEM_STATUS);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
   const [error, setError] = useState("");
   // Importação por link: a leitura é só uma ajuda; falhar não impede preencher tudo à mão.
   const [importUrl, setImportUrl] = useState("");
@@ -386,6 +387,7 @@ export function AddItemModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (imageBusy) return;
 
     const trimmedName = name.trim();
     const trimmedCategoryName = normalizeEnvironmentName(newCategoryName);
@@ -992,6 +994,7 @@ export function AddItemModal({
           enxovalId={enxovalId}
           value={imageUrl}
           onChange={setImageUrl}
+          onBusyChange={setImageBusy}
           disabled={isSubmitting}
         />
         </div>
@@ -1007,7 +1010,7 @@ export function AddItemModal({
           )}
           <button
             type="submit"
-            disabled={!name.trim() || isSubmitting}
+            disabled={!name.trim() || isSubmitting || imageBusy}
             className="add-item-submit w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Salvando..." : "Adicionar à lista"}

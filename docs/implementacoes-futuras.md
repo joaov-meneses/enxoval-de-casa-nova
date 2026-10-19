@@ -30,7 +30,7 @@
 4. **Catálogo compartilhado (restante):** autocomplete do catálogo na importação por planilha (Fase 6).
 5. **Analytics, atribuição e reengajamento:** sem PostHog, GA4 nem Sentry (Fase 7).
 6. **Idiomas e preço por região:** app só em português e reais (Fase 8).
-7. **Segurança e banimento:** não grava IP nem aparelho, não verifica e-mail, só liga/desliga conta (Fase 9).
+7. **Segurança e banimento:** grava IP de cadastros, logins bem-sucedidos e contas criadas por convite por até seis meses; o painel permite localizar contas pelo IP e desativá-las. Ainda não há coleta de aparelho, verificação de e-mail ou banimento automático por IP (Fase 9).
 
 ---
 
@@ -273,8 +273,8 @@ Os leads virão de busca orgânica e de anúncios. Esta fase instala **PostHog**
 
 > **Documentação:** [`internacionalizacao-regiao-e-seguranca.md`](./internacionalizacao-regiao-e-seguranca.md), parte C. **Registrar antes de cobrar (Fase 2):** dado de segurança que não foi gravado não pode ser recuperado depois do incidente.
 
-Hoje o app **não grava IP nem user-agent**, as sessões não têm metadados, não há verificação de e-mail e o único bloqueio é `users.is_active`.
-* **Coleta com finalidade e prazo:** tabela `auth_events` (IP, país, provedor, aparelho, resultado), metadados em `sessions`, `user_devices` com `device_id` próprio, prova de consentimento. IP bruto por 6 meses e depois anonimizado por rotina diária.
+O app grava IP de cadastros, logins bem-sucedidos e contas criadas por convite em `user_ip_events`, com remoção diária após seis meses. O painel permite pesquisar pelos IPs registrados e desativar contas. Ainda não há coleta de `user-agent` para segurança, metadados de aparelho, verificação de e-mail nem histórico de ações administrativas.
+* **Próximos passos:** ampliar `auth_events` para falhas de autenticação, trocas de senha e ações sensíveis; avaliar metadados em `sessions`, `user_devices` com `device_id` próprio, prova de consentimento e auditoria de ações administrativas. A retenção atual remove o IP após seis meses, sem anonimização.
 * **Banimento:** `users.status`, tabela `bans` (conta, IP, faixa, aparelho, domínio de e-mail, país), sessões encerradas na hora, motivo e prazo registrados, recurso e reversão.
 * **Prevenção:** verificação de e-mail, limites persistentes (hoje reiniciam a cada deploy), Cloudflare/Turnstile, lista de e-mails descartáveis, alertas.
 * **Painel `/admin`:** ficha da conta com linha do tempo de segurança, contas relacionadas, fila de abuso e trilha de auditoria.

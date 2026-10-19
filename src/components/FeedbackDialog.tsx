@@ -38,7 +38,6 @@ import {
   type FeedbackImportance,
   type FeedbackKind,
   type FeedbackSeverity,
-  type FeedbackTech,
 } from "../feedback";
 
 const DRAFT_KEY = "casamia.feedback.draft.v1";
@@ -104,16 +103,6 @@ function clearDraft() {
   } catch {
     /* Nada a limpar. */
   }
-}
-
-function collectTech(): FeedbackTech {
-  return {
-    path: window.location.pathname,
-    userAgent: navigator.userAgent,
-    viewport: `${window.innerWidth}x${window.innerHeight}`,
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  };
 }
 
 /* ------------------------------------------------------------- captura de tela */
@@ -283,9 +272,6 @@ export function FeedbackDialog({
   triggerRef?: RefObject<HTMLElement | null>;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [contactOk, setContactOk] = useState(true);
-  const [contactEmail, setContactEmail] = useState(user.email);
-  const [includeTech, setIncludeTech] = useState(true);
   const [screenshot, setScreenshot] = useState<Screenshot | null>(null);
   const [imageError, setImageError] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
@@ -313,8 +299,6 @@ export function FeedbackDialog({
       ...saved,
       area: saved.area || (currentArea ?? ""),
     });
-    setContactEmail(user.email);
-    setContactOk(true);
     setErrors({});
     setServerError("");
     setSent(null);
@@ -385,9 +369,9 @@ export function FeedbackDialog({
       severity: draft.severity || null,
       problem: draft.problem,
       importance: draft.importance || null,
-      contactOk,
-      contactEmail,
-      tech: includeTech ? collectTech() : null,
+      contactOk: true,
+      contactEmail: user.email,
+      tech: null,
       screenshot: screenshot ? { type: "image/jpeg" as const, data: screenshot.data } : null,
     };
     const { value, errors: found } = validateFeedback(payload);
@@ -408,7 +392,7 @@ export function FeedbackDialog({
       clearDraft();
       setDraft(EMPTY_DRAFT);
       setScreenshot(null);
-      setSent({ email: value.contactOk ? (value.contactEmail ?? "") : "" });
+      setSent({ email: user.email });
       requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }));
     } catch (err) {
       setServerError(
@@ -426,7 +410,6 @@ export function FeedbackDialog({
   const info = kind ? FEEDBACK_KIND_INFO[kind] : null;
   const KindIcon = kind ? KIND_ICON[kind] : null;
   const errorList = Object.values(errors).filter(Boolean) as string[];
-  const techPreview = includeTech && typeof window !== "undefined" ? collectTech() : null;
 
   const titleId = `${baseId}-title`;
 
@@ -470,13 +453,9 @@ export function FeedbackDialog({
                 A sua mensagem chegou para a equipe do Casa Mia. A gente lê cada uma com carinho e usa o que você
                 contou para melhorar o app.
               </p>
-              {sent.email ? (
-                <p>
-                  Se precisarmos de mais detalhes, escrevemos para <strong>{sent.email}</strong>.
-                </p>
-              ) : (
-                <p>Você pediu para não receber resposta por e-mail, e tudo bem: a sua mensagem já ajuda.</p>
-              )}
+              <p>
+                Se precisarmos de mais detalhes, escrevemos para <strong>{sent.email}</strong>.
+              </p>
               <div className="fb-actions fb-actions-center">
                 <button type="button" className="button button-outline" onClick={() => setSent(null)}>
                   Enviar outra mensagem
@@ -795,66 +774,6 @@ export function FeedbackDialog({
                 </section>
               )}
 
-              <section className="fb-section" aria-labelledby={`${baseId}-s4`}>
-                <h3 id={`${baseId}-s4`}>
-                  <span className="fb-step" aria-hidden="true">{kind === "other" ? 2 : 4}</span>
-                  Como falamos com você
-                </h3>
-                <label className="fb-check">
-                  <input
-                    type="checkbox"
-                    checked={contactOk}
-                    onChange={(event) => setContactOk(event.target.checked)}
-                    disabled={busy}
-                  />
-                  <span>
-                    <strong>Pode me responder por e-mail</strong>
-                    <small>Só se a gente precisar de mais detalhes ou tiver novidade sobre a sua mensagem.</small>
-                  </span>
-                </label>
-                {contactOk && (
-                  <Field id={`${baseId}-email`} label="E-mail para resposta" required error={errors.contactEmail}>
-                    <input
-                      id={`${baseId}-email`}
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      value={contactEmail}
-                      onChange={(event) => {
-                        setContactEmail(event.target.value);
-                        if (errors.contactEmail) setErrors((current) => ({ ...current, contactEmail: undefined }));
-                      }}
-                      aria-invalid={Boolean(errors.contactEmail)}
-                      disabled={busy}
-                    />
-                  </Field>
-                )}
-
-                <label className="fb-check">
-                  <input
-                    type="checkbox"
-                    checked={includeTech}
-                    onChange={(event) => setIncludeTech(event.target.checked)}
-                    disabled={busy}
-                  />
-                  <span>
-                    <strong>Enviar informações técnicas</strong>
-                    <small>Ajudam a encontrar o problema: tela, navegador e idioma. Nunca incluem sua senha nem sua lista.</small>
-                  </span>
-                </label>
-                {techPreview && (
-                  <details className="fb-tech">
-                    <summary>Ver o que será enviado</summary>
-                    <dl>
-                      <div><dt>Página</dt><dd>{techPreview.path}</dd></div>
-                      <div><dt>Tamanho da tela</dt><dd>{techPreview.viewport}</dd></div>
-                      <div><dt>Idioma e fuso</dt><dd>{techPreview.language} · {techPreview.timezone}</dd></div>
-                      <div><dt>Navegador</dt><dd>{techPreview.userAgent}</dd></div>
-                    </dl>
-                  </details>
-                )}
-              </section>
-
               {serverError && (
                 <div className="fb-summary is-server" role="alert">
                   {serverError}
@@ -864,7 +783,7 @@ export function FeedbackDialog({
               <div className="fb-actions">
                 <p className="fb-promise">
                   <ShieldCheck size={16} aria-hidden="true" />
-                  <span>Só a equipe do Casa Mia lê esta mensagem.</span>
+                  <span>Só a equipe do Casa Mia lê esta mensagem. Responderemos pelo e-mail cadastrado na sua conta.</span>
                 </p>
                 <div className="fb-actions-buttons">
                   <button type="button" className="button button-outline" onClick={close} disabled={busy}>

@@ -8,8 +8,17 @@ import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { PrivacyPage } from './components/PrivacyPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
 import './index.css';
+import { startSessionActivity } from './sessionActivity';
+import { startAnalytics, captureError } from './analytics';
+
+const stopSessionActivity = startSessionActivity();
+if (import.meta.hot) import.meta.hot.dispose(stopSessionActivity);
 
 // /signup antigo: a conta só é criada no fim do funil de onboarding.
+// Checkouts antigos voltavam para o onboarding; preserve a confirmação ao abrir o enxoval.
+if (window.location.pathname === '/comecar' && new URLSearchParams(window.location.search).get('assinatura') === 'sucesso') {
+  window.history.replaceState({}, '', `/app${window.location.search}`);
+}
 if (window.location.pathname === '/signup') window.history.replaceState({}, '', '/comecar');
 
 // /login?cadastro=1 antigo: o cadastro agora tem rota própria.
@@ -20,7 +29,13 @@ if (
   window.history.replaceState({}, '', '/cadastro');
 }
 
-createRoot(document.getElementById('root')!).render(
+const stopAnalytics = startAnalytics();
+if (import.meta.hot) import.meta.hot.dispose(stopAnalytics);
+
+createRoot(document.getElementById('root')!, {
+  onUncaughtError: error => captureError(error),
+  onCaughtError: error => captureError(error),
+}).render(
   <StrictMode>
     {/^\/admin(?:\/|$)/.test(window.location.pathname) ? (
       <AdminPage />

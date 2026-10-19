@@ -165,7 +165,6 @@ function PlanRow({
       <div className="pp-row-main">
         <strong className="pp-row-name">{item.name}</strong>
         <span className="pp-row-meta">
-          {item.category}
           {done && <> · {ITEM_STATUS_META[item.status].label}</>}
           {overdue && <b className="pp-late"> · Atrasado</b>}
         </span>
@@ -190,13 +189,15 @@ function PlanRow({
             )}
           </>
         ) : realBand ? (
-          <span title="O que outras listas pagaram por este item, no seu perfil de gasto (só agregados, sem dados de ninguém)">
-            outras listas pagam {money(band.minCents)} a {money(band.maxCents)}
-          </span>
+          <div className="pp-price-estimate" title="O que outras listas pagaram por este item, no seu perfil de gasto (só agregados, sem dados de ninguém)">
+            <span className="pp-price-label">Outras listas pagam</span>
+            <span className="pp-price-range"><span>{money(band.minCents)}</span><span className="pp-price-to">a</span><span>{money(band.maxCents)}</span></span>
+          </div>
         ) : (
-          <span title="Faixa esperada para o seu perfil de gasto">
-            costuma ser {money(band.minCents)} a {money(band.maxCents)}
-          </span>
+          <div className="pp-price-estimate" title="Faixa esperada para o seu perfil de gasto">
+            <span className="pp-price-label">Faixa estimada</span>
+            <span className="pp-price-range"><span>{money(band.minCents)}</span><span className="pp-price-to">a</span><span>{money(band.maxCents)}</span></span>
+          </div>
         )}
       </div>
       <div className="pp-row-week">
@@ -215,6 +216,39 @@ function PlanRow({
 }
 
 const ROWS_COLLAPSED = 6;
+
+function PlanRoomGroup({ name, entries, initiallyOpen, moveDate, canPickWeek, busyId, onPickWeek }: {
+  name: string;
+  entries: PlannedItem<EnxovalItem>[];
+  initiallyOpen: boolean;
+  moveDate: string | null;
+  canPickWeek: boolean;
+  busyId: string | null;
+  onPickWeek: (id: string, week: number | null) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? entries : entries.slice(0, ROWS_COLLAPSED);
+  return (
+    <details className="pp-room-group" open={initiallyOpen}>
+      <summary>
+        <span className="pp-room-name">{name}</span>
+        <span className="pp-room-count">{entries.length} {entries.length === 1 ? "item" : "itens"}</span>
+        <ChevronDown size={16} aria-hidden="true" />
+      </summary>
+      <ul className="pp-rows">
+        {shown.map((entry) => <PlanRow key={entry.item.id} entry={entry}
+          moveDate={moveDate} canPickWeek={canPickWeek} busy={busyId === entry.item.id}
+          onPickWeek={onPickWeek} />)}
+      </ul>
+      {entries.length > ROWS_COLLAPSED && (
+        <button type="button" className="pp-more" aria-expanded={showAll}
+          onClick={() => setShowAll((value) => !value)}>
+          {showAll ? "Mostrar menos" : `Ver mais ${entries.length - ROWS_COLLAPSED} neste ambiente`}
+        </button>
+      )}
+    </details>
+  );
+}
 
 /**
  * Uma etapa da mudança. Fechada, mostra só o essencial (nome, datas, quantos itens faltam, faixa e veredito);
@@ -236,13 +270,18 @@ function PeriodCard({
   onPickWeek: (id: string, week: number | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);
   const baseId = useId();
   const bodyId = `${baseId}-body`;
   const { period } = summary;
   // Só o que ainda falta resolver é listado: comprados, ganhos e "já tenho" ficam de fora (mas contam nos números do período).
   const entries = summary.entries.filter((entry) => entry.pending);
-  const shown = showAll ? entries : entries.slice(0, ROWS_COLLAPSED);
+  const groups = new Map<string, { name: string; entries: typeof entries }>();
+  for (const entry of entries) {
+    const key = entry.item.categoryId;
+    const group = groups.get(key);
+    if (group) group.entries.push(entry);
+    else groups.set(key, { name: entry.item.category, entries: [entry] });
+  }
   const verdict = summary.verdict;
   const VerdictIcon = VERDICT_ICON[verdict];
 
@@ -346,37 +385,13 @@ function PeriodCard({
           </div>
         )}
 
-        {entries.length > 0 && (
-          <ul className="pp-rows">
-            {shown.map((entry) => (
-              <PlanRow
-                key={entry.item.id}
-                entry={entry}
-                moveDate={moveDate}
-                canPickWeek={canPickWeek}
-                busy={busyId === entry.item.id}
-                onPickWeek={onPickWeek}
-              />
-            ))}
-          </ul>
-        )}
-        {entries.length > ROWS_COLLAPSED && (
-          <button
-            type="button"
-            className="pp-more"
-            aria-expanded={showAll}
-            onClick={() => setShowAll((value) => !value)}
-          >
-            {showAll
-              ? "Mostrar menos"
-              : `Ver mais ${entries.length - ROWS_COLLAPSED} ${entries.length - ROWS_COLLAPSED === 1 ? "item" : "itens"}`}
-            <ChevronDown
-              size={14}
-              aria-hidden="true"
-              style={{ transform: showAll ? "rotate(180deg)" : undefined }}
-            />
-          </button>
-        )}
+        <div className="pp-room-groups">
+          {[...groups].map(([id, group], index) => (
+            <PlanRoomGroup key={id} name={group.name} entries={group.entries}
+              initiallyOpen={index === 0} moveDate={moveDate} canPickWeek={canPickWeek}
+              busyId={busyId} onPickWeek={onPickWeek} />
+          ))}
+        </div>
       </div>
     </section>
   );

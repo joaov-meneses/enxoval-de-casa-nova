@@ -177,6 +177,44 @@ html {
 .cm-nav .cm-nav-login {
   display: none;
 }
+.cm-login.cm-btn-primary,
+.cm-nav .cm-nav-login.cm-btn-primary {
+  color: #fff;
+  background: var(--cm-action);
+}
+.cm-login.cm-btn-primary:hover,
+.cm-nav .cm-nav-login.cm-btn-primary:hover {
+  background: var(--cm-action-hover);
+}
+.cm-login.cm-login-secondary,
+.cm-nav .cm-nav-login.cm-login-secondary {
+  color: var(--cm-text);
+  border: 1.5px solid var(--cm-line);
+  border-radius: 14px;
+  background: #fff9ef;
+}
+.cm-login.cm-login-secondary:hover,
+.cm-nav .cm-nav-login.cm-login-secondary:hover {
+  color: var(--cm-text);
+  border-color: var(--cm-primary-dark);
+  background: var(--cm-tint);
+}
+.cm-trial-cta {
+  animation: cm-trial-attention 2.4s ease-in-out infinite;
+}
+@keyframes cm-trial-attention {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgb(116 67 35 / 0%);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(116 67 35 / 14%);
+    transform: translateY(-2px);
+  }
+}
+.cm-header-actions .cm-login.is-signed-in {
+  display: inline-flex;
+}
 .cm-header-actions {
   display: flex;
   align-items: center;
@@ -1094,6 +1132,9 @@ html {
   .cm-header-actions {
     transition: none;
   }
+  .cm-trial-cta {
+    animation: none;
+  }
 }
 
 /* Carrossel de funcionalidades: um slide por vez, avança sozinho e pausa ao passar o mouse.
@@ -1297,4 +1338,20 @@ html {
     transition: none;
     animation: none;
   }
+}
+
+/* Cabe?alho compacto: marca, a??o e menu cabem em uma linha a 320px. */
+@media (max-width: 380px) {
+  .cm-header { gap: 8px; padding: 8px 10px; }
+  .cm-header > .brand-link { flex-shrink: 0; }
+  .cm-header .brand { font-size: 18px; gap: 4px; }
+  .cm-header-actions { min-width: 0; gap: 4px; }
+  .cm-header-actions .cm-btn-sm {
+    min-height: 40px;
+    padding-inline: 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .cm-header .cm-menu-toggle { flex: 0 0 44px; width: 44px; height: 44px; }
+  .cm-header .cm-nav { padding-inline: 10px; }
 }

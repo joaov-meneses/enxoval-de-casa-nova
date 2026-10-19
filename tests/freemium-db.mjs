@@ -1,5 +1,4 @@
-// Teste de integração com PostgreSQL real: travas do plano gratuito (1 enxoval, 2 ambientes, 10 itens por
-// ambiente), corte do conteúdo inicial, limites herdados do dono e contas antigas viram fundadoras.
+// Integração PostgreSQL: trial sem limites, bloqueio de acesso herdado do titular e fundadores preservados.
 // Usa um schema descartável. Rodar: npm run test:freemium-db
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -74,105 +73,46 @@ try {
     assert.ok(result.data.error, `${label}: a recusa explica o motivo`);
   };
 
-  // Conta nova nasce no plano gratuito.
+  // Sem plano ativo, a conta existe, mas não acessa o produto.
   const owner = person();
   const ownerUser = await register(owner, "dona@example.invalid");
-  assert.equal(ownerUser.plan, "free", "conta nova nasce no plano gratuito");
-
-  // O modelo padrão entra cortado: os 2 primeiros ambientes, com até 10 itens cada.
-  const created1 = await owner("/enxovais", "POST", { name: "Casa", useDefaultTemplate: true });
+  assert.equal(ownerUser.plan, 'free');
+  expectLimit(await owner('/enxovais', 'POST', {name: 'Bloqueado'}), 'SUBSCRIPTION_REQUIRED', 'sem cartão');
+  await query("UPDATE users SET plan = 'monthly', subscription_status = 'trialing', trial_used = true, trial_started_at = now(), trial_ends_at = now() + interval '48 hours' WHERE id = $1", [ownerUser.id]);
+  const created1 = await owner('/enxovais', 'POST', {name: 'Casa', useDefaultTemplate: true});
   assert.equal(created1.status, 201, JSON.stringify(created1.data));
   const enxovalId = created1.data.enxoval.id;
-  assert.equal(created1.data.categories.length, 2, "o modelo padrão entra com 2 ambientes");
-  for (const category of created1.data.categories) {
-    const count = created1.data.items.filter((item) => item.categoryId === category.id).length;
-    assert.ok(count <= 10, `${category.name}: ${count} itens, acima do limite`);
-  }
+  assert.ok(created1.data.categories.length > 2, 'trial não corta o modelo');
+  assert.equal((await owner('/enxovais', 'POST', {name: 'Praia', useDefaultTemplate: false})).status, 201);
+  const categoryId = created1.data.categories[0].id;
+  for (let n = 0; n < 11; n++) assert.equal((await owner('/items', 'POST', {enxovalId, categoryId, name: `Item extra ${n}`})).status, 201);
 
-  // Segundo enxoval é recusado.
-  expectLimit(await owner("/enxovais", "POST", { name: "Casa de praia", useDefaultTemplate: false }), "LIMIT_REACHED_ENXOVAIS", "segundo enxoval");
-
-  // Terceiro ambiente é recusado; repetir o nome de um ambiente existente não conta como novo.
-  const [first, second] = created1.data.categories;
-  expectLimit(await owner("/categories", "POST", { enxovalId, name: "Varanda" }), "LIMIT_REACHED_ENVIRONMENTS", "terceiro ambiente");
-  const same = await owner("/categories", "POST", { enxovalId, name: first.name });
-  assert.equal(same.status, 201, "ambiente já existente continua acessível");
-  assert.equal(same.data.id, first.id);
-  expectLimit(
-    await owner("/items", "POST", { enxovalId, name: "Rede", categoryName: "Varanda" }),
-    "LIMIT_REACHED_ENVIRONMENTS",
-    "item que criaria um ambiente novo",
-  );
-
-  // Enche o primeiro ambiente até 10 e esvazia o segundo.
-  const itemsIn = async (categoryId) =>
-    (await query("SELECT id FROM items WHERE category_id = $1 ORDER BY sort_order", [categoryId])).map((row) => row.id);
-  await query("DELETE FROM items WHERE category_id = $1", [second.id]);
-  while ((await itemsIn(first.id)).length < 10) {
-    const added = await owner("/items", "POST", { enxovalId, name: `Item ${randomUUID().slice(0, 6)}`, categoryId: first.id });
-    assert.equal(added.status, 201, JSON.stringify(added.data));
-  }
-  expectLimit(await owner("/items", "POST", { enxovalId, name: "Décimo primeiro", categoryId: first.id }), "LIMIT_REACHED_ITEMS", "décimo primeiro item");
-
-  // Mover um item para o ambiente cheio também é recusado; editar sem mudar de ambiente segue livre.
-  const loose = await owner("/items", "POST", { enxovalId, name: "Solto", categoryId: second.id });
-  assert.equal(loose.status, 201, JSON.stringify(loose.data));
-  const looseId = loose.data.item.id;
-  expectLimit(await owner(`/items/${looseId}`, "PATCH", { categoryId: first.id }), "LIMIT_REACHED_ITEMS", "mover para ambiente cheio");
-  assert.equal((await owner(`/items/${looseId}`, "PATCH", { categoryId: second.id, name: "Solto 2" })).status, 200, "mesmo ambiente não conta");
-
-  // Remover um item libera a vaga.
-  const [firstItem] = await itemsIn(first.id);
-  assert.equal((await owner(`/items/${firstItem}`, "DELETE")).status, 204);
-  assert.equal((await owner(`/items/${looseId}`, "PATCH", { categoryId: first.id })).status, 200, "vaga liberada aceita o item movido");
-
-  // Quem é convidado herda os limites de quem é dono do enxoval.
+  // A assinatura do convidado não substitui a do titular do enxoval.
   const editor = person();
-  const editorUser = await register(editor, "editor@example.invalid");
-  await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [editorUser.id]);
+  const editorUser = await register(editor, 'editor@example.invalid');
+  await query("UPDATE users SET plan = 'monthly', subscription_status = 'active' WHERE id = $1", [editorUser.id]);
   await query("INSERT INTO enxoval_members (enxoval_id, user_id, role) VALUES ($1, $2, 'editor')", [enxovalId, editorUser.id]);
-  expectLimit(await editor("/categories", "POST", { enxovalId, name: "Varanda" }), "LIMIT_REACHED_ENVIRONMENTS", "convidado com plano pago no enxoval de conta gratuita");
+  assert.equal((await editor(`/enxovais/${enxovalId}`)).status, 200);
+  await query("UPDATE users SET subscription_cancel_at_period_end = true WHERE id = $1", [ownerUser.id]);
+  expectLimit(await editor(`/enxovais/${enxovalId}`), 'SUBSCRIPTION_REQUIRED', 'cancelamento agendado bloqueia convidado');
+  await query("UPDATE users SET subscription_cancel_at_period_end = false, trial_ends_at = now() - interval '1 second' WHERE id = $1", [ownerUser.id]);
+  expectLimit(await owner(`/enxovais/${enxovalId}`), 'SUBSCRIPTION_REQUIRED', '48 horas encerradas');
+  expectLimit(await editor('/categories', 'POST', {enxovalId, name: 'Varanda'}), 'SUBSCRIPTION_REQUIRED', 'convidado sem acesso após expiração');
+  await query("UPDATE users SET subscription_status = 'active' WHERE id = $1", [ownerUser.id]);
+  assert.equal((await editor('/categories', 'POST', {enxovalId, name: 'Varanda'})).status, 201);
 
-  // Plano pago libera tudo.
-  await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [ownerUser.id]);
-  assert.equal((await owner("/categories", "POST", { enxovalId, name: "Varanda" })).status, 201, "plano pago cria o terceiro ambiente");
-  assert.equal((await owner("/items", "POST", { enxovalId, name: "Décimo primeiro", categoryId: first.id })).status, 201, "plano pago cria o décimo primeiro item");
-  assert.equal((await owner("/enxovais", "POST", { name: "Casa de praia", useDefaultTemplate: false })).status, 201, "plano pago cria outro enxoval");
-
-  // O plano do funil entra cortado para a conta gratuita.
-  const answers = {
-    ...emptyAnswers,
-    name: "Funil",
-    moment: "casal",
-    moveDate: "2027-01-12",
-    moveDateAnswered: true,
-    state: "BA",
-    housing: "apartamento",
-    people: 3,
-    rooms: ["cozinha", "banheiro", "sala", "quarto", "servico"],
-    owned: "algumas",
-    style: "full",
-    budget: "10-25",
-    worries: ["waste"],
-    usage: ["buy"],
-    source: "instagram",
-  };
+  // O onboarding mantém todos os ambientes e itens durante o trial.
+  const answers = {...emptyAnswers, name: 'Funil', moment: 'casal', moveDate: '2027-01-12', moveDateAnswered: true,
+    state: 'BA', housing: 'apartamento', people: 3, rooms: ['cozinha','banheiro','sala','quarto','servico'],
+    owned: 'algumas', style: 'full', budget: '10-25', worries: ['waste'], usage: ['buy'], source: 'instagram'};
   const plan = generatePlan(answers);
-  assert.ok(plan.categories.length > 2, "o plano de teste precisa passar do limite");
   const funnel = person();
-  await register(funnel, "funil@example.invalid");
-  const fromPlan = await funnel("/enxovais", "POST", { name: plan.enxovalName, plan: toPayload(plan), profile: answers, userName: "Funil" });
+  const funnelUser = await register(funnel, 'funil@example.invalid');
+  await query("UPDATE users SET plan = 'monthly', subscription_status = 'trialing', trial_ends_at = now() + interval '48 hours' WHERE id = $1", [funnelUser.id]);
+  const fromPlan = await funnel('/enxovais', 'POST', {name: plan.enxovalName, plan: toPayload(plan), profile: answers, userName: 'Funil'});
   assert.equal(fromPlan.status, 201, JSON.stringify(fromPlan.data));
-  assert.deepEqual(
-    fromPlan.data.categories.map((category) => category.name),
-    plan.categories.slice(0, 2).map((category) => category.name),
-    "entram os 2 primeiros ambientes do plano",
-  );
-  for (const category of fromPlan.data.categories) {
-    const names = fromPlan.data.items.filter((item) => item.categoryId === category.id).map((item) => item.name);
-    const expected = plan.categories.find((planned) => planned.name === category.name).items.slice(0, 10).map((item) => item.name);
-    assert.deepEqual(names, expected, `${category.name}: entram os 10 primeiros itens`);
-  }
+  assert.deepEqual(fromPlan.data.categories.map(c => c.name), plan.categories.map(c => c.name));
+  assert.equal(fromPlan.data.items.length, plan.categories.reduce((total, c) => total + c.items.length, 0));
 
   // Contas que já existiam antes do freemium viram fundadoras uma única vez; as novas continuam gratuitas.
   await query("ALTER TABLE users DROP COLUMN plan");
@@ -185,7 +125,7 @@ try {
   assert.equal((await query("SELECT plan FROM users WHERE email = 'depois@example.invalid'"))[0].plan, "free", "a migração não refaz a promoção");
   await assert.rejects(query("UPDATE users SET plan = 'vip'"), /users_plan_valid/, "o banco recusa planos desconhecidos");
 
-  console.log("PASS: plano gratuito limita enxovais, ambientes e itens; conteúdo inicial entra cortado; contas antigas viram fundadoras.");
+  console.log("PASS: trial sem limites, bloqueio após cancelamento/expiração, convidados herdam acesso e contas fundadoras preservadas.");
 } finally {
   if (server)
     await new Promise((resolve, reject) =>

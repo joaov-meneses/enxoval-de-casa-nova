@@ -109,6 +109,25 @@ export async function migrateDatabase() {
       expires_at timestamptz NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS user_ip_events (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip inet NOT NULL,
+      event text NOT NULL CHECK (event IN ('signup', 'login', 'invitation_signup')),
+      occurred_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS user_ip_events_ip_time_idx ON user_ip_events(ip, occurred_at DESC);
+    CREATE INDEX IF NOT EXISTS user_ip_events_user_time_idx ON user_ip_events(user_id, occurred_at DESC);
+    CREATE INDEX IF NOT EXISTS user_ip_events_time_idx ON user_ip_events(occurred_at);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data bytea;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_version text;
+
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_activity_at timestamptz;
+    UPDATE sessions SET last_activity_at = created_at WHERE last_activity_at IS NULL;
+    ALTER TABLE sessions ALTER COLUMN last_activity_at SET DEFAULT now();
+    ALTER TABLE sessions ALTER COLUMN last_activity_at SET NOT NULL;
+    UPDATE sessions SET expires_at = created_at + interval '7 days'
+      WHERE expires_at > created_at + interval '7 days';
 
     CREATE TABLE IF NOT EXISTS enxovais (
       id uuid PRIMARY KEY,
@@ -205,6 +224,23 @@ export async function migrateDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_started_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_used boolean NOT NULL DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS billing_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_notice_seen_session_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_intro_seen_subscription_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ending_seen_subscription_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_draft jsonb;
+    CREATE TABLE IF NOT EXISTS billing_checkouts (
+      user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      url text NOT NULL, expires_at timestamptz NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS billing_mail (
+      subscription_id text NOT NULL, kind text NOT NULL, sent_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (subscription_id, kind)
+    );
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_renews_at timestamptz;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_cancel_at_period_end boolean NOT NULL DEFAULT false;
     -- Passe da Casa Nova (pagamento único): acesso até esta data. users.plan não guarda 'pass'; o plano em vigor sai de effectivePlanSql.

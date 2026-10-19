@@ -1,8 +1,9 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { analyticsAvailable, analyticsOptedOut, setAnalyticsOptOut } from '../analytics';
 import { ArrowLeft } from "lucide-react";
 import { Brand } from "./Brand";
 
-const UPDATED = "7 de outubro de 2026";
+const UPDATED = "18 de outubro de 2026";
 
 /**
  * Contato do responsável pelo tratamento dos dados. Preencher antes do lançamento
@@ -28,6 +29,11 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         <li>
           <strong>Conta:</strong> nome, e-mail e senha. A senha não é guardada em
           texto: só uma versão protegida (hash).
+        </li>
+        <li>
+          <strong>Segurança:</strong> o endereço IP registrado em cadastros e
+          logins bem-sucedidos, inclusive em contas criadas por convite, para
+          investigar abusos e proteger contas.
         </li>
         <li>
           <strong>Seu enxoval:</strong> nome do enxoval, ambientes, itens, preços,
@@ -70,8 +76,9 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         </li>
         <li>Manter e mostrar o seu enxoval em qualquer aparelho.</li>
         <li>
-          Entender, de forma agregada, quem usa o Casa Mia e melhorar o produto, sem
-          identificar você.
+          Entender o uso do Casa Mia e melhorar o produto. Quando a análise está
+          ativa, usamos um identificador interno da conta para medir ações e
+          retornos ao longo do tempo, sem enviar nome ou e-mail ao PostHog.
         </li>
         <li>Proteger as contas e prevenir abusos.</li>
       </ul>
@@ -88,7 +95,8 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         <li>
           <strong>Equipe de operação:</strong> o painel administrativo mostra
           nome, e-mail, situação da conta, datas de cadastro e de último acesso e
-          quantos enxovais a conta tem. As respostas do onboarding ficam no banco
+          quantos enxovais a conta tem. Também permite consultar os IPs associados
+          à conta para investigar abusos e desativar contas. As respostas do onboarding ficam no banco
           de dados e só são acessadas por quem administra a infraestrutura, para
           operar e melhorar o produto. Isso inclui estado, data da mudança e faixa
           de orçamento: <strong>essas respostas não são visíveis só para você</strong>.
@@ -101,9 +109,29 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
     body: (
       <>
         <p>
-          Não vendemos nem compartilhamos os seus dados com anunciantes. No momento,
-          não usamos ferramentas de análise nem de publicidade de terceiros, e não
-          enviamos e-mails.
+          Não vendemos nem compartilhamos os seus dados com anunciantes.
+          Quando configurado, o PostHog recebe eventos de uso, como etapas do
+          onboarding, criação de itens e ativação de planos, associados a um
+          identificador interno. O navegador pode guardar identificadores de
+          análise para relacionar visitas. Não enviamos nomes, e-mails, senhas,
+          respostas pessoais do onboarding, conteúdo das listas, links de produtos
+          ou tokens de acesso nessa análise. Não gravamos sessões nem capturamos
+          automaticamente cliques ou formulários. Respeitamos o sinal Do Not Track
+          do navegador e você pode desativar a análise neste aparelho abaixo.
+        </p>
+        <p>
+          Medimos também a página visitada, cliques em botões da página inicial,
+          a origem das visitas e o desempenho de carregamento e interação.
+          Enviamos somente rotas conhecidas, fontes e códigos de campanha permitidos
+          e medidas numéricas. Parâmetros de URL, fragmentos, termos de busca,
+          identificadores de anúncios e o conteúdo das páginas não são enviados.
+        </p>
+        <p>
+          Para corrigir falhas, também podemos enviar ao PostHog o tipo do erro
+          e sua localização no código. As mensagens livres dos erros e o conteúdo
+          das requisições não são enviados. A captura no navegador respeita a
+          opção de desativar a análise; erros internos do servidor são registrados
+          separadamente, sem associá-los à sua conta.
         </p>
         <p>
           Os serviços que sustentam o aplicativo (hospedagem e banco de dados)
@@ -130,8 +158,11 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
     title: "Por quanto tempo guardamos",
     body: (
       <p>
-        Enquanto a sua conta existir. Se a conta for desativada, as listas são
-        preservadas até que você peça a exclusão dos dados.
+        Os endereços IP de cadastros e logins são mantidos por até seis meses e
+        removidos depois desse prazo. Os dados da conta e as listas são mantidos
+        enquanto a conta existir. Se ela for desativada, as listas são preservadas
+        até que você peça a exclusão dos dados.
+
       </p>
     ),
   },
@@ -189,6 +220,7 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
 ];
 
 export function PrivacyPage() {
+  const [optedOut, setOptedOut] = useState(analyticsOptedOut);
   useEffect(() => {
     document.title = "Política de privacidade | Casa Mia";
   }, []);
@@ -206,6 +238,14 @@ export function PrivacyPage() {
         <span className="eyebrow">COMO CUIDAMOS DOS SEUS DADOS</span>
         <h1>Política de privacidade</h1>
         <p className="privacy-updated">Última atualização: {UPDATED}</p>
+        {analyticsAvailable() && <section>
+          <h2>Análise de uso neste aparelho</h2>
+          <p aria-live="polite">{optedOut ? 'A análise de uso está desativada neste navegador.' : 'Você pode desativar os eventos opcionais de análise de uso neste navegador.'}</p>
+          <button type="button" className="button button-outline" onClick={() => {
+            setAnalyticsOptOut(!optedOut);
+            setOptedOut(analyticsOptedOut());
+          }}>{optedOut ? 'Ativar análise de uso' : 'Desativar análise de uso'}</button>
+        </section>}
         {SECTIONS.map((section) => (
           <section key={section.title}>
             <h2>{section.title}</h2>

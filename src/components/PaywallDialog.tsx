@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { Dialog } from "./Dialog";
 import { Nino } from "./Nino";
+import { capture } from '../analytics';
 import {
   PaywallPeek,
   PaywallTimeline,
@@ -75,10 +76,12 @@ export function PaywallDialog({
 
   useEffect(() => {
     const onLimit = (event: Event) => {
+      capture('plans_viewed', { source: 'limit', reason: (event as CustomEvent<LimitReachedDetail>).detail.code });
       setError("");
       setLimit((event as CustomEvent<LimitReachedDetail>).detail);
     };
     const onOpenPlans = () => {
+      capture('plans_viewed', { source: 'menu' });
       setError("");
       setIsPlansOpen(true);
     };
@@ -185,37 +188,10 @@ export function PaywallDialog({
       <div className="paywall">
         <div className="paywall-intro">
           <Nino pose="wave" size={96} />
-          {variant === "peek" ? (
-            <p>Vamos abrir as portas de todos os cômodos do seu lar?</p>
-          ) : (
-            <p>
-              No plano gratuito, você pode testar até{" "}
-              {FREE_PLAN_LIMITS.environments} cômodos com{" "}
-              {FREE_PLAN_LIMITS.itemsPerEnvironment} itens cada. Vamos abrir as
-              portas de todos os cômodos do seu lar?
-            </p>
-          )}
+          <p>Acesso completo a todos os recursos. Sua conta e seus dados ficam preservados após o cancelamento.</p>
         </div>
-        {variant === "peek" && (
-          <PaywallPeek categories={categories} items={items} />
-        )}
-        {variant === "timeline" && <PaywallTimeline />}
-        {variant === "control" && (
-          <ul
-            className="paywall-unlocks"
-            aria-label="O que os planos pagos liberam"
-          >
-            {UNLOCKS.map((text) => (
-              <li key={text}>
-                <Check size={15} aria-hidden="true" /> {text}
-              </li>
-            ))}
-          </ul>
-        )}
         <ul className="paywall-plans" aria-label="Planos">
-          {PAID_PLAN_OFFERS.filter(
-            (offer) => !(hasPass && offer.id === "monthly"),
-          ).map((offer) => (
+          {PAID_PLAN_OFFERS.filter((offer) => offer.id === "pass" || !hasPass).map((offer) => (
             <li
               key={offer.id}
               className={offer.featured ? "is-featured" : undefined}

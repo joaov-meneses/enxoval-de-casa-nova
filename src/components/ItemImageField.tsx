@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
-import { ImagePlus, ImageOff, Link2, LoaderCircle, Trash2 } from "lucide-react";
+import { ImagePlus, ImageOff, LoaderCircle, Trash2 } from "lucide-react";
 import { importItemImageFromUrl, uploadItemImage } from "../api";
+import { CopyableLinkInput } from "./CopyableLinkInput";
 import { IMAGE_UPLOAD_ACCEPT } from "../itemImages";
 import { imageFileProblem, prepareImageForUpload } from "../imageUpload";
 
@@ -12,6 +13,7 @@ interface ItemImageFieldProps {
   onChange: (imageUrl: string | null) => void;
   disabled?: boolean;
   className?: string;
+  onBusyChange?: (busy: boolean) => void;
 }
 
 const inputClass =
@@ -23,10 +25,12 @@ const buttonClass =
  * Imagem do item: enviar um arquivo do aparelho ou colar o link de uma imagem. Nos dois casos o servidor
  * confere, reduz e guarda a imagem no banco, e o item passa a apontar para ela.
  */
-export function ItemImageField({ enxovalId, value, onChange, disabled, className = "" }: ItemImageFieldProps) {
+export function ItemImageField({ enxovalId, value, onChange, disabled, className = "", onBusyChange }: ItemImageFieldProps) {
   const id = useId();
   const fileInput = useRef<HTMLInputElement>(null);
   const [linkText, setLinkText] = useState("");
+  const lastImported = useRef("");
+  const latestLink = useRef("");
   const [busy, setBusy] = useState<"file" | "link" | null>(null);
   const [error, setError] = useState("");
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -43,14 +47,17 @@ export function ItemImageField({ enxovalId, value, onChange, disabled, className
       return;
     }
     setBusy("file");
+    onBusyChange?.(true);
     setError("");
     try {
       const { imageUrl } = await uploadItemImage(enxovalId, await prepareImageForUpload(file));
       onChange(imageUrl);
+      setLinkText(''); latestLink.current = ''; lastImported.current = '';
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível enviar a imagem.");
     } finally {
       setBusy(null);
+      onBusyChange?.(false);
       // Permite escolher o mesmo arquivo de novo depois de um erro.
       if (fileInput.current) fileInput.current.value = "";
     }
@@ -58,21 +65,24 @@ export function ItemImageField({ enxovalId, value, onChange, disabled, className
 
   async function useLink() {
     const url = linkText.trim();
-    if (!url || !enxovalId) return;
+    if (!url || !enxovalId || url === lastImported.current || busy) return;
     if (!/^https?:\/\//i.test(url)) {
       setError("Cole o endereço completo da imagem, começando com https://.");
       return;
     }
     setBusy("link");
+    onBusyChange?.(true);
     setError("");
     try {
       const { imageUrl } = await importItemImageFromUrl(enxovalId, url);
+      if (latestLink.current !== url) return;
       onChange(imageUrl);
-      setLinkText("");
+      lastImported.current = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível importar a imagem desse link.");
     } finally {
       setBusy(null);
+      onBusyChange?.(false);
     }
   }
 
@@ -81,7 +91,7 @@ export function ItemImageField({ enxovalId, value, onChange, disabled, className
       <span id={`${id}-label`} className="block text-sm font-medium text-stone-700 mb-1">
         Imagem do item <span className="font-normal text-stone-500">(opcional)</span>
       </span>
-      <div className="flex gap-3 rounded-2xl border border-stone-200 bg-white p-3">
+      <div className="item-image-layout">
         <div className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl border border-stone-100 bg-stone-50 text-stone-400">
           {showPreview ? (
             <img
@@ -100,8 +110,7 @@ export function ItemImageField({ enxovalId, value, onChange, disabled, className
             </span>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap gap-2">
+        <div className="item-image-upload-actions">
             <button
               type="button"
               className={buttonClass}
@@ -119,6 +128,7 @@ export function ItemImageField({ enxovalId, value, onChange, disabled, className
                 onClick={() => {
                   setError("");
                   onChange(null);
+                  setLinkText(''); latestLink.current = ''; lastImported.current = '';
                 }}
                 disabled={locked}
               >
@@ -130,37 +140,37 @@ export function ItemImageField({ enxovalId, value, onChange, disabled, className
               ref={fileInput}
               type="file"
               accept={IMAGE_UPLOAD_ACCEPT}
-              className="sr-only"
+              hidden
               tabIndex={-1}
               aria-label="Escolher arquivo de imagem"
               onChange={(event) => void pickFile(event.target.files?.[0])}
               disabled={locked}
             />
-          </div>
-          <div className="flex gap-2">
-            <input
+        </div>
+          <div className="item-image-link">
+            <label htmlFor={`${id}-image-link`}>Link da imagem</label>
+            <CopyableLinkInput
+              id={`${id}-image-link`}
+              copyLabel="Copiar link da imagem"
               type="text"
               inputMode="url"
               autoComplete="off"
               aria-label="Link de uma imagem"
               value={linkText}
-              onChange={(event) => setLinkText(event.target.value)}
+              onChange={(event) => { setLinkText(event.target.value); latestLink.current = event.target.value.trim(); setError(""); }}
+              onBlur={event => { if (!(event.relatedTarget instanceof Element && event.relatedTarget.closest("[data-copy-link]"))) void useLink(); }}
               onKeyDown={(event) => {
                 // Enter aqui importa a imagem em vez de enviar o formulário inteiro.
                 if (event.key !== "Enter") return;
                 event.preventDefault();
                 void useLink();
               }}
-              placeholder="Ou cole o link de uma imagem"
+              placeholder="https://..."
               disabled={locked}
               className={inputClass}
             />
-            <button type="button" className={buttonClass} onClick={() => void useLink()} disabled={locked || !linkText.trim()}>
-              {busy === "link" ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> : <Link2 size={16} aria-hidden="true" />}
-              <span>Usar<span className="hidden sm:inline"> link</span></span>
-            </button>
+            <small className="item-inline-hint">A imagem é carregada ao sair do campo ou pressionar Enter.</small>
           </div>
-        </div>
       </div>
       <p className="mt-1 text-xs text-stone-500">JPG, PNG, WebP, GIF ou AVIF. A gente reduz o tamanho e guarda com segurança.</p>
       {error && (

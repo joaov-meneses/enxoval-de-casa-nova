@@ -26,6 +26,7 @@ import { Brand } from "./Brand";
 import { HowItWorks } from "./HowItWorks";
 import { Nino } from "./Nino";
 import { FREE_PLAN_LIMITS, PAID_PLAN_OFFERS, type PaidPlanOffer } from "../plans";
+import { trackLandingCta } from '../analytics';
 
 const FAQS = [
   [
@@ -37,8 +38,8 @@ const FAQS = [
     "O Nino é a casinha-chaveiro que acompanha a sua mudança. Ele segura a trena, lembra do que não pode faltar no primeiro dia e ajuda a decidir o que fica para depois, sem julgar nenhuma escolha.",
   ],
   [
-    "O plano gratuito tem prazo para acabar?",
-    "Não. Você começa agora, sem cartão, com 2 cômodos e até 5 itens em cada um. Quando a sua casa crescer, é só abrir as portas dos outros cômodos em um plano pago.",
+    "Como funciona o teste de 2 dias?",
+    "Você cadastra o cartão e tem 48 horas completas de acesso a tudo. Depois, a mensalidade é cobrada automaticamente. Avisamos por e-mail e no app; cancele antes do fim para evitar a cobrança. O cancelamento bloqueia também os convidados e preserva sua conta e seus dados.",
   ],
   [
     "Posso montar a lista com outra pessoa?",
@@ -54,7 +55,7 @@ const FAQS = [
   ],
   [
     "Os planos já estão disponíveis para compra?",
-    "Ainda não. Os valores desta página são os previstos para o lançamento. Hoje não há cobrança, assinatura ativa nem pedido de cartão: você cria a conta e começa a montar o seu lar.",
+    "O teste completo dura 2 dias, com cartão cadastrado. Depois das 48 horas, a assinatura mensal é cobrada automaticamente. Você pode cancelar no app antes do fim para evitar a cobrança.",
   ],
 ];
 
@@ -125,27 +126,11 @@ const PAID_CTA: Record<PaidPlanOffer["id"], string> = {
   monthly: "Quero o Mensal",
 };
 
-const PLANS: Plan[] = [
-  {
-    id: "gratis",
-    name: "Gratuito",
-    price: "R$ 0",
-    per: "",
-    billing: "Para começar agora, sem cartão",
-    cta: "Começar Grátis",
-    features: [
-      `${FREE_PLAN_LIMITS.environments} cômodos com até ${FREE_PLAN_LIMITS.itemsPerEnvironment} itens cada`,
-      "Lista do Primeiro Dia",
-      "3 dicas do Nino por mês",
-      "No celular e no computador",
-    ],
-  },
-  ...PAID_PLAN_OFFERS.map((offer) => ({
-    ...offer,
-    cta: PAID_CTA[offer.id],
-    features: PAID_FEATURES,
-  })),
-];
+const PLANS: Plan[] = [{
+  id: "monthly", name: "Casa Mia", price: "R$ 29,90", per: "/mês",
+  billing: "2 dias de teste completo. Após 48 horas, cobrança automática no cartão.",
+  cta: "Começar teste de 2 dias", features: PAID_FEATURES,
+}];
 
 const MOCK_ITEMS = [
   { name: "Colchão", room: "Quarto", done: true },
@@ -263,7 +248,7 @@ function AppMock() {
   );
 }
 
-export function LandingPage({ signedIn }: { signedIn: boolean }) {
+export function LandingPage({ signedIn, authLoading = false }: { signedIn: boolean; authLoading?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [faq, setFaq] = useState<number | null>(0);
   // No topo o menu fica sem fundo; ao rolar, vira a barra de vidro.
@@ -277,8 +262,10 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     document.title = "Casa Mia | Enxoval de casa nova";
   }, []);
-  const start = signedIn ? "/app" : "/cadastro";
+  const start = signedIn || authLoading ? "/app" : "/cadastro";
+  const startLabel = signedIn || authLoading ? "Acessar meu lar" : "Começar teste de 2 dias";
   const closeMenu = () => setMenuOpen(false);
+  const trackStart = (position: 'header' | 'hero' | 'pricing' | 'footer_cta') => trackLandingCta(signedIn || authLoading ? 'open_app' : 'start_trial', position);
 
   return (
     <div className="cm-page">
@@ -298,29 +285,29 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           className={`cm-nav${menuOpen ? " is-open" : ""}`}
           aria-label="Navegação principal"
         >
-          <a href="#como-funciona" onClick={closeMenu}>
+          <a href="#como-funciona" onClick={() => { trackLandingCta('view_how_it_works', 'navigation'); closeMenu(); }}>
             Como Funciona
           </a>
-          <a href="#nino" onClick={closeMenu}>
+          <a href="#nino" onClick={() => { trackLandingCta('view_nino', 'navigation'); closeMenu(); }}>
             O Nino
           </a>
-          <a href="#cha" onClick={closeMenu}>
+          <a href="#cha" onClick={() => { trackLandingCta('view_gift_list', 'navigation'); closeMenu(); }}>
             Chá de Casa Nova
           </a>
-          <a href="#planos" onClick={closeMenu}>
+          <a href="#planos" onClick={() => { trackLandingCta('view_pricing', 'navigation'); closeMenu(); }}>
             Preços
           </a>
-          <a className="cm-nav-login" href={signedIn ? "/app" : "/login"}>
+          {!authLoading && <a className="cm-nav-login cm-btn cm-login-secondary" href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'navigation')}>
             {signedIn ? "Meu lar" : "Entrar"}
-          </a>
+          </a>}
         </nav>
         <div className="cm-header-actions">
-          <a className="cm-login" href={signedIn ? "/app" : "/login"}>
+          {!authLoading && <a className={`cm-login cm-login-secondary cm-btn cm-btn-sm${signedIn ? ' is-signed-in' : ''}`} href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'header')}>
             {signedIn ? "Meu lar" : "Entrar"}
-          </a>
-          <a className="cm-btn cm-btn-primary cm-btn-sm" href={start}>
-            Começar Grátis
-          </a>
+          </a>}
+          {!signedIn && !authLoading && <a className="cm-btn cm-btn-primary cm-btn-sm cm-trial-cta" href={start} onClick={() => trackStart('header')}>
+            Testar por 2 dias
+          </a>}
           <button
             type="button"
             className="cm-menu-toggle"
@@ -347,19 +334,20 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
               artificial e celebra cada conquista do seu novo lar.
             </p>
             <div className="cm-hero-actions">
-              <a className="cm-btn cm-btn-primary cm-btn-lg" href={start}>
-                Criar Minha Lista Grátis (Sem Cartão) <ArrowRight size={18} />
+              <a className="cm-btn cm-btn-primary cm-btn-lg cm-trial-cta" href={start} onClick={() => trackStart('hero')}>
+                {startLabel} <ArrowRight size={18} />
               </a>
               <a
                 className="cm-btn cm-btn-ghost cm-btn-lg"
                 href="#como-funciona"
+                onClick={() => trackLandingCta('view_how_it_works', 'hero')}
               >
                 Ver como funciona
               </a>
             </div>
             <ul className="cm-hero-notes">
               <li>
-                <Check size={15} /> Sem cartão de crédito
+                <Check size={15} /> {signedIn || authLoading ? "Seu enxoval sempre à mão" : "48 horas de acesso completo"}
               </li>
               <li>
                 <Check size={15} /> Do seu jeito, no seu tempo
@@ -513,8 +501,9 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
                 <a
                   className={`cm-btn ${plan.featured ? "cm-btn-primary" : "cm-btn-outline"}`}
                   href={start}
+                  onClick={() => trackStart('pricing')}
                 >
-                  {plan.cta}
+                  {signedIn || authLoading ? "Acessar meu lar" : plan.cta}
                 </a>
                 <ul>
                   {plan.features.map((feature) => (
@@ -567,10 +556,10 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <Nino pose="wave" size={120} className="cm-final-nino" />
           <h2>Toda casa começa com um primeiro passo.</h2>
           <p>Que tal colocar a cama ou o chuveiro na lista agora?</p>
-          <a className="cm-btn cm-btn-primary cm-btn-lg" href={start}>
-            Começar Grátis <ArrowRight size={18} />
+          <a className="cm-btn cm-btn-primary cm-btn-lg" href={start} onClick={() => trackStart('footer_cta')}>
+            {signedIn || authLoading ? "Acessar meu lar" : "Testar por 2 dias"} <ArrowRight size={18} />
           </a>
-          <small>Sem pressa. Sem cartão. Do seu jeito.</small>
+          {!signedIn && !authLoading && <small>Cartão necessário. Cancele antes do fim para evitar a cobrança.</small>}
         </section>
       </main>
 
@@ -586,8 +575,8 @@ export function LandingPage({ signedIn }: { signedIn: boolean }) {
           <p>Feito com carinho para quem está montando o próprio cantinho.</p>
         </div>
         <nav className="cm-footer-links" aria-label="Rodapé">
-          <a href="#como-funciona">Como Funciona</a>
-          <a href="#planos">Preços</a>
+          <a href="#como-funciona" onClick={() => trackLandingCta('view_how_it_works', 'footer')}>Como Funciona</a>
+          <a href="#planos" onClick={() => trackLandingCta('view_pricing', 'footer')}>Preços</a>
           <a href="/privacidade">Privacidade</a>
         </nav>
         <span className="cm-footer-copy">

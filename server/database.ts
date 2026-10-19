@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import pg from 'pg';
 import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { getLogger } from './logger.ts';
 
 dotenv.config({ path: '.env.local', quiet: true });
 dotenv.config({ quiet: true });
@@ -31,6 +32,9 @@ export function getPool() {
       connectionString,
       ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : undefined
     }) as Pool;
+    pool.on('error', err => {
+      getLogger().error({ event: 'database.pool.error', err }, 'Conexão ociosa com o PostgreSQL falhou; o pool descartou a conexão.');
+    });
   }
 
   return pool;

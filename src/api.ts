@@ -20,6 +20,9 @@ import type {
   ScrapedProductPreview,
 } from "./types";
 import { isItemStatus, normalizeItemStatus } from "./itemStatus";
+import { SESSION_AUTHENTICATED_EVENT, SESSION_EXPIRED_EVENT } from './sessionActivity';
+import * as analytics from './analytics';
+import { recordApiSuccess } from './analytics/apiEvents';
 import type { Answers, PlanPayload } from "./onboarding/types";
 import type { AdminFeedback, FeedbackInput, FeedbackStatus } from "./feedback";
 import {
@@ -29,7 +32,7 @@ import {
   type PaidPlanOffer,
 } from "./plans";
 
-type PaidPlanId = PaidPlanOffer["id"];
+export type PaidPlanId = PaidPlanOffer["id"];
 
 export class ApiError extends Error {
   status: number;
@@ -70,16 +73,24 @@ function withItemStatus(data: unknown): unknown {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    ...options,
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
+  if (path === '/api/auth/register') analytics.capture('signup_submit');
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    if (!(error instanceof Error && error.name === 'AbortError') && !path.startsWith('/api/admin')) analytics.captureError(error, { error_source: 'api' });
+    throw error;
+  }
 
   if (!response.ok) {
+    if (response.status === 401 && !path.startsWith('/api/auth/')) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     const body = (await response.json().catch(() => null)) as {
       error?: string;
       code?: string;
@@ -97,20 +108,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       response.status,
       body?.code,
     );
+    if (response.status >= 500 && !path.startsWith('/api/admin')) analytics.captureError(error, { error_source: 'api', http_status: response.status });
+    if (body?.code === "SUBSCRIPTION_REQUIRED") window.dispatchEvent(new Event("casamia:subscription-required"));
     if (isLimitCode(body?.code))
       window.dispatchEvent(
         new CustomEvent<LimitReachedDetail>(LIMIT_REACHED_EVENT, {
           detail: { code: body.code, message: error.message },
         }),
       );
+    if (path === '/api/billing/checkout') {
+      try {
+        const { plan } = JSON.parse(String(options.body));
+        if (plan === 'monthly' || plan === 'pass') analytics.capture('checkout_failed', { plan });
+      } catch { /* Do not inspect non-JSON bodies. */ }
+    }
     throw error;
   }
 
-  if (response.status === 204) {
-    return undefined as T;
+  if (path.startsWith('/api/bootstrap') || ['/api/auth/login', '/api/auth/register', '/api/auth/change-password'].includes(path)) {
+    window.dispatchEvent(new Event(SESSION_AUTHENTICATED_EVENT));
   }
-
-  return withItemStatus(await response.json()) as T;
+  const data = response.status === 204 ? undefined : withItemStatus(await response.json());
+  try {
+    const input = typeof options.body === 'string' ? JSON.parse(options.body) : {};
+    recordApiSuccess(analytics, path, options.method ?? 'GET', input, data);
+  } catch { /* Telemetry never changes the result of an API action. */ }
+  return data as T;
 }
 
 export function fetchBootstrap(enxovalId?: string) {
@@ -203,18 +226,25 @@ export function createEnxoval(name: string, useDefaultTemplate: boolean) {
   });
 }
 
-/** Passo final do funil /comecar: cria o primeiro enxoval já com o plano gerado e as respostas. */
+/** Compatibilidade com telas antigas: salva o onboarding sem criar ou liberar o enxoval. */
 export function createEnxovalFromOnboarding(
   enxovalName: string,
   plan: PlanPayload,
   profile: Answers,
   userName: string,
 ) {
-  return request<EnxovalWorkspace>("/api/enxovais", {
-    method: "POST",
-    body: JSON.stringify({ name: enxovalName, plan, profile, userName }),
+  return completeOnboarding(enxovalName, plan, profile, userName);
+}
+export function completeOnboarding(name: string, plan: PlanPayload, profile: Answers, userName: string) {
+  return request<{ completed: boolean }>("/api/onboarding/complete", {
+    method: "POST", body: JSON.stringify({ name, plan, profile, userName }),
   });
 }
+export interface ProfileData { id: string; name: string; email: string; avatarUrl: string | null; createdAt: string; }
+export const fetchProfile = () => request<ProfileData>('/api/profile');
+export const updateProfile = (name: string) => request<ProfileData>('/api/profile', { method: 'PATCH', body: JSON.stringify({ name }) });
+export const uploadProfileAvatar = (image: Blob) => request<ProfileData>('/api/profile/avatar', { method: 'POST', headers: { 'Content-Type': image.type || 'image/jpeg' }, body: image });
+export const removeProfileAvatar = () => request<ProfileData>('/api/profile/avatar', { method: 'DELETE' });
 export function updateEnxoval(
   enxovalId: string,
   updates:
@@ -513,6 +543,15 @@ export type {
 };
 
 export interface BillingStatus {
+  monthlyPrice?: { amount: number; currency: string } | null;
+  passPayment?: { amount: number | null; currency: string | null; sessionId: string } | null;
+  passNotice?: string | null;
+  trialNotice: 'started' | 'ending' | null;
+  subscriptionId: string | null;
+  accessAllowed: boolean;
+  isOwner: boolean;
+  trialEndsAt: string | null;
+  trialUsed: boolean;
   /** false quando o servidor ainda não tem as chaves da Stripe. */
   available: boolean;
   plan: AccountPlan;
@@ -525,15 +564,35 @@ export interface BillingStatus {
   canManage: boolean;
 }
 
-export function fetchBillingStatus() {
-  return request<BillingStatus>("/api/billing/status");
+export function fetchBillingStatus(enxovalId?: string) {
+  return request<BillingStatus>(`/api/billing/status${enxovalId ? `?enxovalId=${encodeURIComponent(enxovalId)}` : ""}`);
+}
+export interface BillingOffer {
+  id: PaidPlanId;
+  name: string;
+  amount: number;
+  currency: string;
+}
+export function fetchBillingOffers() {
+  return request<{ offers: BillingOffer[] }>('/api/billing/plans');
+}
+export function acknowledgePassNotice(sessionId: string) {
+  return request<void>('/api/billing/pass-notice', { method: 'POST', body: JSON.stringify({ sessionId }) });
+}
+export function formatBillingAmount(price: { amount: number | null; currency: string | null } | null | undefined) {
+  return price && typeof price.amount === 'number' && price.currency
+    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: price.currency }).format(price.amount / 100)
+    : 'valor confirmado no checkout';
+}
+export function acknowledgeTrialNotice(kind: 'started' | 'ending', subscriptionId: string) {
+  return request<void>('/api/billing/trial-notice', { method: 'POST', body: JSON.stringify({ kind, subscriptionId }) });
 }
 
 /** Devolve o endereço do checkout da Stripe para o plano escolhido. */
-export function startCheckout(plan: PaidPlanId) {
+export function startCheckout(plan: PaidPlanId, returnTo = "/app") {
   return request<{ url: string }>("/api/billing/checkout", {
     method: "POST",
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({ plan, returnTo }),
   });
 }
 
@@ -543,9 +602,13 @@ export function openBillingPortal() {
 }
 
 /** Na volta do checkout: lê a assinatura na Stripe sem esperar o webhook. */
-export function syncBilling() {
-  return request<{ plan: AccountPlan; status: string | null }>(
+export function syncBilling(sessionId?: string, prepareWorkspace = false) {
+  return request<{ plan: AccountPlan; status: string | null; accessAllowed: boolean; enxovalId: string | null }>(
     "/api/billing/sync",
-    { method: "POST" },
+    { method: "POST", body: JSON.stringify({ sessionId, prepareWorkspace }) },
   );
+}
+
+export function cancelSubscription() {
+  return request<{ canceled: boolean }>("/api/billing/cancel", { method: "POST" });
 }

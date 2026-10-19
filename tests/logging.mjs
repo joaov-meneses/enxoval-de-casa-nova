@@ -1,0 +1,120 @@
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { once } from 'node:events';
+import { setTimeout as delay } from 'node:timers/promises';
+import test from 'node:test';
+import express from 'express';
+import { createLogger, getLogger, setLogUser } from '../server/logger.ts';
+import { createHttpLogging, httpErrorHandler } from '../server/httpLogging.ts';
+import { asyncHandler, HttpError } from '../server/security.ts';
+
+test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interrupção', async () => {
+  const logs = [];
+  const logger = createLogger({ write: line => logs.push(JSON.parse(line)) });
+  const previousSlow = process.env.LOG_SLOW_REQUEST_MS;
+  process.env.LOG_SLOW_REQUEST_MS = '30';
+  const app = express();
+  app.use(createHttpLogging(logger));
+  if (previousSlow === undefined) delete process.env.LOG_SLOW_REQUEST_MS;
+  else process.env.LOG_SLOW_REQUEST_MS = previousSlow;
+  // Same order as production: webhook before JSON parser.
+  app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+    assert.ok(Buffer.isBuffer(req.body));
+    res.json({ received: true });
+  });
+  app.use(express.json({ limit: '1kb' }));
+  const router = express.Router();
+  router.get('/items/:id', asyncHandler(async (req, res) => {
+    setLogUser(`user-${req.params.id}`);
+    await delay(req.params.id === 'one' ? 12 : 1);
+    getLogger().info({ event: 'item.loaded' }, 'Item consultado.');
+    res.setHeader('Set-Cookie', 'session=RESPONSE_COOKIE_SECRET');
+    res.json({ password: 'RESPONSE_BODY_SECRET' });
+  }));
+  app.use('/api', router);
+  app.get('/expected', () => { throw new HttpError(403, 'Acesso negado.', 'FORBIDDEN'); });
+  app.get('/failure', asyncHandler(async () => {
+    const err = new Error('Banco indisponível.', { cause: new Error('Conexão encerrada.') });
+    Object.assign(err, { code: 'ECONNRESET', detail: 'PRIVATE_SQL_DETAIL', query: 'PRIVATE_SQL_QUERY', password: 'ERROR_PASSWORD_SECRET' });
+    throw err;
+  }));
+  app.get('/direct-error', (_req, res) => res.status(429).json({ error: 'Limite atingido.' }));
+  app.get('/slow', asyncHandler(async (_req, res) => { await delay(50); res.end('ok'); }));
+  let abortStarted;
+  const abortReady = new Promise(resolve => { abortStarted = resolve; });
+  app.get('/abort', (_req, _res) => abortStarted());
+  app.get('/', (_req, res) => res.type('html').send('<h1>Casa Mia</h1>'));
+  app.use(httpErrorHandler);
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (path, options) => {
+    const response = await fetch(`${base}${path}`, options);
+    const body = await response.text();
+    return { response, body, id: response.headers.get('x-request-id') };
+  };
+  try {
+    const [one, two] = await Promise.all(['one', 'two'].map(id => call(`/api/items/${id}?token=QUERY_TOKEN_SECRET&email=PRIVATE_EMAIL`, {
+      headers: { authorization: 'Bearer AUTH_SECRET', cookie: 'session=COOKIE_SECRET', 'x-request-id': 'UNTRUSTED_ID' },
+    })));
+    assert.notEqual(one.id, two.id);
+    assert.match(one.id, /^[0-9a-f-]{36}$/);
+    for (const [id, result] of [['one', one], ['two', two]]) {
+      const scoped = logs.filter(log => log.reqId === result.id);
+      assert.equal(scoped.filter(log => log.event === 'http.request.started').length, 1);
+      assert.equal(scoped.find(log => log.event === 'http.request.started').level, 30);
+      const completed = scoped.find(log => log.event === 'http.request.completed');
+      assert.equal(completed.route, '/api/items/:id');
+      assert.equal(completed.res.statusCode, 200);
+      assert.equal(completed.userId, `user-${id}`);
+      assert.equal(scoped.find(log => log.event === 'item.loaded').userId, `user-${id}`);
+      assert.equal(typeof completed.responseTime, 'number');
+    }
+    const expected = await call('/expected');
+    assert.equal(expected.response.status, 403);
+    assert.deepEqual(JSON.parse(expected.body), { error: 'Acesso negado.', code: 'FORBIDDEN' });
+    const expectedLog = logs.find(log => log.reqId === expected.id && log.event === 'http.request.failed');
+    assert.equal(expectedLog.level, 40);
+    assert.equal(expectedLog.err.code, 'FORBIDDEN');
+    const failure = await call('/failure');
+    assert.equal(failure.response.status, 500);
+    assert.equal(JSON.parse(failure.body).error, 'Erro interno do servidor.');
+    const failedLog = logs.find(log => log.reqId === failure.id && log.event === 'http.request.failed');
+    assert.equal(failedLog.level, 50);
+    assert.match(failedLog.err.stack, /Banco indisponível/);
+    assert.match(failedLog.err.stack, /Conexão encerrada/);
+    assert.equal(failedLog.err.code, 'ECONNRESET');
+    const direct = await call('/direct-error');
+    assert.equal(logs.find(log => log.reqId === direct.id && log.res).level, 40);
+    const malformed = await call('/json', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"password":"MALFORMED_PASSWORD_SECRET", invalid}' });
+    assert.equal(malformed.response.status, 400);
+    const oversized = await call('/json', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'LARGE_BODY_SECRET'.repeat(100) }) });
+    assert.equal(oversized.response.status, 413);
+    const webhook = await call('/api/billing/webhook', { method: 'POST', headers: { 'content-type': 'application/json', 'stripe-signature': 'STRIPE_SIGNATURE_SECRET' }, body: '{}' });
+    assert.equal(webhook.response.status, 200);
+    assert.ok(logs.find(log => log.reqId === webhook.id && log.res));
+    const slow = await call('/slow');
+    const slowLog = logs.find(log => log.reqId === slow.id && log.res);
+    assert.equal(slowLog.slow, true);
+    assert.equal(slowLog.level, 40);
+    const missing = await call('/missing');
+    assert.equal(missing.response.status, 404);
+    assert.equal(logs.find(log => log.reqId === missing.id && log.res).level, 40);
+    const page = await call('/');
+    assert.equal(logs.find(log => log.reqId === page.id && log.res).res.statusCode, 200);
+    const request = http.get(`${base}/abort`);
+    request.on('error', () => {});
+    await abortReady;
+    request.destroy();
+    // Let the server process the socket close event.
+    for (let i = 0; i < 50 && !logs.some(log => log.event === 'http.request.aborted'); i++) await delay(10);
+    assert.equal(logs.find(log => log.event === 'http.request.aborted').level, 40);
+    const output = JSON.stringify(logs);
+    for (const secret of ['QUERY_TOKEN_SECRET', 'PRIVATE_EMAIL', 'AUTH_SECRET', 'COOKIE_SECRET', 'UNTRUSTED_ID', 'RESPONSE_BODY_SECRET', 'RESPONSE_COOKIE_SECRET', 'PRIVATE_SQL_DETAIL', 'PRIVATE_SQL_QUERY', 'ERROR_PASSWORD_SECRET', 'MALFORMED_PASSWORD_SECRET', 'LARGE_BODY_SECRET', 'STRIPE_SIGNATURE_SECRET']) {
+      assert.equal(output.includes(secret), false, `Dado sensível apareceu nos logs: ${secret}`);
+    }
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

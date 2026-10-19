@@ -160,7 +160,8 @@ try {
   assert.equal(row.severity, "annoying");
   assert.equal(row.status, "new");
   assert.equal(row.user_email, "ajuda@example.invalid");
-  assert.equal(row.contact_email, "pessoa@example.invalid");
+  assert.equal(row.contact_email, "ajuda@example.invalid", "e-mail alternativo enviado pelo navegador é ignorado");
+  assert.equal(row.contact_ok, true);
   assert.equal(row.tech.viewport, "390x844");
   assert.equal(row.tech.ignorado, undefined);
   assert.equal(Buffer.from(row.screenshot).toString("base64"), jpeg, "a imagem é guardada como veio");
@@ -168,7 +169,8 @@ try {
   const mail = mailOutbox.find((entry) => entry.to === "gestao@example.invalid");
   assert.ok(mail, "a gestão é avisada por e-mail");
   assert.match(mail.subject, /Problema: O botão de salvar não responde/);
-  assert.match(mail.text, /pessoa@example\.invalid/);
+  assert.match(mail.text, /ajuda@example\.invalid/);
+  assert.ok(!mail.text.includes("pessoa@example.invalid"));
   assert.match(mail.text, /Passo a passo/);
   assert.match(mail.text, /https:\/\/app\.example\.invalid\/admin/);
   console.log("PASS: problema completo é gravado, com captura de tela, e a gestão é avisada.");
@@ -191,14 +193,14 @@ try {
   });
   assert.equal(other.status, 201, JSON.stringify(other.data));
   const ideaRow = (await query("SELECT * FROM feedback WHERE id = $1", [idea.data.id]))[0];
-  assert.deepEqual([ideaRow.importance, ideaRow.severity, ideaRow.contact_ok, ideaRow.screenshot], ["essential", null, false, null]);
+  assert.deepEqual([ideaRow.importance, ideaRow.severity, ideaRow.contact_ok, ideaRow.screenshot], ["essential", null, true, null]);
   console.log("PASS: sugestão e outro assunto.");
 
   // 5. Mensagens inválidas são recusadas com uma explicação, sem gravar nada.
   const before = (await query("SELECT count(*)::int AS n FROM feedback"))[0].n;
   for (const [label, input] of [
     ["sem gravidade", bug({ severity: undefined })],
-    ["e-mail inválido", bug({ contactEmail: "x" })],
+    ["sem resumo", bug({ title: "" })],
     ["imagem que não é imagem", bug({ screenshot: { type: "image/jpeg", data: notAnImage } })],
     ["tipo de imagem trocado", bug({ screenshot: { type: "image/png", data: jpeg } })],
   ]) {
@@ -220,7 +222,7 @@ try {
   const bugEntry = list.data.feedback.find((entry) => entry.id === sent.data.id);
   assert.deepEqual(
     [bugEntry.kind, bugEntry.status, bugEntry.hasScreenshot, bugEntry.userEmail, bugEntry.contactEmail],
-    ["bug", "new", true, "ajuda@example.invalid", "pessoa@example.invalid"],
+    ["bug", "new", true, "ajuda@example.invalid", "ajuda@example.invalid"],
   );
   assert.ok(!JSON.stringify(list.data).includes(jpeg), "a lista não carrega a imagem");
   assert.equal(list.data.feedback.find((entry) => entry.id === idea.data.id).hasScreenshot, false);

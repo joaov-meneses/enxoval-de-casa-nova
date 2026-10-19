@@ -289,3 +289,10 @@ ${input.opportunities
   );
   return { to: input.to, subject, text, html };
 }
+
+export function trialEmail(input: { to: string; endsAt: Date; reminder: boolean }): MailMessage {
+  const deadline = input.endsAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const subject = input.reminder ? 'Seu teste do Casa Mia termina em até 24 horas' : 'Seu teste de 2 dias do Casa Mia começou';
+  const text = `${input.reminder ? 'Seu teste está acabando.' : 'Você tem 48 horas completas de acesso a todos os recursos, incluindo convidados, importação e exportação.'} O teste termina em ${deadline} (horário de Brasília). Após esse horário, o valor mensal informado no checkout será cobrado automaticamente no cartão cadastrado. Para evitar a cobrança, cancele antes desse horário em ${appBaseUrl()}/app, no botão "Cancelar assinatura". O cancelamento bloqueia imediatamente o acesso ao enxoval para você e seus convidados, inclusive importação e exportação. Sua conta e seus dados serão preservados.`;
+  return { to: input.to, subject, text, html: layout(subject, `<p style="line-height:1.6">${escapeHtml(text)}</p>`) };
+}

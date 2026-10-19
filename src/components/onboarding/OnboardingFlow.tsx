@@ -24,7 +24,6 @@ import {
   Check,
   ClipboardCheck,
   Clock,
-  CloudSun,
   CookingPot,
   DoorOpen,
   Flower2,
@@ -37,6 +36,7 @@ import {
   Link2,
   ListChecks,
   ListOrdered,
+  ListPlus,
   LoaderCircle,
   MapPin,
   PackageCheck,
@@ -46,10 +46,8 @@ import {
   ShieldCheck,
   Share2,
   ShoppingBag,
-  Snowflake,
   Sofa,
   Sparkles,
-  Sun,
   TrendingDown,
   Trees,
   Truck,
@@ -60,9 +58,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Brand } from "../Brand";
-import { createEnxovalFromOnboarding, fetchBootstrap } from "../../api";
-import { planLimits, type AccountPlan, type PlanLimits } from "../../plans";
+import { completeOnboarding, fetchBootstrap } from "../../api";
 import { track } from "../../onboarding/analytics";
+import { journeyFor, updateJourney } from "../../onboarding/journey";
 import { detectStateFromDevice } from "../../onboarding/location";
 import {
   citiesOfState,
@@ -83,13 +81,11 @@ import {
   roomItemCounts,
   savingsFor,
   scheduleFor,
-  SEASONS,
   STATES,
   stateInfo,
   toPayload,
   weeksUntil,
   type Phase,
-  type SeasonTone,
 } from "../../onboarding/plan";
 import {
   clearOnboarding,
@@ -138,7 +134,6 @@ const ALL_STEPS = [
   "date",
   "timeline",
   "state",
-  "climate",
   "housing",
   "people",
   "rooms",
@@ -164,6 +159,7 @@ const isStepId = (value: string): value is StepId =>
 function visibleSteps(answers: Answers, plan: GeneratedPlan): StepId[] {
   const hasKit = firstNightItems(plan).length > 0;
   return ALL_STEPS.filter((step) => {
+    if (answers.style === "none" && ["savings", "firstnight", "schedule", "compare"].includes(step)) return false;
     if (step === "timeline" || step === "schedule") return answers.moveDate !== null;
     if (step === "firstnight") return hasKit;
     return true;
@@ -198,7 +194,6 @@ function guessState() {
 
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`;
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /* ------------------------------------------------------------- opções */
 
@@ -256,14 +251,6 @@ const ROOM_ICONS: Record<RoomKey, LucideIcon> = {
   externa: Flower2,
 };
 
-const SEASON_NAMES = ["Verão", "Outono", "Inverno", "Primavera"];
-const TONE_LABEL: Record<SeasonTone, string> = {
-  calor: "calor",
-  ameno: "ameno",
-  fresco: "fresco",
-  frio: "frio",
-};
-
 const WORRY_PAIN: Record<Worry, string> = {
   start: "Não saber por onde começar",
   waste: "Gastar com o que não vai usar",
@@ -304,6 +291,10 @@ const sectionVariants = {
 /* -------------------------------------------------------------- fluxo */
 
 export default function OnboardingFlow() {
+  return <OnboardingContent />;
+}
+
+function OnboardingContent() {
   const reduced = !!useReducedMotion();
   const saved = useMemo(() => loadOnboarding(), []);
   const [hasProgress, setHasProgress] = useState(
@@ -320,19 +311,17 @@ export default function OnboardingFlow() {
   // O funil agora é a etapa pós-cadastro: exige conta criada (sem conta, cria em /login) e só
   // mostra as perguntas enquanto a conta ainda não tem nenhum enxoval (senão, já passou por aqui).
   const [gate, setGate] = useState<"checking" | "open">("checking");
-  const [accountPlan, setAccountPlan] = useState<AccountPlan>("free");
   useEffect(() => {
     let active = true;
     fetchBootstrap()
       .then((data) => {
         if (!active) return;
-        if (data.enxovais.length > 0) {
+        if (data.enxovais.length > 0 || data.user.onboardingCompleted || data.user.trialUsed) {
           window.location.replace("/app");
           return;
         }
         // O cadastro não pede o nome: sem ele a conta usa o começo do e-mail como nome provisório,
         // que não serve de sugestão. Só pré-preenche quando o nome é de verdade.
-        if (data.user.plan) setAccountPlan(data.user.plan);
         const provisional = data.user.email.split("@")[0];
         setAnswers((current) => ({
           ...current,
@@ -354,9 +343,10 @@ export default function OnboardingFlow() {
   const steps = visibleSteps(answers, plan);
   const index = Math.max(steps.indexOf(step), 0);
   const first = firstName(answers.name);
+  const journey = journeyFor(answers);
 
   const set = useCallback(
-    (patch: Partial<Answers>) => setAnswers((a) => ({ ...a, ...patch })),
+    (patch: Partial<Answers>) => setAnswers((a) => updateJourney(a, patch)),
     [],
   );
 
@@ -403,9 +393,23 @@ export default function OnboardingFlow() {
     });
   }, [answers, step, completed, hasProgress]);
 
+  const analyticsStarted = useRef(false);
+  useEffect(() => {
+    if (analyticsStarted.current) return;
+    analyticsStarted.current = true;
+    track("onboarding_start", { resumed: Boolean(saved) });
+    document.title = "Monte o plano da sua casa nova | Casa Mia";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const analyticsStep = useRef('');
   useEffect(() => {
     if (step === "ready") {
       setCompleted(true);
+    }
+    if (analyticsStep.current === step) return;
+    analyticsStep.current = step;
+    if (step === "ready") {
       track("plan_ready", {
         items: plan.stats.total,
         rooms: plan.stats.rooms,
@@ -415,12 +419,6 @@ export default function OnboardingFlow() {
     // Só reage à troca de tela.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
-
-  useEffect(() => {
-    track("onboarding_start", { resumed: Boolean(saved) });
-    document.title = "Monte o plano da sua casa nova | Casa Mia";
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Valores sugeridos entram na tela já selecionados; a pessoa confirma ou muda.
   useEffect(() => {
@@ -485,7 +483,7 @@ export default function OnboardingFlow() {
   })();
 
   const resume = () => {
-    const target = saved && isStepId(saved.step) ? saved.step : "name";
+    const target = saved?.step === "climate" ? "housing" : saved && isStepId(saved.step) ? saved.step : "name";
     const list = visibleSteps(answers, plan);
     goTo(
       completed ? "ready" : list.includes(target) ? target : "name",
@@ -607,12 +605,7 @@ export default function OnboardingFlow() {
               name="moment"
               value={answers.moment}
               options={MOMENTS}
-              onChange={(moment) =>
-                set({
-                  moment,
-                  people: answers.people ?? defaultPeople(moment),
-                })
-              }
+              onChange={(moment) => set({ moment })}
               reduced={reduced}
             />
           </>
@@ -632,6 +625,7 @@ export default function OnboardingFlow() {
           <TimelineStep
             weeks={weeksUntil(answers.moveDate ?? "")}
             first={first}
+            context={journey.intro}
             reduced={reduced}
           />
         );
@@ -639,6 +633,7 @@ export default function OnboardingFlow() {
       case "state":
         return (
           <StateStep
+            context={`${journey.intro} O clima ajuda a escolher as peças certas.`}
             value={stateValue}
             city={answers.city}
             onChange={(state) =>
@@ -655,15 +650,13 @@ export default function OnboardingFlow() {
           />
         );
 
-      case "climate":
-        return <ClimateStep info={info} reduced={reduced} />;
-
       case "housing":
         return (
           <>
             <h1 className="ob-title" tabIndex={-1}>
-              Como é a sua casa nova?
+              {journey.housing}
             </h1>
+            <p className="ob-sub">{journey.timing}</p>
             <RadioOptions
               legend="Tipo de moradia"
               name="housing"
@@ -678,6 +671,7 @@ export default function OnboardingFlow() {
       case "people":
         return (
           <PeopleStep
+            answers={answers}
             people={people}
             onChange={(value) => set({ people: value })}
             reduced={reduced}
@@ -698,8 +692,11 @@ export default function OnboardingFlow() {
         return (
           <>
             <h1 className="ob-title" tabIndex={-1}>
-              Você já tem alguma coisa?
+              {journey.owned}
             </h1>
+            <p className="ob-sub">
+              {answers.moment === "troca" ? "Vamos aproveitar o que vai com você. Depois, marque na lista o que já tem." : `Vamos evitar compras repetidas para ${journey.home}. Depois, marque na lista o que já tem.`}
+            </p>
             <RadioOptions
               legend="O que você já tem"
               name="owned"
@@ -724,10 +721,11 @@ export default function OnboardingFlow() {
         return (
           <>
             <h1 className="ob-title" tabIndex={-1}>
-              Quanto você pretende investir?
+              {journey.budget}
             </h1>
             <p className="ob-sub">
-              Uma ideia basta, você ajusta depois. Fica neste aparelho até o plano ser criado; depois, guardamos na sua conta para dimensionar o plano.
+              {answers.owned === "boa" ? "Pense só no que falta comprar. " : answers.owned === "algumas" ? "Considere só o que ainda falta. " : "Uma estimativa basta. "}
+              {journey.phase === "now" || journey.phase === "final" ? "A mudança está perto: priorize o essencial." : journey.phase ? "Distribua as compras até a mudança." : "Você pode ajustar esse valor depois."}
             </p>
             <RadioOptions
               legend="Orçamento"
@@ -746,7 +744,7 @@ export default function OnboardingFlow() {
             <h1 className="ob-title" tabIndex={-1}>
               O que mais te preocupa?
             </h1>
-            <p className="ob-sub">Pode marcar mais de uma.</p>
+            <p className="ob-sub">{journey.phase === "now" || journey.phase === "final" ? "Com a mudança perto, o que precisa de mais atenção?" : `Sobre ${journey.home}, pode marcar mais de uma.`}</p>
             <CheckOptions
               legend="Preocupações"
               name="worries"
@@ -762,14 +760,22 @@ export default function OnboardingFlow() {
         return (
           <>
             <h1 className="ob-title" tabIndex={-1}>
-              Como você quer usar o Casa Mia?
+              {journey.usage}
             </h1>
-            <p className="ob-sub">Pode escolher mais de uma opção.</p>
+            <p className="ob-sub">
+              {answers.worries.includes("budget") || answers.worries.includes("waste")
+                ? "Para cuidar do orçamento, você pode acompanhar gastos e comparar links."
+                : answers.worries.includes("time")
+                  ? `Vamos organizar as prioridades. ${journey.timing}`
+                  : answers.worries.includes("forget") || answers.worries.includes("start")
+                    ? "A lista por ambiente ajuda a saber por onde começar e o que falta."
+                    : "Pode escolher mais de uma opção."}
+            </p>
             <CheckOptions
               legend="Como usar"
               name="usage"
               values={answers.usage}
-              options={USAGES}
+              options={USAGES.map((option) => option.value === "share" ? { ...option, label: journey.share } : option)}
               onToggle={(u) => set({ usage: toggle(answers.usage, u) })}
               reduced={reduced}
             />
@@ -795,7 +801,7 @@ export default function OnboardingFlow() {
                 <Sparkles size={16} />
               </span>
               <strong>Um plano só seu</strong>
-              <span>Eu cuido das quantidades, do clima e das prioridades.</span>
+              <span>{journey.intro} {journey.timing}</span>
             </motion.div>
           </div>
         );
@@ -827,7 +833,7 @@ export default function OnboardingFlow() {
         return <SavingsStep answers={answers} loc={info.loc} reduced={reduced} />;
 
       case "firstnight":
-        return <FirstNightStep plan={plan} first={first} reduced={reduced} />;
+        return <FirstNightStep plan={plan} answers={answers} first={first} reduced={reduced} />;
 
       case "schedule":
         return (
@@ -851,7 +857,6 @@ export default function OnboardingFlow() {
           <SaveStep
             answers={answers}
             plan={plan}
-            limits={planLimits(accountPlan)}
             first={first}
             reduced={reduced}
           />
@@ -869,15 +874,12 @@ export default function OnboardingFlow() {
 
   return (
     <div className="ob" data-step={step}>
-      <aside className="ob-aside">
-        <img src="/images/casamia-home.webp" alt="" />
-        <a href="/" className="brand-link ob-aside-brand">
-          <Brand light />
+      <div className="ob-desktop-header">
+        <a href="/" className="brand-link">
+          <Brand />
         </a>
-        <p className="ob-aside-quote">
-          O melhor de uma casa é o que você <em>vai viver nela.</em>
-        </p>
-      </aside>
+        <span><Sparkles size={16} aria-hidden="true" /> Seu lar, do seu jeito</span>
+      </div>
 
       <div className="ob-col">
         <header className="ob-top">
@@ -915,6 +917,9 @@ export default function OnboardingFlow() {
               }
             />
           </div>
+          <span className="ob-desktop-step">
+            {step === "welcome" ? "Vamos começar" : index < steps.indexOf("thanks") ? "Conhecendo seu lar" : "Seu plano personalizado"}
+          </span>
         </header>
 
         <main className="ob-main" id="ob-main">
@@ -922,6 +927,7 @@ export default function OnboardingFlow() {
             <motion.section
               key={step}
               className="ob-section"
+              data-step={step}
               custom={{ dir, reduced }}
               variants={sectionVariants}
               initial="enter"
@@ -1061,7 +1067,7 @@ function WelcomeStep({ reduced }: { reduced: boolean }) {
       </h1>
       <p className="ob-sub ob-sub-center">
         Responda a algumas perguntas rápidas e eu monto o plano do seu lar.
-        Cerca de 2 minutos, sem e-mail por enquanto.
+        Leva cerca de 2 minutos. Você pode voltar e ajustar as respostas.
       </p>
     </div>
   );
@@ -1079,6 +1085,7 @@ function DateStep({
   reduced: boolean;
 }) {
   const today = new Date();
+  const journey = journeyFor(answers);
   const shortcuts = [
     { label: "Em 1 mês", iso: addMonthsISO(today, 1) },
     { label: "Em 3 meses", iso: addMonthsISO(today, 3) },
@@ -1088,10 +1095,10 @@ function DateStep({
   return (
     <>
       <h1 className="ob-title" tabIndex={-1}>
-        Quando você vai se mudar?
+        {journey.date}
       </h1>
       <p className="ob-sub">
-        Pode ser uma data aproximada. Isso me ajuda a definir as prioridades.
+        {journey.intro} Uma previsão basta para definir as prioridades.
       </p>
       <div className="ob-chips" role="group" aria-label="Atalhos de data">
         {shortcuts.map((s) => (
@@ -1114,11 +1121,14 @@ function DateStep({
           Ainda não sei
         </button>
       </div>
-      <CalendarPicker
-        value={answers.moveDate}
-        reduced={reduced}
-        onSelect={(iso) => set({ moveDate: iso, moveDateAnswered: true })}
-      />
+      <details className="ob-date-picker">
+        <summary>Escolher um dia no calendário</summary>
+        <CalendarPicker
+          value={answers.moveDate}
+          reduced={reduced}
+          onSelect={(iso) => set({ moveDate: iso, moveDateAnswered: true })}
+        />
+      </details>
       <div className="ob-date-summary" aria-live="polite">
         <span>Mudança prevista</span>
         <strong>
@@ -1142,10 +1152,12 @@ const PHASES: { id: Phase; label: string }[] = [
 function TimelineStep({
   weeks,
   first,
+  context,
   reduced,
 }: {
   weeks: number;
   first: string;
+  context: string;
   reduced: boolean;
 }) {
   const phase = phaseOf(weeks);
@@ -1182,7 +1194,7 @@ function TimelineStep({
       <h1 className="ob-title ob-title-center" tabIndex={-1}>
         {copy[phase].title}
       </h1>
-      <p className="ob-sub ob-sub-center">{copy[phase].text}</p>
+      <p className="ob-sub ob-sub-center">{context} {copy[phase].text}</p>
       <div className="ob-track" aria-hidden="true">
         <div className="ob-track-bar">
           <motion.span
@@ -1213,11 +1225,13 @@ function TimelineStep({
 /* --------------------------------------------------------------- estado */
 
 function StateStep({
+  context,
   value,
   city,
   onChange,
   onCityChange,
 }: {
+  context: string;
   value: string;
   city: string | null;
   onChange: (uf: string) => void;
@@ -1257,7 +1271,7 @@ function StateStep({
         Em qual estado fica a sua casa nova?
       </h1>
       <p className="ob-sub">
-        Assim eu ajusto as peças ao clima de onde você vai morar.
+        {context}
       </p>
       <button
         type="button"
@@ -1314,68 +1328,15 @@ function StateStep({
 
 /* --------------------------------------------------------------- clima */
 
-function ClimateStep({
-  info,
-  reduced,
-}: {
-  info: ReturnType<typeof stateInfo>;
-  reduced: boolean;
-}) {
-  const copy = {
-    hot: {
-      Icon: Sun,
-      title: "Sua casa nova vai ser quente",
-      text: `Faz calor quase o ano todo ${info.loc}. Vou priorizar ventilação e roupa de cama leve, e deixar os cobertores pesados de fora.`,
-    },
-    mild: {
-      Icon: CloudSun,
-      title: "Seu clima tem de tudo um pouco",
-      text: `O clima ${info.loc} muda ao longo do ano: calor no verão e noites frescas no inverno. Vou equilibrar peças leves com uma camada extra.`,
-    },
-    cold: {
-      Icon: Snowflake,
-      title: "O inverno pede cobertor",
-      text: `${capitalize(info.loc)} o inverno é de verdade. Vou incluir edredom, cobertores e tapetes, e deixar o ar-condicionado como opcional.`,
-    },
-  }[info.climate];
-  return (
-    <div className="ob-center">
-      <Ring reduced={reduced}>
-        <copy.Icon size={56} strokeWidth={1.3} />
-      </Ring>
-      <h1 className="ob-title ob-title-center" tabIndex={-1}>
-        {copy.title}
-      </h1>
-      <p className="ob-sub ob-sub-center">{copy.text}</p>
-      <motion.ul
-        className="ob-seasons"
-        initial={reduced ? false : "hidden"}
-        animate="show"
-        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.3 } } }}
-      >
-        {SEASON_NAMES.map((season, i) => {
-          const tone = SEASONS[info.climate][i];
-          return (
-            <motion.li key={season} variants={reduced ? undefined : itemVariants}>
-              <span>{season}</span>
-              <b data-tone={tone}>{TONE_LABEL[tone]}</b>
-            </motion.li>
-          );
-        })}
-      </motion.ul>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------- pessoas */
-
 const PEOPLE_CAPTION = ["só eu", "duas", "três", "quatro", "cinco ou mais"];
 
 function PeopleStep({
+  answers,
   people,
   onChange,
   reduced,
 }: {
+  answers: Answers;
   people: number;
   onChange: (value: number) => void;
   reduced: boolean;
@@ -1383,10 +1344,10 @@ function PeopleStep({
   return (
     <>
       <h1 className="ob-title" tabIndex={-1}>
-        Quantas pessoas vão morar aí?
+        {journeyFor(answers).people}
       </h1>
       <p className="ob-sub">
-        Isso define quantas peças de cada item eu vou sugerir.
+        {journeyFor(answers).peopleHint}
       </p>
       <fieldset className="ob-fieldset">
         <legend className="ob-sr">Número de moradores</legend>
@@ -1475,28 +1436,45 @@ function RoomsStep({
     ...option,
     meta: counts[option.value] ? plural(counts[option.value]!, "item", "itens") : undefined,
   }));
+  const suggested = defaultRooms(housing, answers.people);
+  const mainOptions = options.filter((option) => suggested.includes(option.value)).slice(0, 6);
+  const moreOptions = options.filter((option) => !mainOptions.includes(option));
+  const housingLabel = housing === "studio" ? "studio" : housing === "casa" ? "casa" : "apartamento";
   return (
     <>
       <h1 className="ob-title" tabIndex={-1}>
-        Quais espaços você quer equipar?
+        {journeyFor(answers).shared ? "Os ambientes de vocês" : "Os seus ambientes"}
       </h1>
       <p className="ob-sub">
-        Marque o que entra no plano. O número mostra quantos itens cada espaço tem.
+        Sugestão para {housingLabel === "casa" ? "uma casa" : `um ${housingLabel}`} com {plural(answers.people ?? defaultPeople(answers.moment), "morador", "moradores")}. Ajuste ao seu lar.
       </p>
       <CheckOptions
         legend="Espaços da casa"
         name="rooms"
         values={rooms}
-        options={options}
+        options={mainOptions}
         onToggle={onToggle}
         reduced={reduced}
       />
+      {moreOptions.length > 0 && (
+        <details className="ob-extra-rooms">
+          <summary>Outros ambientes{moreOptions.some((option) => rooms.includes(option.value)) ? ` (${moreOptions.filter((option) => rooms.includes(option.value)).length} selecionado${moreOptions.filter((option) => rooms.includes(option.value)).length > 1 ? "s" : ""})` : ""}</summary>
+          <CheckOptions
+            legend="Outros espaços da casa"
+            name="rooms"
+            values={rooms}
+            options={moreOptions}
+            onToggle={onToggle}
+            reduced={reduced}
+          />
+        </details>
+      )}
       <p className="ob-live" aria-live="polite">
         {rooms.length === 0 ? (
           "Marque pelo menos um espaço para continuar."
         ) : (
           <>
-            Com essas escolhas, seu plano tem{" "}
+            Selecionados: {" "}
             <strong>{plural(total, "item", "itens")}</strong>.
           </>
         )}
@@ -1521,24 +1499,28 @@ function StyleStep({
     {
       value: "full",
       label: "Completo, sem faltar nada",
-      hint: "Tudo o que sua casa pode precisar",
+      hint: `${stats.complete} itens ${answers.owned === "nada" ? "para começar do zero" : "para conferir o que falta"}`,
       icon: <ClipboardCheck size={20} />,
-      meta: `${stats.complete} itens`,
     },
     {
       value: "min",
       label: "Minimalista, só o necessário",
-      hint: "O básico para morar bem",
+      hint: `${stats.essentials} essenciais para ${plural(answers.people ?? defaultPeople(answers.moment), "pessoa", "pessoas")}`,
       icon: <Leaf size={20} />,
-      meta: `${stats.essentials} itens`,
+    },
+    {
+      value: "none",
+      label: "Nenhum item",
+      hint: answers.owned === "nada" ? "Só ambientes; adiciono os itens depois" : "Só ambientes; adiciono o que falta",
+      icon: <ListPlus size={20} />,
     },
   ];
   return (
     <>
       <h1 className="ob-title" tabIndex={-1}>
-        Como você quer montar o enxoval?
+        {journeyFor(answers).shared ? "A lista de vocês" : "Sua lista de enxoval"}
       </h1>
-      <p className="ob-sub">A contagem já considera as suas respostas.</p>
+      <p className="ob-sub">{answers.owned === "boa" ? "Já tem boa parte? Confira o que falta ou comece sem itens." : answers.owned === "algumas" ? "Aproveite o que já tem. Escolha como organizar o que falta." : "Comece com sugestões ou adicione cada item do seu jeito."}</p>
       <RadioOptions
         legend="Estilo do enxoval"
         name="style"
@@ -1593,8 +1575,7 @@ function BuildingStep({
   const checklist = [
     `${plural(plan.stats.total, "item", "itens")} em ${plural(plan.stats.rooms, "ambiente", "ambientes")}`,
     `Quantidades para ${plural(people, "pessoa", "pessoas")}`,
-    "Prioridade para a primeira noite",
-    `Ajuste ao clima ${loc}`,
+    ...(plan.stats.total > 0 ? ["Prioridade para a primeira noite", `Ajuste ao clima ${loc}`] : ["Ambientes sem itens automáticos", "Preferências salvas para personalizar a ajuda"]),
     ...(hasDate ? ["Prazo até a mudança"] : []),
   ];
   const step = 100 / (checklist.length + 0.5);
@@ -1616,7 +1597,7 @@ function BuildingStep({
       <h1 className="ob-title ob-title-center" tabIndex={-1} role="status">
         Montando o plano de {first}
       </h1>
-      <p className="ob-sub ob-sub-center">Ajustando as peças ao clima {loc}.</p>
+      <p className="ob-sub ob-sub-center">{plan.stats.total > 0 ? `Ajustando as peças ao clima ${loc}.` : "Organizando os ambientes que você escolheu."}</p>
       <div className="ob-bar" aria-hidden="true">
         <span style={{ width: `${pct}%` }} />
       </div>
@@ -1658,6 +1639,21 @@ function ReadyStep({
   reduced: boolean;
 }) {
   const { stats } = plan;
+  if (answers.style === "none") {
+    return (
+      <>
+        <div className="ob-ready-head">
+          <Ring reduced={reduced} size="md"><ListPlus size={34} /></Ring>
+          <h1 className="ob-title ob-title-center" tabIndex={-1}>Seu enxoval, do seu jeito</h1>
+          <p className="ob-sub ob-sub-center">{journeyFor(answers).intro} Os ambientes ficam prontos, sem itens adicionados automaticamente.</p>
+        </div>
+        <ul className="ob-empty-rooms">
+          {plan.categories.map((category) => <li key={category.key}><Check size={16} />{category.name}</li>)}
+        </ul>
+        <p className="ob-hint">Suas preferências ficam salvas para personalizar a ajuda no app. Adicione cada item quando quiser.</p>
+      </>
+    );
+  }
   const fit = {
     within: "Cabe no seu orçamento, com folga para imprevistos.",
     tight: "Fica perto do seu limite. Comece pelos essenciais.",
@@ -1691,6 +1687,7 @@ function ReadyStep({
         <h1 className="ob-title ob-title-center" tabIndex={-1}>
           O plano de <em>{first}</em> está pronto
         </h1>
+        <p className="ob-sub ob-sub-center">{journeyFor(answers).intro}</p>
       </div>
 
       <div className="ob-metrics">
@@ -1882,10 +1879,12 @@ function SavingsStep({
 
 function FirstNightStep({
   plan,
+  answers,
   first,
   reduced,
 }: {
   plan: GeneratedPlan;
+  answers: Answers;
   first: string;
   reduced: boolean;
 }) {
@@ -1901,7 +1900,7 @@ function FirstNightStep({
           <Moon size={34} strokeWidth={1.4} />
         </Ring>
         <h1 className="ob-title ob-title-center" tabIndex={-1}>
-          A primeira noite de {first}, resolvida
+          {journeyFor(answers).shared ? "A primeira noite de vocês, resolvida" : `A primeira noite de ${first}, resolvida`}
         </h1>
         <p className="ob-sub ob-sub-center">
           Estes {plural(items.length, "item", "itens")} deixam a casa pronta para
@@ -2113,21 +2112,14 @@ const BENEFITS: { Icon: LucideIcon; text: string }[] = [
 function SaveStep({
   answers,
   plan,
-  limits,
   first,
   reduced,
 }: {
   answers: Answers;
   plan: GeneratedPlan;
-  limits: PlanLimits;
   first: string;
   reduced: boolean;
 }) {
-  // O servidor guarda só o que cabe no plano gratuito; a pessoa fica sabendo antes de confirmar.
-  const trimmed =
-    (limits.environments !== null && plan.categories.length > limits.environments) ||
-    (limits.itemsPerEnvironment !== null &&
-      plan.categories.some((category) => category.items.length > limits.itemsPerEnvironment!));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const payload = useMemo(() => toPayload(plan), [plan]);
@@ -2141,16 +2133,14 @@ function SaveStep({
     rooms: answers.rooms ?? defaultRooms(answers.housing, answers.people),
   };
 
-  // A conta já existe (cadastro feito antes do funil, em /login). Este passo só cria o
-  // primeiro enxoval, já com o plano. Se falhar, nada fica pela metade e as respostas
-  // continuam guardadas para tentar de novo.
+  // Salva o plano completo antes do cartão. O enxoval é criado após a confirmação da Stripe.
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
     setError("");
     track("signup_submit");
     try {
-      await createEnxovalFromOnboarding(
+      await completeOnboarding(
         plan.enxovalName,
         payload,
         profile,
@@ -2158,7 +2148,7 @@ function SaveStep({
       );
       clearOnboarding();
       track("signup_success");
-      window.location.assign("/app");
+      window.location.assign('/app');
     } catch (err) {
       setError(
         err instanceof Error
@@ -2179,21 +2169,13 @@ function SaveStep({
           O plano de {first} está pronto para salvar
         </h1>
         <p className="ob-sub ob-sub-center">
-          Confirme para guardar tudo isso na sua conta e abrir no celular ou
-          no computador.
+          Guarde suas escolhas na conta. Na próxima tela, escolha o Mensal ou o
+          Passe para liberar seu enxoval.
         </p>
         <p className="ob-save-summary">
           <ListChecks size={16} /> {plural(plan.stats.total, "item", "itens")} em{" "}
           {plural(plan.stats.rooms, "ambiente", "ambientes")}
         </p>
-        {trimmed && (
-          <p className="ob-sub ob-sub-center ob-save-limit">
-            No plano gratuito, entram os {limits.environments} primeiros
-            ambientes com até {limits.itemsPerEnvironment} itens cada. O
-            restante fica para quando você quiser abrir todos os cômodos em um
-            plano pago.
-          </p>
-        )}
       </div>
 
       <ul className="ob-benefits" aria-label="O que você ganha com a sua conta">
@@ -2233,7 +2215,7 @@ function SaveStep({
       </p>
 
       <p className="ob-trust">
-        <ShieldCheck size={15} /> Sem cartão de crédito. Seus dados ficam só com você.
+        <ShieldCheck size={15} /> Mensal com 2 dias de teste ou Passe com pagamento único.
       </p>
     </>
   );

@@ -1,3 +1,9 @@
+import { DesktopActionsMenu } from "./components/DesktopActionsMenu";
+import { ProfileDialog } from "./components/ProfileDialog";
+import { UserAvatar } from "./components/UserAvatar";
+import { SubscriptionAccess } from "./components/SubscriptionAccess";
+import { SESSION_EXPIRED_EVENT } from './sessionActivity';
+import { WorkspaceAnalytics } from './components/WorkspaceAnalytics';
 import React, {
   useCallback,
   useEffect,
@@ -13,6 +19,7 @@ import {
   Sparkles,
   LogOut,
   UserPlus,
+  UserRound,
   DoorOpen,
   ListPlus,
   X,
@@ -28,7 +35,6 @@ import {
   Percent,
   CalendarClock,
   MessageCircleHeart,
-  CreditCard,
 } from "lucide-react";
 import type {
   AuthUser,
@@ -49,7 +55,7 @@ import {
   deleteEnxoval as deleteEnxovalRequest,
   deleteItem as deleteItemRequest,
   fetchBootstrap,
-  openBillingPortal,
+  syncBilling,
   fetchEnxoval as fetchEnxovalRequest,
   fetchInvitations as fetchInvitationsRequest,
   inviteMember as inviteMemberRequest,
@@ -92,7 +98,7 @@ import { PurchasePlanView, type PlanningUpdates } from "./components/PurchasePla
 import { buildPurchasePlan } from "./planning/purchasePlan";
 import { measureTextWidth } from "./utils/textWidth";
 import { FeedbackDialog } from "./components/FeedbackDialog";
-import { OPEN_PLANS_EVENT, PaywallDialog } from "./components/PaywallDialog";
+import { PaywallDialog } from "./components/PaywallDialog";
 import {
   activeItems,
   discountApplies,
@@ -220,6 +226,7 @@ export default function App() {
   // Central de ajuda: quem abriu (botão do topo ou menu do celular) recebe o foco de volta ao fechar.
   const helpTriggerRef = useRef<HTMLElement | null>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const openWorkspaceMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
     menuTriggerRef.current = event.currentTarget;
     setIsWorkspaceMenuOpen(true);
@@ -268,6 +275,30 @@ export default function App() {
   useEffect(() => {
     setJustAddedItemId(null);
   }, [activeCategoryId, itemSortMode, activeEnxoval?.id]);
+  useEffect(() => {
+    if (workspaceView !== "list") return;
+    const frame = window.requestAnimationFrame(() => {
+      const scroller = chipsScrollRef.current;
+      if (!scroller || scroller.clientWidth === 0) return;
+      const selected = scroller.querySelector<HTMLElement>(
+        '.environment-select[aria-current="true"]',
+      );
+      if (!selected) return;
+      const containerRect = scroller.getBoundingClientRect();
+      const selectedRect = selected.getBoundingClientRect();
+      scroller.scrollTo({
+        left:
+          scroller.scrollLeft +
+          selectedRect.left -
+          containerRect.left -
+          (scroller.clientWidth - selectedRect.width) / 2,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "instant"
+          : "smooth",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeCategoryId, workspaceView, categories, isHeaderMobile]);
   const categorySwipeRef = useRef<{
     pointerId: number;
     startX: number;
@@ -317,7 +348,26 @@ export default function App() {
     let isMounted = true;
 
     // Volta para o enxoval que a pessoa estava usando (o servidor ignora se ela não tiver mais acesso).
-    fetchBootstrap(readStoredEnxovalId())
+    const loadInitialWorkspace = async () => {
+      let targetEnxoval = readStoredEnxovalId();
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('assinatura') === 'sucesso') {
+        try {
+          const confirmed = await syncBilling(params.get('session_id') ?? undefined, true);
+          if (confirmed.accessAllowed) {
+            targetEnxoval = confirmed.enxovalId ?? undefined;
+            storeEnxovalId(targetEnxoval ?? null);
+            params.delete('assinatura'); params.delete('plano'); params.delete('session_id');
+            window.history.replaceState(null, '', `/app${params.size ? `?${params}` : ''}`);
+          }
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 401) throw err;
+          // Keep the session and let the access screen retry confirmation.
+        }
+      }
+      return fetchBootstrap(targetEnxoval);
+    };
+    loadInitialWorkspace()
       .then((data) => {
         if (isMounted) applyBootstrap(data);
       })
@@ -345,6 +395,20 @@ export default function App() {
   useEffect(() => {
     if (user) storeEnxovalId(activeEnxoval?.id ?? null);
   }, [user, activeEnxoval?.id]);
+
+  useEffect(() => {
+    const expire = () => {
+      setUser(null); setItems([]); setCategories([]); setMembers([]);
+      setEnxovais([]); setActiveEnxoval(null);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, expire);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expire);
+  }, []);
+
+  const needsOnboarding = Boolean(user && !user.isGuest && !user.mustChangePassword && user.plan === 'free' && !user.onboardingCompleted && !user.trialUsed && enxovais.length === 0);
+  useEffect(() => {
+    if (!isLoading && needsOnboarding && window.location.pathname !== '/') window.location.replace('/comecar');
+  }, [isLoading, needsOnboarding]);
 
   useEffect(() => {
     if (user?.mustChangePassword) {
@@ -460,24 +524,6 @@ export default function App() {
       window.removeEventListener("resize", updateHeaderSize);
     };
   }, []);
-
-  /** Gratuito ou Passe: abre a tela de planos. Assinatura mensal: abre o portal da Stripe (cartão, faturas, cancelar). */
-  const openPlans = async () => {
-    if (user?.plan !== "monthly") {
-      window.dispatchEvent(new Event(OPEN_PLANS_EVENT));
-      return;
-    }
-    try {
-      const { url } = await openBillingPortal();
-      window.location.assign(url);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível abrir a assinatura agora.",
-      );
-    }
-  };
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -733,7 +779,6 @@ export default function App() {
     !isSearching && !isShowingLatestChanges && !hasItemFilters
       ? `${filteredCheckedCount} de ${filteredActiveCount} itens`
       : itemCountText;
-  const showItemCategory = isAllEnvironments || isShowingLatestChanges;
   const searchScopeLabel = activeCategory
     ? `Buscar em ${activeCategory.name}`
     : "Buscar em todos os ambientes";
@@ -1045,6 +1090,10 @@ export default function App() {
     if (typeof updates.priceAlertEnabled === "boolean")
       payload.priceAlertEnabled = updates.priceAlertEnabled;
     if (updates.imageUrl !== undefined) payload.imageUrl = updates.imageUrl;
+    if (updates.trackedProductUrl !== undefined) payload.trackedProductUrl = updates.trackedProductUrl;
+    if (updates.initialPriceCents !== undefined) payload.initialPriceCents = updates.initialPriceCents;
+    if (updates.selectedVariation !== undefined) payload.selectedVariation = updates.selectedVariation;
+    if (updates.priceBasis !== undefined) payload.priceBasis = updates.priceBasis;
 
     if (Object.keys(payload).length === 0) return;
 
@@ -1760,11 +1809,7 @@ export default function App() {
             }
           : undefined
       }
-      categoryName={
-        showItemCategory
-          ? (categoryById.get(item.categoryId)?.name ?? item.category)
-          : undefined
-      }
+      categoryName={categoryById.get(item.categoryId)?.name ?? item.category}
       showUpdatedAt={isShowingLatestChanges}
       updatedAtLabel={formatUpdatedAt(item.updatedAt)}
       enxovalId={activeEnxoval?.id}
@@ -1807,7 +1852,7 @@ export default function App() {
     );
 
   if (window.location.pathname === "/")
-    return <LandingPage signedIn={Boolean(user)} />;
+    return <LandingPage signedIn={Boolean(user)} authLoading={isLoading} />;
 
   if (isLoading) {
     return (
@@ -1826,12 +1871,17 @@ export default function App() {
     return <AuthPage onAuthenticated={applyBootstrap} />;
   }
 
+  if (needsOnboarding) return <main className="subscription-page" aria-busy="true">Preparando seu onboarding…</main>;
+
   // Convidado removido de todos os enxovais: a conta continua existindo, mas sem nada para usar.
   if (user.isGuest && enxovais.length === 0) {
     return <NoAccessPage user={user} onLogout={() => void handleLogout()} />;
   }
 
   return (
+    <>
+    <SubscriptionAccess enxovalId={activeEnxoval?.id ?? enxovais[0]?.id} onChanged={() => void handleRefresh()} onLogout={() => void handleLogout()}>
+    <WorkspaceAnalytics userId={user.id} enxovalId={activeEnxoval?.id} view={workspaceView} />
     <div
       className={`workspace-app workspace-view-${workspaceView} min-h-screen pb-24 font-sans text-brand-dark overscroll-y-contain`}
       style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}
@@ -1928,15 +1978,13 @@ export default function App() {
             />
           </nav>
           <div className="sidebar-bottom">
-            <div className="sidebar-profile">
-              <span className="user-avatar">
-                {user.name.slice(0, 1).toUpperCase()}
-              </span>
+            <button type="button" className="sidebar-profile sidebar-profile-button" onClick={() => setIsProfileOpen(true)} aria-label="Abrir meu perfil">
+              <UserAvatar name={user.name} src={user.avatarUrl} />
               <span>
                 <strong>{user.name}</strong>
                 <small>{user.email}</small>
               </span>
-            </div>
+            </button>
           </div>
         </motion.aside>
         <div className="desktop-app-header">
@@ -1962,19 +2010,13 @@ export default function App() {
               </>
             )}
           </span>
-          <div>
+          <div className="desktop-account-actions">
+            <DesktopActionsMenu name={user.name} email={user.email} avatarUrl={user.avatarUrl}>
             {hasEnxoval && (
               <>
-                <span className="member-avatars">
-                  {members.slice(0, 3).map((m) => (
-                    <span title={m.name} key={m.id}>
-                      {m.name.slice(0, 1).toUpperCase()}
-                    </span>
-                  ))}
-                </span>
                 {isOwner ? (
                   <button
-                    className="button button-outline button-small"
+                    className="desktop-menu-item"
                     onClick={openInvite}
                   >
                     <UserPlus size={16} /> Convidar
@@ -1986,7 +2028,7 @@ export default function App() {
                     </span>
                     <button
                       type="button"
-                      className="button button-outline button-small"
+                      className="desktop-menu-item"
                       onClick={openLeaveEnxoval}
                     >
                       <DoorOpen size={16} /> Sair do enxoval
@@ -1994,7 +2036,7 @@ export default function App() {
                   </>
                 )}
                 <button
-                  className="button button-outline button-small"
+                  className="desktop-menu-item"
                   aria-label="Descontos e cashback"
                   title="Descontos e cashback"
                   onClick={openDiscounts}
@@ -2003,27 +2045,15 @@ export default function App() {
                 </button>
               </>
             )}
-            {!user.isGuest && user.plan !== "founder" && (
-              <button
-                type="button"
-                className="button button-outline button-small"
-                onClick={() => void openPlans()}
-              >
-                <CreditCard size={16} />{" "}
-                {user.plan === "free"
-                  ? "Conhecer os planos"
-                  : user.plan === "pass"
-                    ? "Meu Passe"
-                    : "Gerenciar assinatura"}
-              </button>
-            )}
+            <button type="button" className="desktop-menu-item" onClick={() => setIsProfileOpen(true)}><UserRound size={16} /> Meu perfil</button>
+            <div className="desktop-menu-separator" role="separator" />
             <button
               type="button"
-              className="button button-outline button-small help-entry"
+              className="desktop-menu-item"
               aria-label="Central de ajuda: relatar um problema ou sugerir uma melhoria"
               title="Relatar um problema ou sugerir uma melhoria"
               onClick={(event) => {
-                helpTriggerRef.current = event.currentTarget;
+                helpTriggerRef.current = event.currentTarget.closest('.desktop-actions-menu')?.querySelector<HTMLButtonElement>('.desktop-actions-trigger') ?? event.currentTarget;
                 setIsFeedbackOpen(true);
               }}
             >
@@ -2031,12 +2061,13 @@ export default function App() {
             </button>
             <button
               type="button"
-              className="button button-outline button-small"
+              className="desktop-menu-item"
               aria-label="Sair da conta"
               onClick={() => void handleLogout()}
             >
               <LogOut size={16} /> Sair
             </button>
+            </DesktopActionsMenu>
           </div>
         </div>
         <div className="mobile-app-brand">
@@ -2433,6 +2464,7 @@ export default function App() {
         triggerRef={helpTriggerRef}
       />
       <WorkspaceMenu
+        onProfile={() => setIsProfileOpen(true)}
         open={isWorkspaceMenuOpen}
         onHelp={() => {
           helpTriggerRef.current = menuTriggerRef.current;
@@ -3341,5 +3373,8 @@ export default function App() {
         items={items}
       />
     </div>
+    </SubscriptionAccess>
+    <ProfileDialog open={isProfileOpen} onClose={() => setIsProfileOpen(false)} user={user} enxoval={activeEnxoval} onChanged={() => void handleRefresh()} onUserChanged={profile => setUser(current => current ? { ...current, name: profile.name, avatarUrl: profile.avatarUrl } : current)} />
+    </>
   );
 }

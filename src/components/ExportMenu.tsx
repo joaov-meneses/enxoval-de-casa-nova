@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Download, FolderDown, Layers } from "lucide-react";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import { exportItems, type ExportFormat } from "../utils/export";
+import { useSubscriptionCheck } from "./SubscriptionAccess";
 
 interface ExportMenuProps {
   categories: EnxovalCategory[];
@@ -24,6 +25,7 @@ export function ExportMenu({
   enxovalName,
   activeCategoryId,
 }: ExportMenuProps) {
+  const checkAccess = useSubscriptionCheck();
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("csv");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -67,16 +69,18 @@ export function ExportMenu({
     };
   }, [open]);
 
-  const exportEnvironment = (category: EnxovalCategory) => {
+  const exportEnvironment = async (category: EnxovalCategory) => {
     setOpen(false);
+    if (!checkAccess || !await checkAccess()) return;
     void exportItems(
       items.filter((item) => item.categoryId === category.id),
       `${enxovalName}-${category.name}`,
       format,
     );
   };
-  const exportAll = () => {
+  const exportAll = async () => {
     setOpen(false);
+    if (!checkAccess || !await checkAccess()) return;
     void exportItems(items, enxovalName, format);
   };
 

@@ -15,7 +15,7 @@ import { HttpError } from './security.ts';
  */
 export function effectivePlanSql(alias = '') {
   const p = alias ? `${alias}.` : '';
-  return `(CASE WHEN ${p}plan = 'founder' THEN 'founder' WHEN ${p}pass_expires_at > now() THEN 'pass' ELSE ${p}plan END)`;
+  return `(CASE WHEN ${p}plan = 'founder' THEN 'founder' WHEN ${p}pass_expires_at > now() THEN 'pass' WHEN ${p}plan = 'monthly' AND (${p}subscription_cancel_at_period_end OR ${p}subscription_status = 'trialing' AND (${p}trial_ends_at IS NULL OR ${p}trial_ends_at <= now())) THEN 'free' ELSE ${p}plan END)`;
 }
 
 function asPlan(value: unknown): AccountPlan {
@@ -32,6 +32,7 @@ export async function lockEnxovalLimits(client: PoolClient, enxovalId: string): 
     FOR UPDATE OF e
   `, [enxovalId]);
   if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
+  if (result.rows[0].plan === 'free') throw subscriptionRequired();
   return planLimits(asPlan(result.rows[0].plan));
 }
 
@@ -69,6 +70,7 @@ export async function assertCanAddItem(client: PoolClient, enxovalId: string, ca
 export async function lockUserLimits(client: PoolClient, userId: string): Promise<PlanLimits> {
   const result = await client.query<{ plan: string }>(`SELECT ${effectivePlanSql()} AS plan FROM users WHERE id = $1 FOR UPDATE`, [userId]);
   if (!result.rows[0]) throw new HttpError(401, 'Faça login para continuar.');
+  if (result.rows[0].plan === 'free') throw subscriptionRequired();
   return planLimits(asPlan(result.rows[0].plan));
 }
 
@@ -92,4 +94,8 @@ export function trimToLimits<T extends { items: unknown[] }>(categories: T[], li
   return limits.itemsPerEnvironment === null
     ? kept
     : kept.map(category => ({ ...category, items: category.items.slice(0, limits.itemsPerEnvironment!) }));
+}
+
+export function subscriptionRequired() {
+  return new HttpError(403, 'O acesso está bloqueado. Ative sua assinatura para continuar. Sua conta e seus dados estão preservados.', 'SUBSCRIPTION_REQUIRED');
 }

@@ -220,7 +220,7 @@ Poder **identificar, bloquear e provar** abuso (contas falsas, fraude de pagamen
 ## C.2 Diagnóstico do que existe hoje
 | Item | Estado atual |
 |---|---|
-| IP | Só `req.ip` em memória, para limite de tentativas (`loginRateLimit`, `rateLimit` em `server/security.ts`). **Nada é gravado** |
+| IP | `user_ip_events` registra IP de cadastro, login bem-sucedido e criação de conta por convite. O painel `/admin` permite buscar pelo IP e desativar as contas associadas. Retenção de 6 meses, com remoção diária. Falhas de login ainda não são associadas a contas |
 | `user-agent`, idioma, dispositivo | Não coletados (o único `User-Agent` do código é o do leitor de lojas) |
 | Sessões | A tabela `sessions` guarda só `id`, `user_id`, `token_hash`, `expires_at`, `created_at`: **sem IP, aparelho nem última atividade** |
 | Histórico de segurança | Não existe (logins, falhas, trocas de senha, convites, exclusões) |
@@ -233,7 +233,7 @@ Poder **identificar, bloquear e provar** abuso (contas falsas, fraude de pagamen
 ## C.3 O que coletar (e o que não coletar)
 | Dado | Para quê | Onde | Retenção sugerida |
 |---|---|---|---|
-| **IP** (cadastro, login, falha, troca de senha, convite, pagamento, ação sensível) | Detectar abuso, bloquear por IP/faixa, atender pedido legal | `auth_events` | IP bruto 6 meses; depois anonimizado (C.4) |
+| **IP** (cadastro, login bem-sucedido e primeiro acesso por convite) | Detectar abuso e localizar contas associadas ao mesmo IP | `user_ip_events` | IP bruto por até 6 meses; depois removido |
 | **País, região e cidade aproximados e provedor (ASN)** do IP | Risco geográfico, divergência com o país do cartão, VPN/hospedagem | `auth_events` | Junto do IP; o país pode ficar mais tempo |
 | **User-agent** bruto e interpretado (navegador, sistema, tipo de aparelho) | Distinguir aparelhos, robôs | `auth_events`, `user_devices` | 6 meses (bruto) |
 | **Idioma e fuso do navegador** | Coerência com o país | `auth_events` | 6 meses |
@@ -313,7 +313,7 @@ CREATE TABLE admin_audit_log (
   target_type text, target_id text, details jsonb, at timestamptz NOT NULL DEFAULT now(), ip inet
 );
 ```
-**Rotina de retenção** (worker diário): após 6 meses, `auth_events.ip` vira `NULL` (permanece `ip_prefix`, `ip_country` e `ip_asn`); `user_agent` bruto e `accept_language` também. Eventos ligados a banimento ou fraude confirmada ficam pelo prazo da decisão. Cada execução registra quantas linhas anonimizou.
+**Rotina de retenção implementada:** worker diário remove linhas de `user_ip_events` com mais de 6 meses. Atualmente não há anonimização nem exceções de retenção para eventos ligados a banimento ou fraude confirmada.
 
 ## C.5 Obter o IP certo
 * Hoje `trust proxy = 1`: confia em **um** proxy (o da Railway). Se entrar um **segundo** na frente (Cloudflare), o IP verdadeiro vem em `CF-Connecting-IP` e a configuração muda; errar aqui faz o sistema registrar o IP do proxy (todo mundo "igual") ou aceitar IP forjado em `X-Forwarded-For`.

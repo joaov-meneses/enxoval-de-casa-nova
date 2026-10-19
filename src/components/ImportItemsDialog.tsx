@@ -6,6 +6,7 @@ import {
   Upload,
 } from "lucide-react";
 import { ApiError, createItem } from "../api";
+import { capture } from '../analytics';
 import { ITEM_STATUS_META } from "../itemStatus";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import {
@@ -217,6 +218,7 @@ function ImportItemsDialog({
     setCreated(ok);
     setFailures(failed);
     setPhase("done");
+    capture('items_imported', { count: ok, failed: failed.length, stopped: stopRef.current });
     if (ok > 0) await onImported();
   }
 

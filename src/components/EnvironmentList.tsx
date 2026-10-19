@@ -45,7 +45,7 @@ export function EnvironmentList({
         <div
           className={`environment-row ${activeId === category.id ? "active" : ""}`}
         >
-          {handle}
+          {!horizontal && handle}
           <button
             type="button"
             className="environment-select"
@@ -55,19 +55,19 @@ export function EnvironmentList({
           >
             {!horizontal && <RoomIcon name={category.name} />}
             <span>{category.name}</span>
-            <small>
-              {horizontal
-                ? `${items.filter((item) => item.categoryId === category.id && item.checked).length}/`
-                : ""}
-              {
-                items.filter(
-                  (item) =>
-                    item.categoryId === category.id &&
-                    !isInactiveStatus(item.status),
-                ).length
-              }
-            </small>
+            {!horizontal && (
+              <small>
+                {
+                  items.filter(
+                    (item) =>
+                      item.categoryId === category.id &&
+                      !isInactiveStatus(item.status),
+                  ).length
+                }
+              </small>
+            )}
           </button>
+          {horizontal && handle}
           {!horizontal && (
             <button
               type="button"
@@ -108,9 +108,6 @@ export function EnvironmentList({
           aria-current={allOption.active ? "true" : undefined}
         >
           <span>Todos</span>
-          <small>
-            {allOption.done}/{allOption.total}
-          </small>
         </button>
       </div>
       {list}

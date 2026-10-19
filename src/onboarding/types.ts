@@ -3,7 +3,7 @@ import type { SpendingTier, PriceCategory } from "../planning/spending";
 export type Moment = "casal" | "solo" | "amigos" | "troca";
 export type Housing = "apartamento" | "casa" | "studio";
 export type Owned = "nada" | "algumas" | "boa";
-export type PlanStyle = "full" | "min";
+export type PlanStyle = "full" | "min" | "none";
 export type Budget = "lt10" | "10-25" | "25-50" | "gt50" | "unknown";
 export type Climate = "hot" | "mild" | "cold";
 export type Worry = "start" | "waste" | "forget" | "budget" | "time";

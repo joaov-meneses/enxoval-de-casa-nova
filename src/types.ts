@@ -228,6 +228,9 @@ export interface EnxovalItem {
 }
 
 export interface AuthUser {
+  avatarUrl?: string | null;
+  onboardingCompleted?: boolean;
+  trialUsed?: boolean;
   id: string;
   name: string;
   email: string;
@@ -247,6 +250,7 @@ export interface AdminUser {
   passwordResetExpiresAt: string | null;
   createdAt: string;
   lastLoginAt: string | null;
+  ipAddresses?: string[];
   workspaceCount: number;
 }
 

@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { login, register } from "../api";
 import type { BootstrapData } from "../types";
-import { AuthShowcase } from "./AuthShowcase";
 import { Brand } from "./Brand";
 import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
 import { Nino } from "./Nino";
@@ -22,8 +21,8 @@ const MODE_PATH: Record<AuthMode, string> = {
   register: "/cadastro",
 };
 
-/** Abaixo disso a tela vira "celular e tablet": a cúpula da porta mostra o app no lugar do Nino. */
-const COMPACT_QUERY = "(max-width: 959px)";
+/** Celular e tablet priorizam o formulário, sem a vitrine de telas. */
+const COMPACT_QUERY = "(max-width: 1023px)";
 
 /** `/cadastro` abre a tela já na aba de criar conta (usado pelo CTA "Começar Grátis" da landing). */
 function initialMode(): AuthMode {
@@ -79,8 +78,7 @@ export function AuthPage({
       </div>
 
       <div className="auth-door">
-        {/* Desktop: o Nino espia por cima do cartão. Celular e tablet: as telas do app sobem por trás dele. */}
-        {compact ? <AuthShowcase /> : <Nino pose="wave" size={104} className="auth-nino" />}
+        {!compact && <Nino pose="wave" size={104} className="auth-nino" />}
         <div className="auth-card">
           <div
             className="auth-tabs"
@@ -270,7 +268,7 @@ function LoginPanel({
         </button>
       </p>
       <p className="auth-note">
-        <ShieldCheck size={15} aria-hidden="true" /> Sem cartão de crédito. No seu tempo.
+        <ShieldCheck size={15} aria-hidden="true" /> Teste completo por 2 dias. Cancele antes da cobrança.
       </p>
     </section>
   );
@@ -394,7 +392,7 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           {submitting ? (
             <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
           ) : (
-            "Criar conta e montar meu plano"
+            "Criar minha conta"
           )}
           {!submitting && <ArrowRight size={18} aria-hidden="true" />}
         </button>
@@ -413,7 +411,7 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
         .
       </p>
       <p className="auth-note">
-        <ShieldCheck size={15} aria-hidden="true" /> Sem cartão de crédito. Seus dados ficam só com você.
+        <ShieldCheck size={15} aria-hidden="true" /> Teste completo por 2 dias. Cancele no app antes da cobrança.
       </p>
     </section>
   );

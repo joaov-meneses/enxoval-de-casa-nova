@@ -37,6 +37,7 @@ import {
   ITEM_STATUSES,
   ITEM_STATUS_META,
   itemSavingsCents,
+  netPriceCents,
   pendingItems,
   sumBought,
   sumItemDiscounts,
@@ -300,6 +301,13 @@ export function WorkspaceOverview({
   const pending = pendingItems(statsItems);
   const planned = sumPending(statsItems);
   const unpriced = pending.filter((i) => !i.priceCents).length;
+  const largestPurchase = pending.reduce<EnxovalItem | undefined>(
+    (largest, item) =>
+      (item.priceCents ?? 0) > 0 && (!largest || netPriceCents(item) > netPriceCents(largest))
+        ? item
+        : largest,
+    undefined,
+  );
   const percentage = statsActive.length
     ? Math.round((done.length / statsActive.length) * 100)
     : 0;
@@ -401,7 +409,7 @@ export function WorkspaceOverview({
           </>
         )}
       </p>
-      {/* Telas pequenas: resumo em uma linha de leitura; os cartões completos abrem em "Detalhes". */}
+      {/* Telas pequenas: resumo compacto com detalhes complementares sob demanda. */}
       <section className="stats-compact" aria-label="Resumo em poucos números">
         <div className="stats-compact-main">
           <strong className="stats-compact-percent">
@@ -416,7 +424,7 @@ export function WorkspaceOverview({
             type="button"
             className="stats-compact-toggle"
             aria-expanded={statsOpen}
-            aria-controls="stats-details"
+            aria-controls="stats-mobile-details"
             onClick={() => setStatsOpen((open) => !open)}
           >
             {statsOpen ? "Ocultar" : "Detalhes"}
@@ -457,10 +465,39 @@ export function WorkspaceOverview({
             </dd>
           </div>
         </dl>
+        <div id="stats-mobile-details" className="stats-insights" hidden={!statsOpen}>
+          <article className="stats-insight">
+            <span className="stats-insight-label">Preços a pesquisar</span>
+            <strong>{unpriced}<small> de {pending.length} pendentes</small></strong>
+            <p>{unpriced > 0
+              ? "Complete os preços para saber quanto falta investir."
+              : pending.length > 0
+                ? "Todos os itens pendentes já têm preço informado."
+                : "Nenhuma compra pendente por aqui."}</p>
+            {unpriced > 0 && onShowUnpriced && (
+              <button type="button" className="stat-link" onClick={onShowUnpriced}>
+                Revisar preços <ArrowUpRight size={14} aria-hidden="true" />
+              </button>
+            )}
+          </article>
+          <article className="stats-insight">
+            <span className="stats-insight-label">Maior compra prevista</span>
+            {largestPurchase ? <>
+              <strong><Money cents={netPriceCents(largestPurchase)} /></strong>
+              <p className="stats-insight-name">{largestPurchase.name}</p>
+              <p>O maior valor entre as compras que faltam.</p>
+            </> : <>
+              <strong>—</strong>
+              <p>{pending.length > 0
+                ? "Informe os preços para identificar a compra de maior valor."
+                : "Tudo conquistado. Nenhuma compra para planejar."}</p>
+            </>}
+          </article>
+        </div>
       </section>
       <div
         id="stats-details"
-        className={`workspace-stats${statsOpen ? " is-open" : ""}`}
+        className="workspace-stats"
       >
         <article className="stat-progress">
           <span className="stat-icon sage">
@@ -714,8 +751,7 @@ export function WorkspaceOverview({
                   className="panel-add"
                   onClick={onAddCategory}
                 >
-                  <Plus size={15} strokeWidth={2.2} aria-hidden="true" /> Novo
-                  <span className="sr-only"> ambiente</span>
+                    <Plus size={17} strokeWidth={2.2} aria-hidden="true" /> Novo ambiente
                 </button>
               </div>
             </div>

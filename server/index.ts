@@ -1,3 +1,8 @@
+import { createHttpLogging, httpErrorHandler } from './httpLogging.ts';
+import { startErrorTracking, captureServerError, stopErrorTracking } from './errorTracking.ts';
+import { logger, isProduction, stopPosthogLogs } from './logger.ts';
+import { startTrialNotifications } from './workers/trialNotifications.ts';
+import { startUserIpRetention } from './workers/userIpRetention.ts';
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -10,17 +15,26 @@ import { startCatalogScheduler } from "./workers/catalogWorker.ts";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
-const isProduction =
-  process.env.NODE_ENV === "production" ||
-  process.argv.includes("--production");
+startErrorTracking();
 
 app.set("trust proxy", 1);
+app.use(createHttpLogging());
 // O webhook da Stripe confere a assinatura sobre o corpo cru, então vem antes do parser de JSON.
 registerBillingWebhook(app);
 app.use(express.json({ limit: "1mb" }));
 
-await migrateDatabase();
+logger.info({ event: 'server.starting', port }, 'Iniciando servidor e aplicando migrações do banco.');
+try {
+  await migrateDatabase();
+  logger.info({ event: 'database.migrated' }, 'Banco de dados atualizado.');
+} catch (err) {
+  logger.fatal({ event: 'server.startup.failed', err }, 'Não foi possível iniciar o servidor: falha nas migrações.');
+  await Promise.allSettled([stopPosthogLogs(), stopErrorTracking()]);
+  process.exit(1);
+}
 registerApiRoutes(app);
+startTrialNotifications();
+startUserIpRetention();
 
 if (isProduction) {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -52,9 +66,28 @@ if (isProduction) {
   app.use(vite.middlewares);
 }
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Servidor rodando em http://localhost:${port}`);
+app.use(captureServerError);
+app.use(httpErrorHandler);
+
+const httpServer = app.listen(port, "0.0.0.0", () => {
+  logger.info({ event: 'server.listening', port }, `Servidor rodando em http://localhost:${port}`);
+}).on('error', async err => {
+  logger.fatal({ event: 'server.listen.failed', err, port }, 'Não foi possível abrir a porta do servidor.');
+  await Promise.allSettled([stopPosthogLogs(), stopErrorTracking()]);
+  process.exit(1);
 });
+
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    // Let request completion logs reach the queue before flushing telemetry.
+    const deadline = setTimeout(() => httpServer.closeAllConnections(), 5000);
+    deadline.unref();
+    httpServer.close(() => {
+      clearTimeout(deadline);
+      void Promise.allSettled([stopPosthogLogs(), stopErrorTracking()]).finally(() => process.exit(0));
+    });
+  });
+}
 
 // Relê os preços dos produtos acompanhados a cada 12 horas. Em desenvolvimento fica desligado, para não acessar
 // lojas sem querer; PRICE_TRACKER=on liga e PRICE_TRACKER=off desliga em qualquer ambiente.

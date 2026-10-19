@@ -1,15 +1,17 @@
+import { getLogger } from './logger.ts';
 // Pagamentos pela Stripe: assinatura mensal e Passe da Casa Nova (pagamento único, 12 meses sem renovação). O plano da
 // conta só muda aqui, pelos eventos assinados da Stripe (webhook), nunca por algo que o app envie. A assinatura vive em
 // users.plan; o Passe vive em users.pass_expires_at (ver effectivePlanSql). Sem as chaves, o app segue no plano gratuito.
 import express from 'express';
+import { sendTrialNotifications } from './workers/trialNotifications.ts';
 import type { Request, RequestHandler, Router } from 'express';
 import Stripe from 'stripe';
 import type { PoolClient } from 'pg';
-import { getPool, withTransaction } from './database.ts';
+import { getPool, withTransaction, type Queryable } from './database.ts';
 import { effectivePlanSql } from './freemium.ts';
-import { appBaseUrl } from './mailer.ts';
+import { appBaseUrl, canDeliverMail, isProductionServer } from './mailer.ts';
 import { asyncHandler, HttpError } from './security.ts';
-import { PASS_MONTHS } from '../src/plans.ts';
+import { PAID_PLAN_OFFERS, PASS_MONTHS } from '../src/plans.ts';
 import type { AuthUser } from '../src/types.ts';
 
 type PaidPlan = 'monthly' | 'pass';
@@ -28,7 +30,7 @@ const ENDED_STATUSES = new Set<string>(['canceled', 'unpaid', 'incomplete_expire
 const UNAVAILABLE = 'As assinaturas ainda não estão disponíveis. Tente novamente em breve.';
 
 export function isBillingConfigured() {
-  return Boolean(process.env.STRIPE_SECRET_KEY && PAID_PLANS.every(plan => process.env[PRICE_ENV[plan]]));
+  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_MONTHLY);
 }
 
 let stripeClient: Stripe | null = null;
@@ -57,11 +59,19 @@ function isPaidPlan(value: unknown): value is PaidPlan {
   return typeof value === 'string' && (PAID_PLANS as string[]).includes(value);
 }
 
+interface BillingPrice { amount: number; currency: string }
 interface BillingUserRow {
+  billing_snapshot: { monthlyPrice?: BillingPrice; passPayment?: BillingPrice & { sessionId: string } };
+  pass_notice_seen_session_id: string | null;
   /** Plano em vigor (já considera a validade do Passe). */
   plan: string;
   pass_expires_at: Date | null;
   email: string;
+  trial_started_at: Date | null;
+  trial_ends_at: Date | null;
+  trial_used: boolean;
+  trial_intro_seen_subscription_id: string | null;
+  trial_ending_seen_subscription_id: string | null;
   is_guest: boolean;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
@@ -70,9 +80,9 @@ interface BillingUserRow {
   subscription_cancel_at_period_end: boolean;
 }
 
-async function loadBillingRow(userId: string) {
-  const result = await getPool().query<BillingUserRow>(`
-    SELECT ${effectivePlanSql()} AS plan, pass_expires_at, email, is_guest, stripe_customer_id, stripe_subscription_id,
+async function loadBillingRow(userId: string, db: Queryable = getPool()) {
+  const result = await db.query<BillingUserRow>(`
+    SELECT ${effectivePlanSql()} AS plan, billing_snapshot, pass_notice_seen_session_id, trial_started_at, trial_ends_at, trial_used, trial_intro_seen_subscription_id, trial_ending_seen_subscription_id, pass_expires_at, email, is_guest, stripe_customer_id, stripe_subscription_id,
            subscription_status, subscription_renews_at, subscription_cancel_at_period_end
     FROM users WHERE id = $1
   `, [userId]);
@@ -114,7 +124,8 @@ async function applySubscription(client: PoolClient, subscription: Stripe.Subscr
   const isMonthly = Boolean(priceId) && priceId === process.env[PRICE_ENV.monthly];
   let nextPlan: string = user.plan;
   if (user.plan !== 'founder') {
-    if (ACTIVE_STATUSES.has(subscription.status) && isMonthly) nextPlan = 'monthly';
+    if (subscription.cancel_at_period_end) nextPlan = 'free';
+    else if (ACTIVE_STATUSES.has(subscription.status) && isMonthly) nextPlan = 'monthly';
     else if (ENDED_STATUSES.has(subscription.status)) nextPlan = 'free';
   }
 
@@ -126,12 +137,22 @@ async function applySubscription(client: PoolClient, subscription: Stripe.Subscr
         subscription_status = $5,
         subscription_renews_at = $6,
         subscription_cancel_at_period_end = $7,
-        subscription_event_at = GREATEST($8, subscription_event_at)
+        subscription_event_at = GREATEST($8, subscription_event_at),
+        trial_started_at = COALESCE(trial_started_at, $9),
+        trial_ends_at = COALESCE($10, trial_ends_at),
+        trial_used = trial_used OR $9::timestamptz IS NOT NULL,
+        billing_snapshot = billing_snapshot || $11::jsonb
     WHERE id = $1
   `, [
     user.id, nextPlan, customerId, subscription.id, subscription.status, periodEnd(subscription),
-    Boolean(subscription.cancel_at_period_end), eventAt
+    Boolean(subscription.cancel_at_period_end), eventAt,
+    subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,
+    subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+    JSON.stringify(isMonthly && typeof subscription.items?.data?.[0]?.price?.unit_amount === 'number' ? {
+      monthlyPrice: { amount: subscription.items.data[0].price.unit_amount, currency: subscription.items.data[0].price.currency }
+    } : {})
   ]);
+  await client.query('DELETE FROM billing_checkouts WHERE user_id = $1', [user.id]);
   return { applied: true as const, userId: user.id, plan: nextPlan };
 }
 
@@ -149,13 +170,14 @@ async function grantPass(client: PoolClient, session: Stripe.Checkout.Session) {
   if (fresh.rowCount === 0) return null;
   const granted = await client.query<{ plan: string; stripe_subscription_id: string | null; subscription_status: string | null }>(`
     UPDATE users
-    SET pass_expires_at = GREATEST(COALESCE(pass_expires_at, now()), now()) + make_interval(months => $2::int)
+    SET pass_expires_at = GREATEST(COALESCE(pass_expires_at, now()), now()) + make_interval(months => $2::int),
+        billing_snapshot = billing_snapshot || $3::jsonb
     WHERE id::text = $1
     RETURNING plan, stripe_subscription_id, subscription_status
-  `, [userId, PASS_MONTHS]);
+  `, [userId, PASS_MONTHS, JSON.stringify({ passPayment: { sessionId: session.id, amount: session.amount_total ?? null, currency: session.currency ?? null } })]);
   const row = granted.rows[0];
   if (!row) {
-    console.warn(`Stripe: pagamento do Passe (${session.id}) de uma conta que não existe.`);
+    getLogger().warn({ event: 'billing.account_not_found', stripeSessionId: session.id }, 'Stripe: pagamento do Passe de uma conta que não existe.');
     return null;
   }
   return row.plan === 'monthly' && row.stripe_subscription_id && row.subscription_status && ACTIVE_STATUSES.has(row.subscription_status)
@@ -167,9 +189,10 @@ async function grantPass(client: PoolClient, session: Stripe.Checkout.Session) {
 async function cancelMonthly(subscriptionId: string | null) {
   if (!subscriptionId) return;
   try {
-    await getStripe().subscriptions.cancel(subscriptionId);
+    const canceled = await getStripe().subscriptions.cancel(subscriptionId);
+    if (canceled.status) await withTransaction(client => applySubscription(client, canceled, new Date(), true));
   } catch (err) {
-    console.error('Stripe: não foi possível cancelar o mensal ao ativar o Passe', subscriptionId, err);
+    getLogger().error({ event: 'billing.cancellation_failed', subscriptionId, err }, 'Stripe: não foi possível cancelar o mensal ao ativar o Passe.');
   }
 }
 
@@ -191,11 +214,12 @@ export async function handleStripeEvent(event: Stripe.Event) {
     if (!isSubscription) return grantPass(client, event.data.object as Stripe.Checkout.Session);
     const result = await applySubscription(client, event.data.object as Stripe.Subscription, new Date(event.created * 1000));
     if (!result.applied && result.reason === 'user-not-found') {
-      console.warn(`Stripe: evento ${event.id} (${event.type}) de uma assinatura sem conta correspondente.`);
+      getLogger().warn({ event: 'billing.account_not_found', stripeEventId: event.id, stripeEventType: event.type }, 'Stripe: assinatura sem conta correspondente.');
     }
     return null;
   });
   await cancelMonthly(monthlyToCancel);
+  await sendTrialNotifications();
 }
 
 /**
@@ -219,10 +243,12 @@ export function registerBillingWebhook(app: express.Express) {
     }
     try {
       await handleStripeEvent(event);
+      getLogger().info({ event: 'billing.webhook.completed', stripeEventType: event.type }, 'Evento Stripe processado.');
       res.json({ received: true });
     } catch (err) {
       // Uma falha nossa devolve 500 para a Stripe tentar o evento de novo (a marca de "já processado" volta atrás junto).
-      console.error('Stripe: falha ao processar o evento', event.id, err);
+      res.err = err instanceof Error ? err : new Error('Falha ao processar evento Stripe.');
+      getLogger().error({ event: 'billing.webhook.failed', stripeEventId: event.id, stripeEventType: event.type, err }, 'Stripe: falha ao processar o evento; será solicitada nova tentativa.');
       res.status(500).json({ error: 'Erro ao processar o evento.' });
     }
   };
@@ -231,14 +257,60 @@ export function registerBillingWebhook(app: express.Express) {
 
 interface BillingDependencies {
   requireUser: (req: Request) => Promise<AuthUser>;
+  ensureDefaultEnxoval: (userId: string) => Promise<string>;
 }
 
-export function registerBillingRoutes(router: Router, { requireUser }: BillingDependencies) {
+export function registerBillingRoutes(router: Router, { requireUser, ensureDefaultEnxoval }: BillingDependencies) {
+  router.get('/billing/plans', asyncHandler(async (req, res) => {
+    await requireUser(req);
+    const offers = await Promise.all(PAID_PLAN_OFFERS.map(async offer => {
+      if (!process.env[PRICE_ENV[offer.id]]) return null;
+      const price = await getStripe().prices.retrieve(priceIdFor(offer.id));
+      const valid = price.active && typeof price.unit_amount === 'number' &&
+        (offer.id === 'pass' ? price.type === 'one_time' : price.recurring?.interval === 'month' && price.recurring.interval_count === 1);
+      if (!valid) return null;
+      return { id: offer.id, name: offer.name, amount: price.unit_amount, currency: price.currency };
+    }));
+    res.json({ offers: offers.filter(Boolean) });
+  }));
   /** Situação da conta para a tela de planos. */
   router.get('/billing/status', asyncHandler(async (req, res) => {
     const user = await requireUser(req);
-    const row = await loadBillingRow(user.id);
+    let ownerId = user.id;
+    if (typeof req.query.enxovalId === 'string') {
+      const shared = await getPool().query<{owner_id: string}>(`SELECT e.owner_id FROM enxovais e JOIN enxoval_members m ON m.enxoval_id = e.id WHERE e.id = $1 AND m.user_id = $2`, [req.query.enxovalId, user.id]);
+      if (!shared.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
+      ownerId = shared.rows[0].owner_id;
+    }
+    let row = await recoverBillingAccess(ownerId);
+    // Backfill accounts confirmed before billing amounts were persisted. Never infer a purchase from the URL.
+    if (row.plan === 'monthly' && !row.billing_snapshot.monthlyPrice && row.stripe_subscription_id) {
+      try {
+        const subscription = await getStripe().subscriptions.retrieve(row.stripe_subscription_id);
+        if (subscription) {
+          await withTransaction(client => applySubscription(client, subscription, new Date(), true));
+          row = await loadBillingRow(ownerId);
+        }
+      } catch (err) {
+        getLogger().warn({ event: 'billing.price_sync_failed', userId: ownerId, err }, 'Não foi possível atualizar o valor da assinatura.');
+      }
+    }
+    let trialNotice: 'started' | 'ending' | null = null;
+    if (ownerId === user.id && !row.is_guest && row.plan === 'monthly' && row.subscription_status === 'trialing' && row.stripe_subscription_id && row.trial_ends_at && row.trial_ends_at > new Date()) {
+      if (row.trial_ends_at.getTime() - Date.now() <= 86400000 && row.trial_ending_seen_subscription_id !== row.stripe_subscription_id) trialNotice = 'ending';
+      else if (row.trial_intro_seen_subscription_id !== row.stripe_subscription_id) trialNotice = 'started';
+    }
     res.json({
+      trialNotice,
+      monthlyPrice: row.billing_snapshot.monthlyPrice ?? null,
+      passPayment: row.plan === 'pass' ? row.billing_snapshot.passPayment ?? null : null,
+      passNotice: ownerId === user.id && !row.is_guest && row.plan === 'pass' && row.billing_snapshot.passPayment?.sessionId !== row.pass_notice_seen_session_id
+        ? row.billing_snapshot.passPayment?.sessionId ?? null : null,
+      subscriptionId: row.stripe_subscription_id,
+      accessAllowed: row.plan !== 'free',
+      isOwner: ownerId === user.id && !row.is_guest,
+      trialEndsAt: row.trial_ends_at?.toISOString() ?? null,
+      trialUsed: row.trial_used,
       available: isBillingConfigured(),
       plan: row.plan,
       status: row.subscription_status,
@@ -249,12 +321,36 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
     });
   }));
 
+  router.post('/billing/pass-notice', asyncHandler(async (req, res) => {
+    const user = await requireUser(req);
+    const row = await loadBillingRow(user.id);
+    const sessionId = row.billing_snapshot.passPayment?.sessionId;
+    if (row.is_guest || !sessionId || sessionId !== req.body?.sessionId) throw new HttpError(403, 'Aviso inválido.');
+    await getPool().query('UPDATE users SET pass_notice_seen_session_id = $2 WHERE id = $1', [user.id, sessionId]);
+    res.status(204).end();
+  }));
+
+  router.post('/billing/trial-notice' , asyncHandler(async (req, res) => {
+    const user = await requireUser(req);
+    const row = await loadBillingRow(user.id);
+    const kind = req.body?.kind;
+    if (!['started', 'ending'].includes(kind)) throw new HttpError(400, 'Aviso inválido.');
+    if (row.is_guest || !row.stripe_subscription_id || row.stripe_subscription_id !== req.body?.subscriptionId) throw new HttpError(403, 'Este aviso não pertence à sua assinatura.');
+    await getPool().query(`UPDATE users SET trial_intro_seen_subscription_id = $2,
+      trial_ending_seen_subscription_id = CASE WHEN $3 = 'ending' THEN $2 ELSE trial_ending_seen_subscription_id END
+      WHERE id = $1 AND stripe_subscription_id = $2`, [user.id, row.stripe_subscription_id, kind]);
+    res.status(204).end();
+  }));
+
   /** Abre o checkout hospedado da Stripe para o plano escolhido (assinatura mensal ou Passe da Casa Nova). */
   router.post('/billing/checkout', asyncHandler(async (req, res) => {
     const user = await requireUser(req);
     const plan = req.body?.plan;
     if (!isPaidPlan(plan)) throw new HttpError(400, 'Escolha um dos planos disponíveis.');
-    const row = await loadBillingRow(user.id);
+    const url = await withTransaction(async client => {
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [user.id]);
+    const row = await loadBillingRow(user.id, client);
+    if (!canDeliverMail()) throw new HttpError(503, 'Os avisos por e-mail estão indisponíveis. Tente novamente em breve.');
     if (row.is_guest) throw new HttpError(403, 'Contas de convidados usam o plano de quem os convidou.');
     if (row.plan === 'founder') throw new HttpError(409, 'Sua conta já tem acesso completo, sem cobrança.');
     if (plan === 'monthly') {
@@ -263,16 +359,20 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
         throw new HttpError(409, 'Você já tem uma assinatura ativa. Use "Gerenciar assinatura" para alterá-la ou cancelá-la.', 'ALREADY_SUBSCRIBED');
       }
     }
-    const baseUrl = appBaseUrl();
+    const baseUrl = billingReturnUrl(req);
     if (!baseUrl) throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
 
+    if (plan === 'monthly') {
+      const cached = await client.query<{url: string}>('SELECT url FROM billing_checkouts WHERE user_id = $1 AND expires_at > now()', [user.id]);
+      if (cached.rows[0]) return cached.rows[0].url;
+    }
     const stripe = getStripe();
     let customerId = row.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({ email: row.email, metadata: { userId: user.id } });
       customerId = customer.id;
       // Só grava se ninguém gravou antes (duas abas); a vencedora vale para as duas.
-      const saved = await getPool().query<{ stripe_customer_id: string }>(
+      const saved = await client.query<{ stripe_customer_id: string }>(
         'UPDATE users SET stripe_customer_id = COALESCE(stripe_customer_id, $2) WHERE id = $1 RETURNING stripe_customer_id', [user.id, customerId]);
       customerId = saved.rows[0]?.stripe_customer_id ?? customerId;
     }
@@ -284,12 +384,33 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
       allow_promotion_codes: true,
       locale: 'pt-BR',
       metadata: { userId: user.id, plan },
-      ...(plan === 'monthly' ? { subscription_data: { metadata: { userId: user.id } } } : {}),
-      success_url: `${baseUrl}/app?assinatura=sucesso&plano=${plan}`,
+      ...(plan === 'monthly' ? {
+        // Dynamic payment methods are configured in the Stripe Dashboard (API 2026-09-30+).
+        payment_method_collection: 'always',
+        subscription_data: {
+          metadata: { userId: user.id },
+          ...(!row.trial_used ? { trial_period_days: 2, trial_settings: { end_behavior: { missing_payment_method: 'cancel' as const } } } : {})
+        },
+        custom_text: { submit: { message: !row.trial_used ? 'Teste completo por 2 dias (48 horas). Após esse período, cobraremos automaticamente o valor mensal no cartão. Cancele no app antes do término para evitar a cobrança. O cancelamento encerra também o acesso dos convidados.' : 'A assinatura será cobrada agora. O teste gratuito só pode ser usado uma vez.' } }
+      } : {}),
+      success_url: `${baseUrl}/app?assinatura=sucesso&plano=${plan}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/app?assinatura=cancelada`
     });
     if (!session.url) throw new HttpError(502, 'Não foi possível abrir o pagamento agora. Tente novamente.');
-    res.json({ url: session.url });
+    if (plan === 'monthly' && session.expires_at) await client.query(`INSERT INTO billing_checkouts (user_id, url, expires_at) VALUES ($1, $2, $3)
+      ON CONFLICT (user_id) DO UPDATE SET url = EXCLUDED.url, expires_at = EXCLUDED.expires_at`, [user.id, session.url, new Date(session.expires_at * 1000)]);
+    return session.url;
+    });
+    res.json({ url });
+  }));
+
+  router.post('/billing/cancel', asyncHandler(async (req, res) => {
+    const user = await requireUser(req);
+    const row = await loadBillingRow(user.id);
+    if (row.is_guest || !row.stripe_subscription_id) throw new HttpError(403, 'Somente o titular pode cancelar a assinatura.');
+    const subscription = await getStripe().subscriptions.cancel(row.stripe_subscription_id);
+    await withTransaction(client => applySubscription(client, subscription, new Date(), true));
+    res.json({ canceled: true });
   }));
 
   /** Portal da Stripe: atualizar cartão, ver faturas e cancelar o mensal. */
@@ -297,7 +418,7 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
     const user = await requireUser(req);
     const row = await loadBillingRow(user.id);
     if (!row.stripe_customer_id) throw new HttpError(409, 'Você ainda não tem uma assinatura.');
-    const baseUrl = appBaseUrl();
+    const baseUrl = billingReturnUrl(req);
     if (!baseUrl) throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
     const session = await getStripe().billingPortal.sessions.create({
       customer: row.stripe_customer_id,
@@ -312,9 +433,45 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
    */
   router.post('/billing/sync', asyncHandler(async (req, res) => {
     const user = await requireUser(req);
-    const row = await loadBillingRow(user.id);
+    const fresh = await reconcileBillingAccount(user.id, req.body?.sessionId);
+    const enxovalId = req.body?.prepareWorkspace === true && fresh.plan !== 'free' && !fresh.is_guest
+      ? await ensureDefaultEnxoval(user.id) : null;
+    res.json({ plan: fresh.plan, status: fresh.subscription_status, accessAllowed: fresh.plan !== 'free', enxovalId });
+  }));
+}
+
+/** Keep the checkout on the authenticated development origin (localhost and LAN have separate cookies). */
+function billingReturnUrl(req: Request) {
+  const configured = appBaseUrl();
+  const origin = req.get('origin');
+  if (!isProductionServer() && origin) {
+    try {
+      const url = new URL(origin);
+      if (url.host === req.get('host') && ['http:', 'https:'].includes(url.protocol)) return url.origin;
+    } catch { /* Fall back to the configured public URL. */ }
+  }
+  return configured;
+}
+
+/** Authoritative reconciliation, shared by checkout return and recovery of missed webhooks. */
+export async function reconcileBillingAccount(userId: string, sessionId?: string) {
+    const row = await loadBillingRow(userId);
     if (row.stripe_customer_id) {
       const stripe = getStripe();
+      if (sessionId) {
+        if (typeof sessionId !== 'string' || !/^cs_[a-zA-Z0-9_]+$/.test(sessionId)) throw new HttpError(400, 'Sessão de pagamento inválida.');
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const customer = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+        if (customer !== row.stripe_customer_id || session.client_reference_id !== userId) throw new HttpError(403, 'Este pagamento não pertence à sua conta.');
+        if (session.status !== 'complete' || !['paid', 'no_payment_required'].includes(session.payment_status)) throw new HttpError(409, 'O pagamento ainda não foi aprovado.');
+        if (session.mode === 'subscription' && session.subscription) {
+          const subscription = typeof session.subscription === 'string' ? await stripe.subscriptions.retrieve(session.subscription) : session.subscription;
+          await withTransaction(client => applySubscription(client, subscription, new Date(), true));
+        } else {
+          const monthlyToCancel = await withTransaction(client => grantPass(client, session));
+          await cancelMonthly(monthlyToCancel);
+        }
+      } else {
       const list = await stripe.subscriptions.list({ customer: row.stripe_customer_id, status: 'all', limit: 5 });
       const current = list.data.find(sub => ACTIVE_STATUSES.has(sub.status)) ?? list.data[0];
       if (current) await withTransaction(client => applySubscription(client, current, new Date(), true));
@@ -323,8 +480,26 @@ export function registerBillingRoutes(router: Router, { requireUser }: BillingDe
         const monthlyToCancel = await withTransaction(client => grantPass(client, session));
         await cancelMonthly(monthlyToCancel);
       }
+      }
     }
-    const fresh = await loadBillingRow(user.id);
-    res.json({ plan: fresh.plan, status: fresh.subscription_status });
-  }));
+    return loadBillingRow(userId);
+
+}
+
+const recoveryAttempts = new Map<string, { at: number; pending: Promise<BillingUserRow> }>();
+/** A missed callback must not leave an approved customer stuck behind the paywall. */
+export async function recoverBillingAccess(userId: string) {
+  const row = await loadBillingRow(userId);
+  if (row.plan !== 'free' || !row.stripe_customer_id || !isBillingConfigured()) return row;
+  const now = Date.now();
+  for (const [id, attempt] of recoveryAttempts) if (now - attempt.at >= 60000) recoveryAttempts.delete(id);
+  const previous = recoveryAttempts.get(userId);
+  if (previous) { await previous.pending; return loadBillingRow(userId); }
+  const pending = reconcileBillingAccount(userId).catch(error => {
+    getLogger().error({ event: 'billing.reconciliation_failed', userId, err: error }, 'Não foi possível sincronizar o acesso com a Stripe.');
+    return row;
+  });
+  recoveryAttempts.set(userId, { at: now, pending });
+  await pending;
+  return loadBillingRow(userId);
 }

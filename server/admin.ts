@@ -138,6 +138,11 @@ export function registerAdminRoutes(router: Router) {
         u.must_change_password AS "mustChangePassword",
         u.password_reset_expires_at AS "passwordResetExpiresAt",
         u.created_at AS "createdAt", u.last_login_at AS "lastLoginAt",
+        COALESCE((
+          SELECT array_agg(DISTINCT host(e.ip) ORDER BY host(e.ip))
+          FROM user_ip_events e
+          WHERE e.user_id = u.id AND e.occurred_at >= now() - interval '6 months'
+        ), ARRAY[]::text[]) AS "ipAddresses",
         (SELECT COUNT(*)::int FROM enxoval_members m WHERE m.user_id = u.id) AS "workspaceCount"
       FROM users u ORDER BY u.created_at DESC, u.id
     `);

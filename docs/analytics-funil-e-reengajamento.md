@@ -2,7 +2,7 @@
 
 > **Objetivo:** instrumentar o Casa Mia para (1) saber de onde vêm os leads, orgânicos e pagos; (2) enxergar o caminho de cada pessoa até o primeiro valor; (3) usar esse conhecimento para disparos de marketing e reengajamento que tragam as pessoas de volta no momento certo; (4) ver os erros antes que o usuário reclame.
 >
-> **Status:** planejamento. Nada disto está instalado hoje. A página de privacidade ainda diz que o app não usa ferramentas de análise de terceiros; ela precisa ser atualizada antes do primeiro evento sair do navegador.
+> **Status:** planejamento de longo prazo. A implementação atual de PostHog, Web Analytics e Error Tracking está descrita em [analytics.md](analytics.md). GA4, Sentry e os demais fluxos propostos aqui não devem ser considerados instalados; este documento não substitui a configuração atual de coleta e privacidade.
 >
 > Documento irmão: [`internacionalizacao-regiao-e-seguranca.md`](./internacionalizacao-regiao-e-seguranca.md) (idiomas, preço por região, IP e banimento). Os dois se cruzam em três pontos: idioma/país/moeda viram dimensões de análise (seção 11), a política de IP vale para as ferramentas daqui (seção 3.4) e o consentimento é o mesmo.
 

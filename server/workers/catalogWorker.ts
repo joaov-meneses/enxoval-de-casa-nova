@@ -2,6 +2,7 @@
 // demanda: npm run catalog:refresh. Nenhum passo padrão chama o Jev; o pré-cálculo das urgências (que chama) só roda
 // quando pedido: npm run catalog:refresh -- --urgency [--limit 600]
 import { getPool } from '../database.ts';
+import { logger } from '../logger.ts';
 import { itemKey } from '../../src/catalog/normalize.ts';
 import type { RoomKey } from '../../src/onboarding/types.ts';
 import { roomOfCategory } from '../../src/planning/purchasePlan.ts';
@@ -233,9 +234,9 @@ export async function runCatalogRefresh(options: CatalogRefreshOptions = {}): Pr
 /** Agenda a rotina dentro do servidor. A primeira rodada sai alguns minutos depois de subir, fora do caminho do boot. */
 export function startCatalogScheduler() {
   const run = () =>
-    runCatalogRefresh({ log: message => console.log(`[catalog] ${message}`) }).catch(err =>
-      console.error('[catalog] Rotina falhou:', err instanceof Error ? err.message : err)
-    );
+    runCatalogRefresh({ log: message => console.log(`[catalog] ${message}`) })
+      .then(summary => logger.info({ event: 'catalog.refresh.completed', ...summary }, 'Rotina do catálogo concluída.'))
+      .catch(err => logger.error({ event: 'catalog.refresh.failed', err }, 'Rotina do catálogo falhou.'));
   setTimeout(run, 5 * 60_000).unref();
   setInterval(run, CATALOG_REFRESH_INTERVAL_MS).unref();
 }

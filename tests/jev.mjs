@@ -41,6 +41,18 @@ const existing = [
   { name: "Cama de casal", environment: "Quarto" },
 ];
 
+test("preferências do funil acompanham as recomendações no app", async () => {
+  const jev = fake(() => ({ answers: {} }));
+  setJevTransportForTests(jev);
+  await assessItem({ name: "Panela", environments, classify: true, existing, profile: {
+    ...profile, worries: ["budget", "forget"], usage: ["spend", "share"], owned: "algumas", style: "none"
+  } });
+  assert.deepEqual(jev.calls[0].state.preocupacoes, ["budget", "forget"]);
+  assert.deepEqual(jev.calls[0].state.objetivos_no_app, ["spend", "share"]);
+  assert.equal(jev.calls[0].state.itens_que_ja_tem, "algumas");
+  assert.equal(jev.calls[0].state.preferencia_de_lista, "none");
+});
+
 test("sem chave do Jev nada é chamado e tudo volta vazio", async () => {
   setJevTransportForTests(null);
   assert.equal(isJevConfigured(), false);

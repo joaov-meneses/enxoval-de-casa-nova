@@ -753,6 +753,9 @@
   .pp-row-price {
     grid-area: price;
     font-size: 11.5px;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .pp-row-price strong {
     font-size: 13px;
@@ -1385,4 +1388,119 @@
   padding: 0;
   display: grid;
   gap: 8px;
+}
+
+/* Ambientes mant?m cada etapa f?cil de percorrer e abrir separadamente. */
+.pp-room-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.pp-room-group {
+  min-width: 0;
+  border: 1px solid #e9dfce;
+  border-radius: 10px;
+  background: #fffdf9;
+  padding: 0 12px;
+}
+.pp-room-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  cursor: pointer;
+  list-style: none;
+  color: #4f362b;
+}
+.pp-room-group > summary::-webkit-details-marker { display: none; }
+.pp-room-group > summary:focus-visible {
+  outline: 2px solid #c2603f;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.pp-room-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.pp-room-count { font-size: 12px; color: #6a5b50; }
+.pp-room-group > summary > svg { flex-shrink: 0; }
+.pp-room-group[open] > summary > svg { transform: rotate(180deg); }
+.pp-room-group .pp-rows { margin-top: 0; }
+.pp-room-group .pp-row:first-child { border-top-color: #efe6d6; }
+.pp-price-estimate { display: grid; gap: 3px; }
+.pp-price-label { font-size: 11px; color: #6a5b50; font-weight: 400; }
+.pp-price-range {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #4f362b;
+}
+.pp-price-range > span { white-space: nowrap; }
+.pp-price-to { font-weight: 400; color: #6a5b50; }
+@media (max-width: 720px) {
+  .pp-room-group { padding: 0 10px; }
+  .pp-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main" "price" "week";
+    gap: 8px;
+  }
+  .pp-row-name { font-size: 14px; }
+  .pp-row-price { text-align: left; }
+  .pp-price-estimate {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 3px 12px;
+  }
+  .pp-price-range { justify-content: flex-start; }
+  .pp-row-week button.casamia-select-trigger { min-height: 38px; }
+}
+
+/* Celulares estreitos: usar a largura dispon?vel antes de reduzir o texto. */
+@media (max-width: 380px) {
+  .pp { gap: 10px; }
+  .pp-card, .pp-settings, .pp-period.is-current { padding: 10px; }
+  .pp-fields { grid-template-columns: minmax(0, 1fr); }
+  .pp-fields .pp-field { grid-column: 1 / -1; }
+  .pp-date { flex-wrap: wrap; }
+  .pp-date input[type="date"] { width: 100%; flex-basis: 100%; font-size: 16px; }
+  .pp-date .pp-link { min-height: 36px; }
+  .pp-field button.casamia-select-trigger { font-size: 16px; }
+  .pp-summary > div { grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 9px 10px; }
+  .pp-summary strong {
+    grid-column: 1;
+    grid-row: auto;
+    text-align: left;
+    font-size: 16px;
+    overflow-wrap: normal;
+  }
+  .pp-summary span { letter-spacing: 0; }
+  .pp-period-toggle { gap: 6px; }
+  .pp-step { width: 24px; height: 24px; font-size: 12px; }
+  .pp-period-name { font-size: 15px; line-height: 1.3; }
+  .pp-period-band { display: none; }
+  .pp-now { font-size: 10px; }
+  .pp-figures { padding: 10px; }
+  .pp-figures dl { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .pp-figures dl > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 8px; }
+  .pp-figures dt { font-size: 11px; }
+  .pp-figures dd { margin: 0; font-size: 12px; overflow-wrap: normal; }
+  .pp-room-groups { gap: 8px; }
+  .pp-room-group { padding: 0 8px; }
+  .pp-room-group > summary { gap: 6px; }
+  .pp-room-name { font-size: 13px; }
+  .pp-room-count { font-size: 11px; }
+  .pp-row { padding: 10px 0; margin: 0; }
+  .pp-row-main { gap: 0; }
+  .pp-row-meta:empty { display: none; }
+  .pp-price-estimate { display: grid; gap: 2px; }
+  .pp-price-range { font-size: 13px; gap: 4px; overflow-wrap: normal; }
+  .pp-row-week button.casamia-select-trigger { padding: 8px; font-size: 12px; }
+  .pp-row-week .casamia-select-popup { width: 100%; max-width: 100%; }
+  .pp-nino-result, .pp-nino-ranking li { flex-wrap: wrap; gap: 8px; }
+  .pp-nino-result > div, .pp-nino-ranking li > div { flex-basis: 100%; }
+  .pp-how summary { gap: 8px; padding: 10px; }
+  .pp-how-text strong { font-size: 14px; }
 }

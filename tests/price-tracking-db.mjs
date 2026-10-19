@@ -72,6 +72,8 @@ try {
     password: randomBytes(16).toString("base64url"),
   });
   assert.equal(register.status, 201, JSON.stringify(register.data));
+  // O acompanhamento pressupõe acesso ativo; o bloqueio por assinatura tem testes próprios.
+  await query("UPDATE users SET plan = 'monthly', subscription_status = 'active' WHERE id = $1", [register.data.user.id]);
   const workspace = await call("/enxovais", "POST", { name: "Casa de teste", useDefaultTemplate: false });
   assert.equal(workspace.status, 201, JSON.stringify(workspace.data));
   const enxovalId = workspace.data.enxoval.id;
@@ -226,7 +228,9 @@ try {
 
   // --- outra pessoa não vê o histórico nem o resumo
   const stranger = makeClient();
-  await stranger("/auth/register", "POST", { email: "outra@example.invalid", password: randomBytes(16).toString("base64url") });
+  const strangerAccount = await stranger("/auth/register", "POST", { email: "outra@example.invalid", password: randomBytes(16).toString("base64url") });
+  assert.equal(strangerAccount.status, 201, JSON.stringify(strangerAccount.data));
+  await query("UPDATE users SET plan = 'monthly', subscription_status = 'active' WHERE id = $1", [strangerAccount.data.user.id]);
   assert.equal((await stranger(`/items/${item.id}/price-history`)).status, 404);
   assert.equal((await stranger(`/enxovais/${enxovalId}/savings-summary`)).status, 404);
   console.log("PASS: histórico e resumo só aparecem para quem participa do enxoval.");

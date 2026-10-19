@@ -1,6 +1,7 @@
 // Rotina que relê os preços dos produtos acompanhados, guarda o histórico e avisa por e-mail quando um item baixa.
 // Roda sozinha a cada 12 horas dentro do servidor (ver `startPriceTrackerScheduler`) ou sob demanda: npm run track-prices
 import { getPool } from '../database.ts';
+import { logger } from '../logger.ts';
 import { canDeliverMail, priceOpportunityEmail, sendMail, type PriceOpportunity } from '../mailer.ts';
 import { ScrapeError, scrapeProduct, type ScrapedProductPreview } from '../services/productScraper.ts';
 import { recordScrape, recordScrapeFailure, type ScrapeOutcome } from '../trackedProducts.ts';
@@ -218,9 +219,10 @@ export function startPriceTrackerScheduler() {
   const run = () => {
     runPriceTracker({ log: message => console.log(`[preços] ${message}`) })
       .then(summary => {
+        logger.info({ event: 'prices.refresh.completed', ...summary }, 'Rotina de preços concluída.');
         if (!summary.skipped && summary.checked > 0) console.log(`[preços] ${summary.updated} atualizados, ${summary.failed} com falha, ${summary.alertsSent} e-mails.`);
       })
-      .catch(error => console.error('[preços] rodada interrompida:', error));
+      .catch(err => logger.error({ event: 'prices.refresh.failed', err }, 'Rotina de preços interrompida.'));
   };
   const first = setTimeout(run, 60_000);
   const repeat = setInterval(run, PRICE_CHECK_INTERVAL_MS);

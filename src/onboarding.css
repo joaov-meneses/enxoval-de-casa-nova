@@ -35,7 +35,8 @@
   white-space: nowrap;
   border: 0;
 }
-.ob-aside {
+.ob-desktop-header,
+.ob-desktop-step {
   display: none;
 }
 .ob-col {
@@ -653,6 +654,109 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.ob-date-picker {
+  margin-top: 2px;
+}
+.ob-date-picker summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--ob-line);
+  border-radius: 12px;
+  color: var(--ob-wood-deep);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.ob-date-picker summary::-webkit-details-marker {
+  display: none;
+}
+.ob-date-picker[open] summary {
+  margin-bottom: 10px;
+  background: var(--ob-selected);
+}
+.ob-date-picker summary:focus-visible {
+  outline: 3px solid var(--ob-wood);
+  outline-offset: 3px;
+}
+.ob-extra-rooms {
+  margin-top: 10px;
+}
+.ob-extra-rooms summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--ob-wood-deep);
+  font-size: 14px;
+  cursor: pointer;
+}
+.ob-empty-rooms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0;
+  margin: 18px 0 0;
+  list-style: none;
+}
+.ob-empty-rooms li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--ob-card);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.ob-empty-rooms svg {
+  flex-shrink: 0;
+  color: var(--ob-wood);
+}
+@media (max-width: 719px) {
+  .ob[data-step="rooms"] .ob-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .ob[data-step="rooms"] .ob-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+    min-height: 64px;
+    padding: 8px 10px;
+  }
+  .ob[data-step="rooms"] .ob-option-icon,
+  .ob[data-step="rooms"] .ob-option-text small {
+    display: none;
+  }
+  .ob[data-step="rooms"] .ob-option-text {
+    padding-right: 22px;
+    width: 100%;
+  }
+  .ob[data-step="rooms"] .ob-option-text strong {
+    font-size: 13px;
+  }
+  .ob[data-step="rooms"] .ob-option-meta {
+    margin: 0;
+    padding: 0;
+    background: none;
+    font-size: 12px;
+  }
+  .ob[data-step="rooms"] .ob-tick {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+  }
+  .ob[data-step="rooms"] .ob-live {
+    margin-top: 4px;
+  }
 }
 .ob-date-summary span {
   font-size: 13.5px;
@@ -1456,72 +1560,210 @@
   color: var(--ob-muted);
 }
 
-/* Tela larga: fotografia da marca ao lado */
+/* Desktop: painel central com leitura curta e controles agrupados. */
 @media (min-width: 1000px) {
   .ob {
-    grid-template-columns: minmax(380px, 44%) minmax(0, 1fr);
-  }
-  .ob-aside {
-    position: sticky;
-    top: 0;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    padding: 0 32px 40px;
+    background: radial-gradient(ellipse at 50% 10%, #f4e6d4 0, transparent 65%), var(--ob-paper);
+  }
+  .ob-desktop-header {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    height: 100dvh;
-    padding: 40px 46px;
-    color: #fff;
-    isolation: isolate;
-    overflow: hidden;
+    gap: 24px;
+    width: min(100%, 1040px);
+    min-height: 96px;
+    padding-block: 24px;
   }
-  .ob-aside > img {
-    position: absolute;
-    inset: 0;
-    z-index: -2;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: 53% center;
-  }
-  .ob-aside::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: linear-gradient(180deg, #a34c3035, #291c16e3);
-  }
-  .ob-aside-brand .brand-word {
-    color: #fff;
-  }
-  .ob-aside-quote {
-    max-width: 420px;
-    margin: 0;
-    font-family: var(--serif);
-    font-size: clamp(32px, 3.2vw, 46px);
-    line-height: 1.2;
-    letter-spacing: -1px;
-  }
-  .ob-aside-quote em {
-    color: #ead8bf;
+  .ob-desktop-header > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--ob-muted);
   }
   .ob-col {
-    max-width: 540px;
-    justify-content: center;
+    max-width: 760px;
+    min-height: min(700px, calc(100dvh - 140px));
+    margin-block: auto;
+    border: 1px solid #e8dfd2;
+    border-radius: 28px;
+    background: #fffdf8;
+    box-shadow: 0 20px 64px #5d39200c, 0 2px 8px #5d392006;
   }
   .ob-top {
-    padding-top: 36px;
+    gap: 16px;
+    padding: 24px 36px 12px;
+  }
+  .ob-back {
+    background: #f6f0e7;
+    border: 1px solid #ece3d5;
+  }
+  .ob-progress {
+    height: 5px;
+  }
+  .ob-desktop-step {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ob-muted);
+    white-space: nowrap;
   }
   .ob-main {
-    flex: 0 1 auto;
-    min-height: 560px;
-    padding-top: 22px;
+    flex: 1;
+    padding: 16px 40px 28px;
+    min-height: 0;
+  }
+  .ob-title {
+    max-width: 22ch;
+    font-size: 36px;
+    line-height: 1.18;
+    letter-spacing: -0.8px;
+    margin-top: 0;
+    margin-bottom: 12px;
+    text-wrap: pretty;
+  }
+  .ob-title-center {
+    align-self: center;
+    margin-inline: auto;
+  }
+  .ob-sub {
+    max-width: 60ch;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .ob-options {
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .ob-option {
+    min-height: 84px;
+    padding: 16px;
+    border: 1px solid #e8e1d7;
+    background: #faf7f1;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+  .ob-option:hover {
+    border-color: #cbb69b;
+    background: #f7f0e4;
+  }
+  .ob-option[data-selected="true"] {
+    background: #f7ebdc;
+    border-color: var(--ob-wood);
+    box-shadow: 0 0 0 1px var(--ob-wood);
+  }
+  .ob-option-text strong {
+    font-size: 15px;
+  }
+  .ob-option-text small {
+    font-size: 13px;
+  }
+  .ob:is([data-step="moment"], [data-step="housing"], [data-step="owned"], [data-step="budget"], [data-step="worries"], [data-step="usage"], [data-step="rooms"]) .ob-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ob[data-step="style"] .ob-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ob[data-step="style"] .ob-option {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 16px;
+    min-height: 210px;
+  }
+  .ob[data-step="style"] .ob-tick {
+    position: absolute;
+    top: 22px;
+    right: 16px;
+  }
+  .ob[data-step="rooms"] .ob-option {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 26px;
+    column-gap: 12px;
+    row-gap: 4px;
+  }
+  .ob[data-step="rooms"] .ob-option-icon {
+    grid-column: 1;
+    grid-row: 1 / 3;
+  }
+  .ob[data-step="rooms"] .ob-option-text {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .ob[data-step="rooms"] .ob-option-meta {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    margin: 0;
+    padding: 0;
+    background: none;
+  }
+  .ob[data-step="rooms"] .ob-tick {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    justify-self: end;
+    margin: 0;
+  }
+  .ob-chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 24px 0 16px;
+  }
+  .ob-chip {
+    min-height: 52px;
+    border-radius: 14px;
+  }
+  .ob-date-picker summary {
+    min-height: 48px;
+    background: #faf7f1;
+  }
+  .ob-date-summary {
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: #f6f1e8;
   }
   .ob-footer {
     position: static;
-    padding: 8px 20px 36px;
+    padding: 20px 40px 28px;
+    border-top: 1px solid #efe8dc;
     background: none;
   }
+  .ob-cta {
+    min-height: 54px;
+    border-radius: 14px;
+    box-shadow: 0 4px 12px #a34c301a;
+  }
+  .ob-welcome {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    align-content: center;
+    align-items: center;
+    gap: 24px;
+  }
+  .ob-welcome > .ob-title,
+  .ob-welcome > .ob-sub {
+    grid-column: 1 / -1;
+    max-width: none;
+    margin: 0;
+  }
+  .ob-welcome .ob-bubble {
+    font-size: 15px;
+    text-align: center;
+  }
+  .ob-welcome .ob-preview {
+    width: 100%;
+    margin: 0;
+  }
+  .ob-welcome .ob-preview-row {
+    min-height: 38px;
+  }
   .ob-compare {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1536,6 +1778,101 @@
 }
 
 @media (max-height: 700px) {
+  .ob-top {
+    min-height: 56px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+  .ob-main {
+    padding-top: 8px;
+    padding-bottom: 12px;
+  }
+  .ob-title {
+    font-size: 27px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+  }
+  .ob-sub {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .ob-options {
+    margin-top: 14px;
+    gap: 8px;
+  }
+  .ob-option {
+    min-height: 56px;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .ob[data-step="budget"] .ob-option,
+  .ob[data-step="worries"] .ob-option {
+    min-height: 48px;
+    padding-block: 6px;
+  }
+  .ob-option-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+  .ob[data-step="style"] .ob-option-icon {
+    display: none;
+  }
+  .ob-option-text strong {
+    font-size: 14px;
+  }
+  .ob-option-text small {
+    font-size: 12px;
+  }
+  .ob-tick {
+    width: 22px;
+    height: 22px;
+  }
+  .ob-footer {
+    padding-top: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+  .ob-cta {
+    min-height: 50px;
+    padding-block: 12px;
+  }
+  .ob-center {
+    padding-bottom: 8px;
+  }
+  .ob-bignumber {
+    font-size: 76px;
+  }
+  .ob-track {
+    margin-top: 44px;
+  }
+  .ob-center .ob-title {
+    margin-top: 14px;
+  }
+  .ob-chips {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 14px;
+  }
+  .ob-chip {
+    padding-inline: 8px;
+    font-size: 14px;
+  }
+  .ob-date-summary {
+    margin-top: 12px;
+  }
+  .ob-date-summary strong {
+    font-size: 20px;
+  }
+  .ob-ring {
+    width: 88px;
+    height: 88px;
+  }
+  .ob-people {
+    gap: 5px;
+    margin-top: 18px;
+  }
+  .ob-person {
+    min-height: 78px;
+  }
   .ob-mark {
     width: auto;
     height: 78px;
@@ -1544,8 +1881,14 @@
     min-height: 36px;
   }
   .ob-ring-lg {
-    width: 140px;
-    height: 140px;
+    width: 100px;
+    height: 100px;
+  }
+  .ob-note {
+    margin-top: 18px;
+    padding: 20px 12px 12px;
+    font-size: 14px;
+    line-height: 1.45;
   }
 }
 

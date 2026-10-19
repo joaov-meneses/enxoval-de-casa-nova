@@ -14,6 +14,7 @@ import type {
   PlanCategory,
   PlanItem,
   PlanPayload,
+  PlanStyle,
   RoomKey,
   Savings,
 } from "./types";
@@ -137,7 +138,8 @@ export function defaultRooms(
   const rooms: OptionalRoom[] =
     housing === "studio"
       ? ["cozinha", "banheiro", "sala", "servico"]
-      : ["cozinha", "banheiro", "sala", "quarto", "servico", "externa"];
+      : ["cozinha", "banheiro", "sala", "quarto", "servico"];
+  if (housing === "casa") rooms.push("externa");
   if (housing !== "studio" && (people ?? 0) >= 3) rooms.push("quartoExtra");
   return rooms;
 }
@@ -186,7 +188,7 @@ interface Resolved {
   /** Características da cidade (umidade, maresia, estação seca, chuva forte). */
   traits: Set<Trait>;
   climate: Climate;
-  style: "full" | "min";
+  style: PlanStyle;
   budget: Budget;
   name: string;
 }
@@ -342,8 +344,9 @@ export function generatePlan(answers: Answers): GeneratedPlan {
 
   const categories: PlanCategory[] = [];
   for (const key of ROOM_ORDER) {
-    const items = chosen.get(key);
-    if (!items?.length) continue;
+    const suggested = chosen.get(key);
+    if (!suggested?.length) continue;
+    const items = r.style === "none" ? [] : suggested;
     const name =
       key === "sala" && r.housing === "studio"
         ? "Sala e Quarto"

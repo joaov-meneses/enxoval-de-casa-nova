@@ -1,3 +1,4 @@
+import { getLogger } from './logger.ts';
 // Central de ajuda: recebe problemas, sugestões e outros assuntos de quem está logado e os guarda para a gestão ler.
 // A pessoa envia (POST /api/feedback); quem administra lê, filtra e atualiza o andamento em /api/admin/feedback.
 import { randomUUID } from 'node:crypto';
@@ -105,13 +106,13 @@ async function notify(input: FeedbackInput, user: AuthUser) {
         title: input.title,
         userName: user.name,
         userEmail: user.email,
-        replyTo: input.contactOk ? input.contactEmail ?? '' : '',
+        replyTo: user.email,
         lines: describe(input),
         link: base ? `${base}/admin` : null
       })
     );
   } catch (error) {
-    console.error('Aviso de nova mensagem da central de ajuda não enviado:', error instanceof Error ? error.message : error);
+    getLogger().error({ event: 'feedback.notification_failed', err: error }, 'Aviso de nova mensagem da central de ajuda não enviado.');
   }
 }
 
@@ -122,7 +123,7 @@ export function registerFeedbackRoutes(router: Router, requireUser: (req: Reques
     rateLimit(8, 10 * 60_000, 'Você enviou várias mensagens seguidas. Aguarde alguns minutos para mandar outra.'),
     asyncHandler(async (req, res) => {
       const user = await requireUser(req);
-      const { value, errors } = validateFeedback(req.body);
+      const { value, errors } = validateFeedback({ ...req.body, contactOk: true, contactEmail: user.email });
       if (!value) {
         const first = Object.values(errors)[0] ?? 'Confira os campos da mensagem.';
         throw new HttpError(400, first);
