@@ -7,15 +7,12 @@ import {
   Check,
   ChevronDown,
   Coffee,
-  Gift,
   HeartHandshake,
   LayoutGrid,
   Link2,
   ListChecks,
   Menu,
-  MessageCircleHeart,
   PiggyBank,
-  QrCode,
   Ruler,
   ShieldCheck,
   Sofa,
@@ -25,7 +22,7 @@ import {
 import { Brand } from "./Brand";
 import { HowItWorks } from "./HowItWorks";
 import { Nino } from "./Nino";
-import { FREE_PLAN_LIMITS, PAID_PLAN_OFFERS, type PaidPlanOffer } from "../plans";
+import { FREE_PLAN_LIMITS, PAID_PLAN_OFFERS, PASS_MONTHS } from "../plans";
 import { trackLandingCta } from '../analytics';
 
 const FAQS = [
@@ -35,7 +32,7 @@ const FAQS = [
   ],
   [
     "Quem é o Nino e como ele me ajuda?",
-    "O Nino é a casinha-chaveiro que acompanha a sua mudança. Ele segura a trena, lembra do que não pode faltar no primeiro dia e ajuda a decidir o que fica para depois, sem julgar nenhuma escolha.",
+    "O Nino é a casinha-chaveiro do Casa Mia, sempre de pranchetinha em mãos. Na área Ajuda do Nino, você escolhe um ambiente para receber sugestões de itens e ver o que comprar primeiro. Ao adicionar um item, ele também sugere o cômodo e avisa sobre possíveis repetições. As sugestões são dele; as escolhas são suas.",
   ],
   [
     "Como funciona o teste de 2 dias?",
@@ -121,16 +118,22 @@ const PAID_FEATURES = [
   "Importar e exportar em Excel e CSV",
 ];
 
-const PAID_CTA: Record<PaidPlanOffer["id"], string> = {
-  pass: "Quero o Passe",
-  monthly: "Quero o Mensal",
-};
+const priceInReais = (price: string) => Number(price.replace(/[^\d,]/g, "").replace(",", "."));
+const monthlyOffer = PAID_PLAN_OFFERS.find((offer) => offer.id === "monthly");
+const passOffer = PAID_PLAN_OFFERS.find((offer) => offer.id === "pass");
+const passDiscount = monthlyOffer && passOffer
+  ? Math.round((1 - priceInReais(passOffer.price) / (priceInReais(monthlyOffer.price) * PASS_MONTHS)) * 100)
+  : 0;
 
-const PLANS: Plan[] = [{
-  id: "monthly", name: "Casa Mia", price: "R$ 29,90", per: "/mês",
-  billing: "2 dias de teste completo. Após 48 horas, cobrança automática no cartão.",
-  cta: "Começar teste de 2 dias", features: PAID_FEATURES,
-}];
+const PLANS: Plan[] = PAID_PLAN_OFFERS.map((offer) => ({
+  ...offer,
+  badge: offer.id === "pass" && passDiscount > 0 ? `${passDiscount}% de desconto` : undefined,
+  billing: offer.id === "pass"
+    ? `${PASS_MONTHS} meses de acesso por pagamento único, sem renovação automática. ${passDiscount > 0 ? `${passDiscount}% menos que ${PASS_MONTHS} mensalidades.` : ""}`
+    : "2 dias de teste; depois, cobrança mensal automática. Cancele antes do fim do teste para evitar a cobrança.",
+  cta: offer.id === "pass" ? "Escolher o Passe" : "Começar teste de 2 dias",
+  features: PAID_FEATURES,
+}));
 
 const MOCK_ITEMS = [
   { name: "Colchão", room: "Quarto", done: true },
@@ -291,9 +294,6 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
           <a href="#nino" onClick={() => { trackLandingCta('view_nino', 'navigation'); closeMenu(); }}>
             O Nino
           </a>
-          <a href="#cha" onClick={() => { trackLandingCta('view_gift_list', 'navigation'); closeMenu(); }}>
-            Chá de Casa Nova
-          </a>
           <a href="#planos" onClick={() => { trackLandingCta('view_pricing', 'navigation'); closeMenu(); }}>
             Preços
           </a>
@@ -373,27 +373,28 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
             </div>
             <div className="cm-nino-copy">
               <span className="cm-eyebrow">Conheça o Nino</span>
-              <h2>O conselheiro da sua mudança.</h2>
+              <h2>Uma ajudinha para o seu cantinho.</h2>
               <p>
-                O Nino é uma casinha-chaveiro com a barriguinha em forma de
-                porta em arco. Ele segura a trena, calcula as suas prioridades e
-                nunca julga: só ajuda a decidir o que vem primeiro.
+                Com jeitinho de casinha e pranchetinha na mão, o Nino é o
+                mascote do Casa Mia. Ele ajuda a organizar a lista e as
+                prioridades, para você cuidar do seu novo lar uma escolha de cada vez.
               </p>
-              <blockquote>
-                “Respira! A gente pode deixar a luminária decorativa para o mês
-                que vem e focar no colchão agora.”
-                <cite>Nino</cite>
-              </blockquote>
+              <div className="cm-nino-note">
+                <strong>Um cômodo de cada vez, do seu jeitinho.</strong>
+                <p>
+                  Na área Ajuda do Nino, escolha um ambiente e peça uma sugestão.
+                  Você decide o que entra na lista.
+                </p>
+              </div>
               <ul className="cm-checks">
                 <li>
-                  <Check size={16} /> Lembra do que não pode faltar no primeiro
-                  dia
+                  <Check size={16} /> Sugere o próximo item para cada ambiente
                 </li>
                 <li>
-                  <Check size={16} /> Comemora com você cada item riscado
+                  <Check size={16} /> Ajuda a escolher o que comprar primeiro
                 </li>
                 <li>
-                  <Check size={16} /> Fala baixinho quando o orçamento aperta
+                  <Check size={16} /> Ao adicionar itens, sugere o cômodo e avisa sobre possíveis repetições
                 </li>
               </ul>
             </div>
@@ -424,56 +425,6 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
                 )}
               </article>
             ))}
-          </div>
-        </section>
-
-        <section className="cm-cha" id="cha">
-          <div className="cm-wrap cm-cha-grid">
-            <div className="cm-cha-copy">
-              <span className="cm-eyebrow">Chá de Casa Nova</span>
-              <h2>Quem ama vocês escolhe como presentear.</h2>
-              <p>
-                Compartilhe uma página só da sua lista. Os convidados reservam
-                um item ou mandam um Pix direto para vocês, sem intermediários e
-                sem precisar criar conta.
-              </p>
-              <ul className="cm-checks">
-                <li>
-                  <Gift size={16} /> “Vou presentear com este item”, com reserva
-                  em tempo real
-                </li>
-                <li>
-                  <QrCode size={16} /> Pix com QR Code e copia-e-cola
-                </li>
-                <li>
-                  <MessageCircleHeart size={16} /> Um recado de boas-vindas de
-                  cada convidado
-                </li>
-              </ul>
-            </div>
-            <div className="cm-cha-card" aria-hidden="true">
-              <strong>Chá de Casa Nova da Ana e do Léo</strong>
-              <p>
-                Estamos montando nosso cantinho e ficaremos muito felizes com a
-                sua presença e carinho!
-              </p>
-              <ul>
-                <li>
-                  <span>Jogo de pratos</span>
-                  <small>Vou presentear</small>
-                </li>
-                <li className="is-reserved">
-                  <span>Cafeteira</span>
-                  <small>Reservado por Maria</small>
-                </li>
-                <li>
-                  <span>Presentear via Pix</span>
-                  <small>
-                    <QrCode size={13} /> Pix
-                  </small>
-                </li>
-              </ul>
-            </div>
           </div>
         </section>
 

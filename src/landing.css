@@ -632,40 +632,23 @@ html {
   line-height: 1.65;
   color: var(--cm-muted);
 }
-/* A fala do Nino é um balão (o mascote "fala"), e não uma citação com faixa lateral */
-.cm-nino-copy blockquote {
-  position: relative;
+.cm-nino-note {
   margin: 24px 0;
   padding: 18px 22px;
-  font-family: var(--serif);
-  font-size: 20px;
-  font-style: italic;
-  line-height: 1.45;
+  font-size: 15.5px;
+  line-height: 1.55;
   background: var(--cm-card);
   border: 1px solid #ecd2ad;
   border-radius: 22px;
   box-shadow: 0 10px 24px #3b2a2012;
 }
-.cm-nino-copy blockquote::before {
-  content: "";
-  position: absolute;
-  top: -8px;
-  left: 34px;
-  width: 16px;
-  height: 16px;
-  background: var(--cm-card);
-  border-top: 1px solid #ecd2ad;
-  border-left: 1px solid #ecd2ad;
-  transform: rotate(45deg);
-}
-.cm-nino-copy cite {
+.cm-nino-note strong {
   display: block;
-  margin-top: 6px;
-  font-family: var(--sans);
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 700;
   color: var(--cm-primary-dark);
+}
+.cm-nino-note p {
+  margin: 6px 0 0;
+  color: var(--cm-muted);
 }
 .cm-checks {
   display: grid;
@@ -835,24 +818,26 @@ html {
 .cm-plan {
   position: relative;
   display: flex;
-  flex: 1 1 290px;
+  flex: 1 1 320px;
   flex-direction: column;
-  max-width: 340px;
+  max-width: 400px;
   padding: 34px 26px 28px;
   text-align: center;
   background: var(--cm-card);
-  border: 1.5px solid var(--cm-line);
+  border: 2px solid var(--cm-line);
   border-radius: 28px;
 }
 .cm-plan.is-featured {
   background: linear-gradient(180deg, #fff2de 0%, var(--cm-card) 62%);
+  border-width: 2px;
   border-color: var(--cm-primary);
   box-shadow: 0 26px 50px #c2603f2b;
 }
 .cm-plan-badge {
   position: absolute;
+  z-index: 1;
   top: -14px;
-  left: 50%;
+  left: 26px;
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 800;
@@ -861,7 +846,6 @@ html {
   color: #fff;
   background: var(--cm-action);
   border-radius: 999px;
-  transform: translateX(-50%);
 }
 .cm-plan h3 {
   margin: 0;
@@ -889,6 +873,7 @@ html {
   color: var(--cm-muted);
 }
 .cm-plan-billing {
+  flex: 1;
   min-height: 42px;
   margin: 0 0 20px;
   font-size: 13.5px;
@@ -1119,9 +1104,6 @@ html {
   }
   .cm-mock {
     padding: 16px;
-  }
-  .cm-nino-copy blockquote {
-    font-size: 18px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

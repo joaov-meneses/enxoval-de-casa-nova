@@ -95,9 +95,18 @@ try {
       { name: "Cozinha", items: [{ name: "Panela", description: "Essencial" }] },
     ],
   };
-  // O cadastro cria só a conta, sem nenhum enxoval.
-  const registerAccount = (who, name, email, password) =>
-    who.call("/auth/register", "POST", { name, email, password });
+  // O cadastro cria só a conta. Estes cenários precisam de assinatura ativa para
+  // criar enxovais; o bloqueio gratuito e o checkout são cobertos nos testes do funil.
+  const registerPaidAccount = async (who, name, email, password) => {
+    const result = await who.call("/auth/register", "POST", { name, email, password });
+    if (result.status === 201) {
+      await getPool().query(
+        "UPDATE users SET plan = 'monthly', subscription_status = 'active' WHERE id = $1",
+        [result.data.user.id],
+      );
+    }
+    return result;
+  };
   const admin = agent();
   const customer = agent();
   const outsider = agent();
@@ -134,14 +143,14 @@ try {
   assert.equal((await admin.call("/admin/session")).status, 200);
   const originalPassword = randomBytes(16).toString("base64url");
   const email = "cliente@example.invalid";
-  const signup = await registerAccount(customer, "Cliente Teste", email, originalPassword);
+  const signup = await registerPaidAccount(customer, "Cliente Teste", email, originalPassword);
   assert.equal(signup.status, 201);
   const id = signup.data.user.id;
   {
-    // O funil /comecar cria a conta antes (sem plano) e, já autenticado, monta o enxoval em
+    // O funil /comecar cria a conta antes e, já autenticado e com assinatura, monta o enxoval em
     // POST /enxovais: respostas validadas por completo e gravadas em enxovais.onboarding_profile.
     const funnel = agent();
-    const funnelAccount = await registerAccount(
+    const funnelAccount = await registerPaidAccount(
       funnel,
       "Funil Teste",
       "funil@example.invalid",
@@ -196,7 +205,7 @@ try {
 
     // Com plano, qualquer resposta ou plano inválido recusa POST /enxovais e não cria nada pela metade.
     const rejecter = agent();
-    const rejecterAccount = await registerAccount(
+    const rejecterAccount = await registerPaidAccount(
       rejecter,
       "Rejeitado",
       "rejeitado@example.invalid",
@@ -386,7 +395,7 @@ try {
   );
   assert.equal(
     (
-      await registerAccount(outsider, "Outro usuário", "outro@example.invalid", originalPassword)
+      await registerPaidAccount(outsider, "Outro usuário", "outro@example.invalid", originalPassword)
     ).status,
     201,
   );
