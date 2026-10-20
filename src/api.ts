@@ -74,6 +74,9 @@ function withItemStatus(data: unknown): unknown {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (path === '/api/auth/register') analytics.capture('signup_submit');
+  const started = performance.now();
+  const input = { path, method: options.method ?? 'GET', body: options.body, headers: options.headers };
+  analytics.captureOperational('application.api.started', input);
   let response: Response;
   try {
     response = await fetch(path, {
@@ -85,13 +88,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       },
     });
   } catch (error) {
-    if (!(error instanceof Error && error.name === 'AbortError') && !path.startsWith('/api/admin')) analytics.captureError(error, { error_source: 'api' });
+    analytics.captureOperational('application.api.failed', { ...input, duration_ms: performance.now() - started, error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error });
+    if (!(error instanceof Error && error.name === 'AbortError')) analytics.captureError(error, { ...input, error_source: 'api' });
     throw error;
   }
 
+  const context = { ...input, request_id: response.headers.get('x-request-id'), http_status: response.status,
+    duration_ms: performance.now() - started, response_headers: Object.fromEntries(response.headers.entries()) };
+  const readBody = async () => {
+    try { return await response.text(); }
+    catch (error) {
+      analytics.captureOperational('application.api.failed', { ...context, phase: 'response.read', error: String(error) });
+      if (!(error instanceof Error && error.name === 'AbortError')) analytics.captureError(error, { ...context, error_source: 'api', phase: 'response.read' });
+      throw error;
+    }
+  };
   if (!response.ok) {
     if (response.status === 401 && !path.startsWith('/api/auth/')) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
-    const body = (await response.json().catch(() => null)) as {
+    const rawResponse = await readBody();
+    let parsedResponse: unknown;
+    try { parsedResponse = JSON.parse(rawResponse); } catch { parsedResponse = null; }
+    const body = parsedResponse as {
       error?: string;
       code?: string;
     } | null;
@@ -108,7 +125,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       response.status,
       body?.code,
     );
-    if (response.status >= 500 && !path.startsWith('/api/admin')) analytics.captureError(error, { error_source: 'api', http_status: response.status });
+    analytics.captureOperational('application.api.failed', { ...context, response: body ?? rawResponse, error: { name: error.name, message: error.message, stack: error.stack, code: error.code } });
+    analytics.captureError(error, { ...context, response: body ?? rawResponse, error_source: 'api' });
     if (body?.code === "SUBSCRIPTION_REQUIRED") window.dispatchEvent(new Event("casamia:subscription-required"));
     if (isLimitCode(body?.code))
       window.dispatchEvent(
@@ -128,7 +146,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (path.startsWith('/api/bootstrap') || ['/api/auth/login', '/api/auth/register', '/api/auth/change-password'].includes(path)) {
     window.dispatchEvent(new Event(SESSION_AUTHENTICATED_EVENT));
   }
-  const data = response.status === 204 ? undefined : withItemStatus(await response.json());
+  let data: unknown;
+  let originalData: unknown;
+  const rawResponse = response.status === 204 ? '' : await readBody();
+  try {
+    originalData = response.status === 204 ? undefined : JSON.parse(rawResponse);
+    data = withItemStatus(originalData);
+  } catch (error) {
+    analytics.captureOperational('application.api.failed', { ...context, response: rawResponse, phase: 'response.parse', error: String(error) });
+    analytics.captureError(error, { ...context, response: rawResponse, error_source: 'api', phase: 'response.parse' });
+    throw error;
+  }
+  analytics.captureOperational('application.api.completed', { ...context, duration_ms: performance.now() - started, response: originalData });
   try {
     const input = typeof options.body === 'string' ? JSON.parse(options.body) : {};
     recordApiSuccess(analytics, path, options.method ?? 'GET', input, data);
@@ -414,28 +443,6 @@ export function extractProduct(url: string) {
   return request<ScrapedProductPreview>("/api/products/extract", {
     method: "POST",
     body: JSON.stringify({ url }),
-  });
-}
-
-/** Envia o arquivo de uma imagem do item: o servidor confere, reduz, guarda no banco e devolve o endereço dela. */
-export function uploadItemImage(enxovalId: string, image: Blob) {
-  return request<{ imageUrl: string }>(
-    `/api/item-images?enxovalId=${encodeURIComponent(enxovalId)}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": image.type.startsWith("image/") ? image.type : "image/jpeg",
-      },
-      body: image,
-    },
-  );
-}
-
-/** Importa a imagem de um endereço público: o servidor baixa, reduz e guarda no banco, como no envio de arquivo. */
-export function importItemImageFromUrl(enxovalId: string, url: string) {
-  return request<{ imageUrl: string }>("/api/item-images/from-url", {
-    method: "POST",
-    body: JSON.stringify({ enxovalId, url }),
   });
 }
 

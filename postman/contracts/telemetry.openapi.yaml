@@ -1,0 +1,28 @@
+﻿openapi: 3.0.3
+info:
+  title: Local OTLP JSON collector for observability verification
+  version: 1.0.0
+paths:
+  /v1/logs:
+    post:
+      summary: Accept an OTLP JSON log batch (simulation prefix supplies /i)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resourceLogs]
+              properties:
+                resourceLogs:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Batch accepted
+          content:
+            application/json:
+              schema:
+                type: object
+              example: {}

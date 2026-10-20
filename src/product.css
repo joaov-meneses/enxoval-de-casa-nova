@@ -31,7 +31,7 @@ a {
   touch-action: manipulation;
 }
 button:not(:disabled),
-summary {
+[data-slot="collapsible-trigger"] {
   cursor: pointer;
 }
 button:disabled {
@@ -114,7 +114,7 @@ textarea:focus-visible {
 }
 .brand-word {
   font-family: var(--serif);
-  color: var(--color-brand-terracotta, #c2603f);
+  color: var(--cm-primary-dark, #a34c30);
   font-size: 1em;
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -263,7 +263,7 @@ textarea:focus-visible {
   overflow: hidden;
   display: block;
 }
-.progress-track > span {
+.progress-track > [data-slot="progress-indicator"] {
   display: block;
   height: 100%;
   background: #99a374;
@@ -1048,10 +1048,10 @@ h2 {
   height: 4px;
   background: #eee3d3;
 }
-.overview-room .progress-track > span {
+.overview-room .progress-track > [data-slot="progress-indicator"] {
   background: #7d875a;
 }
-.overview-room.is-done .progress-track > span {
+.overview-room.is-done .progress-track > [data-slot="progress-indicator"] {
   background: #c2603f;
 }
 .overview-room-meta {
@@ -3316,14 +3316,14 @@ button.reorder-handle:disabled {
   font-weight: 500;
   letter-spacing: 0;
   margin-right: 0.04em;
-  opacity: 0.8;
+  opacity: 1;
 }
 .workspace-stats .progress-track {
   height: 8px;
   margin-top: 16px;
   border-radius: 8px;
 }
-.workspace-stats .progress-track > span {
+.workspace-stats .progress-track > [data-slot="progress-indicator"] {
   border-radius: 8px;
 }
 .stat-receipt {
@@ -3721,7 +3721,7 @@ button.reorder-handle:disabled {
   border: 1px solid #e9cdbf;
   border-radius: 12px;
 }
-.import-issues summary {
+.import-issues [data-slot="collapsible-trigger"] {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3838,7 +3838,7 @@ button.reorder-handle:disabled {
   background: #f4ece1;
   overflow: hidden;
 }
-.stat-room-bar > span {
+.stat-room-bar > [data-slot="progress-indicator"] {
   display: block;
   height: 100%;
   border-radius: 6px;

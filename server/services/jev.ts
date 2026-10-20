@@ -136,38 +136,42 @@ function remember(key: string, answers: Record<string, JevAnswer>, now: number) 
 
 async function ask(state: unknown, questions: Record<string, unknown>): Promise<Record<string, JevAnswer> | null> {
   const client = getTransport();
-  if (!client) return null;
+  if (!client) { getLogger().info({ event: 'jev.skipped', state, questions }, 'Jev is not configured.'); return null; }
 
   // L1 (memória do processo), depois L3 (Redis, compartilhado entre instâncias), e só então o Jev.
   const key = createHash('sha1').update(JSON.stringify({ state, questions })).digest('hex');
   const now = Date.now();
   const hit = cache.get(key);
-  if (hit && hit.expires > now) return hit.answers;
+  if (hit && hit.expires > now) { getLogger().info({ event: 'jev.cache.hit', cache: 'memory', state, questions, answers: hit.answers }, 'Jev cache hit.'); return hit.answers; }
   const shared = await sharedGet(`jev:answer:${key}`);
   if (shared) {
     try {
       const answers = JSON.parse(shared) as Record<string, JevAnswer>;
+      getLogger().info({ event: 'jev.cache.hit', cache: 'redis', state, questions, answers }, 'Jev shared cache hit.');
       remember(key, answers, now);
       return answers;
-    } catch {
+    } catch (err) {
+      getLogger().warn({ event: 'jev.cache.invalid', key, value: shared, err }, 'Invalid cached Jev response.');
       // Valor corrompido: pergunta de novo e sobrescreve.
     }
   }
 
   if (!(await takeBudget())) {
-    getLogger().warn({ event: 'jev.budget_exhausted' }, 'Limite diário de chamadas atingido; seguindo sem IA.');
+    getLogger().warn({ event: 'jev.budget_exhausted', state, questions }, 'Limite diário de chamadas atingido; seguindo sem IA.');
     return null;
   }
 
   try {
+    getLogger().info({ event: 'jev.request.started', state, questions }, 'Jev request started.');
     callListener?.();
     const { answers } = await client.systemOne({ state, questions });
+    getLogger().info({ event: 'jev.request.completed', state, questions, answers }, 'Jev request completed.');
     remember(key, answers, now);
     void sharedSet(`jev:answer:${key}`, JSON.stringify(answers), sharedCacheTtl());
     return answers;
   } catch (err) {
     // Falha do Jev nunca derruba o app: quem chamou usa a regra de sempre.
-    getLogger().warn({ event: 'jev.request.failed', err }, 'Chamada ao Jev falhou; seguindo sem IA.');
+    getLogger().warn({ event: 'jev.request.failed', state, questions, err }, 'Chamada ao Jev falhou; seguindo sem IA.');
     return null;
   }
 }

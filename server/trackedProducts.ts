@@ -28,15 +28,15 @@ export async function findOrCreateTrackedProduct(queryable: Queryable, rawUrl: s
 
   const result = await queryable.query<{ id: string; inserted: boolean }>(`
     INSERT INTO tracked_products (
-      id, url, canonical_url, domain, title, image_url, current_price_cents, pix_price_cents,
+      id, url, canonical_url, domain, title, current_price_cents, pix_price_cents,
       lowest_price_cents, highest_price_cents, in_stock, last_scraped_at, last_scrape_status
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $7, $7, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $6, $6, $8, $9, $10)
     ON CONFLICT (url) DO UPDATE SET url = EXCLUDED.url
     RETURNING id, (xmax = 0) AS inserted
   `, [
     randomUUID(), url, preview?.canonicalUrl ?? null, domainOf(url), (preview?.title || fallbackTitle).slice(0, 300),
-    preview?.imageUrl ?? null, price, pix, preview?.inStock ?? true,
+    price, pix, preview?.inStock ?? true,
     preview ? new Date() : null, preview ? (price === null ? 'no_price' : 'ok') : 'pending',
   ]);
 
@@ -111,13 +111,12 @@ export async function recordScrape(queryable: Queryable, productId: string, prev
         lowest_price_cents = LEAST(COALESCE(lowest_price_cents, $2), $2),
         highest_price_cents = GREATEST(COALESCE(highest_price_cents, $2), $2),
         in_stock = $4,
-        image_url = COALESCE(image_url, $5),
-        canonical_url = COALESCE(canonical_url, $6),
+        canonical_url = COALESCE(canonical_url, $5),
         last_scraped_at = now(),
         last_scrape_status = 'ok',
         updated_at = now()
     WHERE id = $1
-  `, [productId, price, pix, preview.inStock, preview.imageUrl ?? null, preview.canonicalUrl ?? null]);
+  `, [productId, price, pix, preview.inStock, preview.canonicalUrl ?? null]);
 
   return outcome;
 }

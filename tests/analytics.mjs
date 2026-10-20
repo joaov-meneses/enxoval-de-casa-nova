@@ -120,12 +120,22 @@ async function client(env = {}, pathname = '/app', storage = new Map(), options 
   return { api, sdk, calls, win, doc, storage, config: () => config };
 }
 
-test('missing key, development default and administrative pages never initialize the SDK', async () => {
-  for (const [env, path] of [[{ VITE_POSTHOG_KEY: '' }, '/app'], [{ DEV: true }, '/app'], [{}, '/admin'], [{}, '/admin/catalog']]) {
+test('missing key and development default never initialize the SDK', async () => {
+  for (const [env, path] of [[{ VITE_POSTHOG_KEY: '' }, '/app'], [{ DEV: true }, '/app']]) {
     const c = await client(env, path);
     c.api.startAnalytics(); c.api.capture('signup_submit');
     assert.deepEqual(c.calls, []);
   }
+});
+
+test('admin exceptions and operational diagnostics preserve real data', async () => {
+  const c = await client({}, '/admin/catalog'); c.api.startAnalytics();
+  assert.ok(c.config());
+  const properties = { body: { password: 'raw-password' }, response: { email: 'real@example.test' } };
+  assert.deepEqual(c.config().before_send({ event: 'application.api.completed', properties }).properties.body, properties.body);
+  c.api.captureOperational('application.api.completed', properties);
+  assert.equal(c.calls.at(-1)[0], 'application.api.completed');
+  assert.equal(c.config().before_send({ event: '$exception', properties: { $exception_list: [{ type: 'Error', value: 'Original admin failure' }] } }).properties.$exception_list[0].value, 'Original admin failure');
 });
 
 test('initialization enables bounded web vitals and reconstructs safe standard page properties', async () => {
@@ -206,13 +216,15 @@ test('CTA taxonomy rejects DOM text and page leaves use the previous safe route 
   assert.deepEqual(c.calls.filter(([name]) => name === '$pageleave'), [['$pageleave', { route: '/login' }], ['$pageleave', { route: '/cadastro' }]]);
 });
 
-test('exceptions have a separate privacy filter, opt-out and kill switch', async () => {
+test('exceptions preserve original diagnostics, opt-out and kill switch', async () => {
   const c = await client(); c.api.startAnalytics();
   const event = c.config().before_send({ event: '$exception', properties: {
     $current_url: 'PRIVATE_URL', password: 'PRIVATE_PASSWORD',
     $exception_list: [{ type: 'TypeError', value: 'PRIVATE_EMAIL', stacktrace: { frames: [{ filename: 'https://app.test/assets/app.js?token=PRIVATE_TOKEN', lineno: 12, colno: 8, context_line: 'PRIVATE_CODE' }] } }],
   } });
-  assert.equal(JSON.stringify(event).includes('PRIVATE_'), false);
+  assert.equal(event.properties.$exception_list[0].value, 'PRIVATE_EMAIL');
+  assert.equal(event.properties.password, 'PRIVATE_PASSWORD');
+  assert.equal(event.properties.$exception_list[0].stacktrace.frames[0].context_line, 'PRIVATE_CODE');
   assert.equal(event.properties.$exception_list[0].stacktrace.frames[0].lineno, 12);
   c.api.captureError(new Error('PRIVATE_MESSAGE'));
   assert.equal(c.calls.filter(([name]) => name === '$exception').length, 1);

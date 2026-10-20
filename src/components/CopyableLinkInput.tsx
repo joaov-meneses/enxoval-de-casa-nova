@@ -1,5 +1,7 @@
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
 import { useState, type InputHTMLAttributes } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy } from "@/src/components/icons";
 import './itemLinks.css';
 
 export function CopyableLinkInput({ value, copyLabel, ...props }: InputHTMLAttributes<HTMLInputElement> & {
@@ -24,10 +26,10 @@ export function CopyableLinkInput({ value, copyLabel, ...props }: InputHTMLAttri
   }
   return <div className="copyable-link-field">
     <div className="copyable-link-control">
-      <input {...props} value={value} onChange={event => { setMessage(''); setCopiedValue(''); props.onChange?.(event); }} />
-      <button type="button" className="copyable-link-button" data-copy-link aria-label={copyLabel} title={copied ? 'Link copiado' : copyLabel} disabled={props.disabled || !value.trim()} onClick={() => void copy()}>
+      <Input {...props} value={value} onChange={event => { setMessage(''); setCopiedValue(''); props.onChange?.(event); }} />
+      <Button variant="brand" size="brand" type="button" className="copyable-link-button" data-copy-link aria-label={copyLabel} title={copied ? 'Link copiado' : copyLabel} disabled={props.disabled || !value.trim()} onClick={() => void copy()}>
         {copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}
-      </button>
+      </Button>
     </div>
     {message && <span role="status" className="copyable-link-feedback">{message}</span>}
   </div>;

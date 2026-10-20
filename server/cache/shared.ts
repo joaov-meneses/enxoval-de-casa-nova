@@ -1,10 +1,11 @@
+import { getLogger } from '../logger.ts';
 /**
  * Cache compartilhado entre instâncias (L3 da Fase 6), num Redis opcional.
  *
  * Só existe com `REDIS_URL`. Sem ele, ou com o Redis fora do ar, cada função devolve "não sei" (null/false) na hora e
  * quem chama segue com o que já tinha por processo: o cache em memória do Jev, o teto diário por processo e o índice do
  * catálogo que vence sozinho. Nada aqui pode travar ou derrubar uma requisição: comandos não esperam reconexão
- * (`disableOfflineQueue`) e erros viram um aviso no log, no máximo uma vez por minuto.
+ * (`disableOfflineQueue`) e erros viram avisos estruturados completos no log.
  *
  * Usos: respostas do Jev (para outra instância não pagar a mesma pergunta), o teto diário de chamadas ao Jev (somado
  * entre instâncias) e o aviso de "o catálogo mudou" (para cada instância descartar o índice em memória na hora).
@@ -18,15 +19,12 @@ const prefix = () => process.env.REDIS_KEY_PREFIX?.trim() || 'casamia:';
 let client: Client | null = null;
 let subscriber: Client | null = null;
 let connecting: Promise<Client | null> | null = null;
-let lastWarning = 0;
 let lastFailure = 0;
 const RETRY_AFTER_FAILURE_MS = 30_000;
 const handlers = new Map<string, Set<(message: string) => void>>();
 
 function warn(message: string, err?: unknown) {
-  if (Date.now() - lastWarning < 60_000) return;
-  lastWarning = Date.now();
-  console.warn(`[cache] ${message}`, err instanceof Error ? err.message : err ?? '');
+  getLogger().warn({ event: 'cache.operation.failed', err }, message);
 }
 
 export function isSharedCacheConfigured() {
@@ -106,6 +104,7 @@ export async function sharedGet(key: string): Promise<string | null> {
   if (!redis) return null;
   try {
     const value = await redis.get(prefix() + key);
+    getLogger().info({ event: 'cache.get.completed', key, value, hit: value !== null }, 'Shared cache read.');
     return typeof value === 'string' ? value : null;
   } catch (err) {
     warn('Leitura no Redis falhou.', err);
@@ -118,6 +117,7 @@ export async function sharedSet(key: string, value: string, ttlSeconds: number) 
   if (!redis) return false;
   try {
     await redis.set(prefix() + key, value, { EX: ttlSeconds });
+    getLogger().info({ event: 'cache.set.completed', key, value, ttlSeconds }, 'Shared cache write.');
     return true;
   } catch (err) {
     warn('Gravação no Redis falhou.', err);
@@ -132,6 +132,7 @@ export async function sharedIncrement(key: string, ttlSeconds: number): Promise<
   try {
     const value = await redis.incr(prefix() + key);
     if (value === 1) await redis.expire(prefix() + key, ttlSeconds);
+    getLogger().info({ event: 'cache.increment.completed', key, value, ttlSeconds }, 'Shared counter updated.');
     return value;
   } catch (err) {
     warn('Contador no Redis falhou.', err);
@@ -145,6 +146,7 @@ export async function publish(channel: string, message: string) {
   if (!redis) return;
   try {
     await redis.publish(prefix() + channel, message);
+    getLogger().info({ event: 'cache.publish.completed', channel, message }, 'Shared cache notification published.');
   } catch (err) {
     warn('Aviso pelo Redis falhou.', err);
   }

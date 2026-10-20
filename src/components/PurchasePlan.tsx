@@ -1,3 +1,10 @@
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./ui/collapsible";
+import { Badge } from "@/src/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Disclosure, DisclosureTrigger } from "@/src/components/ui/disclosure";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
 import { useId, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -14,7 +21,7 @@ import {
   Plus,
   Sparkles,
   Wallet,
-} from "lucide-react";
+} from "@/src/components/icons";
 import type { EnxovalCategory, EnxovalItem, EnxovalSummary } from "../types";
 import {
   buildPurchasePlan,
@@ -229,24 +236,24 @@ function PlanRoomGroup({ name, entries, initiallyOpen, moveDate, canPickWeek, bu
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? entries : entries.slice(0, ROWS_COLLAPSED);
   return (
-    <details className="pp-room-group" open={initiallyOpen}>
-      <summary>
+    <Disclosure className="pp-room-group" open={initiallyOpen}>
+      <DisclosureTrigger>
         <span className="pp-room-name">{name}</span>
         <span className="pp-room-count">{entries.length} {entries.length === 1 ? "item" : "itens"}</span>
         <ChevronDown size={16} aria-hidden="true" />
-      </summary>
+      </DisclosureTrigger>
       <ul className="pp-rows">
         {shown.map((entry) => <PlanRow key={entry.item.id} entry={entry}
           moveDate={moveDate} canPickWeek={canPickWeek} busy={busyId === entry.item.id}
           onPickWeek={onPickWeek} />)}
       </ul>
       {entries.length > ROWS_COLLAPSED && (
-        <button type="button" className="pp-more" aria-expanded={showAll}
+        <Button variant="brand" size="brand" type="button" className="pp-more" aria-expanded={showAll}
           onClick={() => setShowAll((value) => !value)}>
           {showAll ? "Mostrar menos" : `Ver mais ${entries.length - ROWS_COLLAPSED} neste ambiente`}
-        </button>
+        </Button>
       )}
-    </details>
+    </Disclosure>
   );
 }
 
@@ -286,114 +293,161 @@ function PeriodCard({
   const VerdictIcon = VERDICT_ICON[verdict];
 
   return (
-    <section
-      className={`pp-card pp-period${summary.current ? " is-current" : ""}${open ? " is-open" : ""}`}
-      aria-labelledby={`${baseId}-title`}
-    >
-      <h3 id={`${baseId}-title`} className="pp-period-title">
-        <button
-          type="button"
-          className="pp-period-toggle"
-          aria-expanded={open}
-          aria-controls={bodyId}
-          onClick={() => setOpen((value) => !value)}
-        >
-          <span className={`pp-step${summary.completed ? " is-done" : ""}`} aria-hidden="true">
-            {summary.completed ? <Check size={16} strokeWidth={2.6} /> : step}
-          </span>
-          <span className="pp-period-text">
-            <span className="pp-period-name">
-              {period.label}
-              {summary.current && <em className="pp-now">Você está aqui</em>}
-            </span>
-            <span className="pp-period-sub">
-              {moveDate ? periodDates(moveDate, period) : period.hint} ·{" "}
-              {entries.length === 0
-                ? "Nada pendente"
-                : `${entries.length} ${entries.length === 1 ? "item a resolver" : "itens a resolver"}`}
-            </span>
-            {verdict !== "empty" && (
-              <span className="pp-period-band">Faixa esperada: {range(summary.band)}</span>
-            )}
-          </span>
-          <span className="pp-badges">
-            {summary.completed && (
-              <span className="pp-badge is-done">
-                <Check size={13} aria-hidden="true" /> Concluído
+    <Collapsible open={open} onOpenChange={setOpen} asChild>
+      <section
+        className={`pp-card pp-period${summary.current ? " is-current" : ""}${open ? " is-open" : ""}`}
+        aria-labelledby={`${baseId}-title`}
+      >
+        <h3 id={`${baseId}-title`} className="pp-period-title">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="brand"
+              size="brand"
+              type="button"
+              className="pp-period-toggle"
+              aria-expanded={open}
+              aria-controls={bodyId}
+            >
+              <span
+                className={`pp-step${summary.completed ? " is-done" : ""}`}
+                aria-hidden="true"
+              >
+                {summary.completed ? (
+                  <Check size={16} strokeWidth={2.6} />
+                ) : (
+                  step
+                )}
               </span>
-            )}
-            {summary.overdueCount > 0 && (
-              <span className="pp-badge is-late">
-                <Clock3 size={13} aria-hidden="true" /> {summary.overdueCount}{" "}
-                {summary.overdueCount === 1 ? "atrasado" : "atrasados"}
-              </span>
-            )}
-            {verdict !== "empty" && (
-              <span className={`pp-badge pp-verdict is-${verdict}`}>
-                <VerdictIcon size={13} aria-hidden="true" />
-                {VERDICT_LABEL[verdict]}
-              </span>
-            )}
-          </span>
-          <ChevronDown size={18} aria-hidden="true" className="pp-period-chevron" />
-        </button>
-      </h3>
-
-      <div id={bodyId} className="pp-period-body" hidden={!open}>
-        {verdict !== "empty" && (
-          <div className="pp-figures">
-            <dl>
-              <div>
-                <dt>Faixa esperada</dt>
-                <dd>{range(summary.band)}</dd>
-              </div>
-              <div>
-                <dt>Você planejou</dt>
-                <dd>{summary.plannedCents > 0 ? money(summary.plannedCents) : "—"}</dd>
-              </div>
-              <div>
-                <dt>Você gastou</dt>
-                <dd>
-                  {money(summary.spentCents)}
-                  {summary.reached && (
-                    <small>
-                      <Check size={11} aria-hidden="true" /> chegou à faixa
-                    </small>
+              <span className="pp-period-text">
+                <span className="pp-period-name">
+                  {period.label}
+                  {summary.current && (
+                    <em className="pp-now">Você está aqui</em>
                   )}
-                </dd>
-              </div>
-            </dl>
-            <Meter
-              band={summary.band}
-              planned={summary.plannedCents}
-              spent={summary.spentCents}
-            />
-            <p className="pp-figures-note">
-              {VERDICT_HELP[verdict]}
-              {summary.unpricedCount > 0 && verdict !== "no_prices" && (
-                <>
-                  {" "}
-                  {summary.unpricedCount}{" "}
-                  {summary.unpricedCount === 1 ? "item sem preço fica" : "itens sem preço ficam"}{" "}
-                  fora da comparação.
-                </>
-              )}
-              {summary.doneCount > 0 && (
-                <> {summary.doneCount} {summary.doneCount === 1 ? "item já resolvido não aparece" : "itens já resolvidos não aparecem"} na lista.</>
-              )}
-            </p>
-          </div>
-        )}
+                </span>
+                <span className="pp-period-sub">
+                  {moveDate ? periodDates(moveDate, period) : period.hint} ·{" "}
+                  {entries.length === 0
+                    ? "Nada pendente"
+                    : `${entries.length} ${entries.length === 1 ? "item a resolver" : "itens a resolver"}`}
+                </span>
+                {verdict !== "empty" && (
+                  <span className="pp-period-band">
+                    Faixa esperada: {range(summary.band)}
+                  </span>
+                )}
+              </span>
+              <span className="pp-badges">
+                {summary.completed && (
+                  <Badge asChild variant="outline">
+                    <span className="pp-badge is-done">
+                      <Check size={13} aria-hidden="true" /> Concluído
+                    </span>
+                  </Badge>
+                )}
+                {summary.overdueCount > 0 && (
+                  <Badge asChild variant="outline">
+                    <span className="pp-badge is-late">
+                      <Clock3 size={13} aria-hidden="true" />{" "}
+                      {summary.overdueCount}{" "}
+                      {summary.overdueCount === 1 ? "atrasado" : "atrasados"}
+                    </span>
+                  </Badge>
+                )}
+                {verdict !== "empty" && (
+                  <Badge asChild variant="outline">
+                    <span className={`pp-badge pp-verdict is-${verdict}`}>
+                      <VerdictIcon size={13} aria-hidden="true" />
+                      {VERDICT_LABEL[verdict]}
+                    </span>
+                  </Badge>
+                )}
+              </span>
+              <ChevronDown
+                size={18}
+                aria-hidden="true"
+                className="pp-period-chevron"
+              />
+            </Button>
+          </CollapsibleTrigger>
+        </h3>
 
-        <div className="pp-room-groups">
-          {[...groups].map(([id, group], index) => (
-            <PlanRoomGroup key={id} name={group.name} entries={group.entries}
-              initiallyOpen={index === 0} moveDate={moveDate} canPickWeek={canPickWeek}
-              busyId={busyId} onPickWeek={onPickWeek} />
-          ))}
-        </div>
-      </div>
-    </section>
+        <CollapsibleContent id={bodyId} className="pp-period-body">
+          {verdict !== "empty" && (
+            <div className="pp-figures">
+              <dl>
+                <div>
+                  <dt>Faixa esperada</dt>
+                  <dd>{range(summary.band)}</dd>
+                </div>
+                <div>
+                  <dt>Você planejou</dt>
+                  <dd>
+                    {summary.plannedCents > 0
+                      ? money(summary.plannedCents)
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Você gastou</dt>
+                  <dd>
+                    {money(summary.spentCents)}
+                    {summary.reached && (
+                      <small>
+                        <Check size={11} aria-hidden="true" /> chegou à faixa
+                      </small>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+              <Meter
+                band={summary.band}
+                planned={summary.plannedCents}
+                spent={summary.spentCents}
+              />
+              <p className="pp-figures-note">
+                {VERDICT_HELP[verdict]}
+                {summary.unpricedCount > 0 && verdict !== "no_prices" && (
+                  <>
+                    {" "}
+                    {summary.unpricedCount}{" "}
+                    {summary.unpricedCount === 1
+                      ? "item sem preço fica"
+                      : "itens sem preço ficam"}{" "}
+                    fora da comparação.
+                  </>
+                )}
+                {summary.doneCount > 0 && (
+                  <>
+                    {" "}
+                    {summary.doneCount}{" "}
+                    {summary.doneCount === 1
+                      ? "item já resolvido não aparece"
+                      : "itens já resolvidos não aparecem"}{" "}
+                    na lista.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+
+          <div className="pp-room-groups">
+            {[...groups].map(([id, group], index) => (
+              <PlanRoomGroup
+                key={id}
+                name={group.name}
+                entries={group.entries}
+                initiallyOpen={index === 0}
+                moveDate={moveDate}
+                canPickWeek={canPickWeek}
+                busyId={busyId}
+                onPickWeek={onPickWeek}
+              />
+            ))}
+          </div>
+        </CollapsibleContent>
+      </section>
+    </Collapsible>
   );
 }
 
@@ -529,11 +583,11 @@ export function PurchasePlanView({
         )}
         <div className="pp-fields">
           <div className="pp-field">
-            <label htmlFor={`${baseId}-date`}>
+            <Label htmlFor={`${baseId}-date`}>
               <CalendarDays size={14} aria-hidden="true" /> Data da mudança
-            </label>
+            </Label>
             <div className="pp-date">
-              <input
+              <Input
                 id={`${baseId}-date`}
                 type="date"
                 value={enxoval.moveDate ?? ""}
@@ -543,14 +597,14 @@ export function PurchasePlanView({
                 }
               />
               {hasMoveDate && canEdit && (
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   className="pp-link"
                   disabled={saving}
                   onClick={() => void saveEnxoval({ moveDate: null })}
                 >
                   Ainda não sei
-                </button>
+                </Button>
               )}
             </div>
             {!hasMoveDate && (
@@ -558,9 +612,9 @@ export function PurchasePlanView({
             )}
           </div>
           <div className="pp-field">
-            <label htmlFor={`${baseId}-state`}>
+            <Label htmlFor={`${baseId}-state`}>
               <MapPin size={14} aria-hidden="true" /> Estado
-            </label>
+            </Label>
             <Select
               id={`${baseId}-state`}
               value={enxoval.state ?? ""}
@@ -573,7 +627,7 @@ export function PurchasePlanView({
             />
           </div>
           <div className="pp-field">
-            <label htmlFor={`${baseId}-city`}>Cidade</label>
+            <Label htmlFor={`${baseId}-city`}>Cidade</Label>
             <Select
               id={`${baseId}-city`}
               value={enxoval.city ?? ""}
@@ -598,7 +652,7 @@ export function PurchasePlanView({
         >
           <legend>Perfil de gasto</legend>
           {/* Só no celular: mostra o perfil escolhido e abre a lista ao tocar. No desktop a lista fica sempre à vista. */}
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="pp-tier-toggle"
             aria-expanded={tiersOpen}
@@ -612,37 +666,29 @@ export function PurchasePlanView({
               </small>
             </span>
             <ChevronDown size={18} aria-hidden="true" />
-          </button>
+          </Button>
           <p className="pp-hint pp-tier-intro">
             Define a faixa de referência de cada item e de cada período. São valores
             de referência para orientar, não preços de loja: o preço de cada item é
             sempre o que você informa.
           </p>
-          <div className="pp-tier-grid" id={`${baseId}-tier-grid`}>
+          <RadioGroup value={enxoval.spendingTier} onValueChange={value => { setTiersOpen(false); void saveEnxoval({ spendingTier: value as SpendingTier }); }} aria-label="Faixa de gastos" className="pp-tier-grid" id={`${baseId}-tier-grid`}>
             {SPENDING_TIERS.map((tier) => {
               const info = SPENDING_TIER_INFO[tier];
               return (
-                <label
+                <Label
                   key={tier}
+                  htmlFor={`${baseId}-tier-${tier}`}
                   className={`pp-tier${enxoval.spendingTier === tier ? " is-selected" : ""}`}
                 >
-                  <input
-                    type="radio"
-                    name={`${baseId}-tier`}
-                    value={tier}
-                    checked={enxoval.spendingTier === tier}
-                    onChange={() => {
-                      setTiersOpen(false);
-                      void saveEnxoval({ spendingTier: tier });
-                    }}
-                  />
+                  <RadioGroupItem id={`${baseId}-tier-${tier}`} value={tier} className="choice-control" />
                   <strong>{info.label}</strong>
                   <span>{info.tagline}</span>
                   <small>{range(totals[tier])}</small>
-                </label>
+                </Label>
               );
             })}
-          </div>
+          </RadioGroup>
           <p className="pp-hint">{tierInfo.detail}</p>
         </fieldset>
       </section>
@@ -711,8 +757,8 @@ export function PurchasePlanView({
       )}
 
       {enxoval.state && suggestions.length > 0 && (
-        <details className="pp-card pp-suggestions">
-          <summary>
+        <Disclosure className="pp-card pp-suggestions">
+          <DisclosureTrigger>
             <Sparkles size={16} aria-hidden="true" />
             <span>
               {suggestions.length}{" "}
@@ -720,7 +766,7 @@ export function PurchasePlanView({
               {placeName}
             </span>
             <ChevronDown size={16} aria-hidden="true" />
-          </summary>
+          </DisclosureTrigger>
           <p className="pp-hint">
             Itens que o catálogo recomenda pelo lugar, e que ainda não estão na sua
             lista.
@@ -736,7 +782,7 @@ export function PurchasePlanView({
                     {suggestion.note && <> · {suggestion.note}</>}
                   </span>
                 </div>
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   className="button button-outline button-small"
                   disabled={addingName !== null}
@@ -744,15 +790,15 @@ export function PurchasePlanView({
                 >
                   <Plus size={14} aria-hidden="true" />
                   {addingName === suggestion.name ? "Adicionando…" : "Adicionar"}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
-        </details>
+        </Disclosure>
       )}
 
-      <details className="pp-how">
-        <summary>
+      <Disclosure className="pp-how">
+        <DisclosureTrigger>
           <span className="pp-how-icon" aria-hidden="true">
             <CircleHelp size={20} />
           </span>
@@ -761,7 +807,7 @@ export function PurchasePlanView({
             <small>Toque para entender a lógica das datas</small>
           </span>
           <ChevronDown size={18} aria-hidden="true" className="pp-how-chevron" />
-        </summary>
+        </DisclosureTrigger>
         <ul>
           <li>
             <b>Primeira noite:</b> cama, colchão, toalhas e o que não dá para ficar sem
@@ -786,7 +832,7 @@ export function PurchasePlanView({
             compra ou informa preços.
           </li>
         </ul>
-      </details>
+      </Disclosure>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import test from 'node:test';
 import express from 'express';
-import { createPosthogLogs, sanitizeLog } from '../server/posthogLogs.ts';
+import { createPosthogLogs, formatLog } from '../server/posthogLogs.ts';
 import { createLogger } from '../server/logger.ts';
 import { createHttpLogging, httpErrorHandler } from '../server/httpLogging.ts';
 import { errorTrackingHandler } from '../server/errorTracking.ts';
@@ -16,8 +16,8 @@ const memoryExporter = () => {
   return { records, export: (batch, callback) => { records.push(...batch); callback({ code: 0 }); }, shutdown: async () => {}, forceFlush: async () => {} };
 };
 
-test('export allowlist removes messages, stack traces, personal data, URLs and arbitrary attributes', () => {
-  const log = sanitizeLog({
+test('export preserves complete logs as formatted JSON with searchable error attributes', () => {
+  const log = formatLog({
     event: 'http.request.failed', level: 50, reqId: uuid, msg: 'PRIVATE_MESSAGE', userId: 'PRIVATE_USER',
     req: { method: 'POST', path: '/PRIVATE_PATH?token=PRIVATE_TOKEN', ip: 'PRIVATE_IP', userAgent: 'PRIVATE_AGENT', body: 'PRIVATE_BODY', headers: { cookie: 'PRIVATE_COOKIE' } },
     res: { statusCode: 500, headers: { authorization: 'PRIVATE_AUTH' } },
@@ -26,7 +26,12 @@ test('export allowlist removes messages, stack traces, personal data, URLs and a
     stripeEventId: 'PRIVATE_STRIPE_ID', stripeEventType: 'checkout.session.completed',
     custom: 'PRIVATE_CUSTOM', service: 'PRIVATE_SERVICE', environment: 'PRIVATE_ENV',
   });
-  assert.equal(log.body, 'http.request.failed');
+  assert.equal(JSON.parse(log.body).msg, 'PRIVATE_MESSAGE');
+  assert.equal(JSON.parse(log.body).req.headers.cookie, 'PRIVATE_COOKIE');
+  assert.equal(JSON.parse(log.body).custom, 'PRIVATE_CUSTOM');
+  assert.ok(log.body.includes('\n  '));
+  assert.equal(log.attributes['exception.message'], 'PRIVATE_EMAIL');
+  assert.equal(log.attributes['exception.stacktrace'], 'PRIVATE_STACK');
   assert.equal(log.severityText, 'error');
   assert.equal(log.severityNumber, 17);
   assert.equal(log.attributes['request.id'], uuid);
@@ -34,12 +39,13 @@ test('export allowlist removes messages, stack traces, personal data, URLs and a
   assert.equal(log.attributes['http.response.status_code'], 500);
   assert.equal(log.attributes['duration_ms'], 1450);
   assert.equal(log.attributes['error.code'], 'ECONNRESET');
-  assert.equal(JSON.stringify(log).includes('PRIVATE_'), false);
-  assert.equal(sanitizeLog({ event: 'PRIVATE_EVENT', level: 50 }), null);
-  assert.equal(sanitizeLog({ event: 'http.request.completed', level: 30 }), null);
-  assert.equal(sanitizeLog({ event: 'server.listening', level: 20 }), null);
-  const untrusted = sanitizeLog({ event: 'http.request.failed', level: 50, reqId: 'PRIVATE_ID', route: '/PRIVATE_PATH', err: { type: 'PRIVATE_TYPE', code: 'PRIVATE_CODE' } });
-  assert.equal(JSON.stringify(untrusted).includes('PRIVATE_'), false);
+  assert.equal(JSON.parse(log.body).err.stack, 'PRIVATE_STACK');
+  assert.equal(JSON.parse(formatLog({ event: 'PRIVATE_EVENT', level: 50 }).body).event, 'PRIVATE_EVENT');
+  assert.equal(JSON.parse(formatLog({ level: 50, msg: 'original' }).body).msg, 'original');
+  assert.equal(formatLog({ event: 'http.request.completed', level: 30 }).severityText, 'info');
+  assert.equal(formatLog({ event: 'server.listening', level: 20 }).severityText, 'debug');
+  const untrusted = formatLog({ event: 'http.request.failed', level: 50, reqId: 'PRIVATE_ID', route: '/PRIVATE_PATH', err: { type: 'PRIVATE_TYPE', code: 'PRIVATE_CODE' } });
+  assert.equal(untrusted.attributes['error.type'], 'PRIVATE_TYPE');
 });
 
 test('disabled without project token, with personal key, in development or by explicit switch', () => {
@@ -48,29 +54,23 @@ test('disabled without project token, with personal key, in development or by ex
   }
 });
 
-test('rate budget reserves warnings/errors, resets each minute and stops after shutdown', async () => {
+test('all events and successes are forwarded without per-minute sampling and stop after shutdown', async () => {
   const exporter = memoryExporter();
-  let now = 0;
-  const remote = createPosthogLogs({ ...configuration, POSTHOG_LOGS_MAX_PER_MINUTE: '10' }, true, { exporter, now: () => now });
-  const send = (event, level) => remote.write(JSON.stringify({ event, level }));
+  const remote = createPosthogLogs(configuration, true, { exporter });
   try {
     remote.write('invalid JSON');
-    for (let i = 0; i < 10; i++) send('billing.webhook.completed', 30);
-    for (let i = 0; i < 20; i++) send('http.request.failed', 50);
+    for (let i = 0; i < 100; i++) remote.write(JSON.stringify({ event: `new.operation.${i}`, level: 30, result: i }));
+    for (let i = 0; i < 20; i++) remote.write(JSON.stringify({ level: 50, msg: 'original error' }));
     await remote.flush();
-    assert.equal(exporter.records.length, 10);
-    assert.equal(exporter.records.filter(record => record.severityText === 'info').length, 2);
-    assert.equal(exporter.records.filter(record => record.severityText === 'error').length, 8);
-    now = 60_000;
-    send('jev.request.failed', 40);
+    assert.equal(exporter.records.length, 120);
+    assert.equal(exporter.records.filter(record => record.severityText === 'info').length, 100);
     await remote.shutdown();
-    assert.equal(exporter.records.length, 11);
-    send('jev.request.failed', 40);
-    assert.equal(exporter.records.length, 11);
+    remote.write(JSON.stringify({ level: 50, msg: 'after shutdown' }));
+    assert.equal(exporter.records.length, 120);
   } finally { await remote.shutdown(); }
 });
 
-test('Pino + Express export real OTLP HTTP with safe fields and exception correlation', async () => {
+test('Pino + Express export real OTLP HTTP with raw diagnostics and exception correlation', async () => {
   const received = [];
   const collector = http.createServer(async (req, res) => {
     let body = '';
@@ -105,8 +105,8 @@ test('Pino + Express export real OTLP HTTP with safe fields and exception correl
     assert.equal(attrs['service.name'], 'casamia');
     assert.equal(attrs['deployment.environment.name'], 'production');
     const records = resources.flatMap(resource => resource.scopeLogs.flatMap(scope => scope.logRecords));
-    assert.equal(records.length, 2); // Routine starts/successes aren't forwarded.
-    const failure = records.find(record => record.body.stringValue === 'http.request.failed');
+    assert.equal(records.length, 3); // Request start, failure and successful webhook.
+    const failure = records.find(record => JSON.parse(record.body.stringValue).event === 'http.request.failed');
     const attributes = Object.fromEntries(failure.attributes.map(attr => [attr.key, Object.values(attr.value)[0]]));
     const id = response.headers.get('x-request-id');
     assert.equal(attributes['request.id'], id);
@@ -115,8 +115,9 @@ test('Pino + Express export real OTLP HTTP with safe fields and exception correl
     assert.equal(captured.length, 1);
     assert.equal(captured[0][2].request_id, id);
     assert.equal(exceptionProperties({ request_id: id }).request_id, id);
-    assert.equal(exceptionProperties({ request_id: 'PRIVATE_ID' }).request_id, undefined);
-    assert.equal(JSON.stringify(received.map(batch => batch.payload)).includes('PRIVATE_'), false);
+    assert.equal(exceptionProperties({ request_id: 'PRIVATE_ID' }).request_id, 'PRIVATE_ID');
+    assert.equal(JSON.parse(failure.body.stringValue).err.message, 'PRIVATE_MESSAGE');
+    assert.match(attributes['exception.stacktrace'], /PRIVATE_MESSAGE/);
     assert.ok(local.some(log => log.err?.message === 'PRIVATE_MESSAGE')); // Local diagnostics stay available.
   } finally {
     await remote.shutdown();
@@ -131,11 +132,14 @@ test('exporter failures never interrupt local logs or propagate from flush/shutd
   const remote = createPosthogLogs(configuration, true, { exporter });
   const local = [];
   const logger = createLogger({ write: line => local.push(JSON.parse(line)) }, remote);
-  logger.error({ event: 'database.pool.error', err: new Error('PRIVATE_ERROR') }, 'Database failed');
+  logger.error({ event: 'database.pool.error', err: Object.assign(new Error('PRIVATE_ERROR', { cause: new Error('ORIGINAL_CAUSE') }), { detail: 'ORIGINAL_DETAIL', token: 'ORIGINAL_TOKEN' }) }, 'Database failed');
   await remote.flush();
   await remote.shutdown();
   assert.equal(local.length, 1);
   assert.equal(local[0].event, 'database.pool.error');
+  assert.equal(local[0].err.detail, 'ORIGINAL_DETAIL');
+  assert.equal(local[0].err.token, 'ORIGINAL_TOKEN');
+  assert.equal(local[0].err.cause.message, 'ORIGINAL_CAUSE');
   const broken = createLogger({ write: line => local.push(JSON.parse(line)) }, { write: () => { throw new Error('broken'); } });
   assert.doesNotThrow(() => broken.error('still local'));
   assert.equal(local.length, 2);

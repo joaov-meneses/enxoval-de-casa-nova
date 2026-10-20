@@ -1,6 +1,8 @@
+import { Button } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, ImagePlus, Trash2 } from 'lucide-react';
+import { Camera, ImagePlus, Trash2 } from "@/src/components/icons";
 import { Dialog } from './Dialog';
 import { UserAvatar } from './UserAvatar';
 
@@ -72,20 +74,20 @@ export function ProfilePhotoEditor({ name, src, disabled, onUpload, onRemove }: 
     canvas.toBlob(blob => { if (blob) { setPreview(blob); stopCamera(); setCamera(false); } }, 'image/jpeg', 0.9);
   };
   return <>
-    <button type="button" className="profile-avatar-edit" aria-label="Alterar foto de perfil" disabled={disabled} onClick={() => { setError(''); setOpen(true); }}>
+    <Button variant="brand" size="brand" type="button" className="profile-avatar-edit" aria-label="Alterar foto de perfil" disabled={disabled} onClick={() => { setError(''); setOpen(true); }}>
       <UserAvatar name={name} src={src} />
       <span className="profile-avatar-camera"><Camera size={15} aria-hidden="true" /></span>
-    </button>
+    </Button>
     {open && createPortal(<Dialog title="Foto de perfil" isOpen={open} onClose={close} busy={disabled} className="profile-photo-dialog">
       <div className="profile-photo-picker">
         <p data-dialog-autofocus tabIndex={-1}>Escolha como atualizar sua foto.</p>
-        <input ref={upload} hidden type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label="Escolher foto de perfil" onChange={choose} disabled={disabled} />
-        <input ref={capture} hidden type="file" accept="image/*" capture="user" aria-label="Tirar foto com o dispositivo" onChange={choose} disabled={disabled} />
+        <Input ref={upload} hidden type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" aria-label="Escolher foto de perfil" onChange={choose} disabled={disabled} />
+        <Input ref={capture} hidden type="file" accept="image/*" capture="user" aria-label="Tirar foto com o dispositivo" onChange={choose} disabled={disabled} />
         {camera && <div className="profile-camera-preview"><video ref={video} autoPlay muted playsInline aria-label="Prévia da câmera" />{connecting && <p role="status">Abrindo câmera…</p>}</div>}
         {previewUrl && <img className="profile-camera-photo" src={previewUrl} alt="Prévia da nova foto de perfil" />}
-        {preview ? <><button className="button button-dark" disabled={disabled} onClick={() => void save(new File([preview], 'foto-perfil.jpg', { type: 'image/jpeg' }))}>Usar esta foto</button><button className="button button-outline" disabled={disabled} onClick={() => void startCamera()}>Tirar outra foto</button></> : camera ? <button className="button button-dark" disabled={disabled || connecting} onClick={takePhoto}>Capturar foto</button> : <button className="button button-outline" disabled={disabled} onClick={() => void startCamera()}><Camera size={20} />Tirar foto</button>}
-        <button className="button button-outline" disabled={disabled} onClick={() => upload.current?.click()}><ImagePlus size={20} />Enviar foto</button>
-        {src && <button className="button button-outline" disabled={disabled} onClick={() => { void onRemove().then(close).catch(err => setError(err instanceof Error ? err.message : 'Não foi possível remover a foto.')); }}><Trash2 size={18} />Remover foto</button>}
+        {preview ? <><Button variant="brand" size="brand" className="button button-dark" disabled={disabled} onClick={() => void save(new File([preview], 'foto-perfil.jpg', { type: 'image/jpeg' }))}>Usar esta foto</Button><Button variant="brand" size="brand" className="button button-outline" disabled={disabled} onClick={() => void startCamera()}>Tirar outra foto</Button></> : camera ? <Button variant="brand" size="brand" className="button button-dark" disabled={disabled || connecting} onClick={takePhoto}>Capturar foto</Button> : <Button variant="brand" size="brand" className="button button-outline" disabled={disabled} onClick={() => void startCamera()}><Camera size={20} />Tirar foto</Button>}
+        <Button variant="brand" size="brand" className="button button-outline" disabled={disabled} onClick={() => upload.current?.click()}><ImagePlus size={20} />Enviar foto</Button>
+        {src && <Button variant="brand" size="brand" className="button button-outline" disabled={disabled} onClick={() => { void onRemove().then(close).catch(err => setError(err instanceof Error ? err.message : 'Não foi possível remover a foto.')); }}><Trash2 size={18} />Remover foto</Button>}
         <small>JPG, PNG ou WebP. Sua foto aparece nos menus da conta.</small>
         {error && <p className="profile-error" role="alert">{error}</p>}
       </div>

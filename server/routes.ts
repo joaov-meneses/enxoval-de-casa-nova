@@ -28,8 +28,6 @@ import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, e
 import { registerBillingRoutes, recoverBillingAccess } from './billing.ts';
 import { registerProfileRoutes } from './profile.ts';
 import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
-import { MAX_IMAGE_UPLOAD_BYTES, internalImageId } from '../src/itemImages.ts';
-import { imageBelongsToEnxoval, importImageFromUrl, isExternalImageUrl, processImage, purgeUnusedImages, storeImage, type ProcessedImage } from './services/itemImages.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -117,7 +115,6 @@ interface ItemRow {
   catalog_region: string | null;
   updated_at: string | Date;
   created_at: string | Date;
-  image_url: string | null;
   selected_variation: string | null;
   tracked_product_id: string | null;
   initial_price_cents: number | null;
@@ -301,7 +298,6 @@ function mapItem(row: ItemRow): EnxovalItem {
       : null,
     createdAt: serializeTimestamp(row.created_at),
     updatedAt: serializeTimestamp(row.updated_at),
-    imageUrl: row.image_url,
     selectedVariation: row.selected_variation,
     priceTracking: mapPriceTracking(row)
   };
@@ -332,7 +328,6 @@ const ITEM_SELECT = `
     i.timing,
     i.created_at,
     i.updated_at,
-    i.image_url,
     i.selected_variation,
     i.tracked_product_id,
     i.initial_price_cents,
@@ -879,19 +874,6 @@ function parseBuyWeek(value: unknown): number | null {
   return value;
 }
 
-/** Imagem do produto: só endereços http(s) de tamanho razoável; qualquer outra coisa é descartada sem barrar o item. */
-function sanitizeImageUrl(value: unknown) {
-  if (typeof value !== 'string' || !value.trim() || value.length > 2000) return null;
-  // Imagem já guardada no banco (enviada ou importada antes): o endereço interno é conferido ao gravar o item.
-  if (internalImageId(value.trim())) return value.trim().toLowerCase();
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Lê e valida os campos opcionais de acompanhamento de preço. Só devolve as chaves que vieram no corpo. */
 function parseTrackingInput(body: unknown): ItemTrackingInput {
   const source = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
@@ -908,7 +890,6 @@ function parseTrackingInput(body: unknown): ItemTrackingInput {
     if (text.length > 80) throw new HttpError(400, 'A variação pode ter no máximo 80 caracteres.');
     input.selectedVariation = text || null;
   }
-  if (has('imageUrl')) input.imageUrl = sanitizeImageUrl(source.imageUrl);
   if (has('priceBasis')) {
     if (source.priceBasis !== 'regular' && source.priceBasis !== 'pix') throw new HttpError(400, 'Tipo de preço inválido.');
     input.priceBasis = source.priceBasis;
@@ -920,29 +901,7 @@ function parseTrackingInput(body: unknown): ItemTrackingInput {
   return input;
 }
 
-/**
- * Imagem de um endereço externo (a foto que o leitor de lojas achou ou um link colado): baixa e prepara antes
- * da transação, para a rede lenta não segurar o banco. Se não der, o item é salvo mesmo assim com o endereço
- * original, e a foto só aparece se a loja permitir.
- */
-async function prefetchExternalImage(imageUrl: string | null | undefined): Promise<ProcessedImage | null> {
-  if (!isExternalImageUrl(imageUrl)) return null;
-  try {
-    return await importImageFromUrl(imageUrl);
-  } catch {
-    return null;
-  }
-}
-
-/** Endereço final da imagem do item: guarda a baixada, confere a interna e mantém o externo quando não houve como baixar. */
-async function resolveItemImage(client: Queryable, userId: string, enxovalId: string, imageUrl: string | null | undefined, prefetched: ProcessedImage | null) {
-  if (!imageUrl) return null;
-  if (internalImageId(imageUrl)) return (await imageBelongsToEnxoval(client, enxovalId, imageUrl)) ? imageUrl : null;
-  return prefetched ? storeImage(client, enxovalId, userId, prefetched) : imageUrl;
-}
-
 async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string; status?: ItemStatus; discountCents?: unknown; quantity?: number; buyWeek?: number | null; tracking?: ItemTrackingInput; placement?: 'top' | 'end' }) {
-  const prefetchedImage = await prefetchExternalImage(input.tracking?.imageUrl);
   const created = await withTransaction(async client => {
     await requireEnxovalMember(client, input.userId, input.enxovalId);
 
@@ -971,7 +930,6 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     const discount = resolveDiscountCents({ status, priceCents: input.priceCents ?? null, discountCents: input.discountCents });
     if ('error' in discount) throw new HttpError(400, discount.error);
     const tracking = input.tracking ?? {};
-    const imageUrl = await resolveItemImage(client, input.userId, input.enxovalId, tracking.imageUrl, prefetchedImage);
     const trackedProductId = tracking.trackedProductUrl
       ? await findOrCreateTrackedProduct(client, tracking.trackedProductUrl, input.name)
       : null;
@@ -980,12 +938,12 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     await client.query(`
       INSERT INTO items (
         id, user_id, enxoval_id, category_id, name, sort_order, price_cents, discount_cents, link, description, status, checked, quantity,
-        tracked_product_id, initial_price_cents, target_price_cents, selected_variation, image_url, price_alert_enabled, price_basis, buy_week
+        tracked_product_id, initial_price_cents, target_price_cents, selected_variation, price_alert_enabled, price_basis, buy_week
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
     `, [
       itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, discount.value, input.link ?? '', input.description ?? '', status, isDoneStatus(status), quantity,
-      trackedProductId, initialPriceCents, trackedProductId ? (tracking.targetPriceCents ?? null) : null, tracking.selectedVariation ?? null, imageUrl, tracking.priceAlertEnabled ?? true, tracking.priceBasis ?? 'regular', input.buyWeek ?? null
+      trackedProductId, initialPriceCents, trackedProductId ? (tracking.targetPriceCents ?? null) : null, tracking.selectedVariation ?? null, tracking.priceAlertEnabled ?? true, tracking.priceBasis ?? 'regular', input.buyWeek ?? null
     ]);
     const { unresolved } = await linkItemsToCatalog(client, [{ id: itemId, name: input.name }]);
 
@@ -1007,9 +965,6 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
   let renamedTo: string | null = null;
   let unresolved: { id: string; name: string }[] = [];
-  const bodyImage = Object.prototype.hasOwnProperty.call(body, 'imageUrl') ? sanitizeImageUrl((body as Record<string, unknown>).imageUrl) : undefined;
-  const prefetchedImage = await prefetchExternalImage(bodyImage);
-  let imageChanged = false;
   const updated = await withTransaction(async client => {
     // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
     const current = await client.query<{ enxoval_id: string; category_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null }>(`
@@ -1115,10 +1070,6 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     if (tracking.initialPriceCents !== undefined) addUpdate('initial_price_cents', tracking.initialPriceCents);
     if (tracking.targetPriceCents !== undefined) addUpdate('target_price_cents', tracking.targetPriceCents);
     if (tracking.selectedVariation !== undefined) addUpdate('selected_variation', tracking.selectedVariation);
-    if (tracking.imageUrl !== undefined) {
-      addUpdate('image_url', await resolveItemImage(client, userId, enxovalId, tracking.imageUrl, prefetchedImage));
-      imageChanged = true;
-    }
     if (tracking.priceBasis !== undefined) addUpdate('price_basis', tracking.priceBasis);
     if (tracking.priceAlertEnabled !== undefined) addUpdate('price_alert_enabled', tracking.priceAlertEnabled);
     // Mudou o alvo, o tipo de preço ou o produto: o último aviso enviado deixa de valer.
@@ -1137,8 +1088,6 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
     if (!result.rowCount) throw new HttpError(404, 'Item não encontrado.');
     if (renamedTo) ({ unresolved } = await linkItemsToCatalog(client, [{ id: itemId, name: renamedTo }]));
-    // Trocou ou tirou a imagem: a antiga, se ninguém mais usa, sai do banco.
-    if (imageChanged) await purgeUnusedImages(client, enxovalId);
     return fetchItemRow(client, itemId, enxovalId);
   });
   queueResolution(unresolved);
@@ -1158,7 +1107,6 @@ async function deleteItemForUser(userId: string, itemId: string) {
   `, [itemId, userId]);
 
   if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
-  await purgeUnusedImages(getPool(), result.rows[0].enxoval_id);
 }
 
 async function reorderCategoriesForUser(userId: string, enxovalId: string, categoryIds: string[]) {
@@ -1213,15 +1161,7 @@ export function registerApiRoutes(app: Express) {
     const user = await requireCurrentUser(req);
     const candidate = req.query.enxovalId ?? req.body?.enxovalId ?? req.path.match(/^\/enxovais\/([^/]+)/)?.[1];
     if (typeof candidate === 'string') await requireEnxovalMember(getPool(), user.id, candidate);
-    else {
-      // Image URLs carry only the image ID: check the owner of that image's workspace.
-      const imageId = req.path.match(/^\/item-images\/([0-9a-f-]+)$/i)?.[1];
-      if (imageId) {
-        const image = await getPool().query<{enxoval_id: string}>('SELECT enxoval_id FROM item_images WHERE id = $1', [imageId]);
-        if (!image.rows[0]) throw new HttpError(404, 'Imagem não encontrada.');
-        await requireEnxovalMember(getPool(), user.id, image.rows[0].enxoval_id);
-      } else if (user.plan === 'free') throw subscriptionRequired();
-    }
+    else if (user.plan === 'free') throw subscriptionRequired();
     next();
   }));
   registerAdminRoutes(router);
@@ -1253,55 +1193,6 @@ export function registerApiRoutes(app: Express) {
     const userName = parseUserName(req.body?.userName);
     await saveOnboardingDraft(user.id, name, plan, profile, userName);
     res.json({ completed: true });
-  }));
-
-  // Imagens dos itens. Enviar um arquivo (corpo cru, `Content-Type: image/*`) ou importar por link: nos dois casos o
-  // servidor confere, reduz e converte a imagem, guarda no banco e devolve o endereço interno para usar no item.
-  const imageUploadLimit = rateLimit(40, 10 * 60_000, 'Muitas imagens em pouco tempo. Aguarde alguns minutos e tente de novo.');
-  router.post('/item-images', imageUploadLimit, express.raw({ type: 'image/*', limit: MAX_IMAGE_UPLOAD_BYTES }), asyncHandler(async (req, res) => {
-    const user = await requireCurrentUser(req);
-    const enxovalId = requireText(req.query.enxovalId, 'Enxoval');
-    await requireEnxovalMember(getPool(), user.id, enxovalId);
-    if (!Buffer.isBuffer(req.body)) throw new HttpError(415, 'Envie o arquivo da imagem (JPG, PNG, WebP, GIF ou AVIF).');
-    const image = await processImage(req.body);
-    res.status(201).json({ imageUrl: await storeImage(getPool(), enxovalId, user.id, image), width: image.width, height: image.height });
-  }));
-
-  router.post('/item-images/from-url', imageUploadLimit, asyncHandler(async (req, res) => {
-    const user = await requireCurrentUser(req);
-    const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
-    const url = requireText(req.body?.url, 'Link da imagem');
-    if (url.length > 2000 || !isExternalImageUrl(url)) throw new HttpError(400, 'Cole o endereço completo da imagem, começando com https://.');
-    await requireEnxovalMember(getPool(), user.id, enxovalId);
-    const image = await importImageFromUrl(url);
-    res.status(201).json({ imageUrl: await storeImage(getPool(), enxovalId, user.id, image), width: image.width, height: image.height });
-  }));
-
-  router.get('/item-images/:id', asyncHandler(async (req, res) => {
-    const user = await requireCurrentUser(req);
-    const id = internalImageId(`/api/item-images/${req.params.id}`);
-    if (!id) throw new HttpError(404, 'Imagem não encontrada.');
-    const result = await getPool().query<{ data: Buffer; content_type: string; sha256: string }>(`
-      SELECT ii.data, ii.content_type, ii.sha256
-      FROM item_images ii
-      INNER JOIN enxoval_members em ON em.enxoval_id = ii.enxoval_id
-      WHERE ii.id = $1 AND em.user_id = $2
-    `, [id, user.id]);
-    const row = result.rows[0];
-    if (!row) throw new HttpError(404, 'Imagem não encontrada.');
-    // O conteúdo de cada id nunca muda, então o navegador pode guardar a imagem.
-    res.set({
-      'Content-Type': row.content_type,
-      'Cache-Control': 'private, max-age=31536000, immutable',
-      ETag: `"${row.sha256}"`,
-      'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'none'; sandbox",
-    });
-    if (req.headers['if-none-match'] === `"${row.sha256}"`) {
-      res.status(304).end();
-      return;
-    }
-    res.send(row.data);
   }));
 
   router.get('/health', (_req, res) => {
@@ -1932,7 +1823,7 @@ export function registerApiRoutes(app: Express) {
       // Resultado parcial (só o nome tirado do link) não é um dado confiável da loja: não vira produto acompanhado.
       if (!preview.partial) rememberPreview(preview);
       // O catálogo sabe o cômodo de quase todo item; o regex de `suggestCategory` fica só como reserva.
-      const catalogItem = preview.title ? await findItemInTitle(preview.title).catch(() => null) : null;
+      const catalogItem = preview.title ? await findItemInTitle(preview.title).catch(err => { getLogger().warn({ event: 'catalog.title.failed', title: preview.title, err }, 'Catalog title lookup failed.'); return null; }) : null;
       res.json({ ...preview, suggestedRoom: catalogItem?.room ?? null });
     } catch (err) {
       if (err instanceof ScrapeError) throw new HttpError(err.code === 'invalid_url' ? 400 : 422, err.message);

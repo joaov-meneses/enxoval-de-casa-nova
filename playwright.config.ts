@@ -8,13 +8,13 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
     viewport: { width: 1440, height: 1000 },
     channel: process.platform === "win32" ? "msedge" : "chromium",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_BASE_URL ? undefined : {
     command: "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,

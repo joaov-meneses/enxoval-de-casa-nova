@@ -1,5 +1,12 @@
+import { Badge } from "@/src/components/ui/badge";
+import { Checkbox } from "./ui/checkbox";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Textarea } from "@/src/components/ui/textarea";
 import {
   useEffect,
+  useLayoutEffect,
   useId,
   useRef,
   useState,
@@ -19,7 +26,7 @@ import {
   TrendingUp,
   PackageX,
   CalendarClock,
-} from "lucide-react";
+} from "@/src/components/icons";
 import type {
   EnxovalCategory,
   EnxovalItem,
@@ -42,11 +49,12 @@ import {
 import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
 import { QuantityStepper } from "./QuantityStepper";
-import { ItemImageField } from "./ItemImageField";
 import { ItemCompletionDialog } from "./ItemCompletionDialog";
 import { Select } from "./Select";
 import { weekOptions } from "../planning/weekOptions";
 import { weekLabel } from "../planning/purchasePlan";
+import { ScribbledItemName } from "./ScribbledItemName";
+import { ItemChalkStroke } from "./ItemChalkStroke";
 
 /** Semana de compra do item no planejamento (sugerida pelo algoritmo ou escolhida pela pessoa). */
 export interface ItemBuyPlan {
@@ -65,8 +73,6 @@ interface ItemRowProps {
   updatedAtLabel?: string;
   dragHandle?: ReactNode;
   buyPlan?: ItemBuyPlan;
-  /** Enxoval do item: é onde a imagem enviada fica guardada. Sem ele a edição não mostra o campo de imagem. */
-  enxovalId?: string;
   onUpdate: (
     id: string,
     updates: Partial<EnxovalItem> & ItemTrackingInput,
@@ -96,18 +102,29 @@ export function ItemRow({
   updatedAtLabel,
   dragHandle,
   buyPlan,
-  enxovalId,
   onUpdate,
   onDelete,
 }: ItemRowProps) {
   const [importStep, setImportStep] = useState<'idle' | 'ask' | 'loading' | 'choose' | 'done' | 'error'>('idle');
   const [productPreview, setProductPreview] = useState<ScrapedProductPreview | null>(null);
   const [importError, setImportError] = useState('');
-  const [previewImageFailed, setPreviewImageFailed] = useState(false);
   const importTicket = useRef(0);
   const reviewedLink = useRef(item.link.trim());
   const currentLink = useRef(item.link);
   const [expanded, setExpanded] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const wasChecked = useRef(item.checked);
+  useLayoutEffect(() => {
+    const justCompleted = item.checked && !wasChecked.current;
+    wasChecked.current = item.checked;
+    if (!justCompleted) {
+      if (!item.checked) setCompleting(false);
+      return;
+    }
+    setCompleting(true);
+    const timeout = window.setTimeout(() => setCompleting(false), 760);
+    return () => window.clearTimeout(timeout);
+  }, [item.checked]);
   const [name, setName] = useState(item.name);
   const [priceText, setPriceText] = useState("");
   const [discountText, setDiscountText] = useState("");
@@ -119,13 +136,10 @@ export function ItemRow({
   const [weekValue, setWeekValue] = useState("auto");
   const [targetText, setTargetText] = useState("");
   const [alertEnabled, setAlertEnabled] = useState(true);
-  const [imageValue, setImageValue] = useState<string | null>(item.imageUrl ?? null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [completionOpen, setCompletionOpen] = useState(false);
-  const [thumbFailed, setThumbFailed] = useState(false);
+  const [checkPointerFocus, setCheckPointerFocus] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [imageBusy, setImageBusy] = useState(false);
-  const imageBusyRef = useRef(false);
   const [error, setError] = useState("");
   const id = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -159,11 +173,9 @@ export function ItemRow({
         : "",
     );
     setAlertEnabled(item.priceTracking?.priceAlertEnabled ?? true);
-    setImageValue(item.imageUrl ?? null);
     setError("");
   }, [item, expanded]);
   useEffect(() => () => { importTicket.current++; }, []);
-  useEffect(() => setThumbFailed(false), [item.imageUrl]);
   // O preço da linha já considera o desconto/cashback registrado (itens ganhos mantêm o valor cheio).
   const price = netPriceCents(item);
   const itemDiscount = discountApplies(item.status) ? item.discountCents : 0;
@@ -179,13 +191,12 @@ export function ItemRow({
   const link = safeLink(item.link);
   const tracking = item.priceTracking ?? null;
   const change = priceChange(tracking);
-  const thumbnail = item.imageUrl && !thumbFailed ? item.imageUrl : "";
   const added =
     item.createdAt && Number.isFinite(Date.parse(item.createdAt))
       ? new Date(item.createdAt).toLocaleDateString("pt-BR")
       : null;
   function toggle() {
-    if (!busy && !imageBusy) setExpanded((value) => !value);
+    if (!busy) setExpanded((value) => !value);
   }
   function close() {
     setExpanded(false);
@@ -205,7 +216,7 @@ export function ItemRow({
     try {
       const preview = await extractProduct(url);
       if (ticket !== importTicket.current || safeLink(currentLink.current) !== url) return;
-      setProductPreview(preview); setPreviewImageFailed(false); setImportStep('choose');
+      setProductPreview(preview); setImportStep('choose');
     } catch (err) {
       if (ticket !== importTicket.current) return;
       setImportError(err instanceof Error ? err.message : 'Não foi possível ler este produto. Você pode preencher os dados manualmente.');
@@ -220,7 +231,6 @@ export function ItemRow({
         setPriceText(money.format(productPreview.priceCents / 100));
         setDiscountText('');
       }
-      if (productPreview.imageUrl) setImageValue(productPreview.imageUrl);
     }
     setImportStep('done');
     if (!useStoreName) requestAnimationFrame(() => {
@@ -230,7 +240,6 @@ export function ItemRow({
   };
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (imageBusyRef.current) return;
     if (offerImport() || ['ask', 'loading', 'choose'].includes(importStep)) return;
     setBusy(true);
     setError("");
@@ -273,8 +282,6 @@ export function ItemRow({
           priceBasis: 'regular' as const,
           selectedVariation: null,
         } : {}),
-        // A imagem só vai no pedido quando a pessoa trocou ou removeu.
-        ...(imageValue !== (item.imageUrl ?? null) ? { imageUrl: imageValue } : {}),
         // A semana só vai no pedido quando a pessoa mexeu nela.
         ...(weekValue !== (item.buyWeek === null ? "auto" : String(item.buyWeek))
           ? { buyWeek: weekValue === "auto" ? null : Number(weekValue) }
@@ -302,39 +309,33 @@ export function ItemRow({
   return (
     <div
       data-item-id={item.id}
-      className={`item-row ${item.checked ? "checked" : ""} ${isInactiveStatus(item.status) ? "inactive" : ""} ${expanded ? "expanded" : ""}`}
+      onPointerDownCapture={() => setCheckPointerFocus(true)}
+      onKeyDownCapture={() => setCheckPointerFocus(false)}
+
+      className={`item-row ${item.checked ? "checked" : ""} ${isInactiveStatus(item.status) ? "inactive" : ""} ${expanded ? "expanded" : ""} ${completing ? "is-completing" : ""}`}
     >
+      {completing && <ItemChalkStroke />}
       <div className="item-row-inner">
         <div className="item-row-controls">
-        <button
+        <Checkbox asChild checked={item.checked}><Button variant="brand" size="brand"
           type="button"
-          role="checkbox"
-          aria-checked={item.checked}
           aria-label={`${item.checked ? "Desmarcar" : "Marcar como conquistado"}: ${item.name}`}
           aria-haspopup={item.checked ? undefined : 'dialog'}
           className="item-check"
+          data-pointer-focus={checkPointerFocus || undefined}
+          onBlur={() => setCheckPointerFocus(false)}
           disabled={busy}
           onClick={() => {
             if (!item.checked) { setCompletionOpen(true); return; }
             void Promise.resolve(onUpdate(item.id, { checked: false })).catch(() => undefined);
           }}
         >
-          <Check size={13} strokeWidth={2.5} />
-        </button>
+          <Check size={15} strokeWidth={2.5} />
+        </Button></Checkbox>
         {dragHandle}
         </div>
-        {thumbnail && (
-          <img
-            className="item-thumb"
-            src={thumbnail}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={() => setThumbFailed(true)}
-          />
-        )}
         <div className="item-content">
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="item-title-button"
             aria-expanded={expanded}
@@ -343,8 +344,8 @@ export function ItemRow({
             disabled={busy}
             title={item.name}
           >
-            <span className="item-name">{item.name}</span>
-          </button>
+            <ScribbledItemName name={item.name} checked={item.checked} />
+          </Button>
           <div className="item-meta">
             {categoryName && (
               <span className="item-category-tag">{categoryName}</span>
@@ -377,7 +378,7 @@ export function ItemRow({
               <span className="item-quantity-tag">{item.selectedVariation}</span>
             )}
             {tracking && change && change.direction !== "same" && (
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className={`price-badge ${change.direction === "down" ? "is-down" : "is-up"}`}
                 onClick={() => setHistoryOpen(true)}
@@ -391,32 +392,32 @@ export function ItemRow({
                 )}
                 {change.direction === "down" ? "−" : "+"}
                 {money.format(Math.abs(change.deltaCents) / 100)} ({change.percent}%)
-              </button>
+              </Button>
             )}
             {tracking?.isLowestIn60d && (
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="price-badge is-lowest"
                 onClick={() => setHistoryOpen(true)}
                 title="Ver histórico de preços"
               >
                 <Flame size={12} aria-hidden="true" /> Menor preço em 60 dias
-              </button>
+              </Button>
             )}
             {tracking && !change && tracking.currentPriceCents !== null && (
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="price-badge"
                 onClick={() => setHistoryOpen(true)}
                 title="Ver histórico de preços"
               >
                 Acompanhando o preço
-              </button>
+              </Button>
             )}
             {tracking && !tracking.inStock && (
-              <span className="price-badge is-out">
+              <Badge asChild variant="outline"><span className="price-badge is-out">
                 <PackageX size={12} aria-hidden="true" /> Indisponível
-              </span>
+              </span></Badge>
             )}
             {added && (
               <span className="item-added">
@@ -451,7 +452,7 @@ export function ItemRow({
           {statusLabel(item.status)}
         </span>
         <div className="item-actions">
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             onClick={() => onDelete(item)}
             className="item-delete"
@@ -460,19 +461,8 @@ export function ItemRow({
             disabled={busy}
           >
             <Trash2 size={15} />
-          </button>
-          <button
-            ref={toggleRef}
-            type="button"
-            onClick={toggle}
-            aria-label={`${expanded ? "Fechar" : "Abrir"} detalhes de ${item.name}`}
-            aria-expanded={expanded}
-            aria-controls={`${id}-details`}
-            className="item-expand"
-            disabled={busy}
-          >
-            <ChevronDown size={18} aria-hidden="true" />
-          </button>
+          </Button>
+
         </div>
       </div>
       <div
@@ -489,7 +479,7 @@ export function ItemRow({
           >
             <div className="item-inline-grid">
               <h4 className="item-inline-section item-inline-wide">Sobre o item</h4>
-              <label htmlFor={`${id}-name`} className="item-inline-wide item-field-name">
+              <Label htmlFor={`${id}-name`} className="item-inline-wide item-field-name">
                 <span className="item-inline-label-row">
                   Nome do item
                   <span
@@ -499,7 +489,7 @@ export function ItemRow({
                     {name.length}/{MAX_ITEM_NAME_LENGTH}
                   </span>
                 </span>
-                <input
+                <Input
                   id={`${id}-name`}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
@@ -507,8 +497,8 @@ export function ItemRow({
                   maxLength={MAX_ITEM_NAME_LENGTH}
                   disabled={busy}
                 />
-              </label>
-              <label htmlFor={`${id}-environment`} className="item-field-env">
+              </Label>
+              <Label htmlFor={`${id}-environment`} className="item-field-env">
                 Ambiente
                 <Select
                   id={`${id}-environment`}
@@ -521,8 +511,8 @@ export function ItemRow({
                   onChange={setCategoryId}
                   disabled={busy}
                 />
-              </label>
-              <label htmlFor={`${id}-status`} className="item-field-status" title={ITEM_STATUS_META[status].hint}>
+              </Label>
+              <Label htmlFor={`${id}-status`} className="item-field-status" title={ITEM_STATUS_META[status].hint}>
                 Situação
                 <Select
                   id={`${id}-status`}
@@ -541,9 +531,9 @@ export function ItemRow({
                 <span className="item-inline-hint">
                   {ITEM_STATUS_META[status].hint}
                 </span>
-              </label>
+              </Label>
               {buyPlan && (
-                <label
+                <Label
                   htmlFor={`${id}-week`}
                   className="item-inline-wide item-field-week"
                   title={weekValue === "auto" ? `Sugestão: ${buyPlan.reason}` : "Semana escolhida por você, contada a partir da mudança."}
@@ -566,12 +556,12 @@ export function ItemRow({
                       ? `Sugestão: ${buyPlan.reason}`
                       : "Semana escolhida por você, contada a partir da mudança. Vale mais que a sugestão."}
                   </span>
-                </label>
+                </Label>
               )}
               <h4 className="item-inline-section item-inline-wide">Valores</h4>
-              <label htmlFor={`${id}-price`} className="item-field-price">
+              <Label htmlFor={`${id}-price`} className="item-field-price">
                 Preço
-                <input
+                <Input
                   id={`${id}-price`}
                   inputMode="numeric"
                   value={priceText}
@@ -586,8 +576,8 @@ export function ItemRow({
                   placeholder="R$ 0,00"
                   disabled={busy}
                 />
-              </label>
-              <label
+              </Label>
+              <Label
                 htmlFor={`${id}-discount`}
                 className="item-field-discount"
                 title={
@@ -599,7 +589,7 @@ export function ItemRow({
                 }
               >
                 Desconto ou cashback
-                <input
+                <Input
                   id={`${id}-discount`}
                   inputMode="numeric"
                   value={discountText}
@@ -621,8 +611,8 @@ export function ItemRow({
                       ? "Item ganho: o valor cheio já vai para o resumo, sem desconto."
                       : "Esta situação não tem compra, então não há desconto."}
                 </span>
-              </label>
-              <label htmlFor={`${id}-quantity`} className="item-field-qty" title="Só informa quantas unidades há. Não muda o preço.">
+              </Label>
+              <Label htmlFor={`${id}-quantity`} className="item-field-qty" title="Só informa quantas unidades há. Não muda o preço.">
                 Quantidade
                 <QuantityStepper
                   id={`${id}-quantity`}
@@ -633,7 +623,7 @@ export function ItemRow({
                 <span className="item-inline-hint">
                   Só informa quantas unidades há. Não muda o preço.
                 </span>
-              </label>
+              </Label>
               <div className="item-inline-summary item-field-total" aria-live="polite">
                 <span className="item-inline-summary-label">
                   {status === "received" ? "Valor ganho" : "Valor final"}
@@ -650,9 +640,9 @@ export function ItemRow({
               {tracking && (
                 <>
                   <h4 className="item-inline-section item-inline-wide">Acompanhar preço</h4>
-                  <label htmlFor={`${id}-target`} className="item-field-target">
+                  <Label htmlFor={`${id}-target`} className="item-field-target">
                     Me avise se cair abaixo de
-                    <input
+                    <Input
                       id={`${id}-target`}
                       inputMode="numeric"
                       value={targetText}
@@ -667,22 +657,21 @@ export function ItemRow({
                       placeholder="R$ 0,00"
                       disabled={busy}
                     />
-                  </label>
-                  <label htmlFor={`${id}-alert`} className="item-inline-check item-field-alert">
-                    <input
+                  </Label>
+                  <Label htmlFor={`${id}-alert`} className="item-inline-check item-field-alert">
+                    <Checkbox
                       id={`${id}-alert`}
-                      type="checkbox"
                       checked={alertEnabled}
-                      onChange={(event) => setAlertEnabled(event.target.checked)}
+                      onCheckedChange={checked => setAlertEnabled(checked === true)}
                       disabled={busy}
                     />
                     <span>Avisar por e-mail quando o preço cair</span>
-                  </label>
+                  </Label>
                 </>
               )}
               <h4 className="item-inline-section item-inline-wide">Detalhes</h4>
               <div className="item-inline-wide item-field-link">
-                <label htmlFor={`${id}-link`}>Link do produto</label>
+                <Label htmlFor={`${id}-link`}>Link do produto</Label>
                 <CopyableLinkInput id={`${id}-link`} type="url" value={linkText} copyLabel="Copiar link do produto"
                   onChange={event => { currentLink.current = event.target.value; setLinkText(event.target.value); importTicket.current++; setImportStep('idle'); setProductPreview(null); setImportError(''); }}
                   onBlur={() => { offerImport(); }}
@@ -692,41 +681,32 @@ export function ItemRow({
               {importStep !== 'idle' && <div id={`${id}-import`} className="item-link-import item-inline-wide" aria-busy={importStep === 'loading'}>
                 {importStep === 'ask' && <>
                   <h5>Quer aproveitar os dados deste link?</h5>
-                  <p>Podemos buscar o nome, o preço e a imagem na loja para ajudar a preencher este item. Você revisa tudo antes de salvar.</p>
-                  <div className="item-link-import-actions"><button type="button" className="button button-dark" onClick={() => void readProduct()}>Buscar dados do produto</button><button type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Preencher manualmente</button></div>
+                  <p>Podemos buscar o nome e o preço na loja para ajudar a preencher este item. Você revisa tudo antes de salvar.</p>
+                  <div className="item-link-import-actions"><Button variant="brand" size="brand" type="button" className="button button-dark" onClick={() => void readProduct()}>Buscar dados do produto</Button><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Preencher manualmente</Button></div>
                 </>}
-                {importStep === 'loading' && <><p className="item-link-import-loading" role="status"><LoaderCircle size={18} className="animate-spin" />Buscando informações na loja…</p><button type="button" className="button button-outline" onClick={() => { importTicket.current++; setImportStep('idle'); }}>Continuar manualmente</button></>}
+                {importStep === 'loading' && <><p className="item-link-import-loading" role="status"><LoaderCircle size={18} className="animate-spin" />Buscando informações na loja…</p><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => { importTicket.current++; setImportStep('idle'); }}>Continuar manualmente</Button></>}
                 {importStep === 'choose' && productPreview && <>
                   <h5>Como prefere chamar este item?</h5>
                   <div className="item-link-import-preview">
-                    {!productPreview.partial && productPreview.imageUrl && !previewImageFailed && <img src={productPreview.imageUrl} alt="" referrerPolicy="no-referrer" onError={() => setPreviewImageFailed(true)} />}
                     <div><strong>{productPreview.title || 'A loja não informou um nome'}</strong>{!productPreview.partial && productPreview.currency?.toUpperCase() === 'BRL' && productPreview.priceCents !== null && <span>{money.format(productPreview.priceCents / 100)}</span>}</div>
                   </div>
-                  <p>{productPreview.partial ? 'A loja limitou a leitura. Encontramos apenas uma sugestão de nome pelo endereço; confira os outros dados manualmente.' : 'O preço e a imagem encontrados serão preenchidos. Para o nome, escolha uma das opções abaixo. Seus dados só serão gravados ao salvar as alterações.'}</p>
-                  <div className="item-link-import-actions"><button type="button" className="button button-dark" disabled={!productPreview.title.trim()} onClick={() => applyProduct(true)}>Usar nome da loja</button><button type="button" className="button button-outline" onClick={() => applyProduct(false)}>Definir meu próprio nome</button></div>
-                  <button type="button" className="button button-outline" onClick={() => { setProductPreview(null); setImportStep('idle'); }}>Manter meus dados atuais</button>
+                  <p>{productPreview.partial ? 'A loja limitou a leitura. Encontramos apenas uma sugestão de nome pelo endereço; confira os outros dados manualmente.' : 'O preço encontrado será preenchido. Para o nome, escolha uma das opções abaixo. Seus dados só serão gravados ao salvar as alterações.'}</p>
+                  <div className="item-link-import-actions"><Button variant="brand" size="brand" type="button" className="button button-dark" disabled={!productPreview.title.trim()} onClick={() => applyProduct(true)}>Usar nome da loja</Button><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => applyProduct(false)}>Definir meu próprio nome</Button></div>
+                  <Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => { setProductPreview(null); setImportStep('idle'); }}>Manter meus dados atuais</Button>
                 </>}
                 {importStep === 'done' && <p role="status">{productPreview?.partial ? 'Nome revisado. Confira os demais dados antes de salvar.' : 'Dados preenchidos. Revise as informações e salve quando estiver tudo certo.'}</p>}
-                {importStep === 'error' && <><p role="alert">{importError}</p><p>O link foi mantido. Você pode continuar preenchendo manualmente.</p><div className="item-link-import-actions"><button type="button" className="button button-outline" onClick={() => void readProduct()}>Tentar buscar novamente</button><button type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Continuar manualmente</button></div></>}
+                {importStep === 'error' && <><p role="alert">{importError}</p><p>O link foi mantido. Você pode continuar preenchendo manualmente.</p><div className="item-link-import-actions"><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => void readProduct()}>Tentar buscar novamente</Button><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Continuar manualmente</Button></div></>}
               </div>}
-              <ItemImageField
-                className="item-inline-wide"
-                enxovalId={enxovalId}
-                value={imageValue}
-                onChange={setImageValue}
-                onBusyChange={value => { imageBusyRef.current = value; setImageBusy(value); }}
-                disabled={busy}
-              />
-              <label htmlFor={`${id}-description`} className="item-inline-wide item-field-notes">
+              <Label htmlFor={`${id}-description`} className="item-inline-wide item-field-notes">
                 Observações
-                <textarea
+                <Textarea
                   id={`${id}-description`}
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   rows={2}
                   disabled={busy}
                 />
-              </label>
+              </Label>
             </div>
             {!added && (
               <p className="item-inline-note">
@@ -739,28 +719,42 @@ export function ItemRow({
               </div>
             )}
             <div className="item-inline-actions">
-              <button
+              <Button variant="brand" size="brand"
                 className="button button-outline"
                 type="button"
                 onClick={close}
                 disabled={busy}
               >
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 className="button button-dark"
                 type="submit"
-                disabled={busy || imageBusy || !name.trim() || ['loading', 'choose'].includes(importStep)}
+                disabled={busy || !name.trim() || ['loading', 'choose'].includes(importStep)}
               >
                 {busy ? (
                   <LoaderCircle size={17} className="animate-spin" />
                 ) : (
                   "Salvar alterações"
                 )}
-              </button>
+              </Button>
             </div>
           </form>
         )}
+      </div>
+      <div className="item-footer">
+          <Button variant="brand" size="brand"
+            ref={toggleRef}
+            type="button"
+            onClick={toggle}
+            aria-label={`${expanded ? "Fechar" : "Abrir"} detalhes de ${item.name}`}
+            aria-expanded={expanded}
+            aria-controls={`${id}-details`}
+            className="item-expand"
+            disabled={busy}
+          >
+            <ChevronDown size={18} aria-hidden="true" />
+          </Button>
       </div>
       {tracking && (
         <PriceHistoryDialog

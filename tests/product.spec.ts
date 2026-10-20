@@ -6,25 +6,19 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    for (const route of ["/", "/login", "/signup"]) {
+    for (const route of ["/", "/login", "/cadastro"]) {
       await page.goto(route);
-      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBeLessThanOrEqual(width);
       await expect(page.getByRole("main")).toBeVisible();
-      expect(
-        await page
-          .locator("img")
-          .evaluateAll((images) =>
-            images.every(
-              (i) =>
-                i instanceof HTMLImageElement &&
-                i.complete &&
-                i.naturalWidth > 0,
-            ),
-          ),
-      ).toBe(true);
+      await expect.poll(() => page.locator("img").evaluateAll(images =>
+        images.filter(image => {
+          const bounds = image.getBoundingClientRect();
+          return bounds.width > 0 && bounds.height > 0 && bounds.bottom > 0 && bounds.top < innerHeight;
+        }).every(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0),
+      )).toBe(true);
     }
     expect(errors).toEqual([]);
   });
@@ -44,17 +38,17 @@ test("landing navigation, FAQ and entry routes work", async ({ page }) => {
   await question.click();
   await expect(question).toHaveAttribute("aria-expanded", "true");
   await expect(
-    page.getByText("Ainda não. Os valores desta página", { exact: false }),
+    page.getByText("O teste completo dura 2 dias", { exact: false }),
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /demonstra/i })).toHaveCount(0);
   // As seções da nova Home têm âncora na navegação.
-  for (const id of ["como-funciona", "nino", "cha", "planos", "duvidas"])
+  for (const id of ["como-funciona", "nino", "recursos", "planos", "duvidas"])
     await expect(page.locator(`#${id}`)).toHaveCount(1);
-  // Quatro planos: gratuito, semestral, anual e mensal.
-  await expect(page.locator(".cm-plan")).toHaveCount(4);
+  // Ofertas atuais: mensal e Passe da Casa Nova.
+  await expect(page.locator(".cm-plan")).toHaveCount(2);
 });
 
-test("login handles API errors and success; registration opens onboarding (mock API)", async ({
+test("login handles API errors and loads the authenticated workspace (mock API)", async ({
   page,
 }) => {
   const enxoval = {
@@ -66,13 +60,17 @@ test("login handles API errors and success; registration opens onboarding (mock 
   };
   const workspace = { enxoval, members: [], categories: [], items: [] };
   const bootstrap = {
-    user: { id: "test", name: "Pessoa Teste", email: "teste@example.com" },
+    user: { id: "test", name: "Pessoa Teste", email: "teste@example.com", plan: "monthly", onboardingCompleted: true },
     enxovais: [workspace.enxoval],
     activeEnxoval: workspace.enxoval,
     members: workspace.members,
     categories: workspace.categories,
     items: workspace.items,
   };
+  await page.route("**/api/billing/status**", route => route.fulfill({ json: {
+    available: true, accessAllowed: true, isOwner: true, trialUsed: true,
+    plan: "monthly", status: "active", trialNotice: null,
+  } }));
   await page.goto("/login");
   await page.getByLabel("Seu e-mail").fill("teste@example.com");
   await page.getByLabel("Sua senha", { exact: true }).fill("senha-de-teste");
@@ -103,9 +101,9 @@ for (const width of [390, 1440]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 1000 });
-    for (const route of ["/", "/login", "/signup"]) {
+    for (const route of ["/", "/login", "/cadastro"]) {
       await page.goto(route);
-      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
       const result = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
         .analyze();

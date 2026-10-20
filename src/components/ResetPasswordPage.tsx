@@ -1,3 +1,6 @@
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -7,7 +10,7 @@ import {
   KeyRound,
   LoaderCircle,
   TriangleAlert,
-} from "lucide-react";
+} from "@/src/components/icons";
 import { checkPasswordResetToken, resetPassword } from "../api";
 import { Brand } from "./Brand";
 
@@ -94,9 +97,9 @@ export function ResetPasswordPage() {
               Ele pode ter expirado (vale por 1 hora), já ter sido usado ou ter
               sido substituído por um pedido mais novo. É só pedir outro.
             </p>
-            <a className="button button-dark account-cta" href="/esqueci-senha">
+            <Button asChild variant="brand" size="brand"><a className="button button-dark account-cta" href="/esqueci-senha">
               Pedir um novo link <ArrowRight size={18} />
-            </a>
+            </a></Button>
             <a className="account-signout" href="/app">
               Voltar para o login
             </a>
@@ -114,10 +117,10 @@ export function ResetPasswordPage() {
               continuam salvos.
             </p>
             <form className="auth-form" onSubmit={submit} aria-busy={busy}>
-              <label htmlFor="reset-password">
+              <Label htmlFor="reset-password">
                 Nova senha
                 <span className="password-field">
-                  <input
+                  <Input
                     id="reset-password"
                     type={visible ? "text" : "password"}
                     autoComplete="new-password"
@@ -130,18 +133,18 @@ export function ResetPasswordPage() {
                     placeholder="Pelo menos 8 caracteres"
                     disabled={busy}
                   />
-                  <button
+                  <Button variant="brand" size="brand"
                     type="button"
                     aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
                     onClick={() => setVisible(!visible)}
                   >
                     {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+                  </Button>
                 </span>
-              </label>
-              <label htmlFor="reset-confirmation">
+              </Label>
+              <Label htmlFor="reset-confirmation">
                 Confirme a nova senha
-                <input
+                <Input
                   id="reset-confirmation"
                   type={visible ? "text" : "password"}
                   autoComplete="new-password"
@@ -153,7 +156,7 @@ export function ResetPasswordPage() {
                   placeholder="Digite novamente"
                   disabled={busy}
                 />
-              </label>
+              </Label>
               <p className="account-password-hint">
                 Ao salvar, você sai de todos os aparelhos e entra de novo com a
                 senha nova.
@@ -163,7 +166,7 @@ export function ResetPasswordPage() {
                   {error}
                 </div>
               )}
-              <button className="button button-dark" type="submit" disabled={busy}>
+              <Button variant="brand" size="brand" className="button button-dark" type="submit" disabled={busy}>
                 {busy ? (
                   <LoaderCircle className="animate-spin" size={18} />
                 ) : (
@@ -171,7 +174,7 @@ export function ResetPasswordPage() {
                     Salvar nova senha <ArrowRight size={18} />
                   </>
                 )}
-              </button>
+              </Button>
             </form>
           </>
         )}
@@ -186,9 +189,9 @@ export function ResetPasswordPage() {
               Tudo certo! Agora é só entrar com a sua nova senha. Também
               enviamos um aviso para o seu e-mail.
             </p>
-            <a className="button button-dark account-cta" href="/app">
+            <Button asChild variant="brand" size="brand"><a className="button button-dark account-cta" href="/app">
               Entrar no meu enxoval <ArrowRight size={18} />
-            </a>
+            </a></Button>
           </>
         )}
       </section>

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Check } from "lucide-react";
+import { Check } from "@/src/components/icons";
 
 export const STEPS = [
   {

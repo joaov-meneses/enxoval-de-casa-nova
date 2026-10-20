@@ -1,3 +1,4 @@
+import { TooltipProvider } from "./components/ui/tooltip";
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
@@ -10,9 +11,6 @@ import { ResetPasswordPage } from './components/ResetPasswordPage';
 import './index.css';
 import { startSessionActivity } from './sessionActivity';
 import { startAnalytics, captureError } from './analytics';
-
-const stopSessionActivity = startSessionActivity();
-if (import.meta.hot) import.meta.hot.dispose(stopSessionActivity);
 
 // /signup antigo: a conta só é criada no fim do funil de onboarding.
 // Checkouts antigos voltavam para o onboarding; preserve a confirmação ao abrir o enxoval.
@@ -32,11 +30,15 @@ if (
 const stopAnalytics = startAnalytics();
 if (import.meta.hot) import.meta.hot.dispose(stopAnalytics);
 
+const stopSessionActivity = startSessionActivity();
+if (import.meta.hot) import.meta.hot.dispose(stopSessionActivity);
+
 createRoot(document.getElementById('root')!, {
-  onUncaughtError: error => captureError(error),
-  onCaughtError: error => captureError(error),
+  onUncaughtError: (error, info) => captureError(error, { error_source: 'react.uncaught', ...info }),
+  onCaughtError: (error, info) => captureError(error, { error_source: 'react.caught', ...info }),
 }).render(
   <StrictMode>
+    <TooltipProvider>
     {/^\/admin(?:\/|$)/.test(window.location.pathname) ? (
       <AdminPage />
     ) : window.location.pathname === '/comecar' ? (
@@ -52,5 +54,6 @@ createRoot(document.getElementById('root')!, {
     ) : (
       <App />
     )}
+    </TooltipProvider>
   </StrictMode>,
 );

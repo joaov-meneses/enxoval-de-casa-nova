@@ -1,5 +1,10 @@
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Textarea } from "@/src/components/ui/textarea";
 import React, { useEffect, useRef, useState } from "react";
-import { Sparkles, LoaderCircle, PackageCheck, PackageX, X } from "lucide-react";
+import { Sparkles, LoaderCircle, PackageCheck, PackageX, X } from "@/src/components/icons";
 import type {
   CatalogSearchResult,
   EnxovalCategory,
@@ -25,7 +30,6 @@ import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { Dialog } from "./Dialog";
 import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
-import { ItemImageField } from "./ItemImageField";
 
 const NEW_CATEGORY_VALUE = "__new_category__";
 const money = new Intl.NumberFormat("pt-BR", {
@@ -114,7 +118,6 @@ export function AddItemModal({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ItemStatus>(DEFAULT_ITEM_STATUS);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imageBusy, setImageBusy] = useState(false);
   const [error, setError] = useState("");
   // Importação por link: a leitura é só uma ajuda; falhar não impede preencher tudo à mão.
   const [importUrl, setImportUrl] = useState("");
@@ -122,9 +125,6 @@ export function AddItemModal({
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "done" | "partial" | "error">("idle");
   const [importError, setImportError] = useState("");
   const [preview, setPreview] = useState<ScrapedProductPreview | null>(null);
-  const [imageFailed, setImageFailed] = useState(false);
-  // Imagem do item: a da loja (vinda da importação), um arquivo enviado ou o link de uma imagem.
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [priceBasis, setPriceBasis] = useState<PriceBasis>("regular");
   const [voltage, setVoltage] = useState("");
   const [color, setColor] = useState("");
@@ -132,8 +132,6 @@ export function AddItemModal({
   // Só preenche sozinho o que a pessoa ainda não mexeu.
   const autoName = useRef("");
   const autoPrice = useRef("");
-  // Imagem que a importação por link colocou sozinha: só ela pode ser trocada por outra importação.
-  const autoImage = useRef("");
   const categoryTouched = useRef(false);
   const importTicket = useRef(0);
   // Último endereço já lido, para o campo "Link do produto" não buscar a mesma loja de novo ao perder o foco.
@@ -261,9 +259,6 @@ export function AddItemModal({
     setImportStatus("idle");
     setImportError("");
     setPreview(null);
-    setImageFailed(false);
-    setImageUrl(null);
-    autoImage.current = "";
     setPriceBasis("regular");
     setVoltage("");
     setColor("");
@@ -296,10 +291,6 @@ export function AddItemModal({
 
   const applyPreview = (data: ScrapedProductPreview) => {
     setPreview(data);
-    setImageFailed(false);
-    const previousAutoImage = autoImage.current;
-    autoImage.current = data.imageUrl ?? "";
-    setImageUrl((current) => (!current || current === previousAutoImage ? (data.imageUrl ?? null) : current));
     setPriceBasis("regular");
     setColor("");
     setVoltage(data.variations?.voltage?.length === 1 ? data.variations.voltage[0] : "");
@@ -367,9 +358,6 @@ export function AddItemModal({
     setImportStatus("idle");
     setImportError("");
     setPreview(null);
-    const autoImageUrl = autoImage.current;
-    autoImage.current = "";
-    setImageUrl((current) => (current === autoImageUrl ? null : current));
     setVoltage("");
     setColor("");
     setTargetText("");
@@ -387,7 +375,6 @@ export function AddItemModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (imageBusy) return;
 
     const trimmedName = name.trim();
     const trimmedCategoryName = normalizeEnvironmentName(newCategoryName);
@@ -433,7 +420,6 @@ export function AddItemModal({
           link: link.trim(),
           description: description.trim(),
           status,
-          ...(imageUrl ? { imageUrl } : {}),
           ...(preview && importStatus === "done"
             ? {
                 trackedProductUrl: preview.url,
@@ -478,11 +464,11 @@ export function AddItemModal({
               <Sparkles size={15} aria-hidden="true" /> Importar por link
             </h3>
             <p id="import-link-hint" className="mt-0.5 text-xs text-stone-500">
-              Cole o link de um produto (Mercado Livre, Amazon, Magalu...) e a gente preenche nome, foto e preço. Depois acompanhamos se ele ficou mais barato.
+              Cole o link de um produto (Mercado Livre, Amazon, Magalu...) e a gente preenche nome e preço. Depois acompanhamos se ele ficou mais barato.
             </p>
           </div>
           <div className="flex gap-2">
-            <input
+            <Input
               id="import-link-url"
               type="text"
               inputMode="url"
@@ -508,7 +494,7 @@ export function AddItemModal({
               disabled={isSubmitting}
               className="min-w-0 flex-1 px-3.5 py-2.5 text-base border border-stone-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
             />
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => void runImport(importUrl)}
               disabled={!importUrl.trim() || importStatus === "loading" || isSubmitting}
@@ -520,7 +506,7 @@ export function AddItemModal({
                 <Sparkles size={16} aria-hidden="true" />
               )}
               <span>Buscar<span className="hidden sm:inline"> informações</span></span>
-            </button>
+            </Button>
           </div>
 
           <div aria-live="polite">
@@ -542,9 +528,9 @@ export function AddItemModal({
             {importStatus === "partial" && preview && (
               <div role="status" className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 <p className="min-w-0 flex-1">
-                  Essa loja não deixou ler o preço e a foto. Preenchemos o nome pelo link: confira o nome e informe o preço abaixo.
+                  Essa loja não deixou ler o preço. Preenchemos o nome pelo link: confira o nome e informe o preço abaixo.
                 </p>
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   onClick={clearImport}
                   aria-label="Remover importação"
@@ -552,26 +538,12 @@ export function AddItemModal({
                   className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-amber-800 hover:bg-amber-100"
                 >
                   <X size={14} aria-hidden="true" />
-                </button>
+                </Button>
               </div>
             )}
             {importStatus === "done" && preview && (
               <div className="rounded-xl border border-stone-200 bg-white p-3">
                 <div className="flex gap-3">
-                  {preview.imageUrl && !imageFailed ? (
-                    <img
-                      src={preview.imageUrl}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      onError={() => setImageFailed(true)}
-                      className="h-16 w-16 shrink-0 rounded-lg border border-stone-100 bg-white object-contain"
-                    />
-                  ) : (
-                    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg bg-stone-100 text-stone-400" aria-hidden="true">
-                      <PackageCheck size={22} />
-                    </div>
-                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-semibold text-stone-700">
@@ -590,7 +562,7 @@ export function AddItemModal({
                       {preview.pixPriceCents ? ` · ${moneyText(preview.pixPriceCents)} no Pix` : ""}
                     </p>
                   </div>
-                  <button
+                  <Button variant="brand" size="brand"
                     type="button"
                     onClick={clearImport}
                     aria-label="Remover importação"
@@ -598,7 +570,7 @@ export function AddItemModal({
                     className="h-8 w-8 shrink-0 grid place-items-center rounded-lg text-stone-500 hover:bg-stone-100"
                   >
                     <X size={16} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </div>
 
                 {preview.pixPriceCents && preview.priceCents ? (
@@ -606,71 +578,62 @@ export function AddItemModal({
                     <span id="import-price-basis" className="block text-xs font-medium text-stone-600 mb-1">
                       Qual preço usar?
                     </span>
-                    <div role="radiogroup" aria-labelledby="import-price-basis" className="grid grid-cols-2 gap-1.5">
+                    <RadioGroup value={priceBasis} onValueChange={value => setPriceBasis(value as PriceBasis)} aria-labelledby="import-price-basis" className="grid grid-cols-2 gap-1.5">
                       {([
                         ["regular", "Normal", preview.priceCents],
                         ["pix", "No Pix", preview.pixPriceCents],
                       ] as const).map(([value, label, cents]) => (
-                        <button
+                        <RadioGroupItem key={value} value={value} asChild><Button variant="brand" size="brand"
                           key={value}
                           type="button"
-                          role="radio"
-                          aria-checked={priceBasis === value}
-                          onClick={() => choosePriceBasis(value)}
                           className={`rounded-lg border px-2 py-2 text-sm transition-colors ${priceBasis === value ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
                         >
                           {label} · {moneyText(cents)}
-                        </button>
+                        </Button></RadioGroupItem>
                       ))}
-                    </div>
+                    </RadioGroup>
                   </div>
                 ) : null}
 
                 {preview.variations?.voltage?.length ? (
                   <div className="mt-3">
                     <span id="import-voltage" className="block text-xs font-medium text-stone-600 mb-1">Voltagem</span>
-                    <div role="radiogroup" aria-labelledby="import-voltage" className="flex flex-wrap gap-1.5">
+                    <RadioGroup value={voltage} onValueChange={value => setVoltage(value)} aria-labelledby="import-voltage" className="flex flex-wrap gap-1.5">
                       {preview.variations.voltage.map((option) => (
-                        <button
+                        <RadioGroupItem key={option} value={option} asChild><Button variant="brand" size="brand"
                           key={option}
                           type="button"
-                          role="radio"
-                          aria-checked={voltage === option}
-                          onClick={() => setVoltage(voltage === option ? "" : option)}
                           className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${voltage === option ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
                         >
                           {option}
-                        </button>
+                        </Button></RadioGroupItem>
                       ))}
-                    </div>
+                    </RadioGroup>
                   </div>
                 ) : null}
 
                 {preview.variations?.colors?.length ? (
                   <div className="mt-3">
                     <span id="import-color" className="block text-xs font-medium text-stone-600 mb-1">Cor</span>
-                    <div role="radiogroup" aria-labelledby="import-color" className="flex flex-wrap gap-1.5">
+                    <RadioGroup value={color} onValueChange={value => setColor(value)} aria-labelledby="import-color" className="flex flex-wrap gap-1.5">
                       {preview.variations.colors.map((option) => (
-                        <button
+                        <RadioGroupItem key={option} value={option} asChild><Button variant="brand" size="brand"
                           key={option}
                           type="button"
-                          role="radio"
-                          aria-checked={color === option}
-                          onClick={() => setColor(color === option ? "" : option)}
                           className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${color === option ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
                         >
                           {option}
-                        </button>
+                        </Button></RadioGroupItem>
                       ))}
-                    </div>
+                    </RadioGroup>
                   </div>
                 ) : null}
 
                 <div className="mt-3">
-                  <label htmlFor="import-target" className="block text-xs font-medium text-stone-600 mb-1">
+                  <Label htmlFor="import-target" className="block text-xs font-medium text-stone-600 mb-1">
                     Me avise se o preço cair abaixo de <span className="font-normal text-stone-500">(opcional)</span>
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     id="import-target"
                     type="text"
                     inputMode="numeric"
@@ -693,15 +656,15 @@ export function AddItemModal({
 
         <div>
           <div className="flex items-baseline justify-between gap-3 mb-1">
-            <label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700">
+            <Label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700">
               Nome do produto
-            </label>
+            </Label>
             <span className={`name-counter${name.length >= MAX_ITEM_NAME_LENGTH ? " is-full" : ""}`} aria-hidden="true">
               {name.length}/{MAX_ITEM_NAME_LENGTH}
             </span>
           </div>
           <div className="relative">
-            <input
+            <Input
               type="text"
               id="new-item-name"
               required
@@ -776,9 +739,9 @@ export function AddItemModal({
 
         <div className="add-item-row grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="new-item-category" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-category" className="block text-sm font-medium text-stone-700 mb-1">
               Ambiente
-            </label>
+            </Label>
             <Select
               id="new-item-category"
               value={categoryId}
@@ -799,9 +762,9 @@ export function AddItemModal({
             )}
           </div>
           <div>
-            <label htmlFor="new-item-status" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-status" className="block text-sm font-medium text-stone-700 mb-1">
               Situação
-            </label>
+            </Label>
             <Select
               id="new-item-status"
               value={status}
@@ -823,10 +786,10 @@ export function AddItemModal({
 
         {categoryId === NEW_CATEGORY_VALUE && (
           <div>
-            <label htmlFor="new-item-category-name" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-category-name" className="block text-sm font-medium text-stone-700 mb-1">
               Nome do ambiente
-            </label>
-            <input
+            </Label>
+            <Input
               id="new-item-category-name"
               required
               maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
@@ -850,10 +813,10 @@ export function AddItemModal({
 
         <div className="add-item-row add-item-row-values grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="new-item-price" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-price" className="block text-sm font-medium text-stone-700 mb-1">
               Preço
-            </label>
-            <input
+            </Label>
+            <Input
               id="new-item-price"
               type="text"
               inputMode="numeric"
@@ -878,10 +841,10 @@ export function AddItemModal({
             )}
           </div>
           <div>
-            <label htmlFor="new-item-discount" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-discount" className="block text-sm font-medium text-stone-700 mb-1">
               Desconto ou cashback
-            </label>
-            <input
+            </Label>
+            <Input
               id="new-item-discount"
               type="text"
               inputMode="numeric"
@@ -903,9 +866,9 @@ export function AddItemModal({
             </p>
           </div>
           <div>
-            <label htmlFor="new-item-quantity" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-quantity" className="block text-sm font-medium text-stone-700 mb-1">
               Quantidade
-            </label>
+            </Label>
             <QuantityStepper
               id="new-item-quantity"
               value={quantityText}
@@ -941,10 +904,10 @@ export function AddItemModal({
 
         <div className="add-item-pair">
         <div>
-          <label htmlFor="new-item-link" className="block text-sm font-medium text-stone-700 mb-1">
+          <Label htmlFor="new-item-link" className="block text-sm font-medium text-stone-700 mb-1">
             Link do produto
-          </label>
-          <input
+          </Label>
+          <Input
             id="new-item-link"
             type="url"
             value={link}
@@ -970,15 +933,15 @@ export function AddItemModal({
             className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
           />
           <p className="add-item-link-hint mt-1 text-xs text-stone-500">
-            Cole o link e preenchemos nome, preço e foto automaticamente.
+            Cole o link e preenchemos nome e preço automaticamente.
           </p>
         </div>
 
         <div>
-          <label htmlFor="new-item-description" className="block text-sm font-medium text-stone-700 mb-1">
+          <Label htmlFor="new-item-description" className="block text-sm font-medium text-stone-700 mb-1">
             Observações
-          </label>
-          <textarea
+          </Label>
+          <Textarea
             id="new-item-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -989,14 +952,6 @@ export function AddItemModal({
           />
         </div>
         </div>
-
-        <ItemImageField
-          enxovalId={enxovalId}
-          value={imageUrl}
-          onChange={setImageUrl}
-          onBusyChange={setImageBusy}
-          disabled={isSubmitting}
-        />
         </div>
 
         <div className="add-item-form-footer">
@@ -1008,13 +963,13 @@ export function AddItemModal({
               {error}
             </p>
           )}
-          <button
+          <Button variant="brand" size="brand"
             type="submit"
-            disabled={!name.trim() || isSubmitting || imageBusy}
+            disabled={!name.trim() || isSubmitting}
             className="add-item-submit w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Salvando..." : "Adicionar à lista"}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>

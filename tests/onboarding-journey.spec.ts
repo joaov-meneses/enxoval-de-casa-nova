@@ -65,7 +65,7 @@ for (const moment of ["casal", "solo", "amigos", "troca"] as Moment[]) {
     await page.getByLabel(/Apartamento/).check();
     await page.locator(".ob-cta").click();
     await expect(page.locator(".ob-section")).toHaveAttribute("data-step", "people");
-    await expect(page.getByRole("radio", { checked: true })).toHaveValue(moment === "solo" ? "1" : moment === "amigos" ? "3" : "2");
+    await expect(page.getByRole("radio", { checked: true })).toHaveAttribute("value", moment === "solo" ? "1" : moment === "amigos" ? "3" : "2");
     await fits(page);
   });
 }
@@ -139,10 +139,10 @@ test("data exata é opcional e preservada ao voltar", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seed(page, "date", { moment: "solo" });
-  await page.locator(".ob-date-picker summary").click();
+  await page.locator(".ob-date-picker [data-slot=collapsible-trigger]").click();
   const today = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric" }).format(new Date());
   await page.getByRole("button", { name: today, exact: true }).click();
-  await page.locator(".ob-date-picker summary").click();
+  await page.locator(".ob-date-picker [data-slot=collapsible-trigger]").click();
   await fits(page);
   await page.locator(".ob-cta").click();
   await page.getByRole("button", { name: "Voltar", exact: true }).click();

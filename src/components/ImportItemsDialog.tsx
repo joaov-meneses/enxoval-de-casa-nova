@@ -1,10 +1,16 @@
+import { Checkbox } from "./ui/checkbox";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/src/components/ui/table";
+import { Disclosure, DisclosureTrigger } from "@/src/components/ui/disclosure";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   FileSpreadsheet,
   Upload,
-} from "lucide-react";
+} from "@/src/components/icons";
 import { ApiError, createItem } from "../api";
 import { capture } from '../analytics';
 import { ITEM_STATUS_META } from "../itemStatus";
@@ -55,7 +61,7 @@ export function ImportItemsButton(props: ImportItemsButtonProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
+      <Button variant="brand" size="brand"
         type="button"
         className="button button-outline button-small export-menu-trigger"
         aria-label="Importar"
@@ -64,7 +70,7 @@ export function ImportItemsButton(props: ImportItemsButtonProps) {
       >
         <Upload size={17} aria-hidden="true" />
         <span>Importar</span>
-      </button>
+      </Button>
       {/* Remonta ao fechar: cada importação começa do zero. */}
       {open && <ImportItemsDialog {...props} onClose={() => setOpen(false)} />}
     </>
@@ -234,7 +240,7 @@ function ImportItemsDialog({
               arquivo gerado pelo botão <strong>Exportar</strong> também
               funciona.
             </p>
-            <label
+            <Label
               className={`import-drop${dragging ? " is-dragging" : ""}`}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -243,7 +249,7 @@ function ImportItemsDialog({
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
             >
-              <input
+              <Input
                 type="file"
                 className="sr-only"
                 accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -255,7 +261,7 @@ function ImportItemsDialog({
               <FileSpreadsheet size={28} aria-hidden="true" />
               <strong>Escolher arquivo</strong>
               <span>ou arraste e solte aqui · .xlsx ou .csv</span>
-            </label>
+            </Label>
             {readError && (
               <div role="alert" className="form-error">
                 {readError}
@@ -294,7 +300,7 @@ function ImportItemsDialog({
             <div className="import-file">
               <FileSpreadsheet size={18} aria-hidden="true" />
               <span>{fileName}</span>
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="import-link-button"
                 onClick={() => {
@@ -303,7 +309,7 @@ function ImportItemsDialog({
                 }}
               >
                 Trocar arquivo
-              </button>
+              </Button>
             </div>
 
             <ul className="import-summary" aria-label="Resumo da leitura">
@@ -353,11 +359,10 @@ function ImportItemsDialog({
             )}
 
             {plan.duplicates > 0 && (
-              <label className="import-check">
-                <input
-                  type="checkbox"
+              <Label className="import-check">
+                <Checkbox
                   checked={skipDuplicates}
-                  onChange={(event) => setSkipDuplicates(event.target.checked)}
+                  onCheckedChange={checked => setSkipDuplicates(checked === true)}
                 />
                 <span>
                   Pular{" "}
@@ -368,7 +373,7 @@ function ImportItemsDialog({
                   )}{" "}
                   (mesmo nome no mesmo ambiente)
                 </span>
-              </label>
+              </Label>
             )}
 
             {toImport.length > 0 && (
@@ -378,29 +383,29 @@ function ImportItemsDialog({
                 aria-label="Prévia dos primeiros itens"
                 tabIndex={0}
               >
-                <table>
-                  <thead>
-                    <tr>
-                      <th scope="col">Item</th>
-                      <th scope="col">Ambiente</th>
-                      <th scope="col">Situação</th>
-                      <th scope="col">Preço</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead scope="col">Item</TableHead>
+                      <TableHead scope="col">Ambiente</TableHead>
+                      <TableHead scope="col">Situação</TableHead>
+                      <TableHead scope="col">Preço</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {toImport.slice(0, PREVIEW_ROWS).map((row) => (
-                      <tr key={row.line}>
-                        <td>
+                      <TableRow key={row.line}>
+                        <TableCell>
                           {row.name}
                           {row.quantity > 1 && <em> ×{row.quantity}</em>}
-                        </td>
-                        <td>{row.categoryName}</td>
-                        <td>{ITEM_STATUS_META[row.status].label}</td>
-                        <td>{money(row.priceCents)}</td>
-                      </tr>
+                        </TableCell>
+                        <TableCell>{row.categoryName}</TableCell>
+                        <TableCell>{ITEM_STATUS_META[row.status].label}</TableCell>
+                        <TableCell>{money(row.priceCents)}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
                 {toImport.length > PREVIEW_ROWS && (
                   <p>
                     … e mais {toImport.length - PREVIEW_ROWS}{" "}
@@ -411,8 +416,8 @@ function ImportItemsDialog({
             )}
 
             {(errors.length > 0 || warnings.length > 0) && (
-              <details className="import-issues" open={errors.length > 0}>
-                <summary>
+              <Disclosure className="import-issues" open={errors.length > 0}>
+                <DisclosureTrigger>
                   <AlertTriangle size={16} aria-hidden="true" />
                   {[
                     errors.length > 0 && plural(errors.length, "erro", "erros"),
@@ -421,7 +426,7 @@ function ImportItemsDialog({
                   ]
                     .filter(Boolean)
                     .join(" e ")}
-                </summary>
+                </DisclosureTrigger>
                 <ul>
                   {[...errors, ...warnings]
                     .slice(0, LISTED_ISSUES)
@@ -436,18 +441,18 @@ function ImportItemsDialog({
                     … e mais {errors.length + warnings.length - LISTED_ISSUES}.
                   </p>
                 )}
-              </details>
+              </Disclosure>
             )}
 
             <div className="import-actions">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="button button-outline"
                 onClick={onClose}
               >
                 Cancelar
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 type="button"
                 className="button button-dark"
                 disabled={errors.length > 0 || toImport.length === 0}
@@ -458,7 +463,7 @@ function ImportItemsDialog({
                   : toImport.length === 0
                     ? "Nada para importar"
                     : `Importar ${plural(toImport.length, "item", "itens")}`}
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -478,7 +483,7 @@ function ImportItemsDialog({
               Mantenha esta janela aberta até terminar.
             </p>
             <div className="import-actions">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="button button-outline"
                 onClick={() => {
@@ -486,7 +491,7 @@ function ImportItemsDialog({
                 }}
               >
                 Parar
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -527,13 +532,13 @@ function ImportItemsDialog({
               </ul>
             )}
             <div className="import-actions">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="button button-dark"
                 onClick={onClose}
               >
                 Concluir
-              </button>
+              </Button>
             </div>
           </>
         )}

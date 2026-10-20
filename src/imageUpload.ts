@@ -1,4 +1,4 @@
-import { MAX_IMAGE_UPLOAD_BYTES } from "./itemImages";
+import { MAX_IMAGE_UPLOAD_BYTES } from "./imageUploadLimits";
 
 /** Fotos de celular passam fácil de 5 MB; antes de enviar, reduzimos para o que o servidor vai guardar de qualquer jeito. */
 const SEND_MAX_SIDE = 1280;

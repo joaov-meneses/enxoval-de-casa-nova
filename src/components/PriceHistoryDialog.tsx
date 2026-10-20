@@ -1,5 +1,7 @@
+import { Button } from "@/src/components/ui/button";
+import { Table, TableCaption, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/src/components/ui/table";
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Flame, LoaderCircle } from "lucide-react";
+import { ExternalLink, Flame, LoaderCircle } from "@/src/components/icons";
 import type { EnxovalItem, ItemPriceHistory } from "../types";
 import { fetchItemPriceHistory } from "../api";
 import { priceChange, storeLabel } from "../priceTracking";
@@ -136,20 +138,20 @@ function PriceChart({
           <span>{longDate.format(active.time)}</span>
         </div>
       ) : null}
-      <table className="sr-only">
-        <caption>Histórico de preços</caption>
-        <thead>
-          <tr><th>Data</th><th>Preço</th></tr>
-        </thead>
-        <tbody>
+      <Table className="sr-only">
+        <TableCaption>Histórico de preços</TableCaption>
+        <TableHeader>
+          <TableRow><TableHead>Data</TableHead><TableHead>Preço</TableHead></TableRow>
+        </TableHeader>
+        <TableBody>
           {points.map((point) => (
-            <tr key={point.time}>
-              <td>{longDate.format(point.time)}</td>
-              <td>{money.format(point.cents / 100)}</td>
-            </tr>
+            <TableRow key={point.time}>
+              <TableCell>{longDate.format(point.time)}</TableCell>
+              <TableCell>{money.format(point.cents / 100)}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -258,7 +260,7 @@ export function PriceHistoryDialog({
         ) : null}
 
         {storeUrl ? (
-          <a
+          <Button asChild variant="brand" size="brand"><a
             className="button button-dark price-history-store"
             href={storeUrl}
             target="_blank"
@@ -266,7 +268,7 @@ export function PriceHistoryDialog({
           >
             Ir para a loja{tracking ? ` (${storeLabel(tracking.domain)})` : ""}
             <ExternalLink size={15} aria-hidden="true" />
-          </a>
+          </a></Button>
         ) : null}
       </div>
     </Dialog>

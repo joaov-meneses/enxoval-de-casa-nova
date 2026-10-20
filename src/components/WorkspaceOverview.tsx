@@ -1,3 +1,6 @@
+import { Card } from "@/src/components/ui/card";
+import { Progress } from "./ui/progress";
+import { Button } from "@/src/components/ui/button";
 import { useState } from "react";
 import {
   ArrowUpRight,
@@ -19,7 +22,7 @@ import {
   Package,
   Plus,
   Wallet,
-} from "lucide-react";
+} from "@/src/components/icons";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import {
   buyOpportunities,
@@ -84,20 +87,18 @@ function RoomMini({
 }) {
   return (
     <li>
-      <button
+      <Button variant="brand" size="brand"
         type="button"
         className="stat-room"
         onClick={() => onOpen(room.cat.id)}
         aria-label={`Abrir ${room.cat.name}: ${room.checked} de ${room.total} itens conquistados`}
       >
         <span className="stat-room-name">{room.cat.name}</span>
-        <span className="stat-room-bar" aria-hidden="true">
-          <span style={{ width: `${room.progress * 100}%` }} />
-        </span>
+        <Progress className="stat-room-bar" value={room.progress * 100} aria-hidden="true" />
         <b>
           {room.checked}/{room.total}
         </b>
-      </button>
+      </Button>
     </li>
   );
 }
@@ -384,12 +385,12 @@ export function WorkspaceOverview({
           <h2>
             {view === "overview"
               ? "Seu lar está ganhando forma."
-              : "Pequenos detalhes. Grandes começos."}
+              : "Seu novo lar começa nos detalhes."}
           </h2>
           <p>
             {view === "overview"
               ? "Um olhar sobre tudo o que vocês já construíram."
-              : "Organize os desejos, acompanhe as compras e aproveite o caminho."}
+              : "Organize seu enxoval, acompanhe as compras e veja sua casa ganhar forma."}
           </p>
         </div>
       </div>
@@ -420,7 +421,7 @@ export function WorkspaceOverview({
             {done.length} de {statsActive.length}{" "}
             {statsActive.length === 1 ? "conquistado" : "conquistados"}
           </span>
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="stats-compact-toggle"
             aria-expanded={statsOpen}
@@ -429,16 +430,9 @@ export function WorkspaceOverview({
           >
             {statsOpen ? "Ocultar" : "Detalhes"}
             <ChevronDown size={14} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
-        <div className="progress-track" aria-hidden="true">
-          <span
-            style={{
-              width: `${percentage}%`,
-              minWidth: done.length > 0 ? 8 : 0,
-            }}
-          />
-        </div>
+        <Progress className="progress-track" value={percentage} aria-hidden="true" />
         <dl className="stats-compact-grid">
           <div>
             <dt>Já investimos</dt>
@@ -465,8 +459,9 @@ export function WorkspaceOverview({
             </dd>
           </div>
         </dl>
-        <div id="stats-mobile-details" className="stats-insights" hidden={!statsOpen}>
-          <article className="stats-insight">
+        <div id="stats-mobile-details" className="stats-insights-reveal" data-open={statsOpen} aria-hidden={!statsOpen} inert={!statsOpen}>
+        <div className="stats-insights-clip"><div className="stats-insights">
+          <Card asChild className="block gap-0"><article className="stats-insight">
             <span className="stats-insight-label">Preços a pesquisar</span>
             <strong>{unpriced}<small> de {pending.length} pendentes</small></strong>
             <p>{unpriced > 0
@@ -475,12 +470,12 @@ export function WorkspaceOverview({
                 ? "Todos os itens pendentes já têm preço informado."
                 : "Nenhuma compra pendente por aqui."}</p>
             {unpriced > 0 && onShowUnpriced && (
-              <button type="button" className="stat-link" onClick={onShowUnpriced}>
+              <Button variant="brand" size="brand" type="button" className="stat-link" onClick={onShowUnpriced}>
                 Revisar preços <ArrowUpRight size={14} aria-hidden="true" />
-              </button>
+              </Button>
             )}
-          </article>
-          <article className="stats-insight">
+          </article></Card>
+          <Card asChild className="block gap-0"><article className="stats-insight">
             <span className="stats-insight-label">Maior compra prevista</span>
             {largestPurchase ? <>
               <strong><Money cents={netPriceCents(largestPurchase)} /></strong>
@@ -492,14 +487,15 @@ export function WorkspaceOverview({
                 ? "Informe os preços para identificar a compra de maior valor."
                 : "Tudo conquistado. Nenhuma compra para planejar."}</p>
             </>}
-          </article>
+          </article></Card>
+        </div></div>
         </div>
       </section>
       <div
         id="stats-details"
         className="workspace-stats"
       >
-        <article className="stat-progress">
+        <Card asChild className="block gap-0"><article className="stat-progress">
           <span className="stat-icon sage">
             <CircleCheck size={20} />
           </span>
@@ -514,22 +510,7 @@ export function WorkspaceOverview({
               ? "item conquistado"
               : "itens conquistados"}
           </span>
-          <div
-            className="progress-track"
-            role="progressbar"
-            aria-label="Progresso do enxoval"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percentage}
-          >
-            <span
-              style={{
-                width: `${percentage}%`,
-                // Com poucos itens conquistados a barra ainda precisa ser visível.
-                minWidth: done.length > 0 ? 8 : 0,
-              }}
-            />
-          </div>
+          <Progress className="progress-track" value={percentage} aria-label="Progresso do enxoval" />
           <ul className="stat-legend stat-progress-legend">
             {compareRooms ? (
               <>
@@ -583,8 +564,8 @@ export function WorkspaceOverview({
               )}
             </div>
           )}
-        </article>
-        <article className="stat-money">
+        </article></Card>
+        <Card asChild className="block gap-0"><article className="stat-money">
           <span className="stat-icon sand">
             <Wallet size={20} />
           </span>
@@ -632,18 +613,18 @@ export function WorkspaceOverview({
                   : "Sem estimativa: nenhum item pendente tem preço ainda."}
             </span>
             {unpriced > 0 && onShowUnpriced && (
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="stat-link"
                 onClick={onShowUnpriced}
               >
                 Ver os {unpriced} {unpriced === 1 ? "item" : "itens"} sem preço
                 <ArrowUpRight size={14} aria-hidden="true" />
-              </button>
+              </Button>
             )}
           </div>
-        </article>
-        <article className="stat-savings">
+        </article></Card>
+        <Card asChild className="block gap-0"><article className="stat-savings">
           <span className="stat-icon amber">
             <BadgePercent size={20} />
           </span>
@@ -724,7 +705,7 @@ export function WorkspaceOverview({
               você economizou.
             </span>
           )}
-        </article>
+        </article></Card>
       </div>
       {view === "overview" && (
         <div className="overview-grid">
@@ -746,13 +727,13 @@ export function WorkspaceOverview({
                   items={items}
                   enxovalName={name}
                 />
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   className="panel-add"
                   onClick={onAddCategory}
                 >
                     <Plus size={17} strokeWidth={2.2} aria-hidden="true" /> Novo ambiente
-                </button>
+                </Button>
               </div>
             </div>
             {categories.length > 1 && (
@@ -762,20 +743,20 @@ export function WorkspaceOverview({
                 aria-label="Ordenar ambientes"
               >
                 {ROOM_ORDERS.map((o) => (
-                  <button
+                  <Button variant="brand" size="brand"
                     key={o.id}
                     type="button"
                     aria-pressed={roomOrder === o.id}
                     onClick={() => setRoomOrder(o.id)}
                   >
                     {o.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
             <div className="overview-room-list">
               {orderedRooms.map((room) => (
-                <button
+                <Button variant="brand" size="brand"
                   key={room.cat.id}
                   className={`overview-room${room.done ? " is-done" : ""}`}
                   onClick={() => onCategory(room.cat.id)}
@@ -790,9 +771,7 @@ export function WorkspaceOverview({
                         <em className="overview-start">Comece por aqui</em>
                       )}
                     </strong>
-                    <span className="progress-track" aria-hidden="true">
-                      <span style={{ width: `${room.progress * 100}%` }} />
-                    </span>
+                    <Progress className="progress-track" value={room.progress * 100} aria-hidden="true" />
                     <span className="overview-room-meta">{room.meta}</span>
                   </span>
                   <small aria-hidden="true">
@@ -805,7 +784,7 @@ export function WorkspaceOverview({
                       : "itens conquistados"}
                   </span>
                   <ArrowUpRight size={17} aria-hidden="true" />
-                </button>
+                </Button>
               ))}
             </div>
           </section>

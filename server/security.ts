@@ -140,7 +140,7 @@ export const protectMutationOrigin: RequestHandler = (req, res, next) => {
   const contentType = req.get("content-type")?.toLowerCase() ?? "";
   // O envio de imagem manda o arquivo cru. Tipos image/* também não passam em pedido cruzado sem autorização
   // prévia do navegador (CORS), então a defesa é a mesma do JSON.
-  const isImageUpload = ["/item-images", "/profile/avatar"].includes(req.path) && contentType.startsWith("image/");
+  const isImageUpload = req.path === "/profile/avatar" && contentType.startsWith("image/");
   if (!contentType.startsWith("application/json") && !isImageUpload) {
     res.status(415).json({ error: "Envie os dados no formato JSON." });
     return;

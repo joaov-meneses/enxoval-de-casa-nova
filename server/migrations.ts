@@ -405,7 +405,6 @@ export async function migrateDatabase() {
       canonical_url text,
       domain text NOT NULL,
       title text NOT NULL,
-      image_url text,
       current_price_cents integer,
       pix_price_cents integer,
       lowest_price_cents integer,
@@ -445,7 +444,6 @@ export async function migrateDatabase() {
     ALTER TABLE items ADD COLUMN IF NOT EXISTS tracked_product_id uuid REFERENCES tracked_products(id) ON DELETE SET NULL;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS target_price_cents integer;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS selected_variation text;
-    ALTER TABLE items ADD COLUMN IF NOT EXISTS image_url text;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_alert_enabled boolean NOT NULL DEFAULT true;
     -- Qual preço da loja o item acompanha (normal ou no Pix) e o último preço avisado por e-mail (evita repetir o aviso).
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_basis text NOT NULL DEFAULT 'regular';
@@ -459,23 +457,10 @@ export async function migrateDatabase() {
     );
     CREATE INDEX IF NOT EXISTS items_tracked_product_id_idx ON items(tracked_product_id);
 
-    -- Imagens dos itens (enviadas ou importadas por link): já reduzidas e convertidas para WebP pelo servidor.
-    -- O item guarda só o endereço interno (/api/item-images/<id>). A mesma imagem não se repete dentro do enxoval.
-    CREATE TABLE IF NOT EXISTS item_images (
-      id uuid PRIMARY KEY,
-      enxoval_id uuid NOT NULL REFERENCES enxovais(id) ON DELETE CASCADE,
-      created_by uuid REFERENCES users(id) ON DELETE SET NULL,
-      content_type text NOT NULL DEFAULT 'image/webp',
-      data bytea NOT NULL,
-      width integer NOT NULL,
-      height integer NOT NULL,
-      byte_size integer NOT NULL,
-      sha256 text NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(),
-      CONSTRAINT item_images_type_valid CHECK (content_type = 'image/webp'),
-      CONSTRAINT item_images_size_valid CHECK (byte_size > 0 AND byte_size <= 1048576)
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS item_images_enxoval_sha_unique ON item_images(enxoval_id, sha256);
+    -- Recurso de imagens dos itens removido: apaga arquivos e endereços já armazenados.
+    DROP TABLE IF EXISTS item_images;
+    ALTER TABLE items DROP COLUMN IF EXISTS image_url;
+    ALTER TABLE tracked_products DROP COLUMN IF EXISTS image_url;
 
     -- Nome de enxoval começa com letra maiúscula ("apartamento" vira "Apartamento"); o app já grava assim e isto
     -- corrige os nomes antigos. Só toca nos que ainda começam com minúscula.

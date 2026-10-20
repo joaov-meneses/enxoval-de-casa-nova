@@ -1,3 +1,4 @@
+import { captureOperational } from './analytics';
 // Activity stays in memory. The server controls idle expiry and the absolute deadline.
 export const SESSION_EXPIRED_EVENT = 'casamia:session-expired';
 export const SESSION_AUTHENTICATED_EVENT = 'casamia:session-authenticated';
@@ -12,17 +13,22 @@ async function recordActivity() {
   lastSent = Date.now();
   pending = true;
   const startedVersion = authVersion;
+  const started = Date.now();
+  captureOperational('application.api.started', { path: '/api/auth/activity', method: 'POST' });
   try {
     const response = await fetch('/api/auth/activity', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' }, body: '{}',
     });
+    captureOperational(response.ok ? 'application.api.completed' : 'application.api.failed', { path: '/api/auth/activity', method: 'POST', http_status: response.status, request_id: response.headers.get('x-request-id'), duration_ms: Date.now() - started });
     if (response.ok && startedVersion === authVersion) authenticated = true;
     else if (response.status === 401 && authenticated && startedVersion === authVersion) {
       authenticated = false;
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
-  } catch { /* A network outage does not log the person out. */ }
+  } catch (error) {
+    captureOperational('application.api.failed', { path: '/api/auth/activity', method: 'POST', error: error instanceof Error ? { message: error.message, stack: error.stack } : error });
+  }
   finally { pending = false; }
 }
 

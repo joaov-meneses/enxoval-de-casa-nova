@@ -1,3 +1,4 @@
+import { getLogger } from '../logger.ts';
 /**
  * Catálogo mestre de itens (Fase 6): o que um enxoval descobre sobre um item vale para todos.
  *
@@ -461,7 +462,7 @@ async function drainQueue() {
         await getPool().query('UPDATE items SET catalog_item_id = $1 WHERE id = ANY($2::uuid[]) AND catalog_item_id IS NULL', [item.id, [...entry.itemIds]]);
       }
     } catch (err) {
-      console.warn('[catalog] Falha ao resolver item:', err instanceof Error ? err.message : err);
+      getLogger().warn({ event: 'catalog.resolve.failed', name: entry.name, itemIds: [...entry.itemIds], err }, 'Catalog item resolution failed.');
     }
   }
 }
@@ -606,7 +607,7 @@ export function recordMetric(metric: string, amount = 1) {
   if (!flushTimer) {
     flushTimer = setTimeout(() => {
       flushTimer = null;
-      void flushCatalogMetrics().catch(err => console.warn('[catalog] Falha ao gravar métricas:', err instanceof Error ? err.message : err));
+      void flushCatalogMetrics().catch(err => getLogger().error({ event: 'catalog.metrics.failed', err }, 'Catalog metrics write failed.'));
     }, 15_000);
     flushTimer.unref?.();
   }

@@ -114,17 +114,17 @@
 .subscription-plan-note { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; color: #6a5648; font-size: 12px; line-height: 1.4; }
 .subscription-plan-note svg { flex-shrink: 0; }
 .subscription-included { border-top: 1px solid #e9dfd0; }
-.subscription-included summary { display: flex; align-items: center; justify-content: center; min-height: 44px; cursor: pointer; color: #6a5648; font-size: 13px; list-style: none; gap: 8px; }
-.subscription-included summary::after { content: '+'; font-size: 18px; }
-.subscription-included[open] summary::after { content: '−'; }
-.subscription-included summary::-webkit-details-marker { display: none; }
-.subscription-included summary:focus-visible { outline: 3px solid #b5532f; outline-offset: 2px; border-radius: 6px; }
+.subscription-included [data-slot="collapsible-trigger"] { display: flex; align-items: center; justify-content: center; min-height: 44px; cursor: pointer; color: #6a5648; font-size: 13px; list-style: none; gap: 8px; }
+.subscription-included [data-slot="collapsible-trigger"]::after { content: '+'; font-size: 18px; }
+.subscription-included[data-state="open"] [data-slot="collapsible-trigger"]::after { content: '−'; }
+.subscription-included [data-slot="collapsible-trigger"]::-webkit-details-marker { display: none; }
+.subscription-included [data-slot="collapsible-trigger"]:focus-visible { outline: 3px solid #b5532f; outline-offset: 2px; border-radius: 6px; }
 .subscription-included ul { display: grid; gap: 10px; margin: 0; padding: 6px 0 12px; list-style: none; }
 .subscription-included li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.5; color: #6a5648; }
 .subscription-included li svg { flex: 0 0 15px; margin-top: 2px; color: #b5532f; }
 .subscription-savings-explanation { margin: 0 0 12px; font-size: 12px; line-height: 1.5; color: #6a5648; }
 .subscription-plan-help { position: relative; }
-.subscription-plan-help:has(.subscription-trial-help) .subscription-included summary { justify-content: flex-start; width: calc(50% - 8px); text-align: left; font-size: 12px; }
+.subscription-plan-help:has(.subscription-trial-help) .subscription-included [data-slot="collapsible-trigger"] { justify-content: flex-start; width: calc(50% - 8px); text-align: left; font-size: 12px; }
 .subscription-trial-help { position: absolute; top: 0; right: 0; display: flex; align-items: center; justify-content: flex-start; gap: 6px; width: calc(50% - 8px); min-height: 44px; padding: 3px 0; color: #9b482b; text-align: left; font-size: 12px; line-height: 1.4; }
 .subscription-trial-help svg { flex: 0 0 16px; }
 .subscription-trial-help:hover span { text-decoration: underline; }
@@ -176,7 +176,7 @@
   .subscription-plan-summary { min-height: 0; font-size: 12px; line-height: 1.45; }
   .subscription-plan-checkout { gap: 10px; }
   .subscription-plan-checkout > .button { min-height: 48px; }
-  .subscription-included summary { font-size: 12px; }
+  .subscription-included [data-slot="collapsible-trigger"] { font-size: 12px; }
 }
 
 @media (max-width: 480px) and (max-height: 650px) {

@@ -1,3 +1,10 @@
+import { Progress } from "../ui/progress";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Button } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
+import { MotionButton, MotionLabel } from "@/src/components/ui/motion";
+import { Disclosure, DisclosureTrigger } from "@/src/components/ui/disclosure";
+import { Label } from "@/src/components/ui/label";
 import {
   useCallback,
   useEffect,
@@ -55,8 +62,8 @@ import {
   Users,
   Wallet,
   WashingMachine,
-  type LucideIcon,
-} from "lucide-react";
+  type IconComponent,
+} from "@/src/components/icons";
 import { Brand } from "../Brand";
 import { completeOnboarding, fetchBootstrap } from "../../api";
 import { track } from "../../onboarding/analytics";
@@ -239,7 +246,7 @@ const USAGES: Option<Usage>[] = [
   { value: "share", label: "Dividir com quem mora comigo", icon: <Share2 size={20} /> },
 ];
 
-const ROOM_ICONS: Record<RoomKey, LucideIcon> = {
+const ROOM_ICONS: Record<RoomKey, IconComponent> = {
   quarto: BedDouble,
   banheiro: Bath,
   cozinha: CookingPot,
@@ -511,9 +518,9 @@ function OnboardingContent() {
           onClick: hasProgress ? resume : next,
           secondary: hasProgress ? (
             <div className="ob-secondary">
-              <button type="button" className="ob-link" onClick={resetAll}>
+              <Button variant="brand" size="brand" type="button" className="ob-link" onClick={resetAll}>
                 Começar de novo
-              </button>
+              </Button>
             </div>
           ) : undefined,
         };
@@ -557,7 +564,7 @@ function OnboardingContent() {
             <h1 className="ob-title" id="ob-name-title" tabIndex={-1}>
               Como podemos te chamar?
             </h1>
-            <input
+            <Input
               className="ob-input"
               data-autofocus
               aria-labelledby="ob-name-title"
@@ -888,22 +895,18 @@ function OnboardingContent() {
               <ArrowLeft size={20} />
             </a>
           ) : (
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               className="ob-back"
               onClick={prev}
               aria-label="Voltar"
             >
               <ArrowLeft size={20} />
-            </button>
+            </Button>
           )}
-          <div
+          <Progress value={Math.round(progress * 100)}
             className="ob-progress"
-            role="progressbar"
             aria-label="Progresso do seu plano"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(progress * 100)}
             data-hidden={hideProgress}
           >
             <motion.span
@@ -916,7 +919,7 @@ function OnboardingContent() {
                   : { type: "spring", stiffness: 140, damping: 24 }
               }
             />
-          </div>
+          </Progress>
           <span className="ob-desktop-step">
             {step === "welcome" ? "Vamos começar" : index < steps.indexOf("thanks") ? "Conhecendo seu lar" : "Seu plano personalizado"}
           </span>
@@ -983,7 +986,7 @@ function CtaButton({
     previous.current = disabled;
   }, [disabled, reduced]);
   return (
-    <motion.button
+    <MotionButton variant="brand" size="brand"
       key={pulse}
       type="button"
       className="ob-cta"
@@ -996,7 +999,7 @@ function CtaButton({
     >
       {label}
       <ArrowRight size={18} />
-    </motion.button>
+    </MotionButton>
   );
 }
 
@@ -1102,7 +1105,7 @@ function DateStep({
       </p>
       <div className="ob-chips" role="group" aria-label="Atalhos de data">
         {shortcuts.map((s) => (
-          <button
+          <Button variant="brand" size="brand"
             key={s.label}
             type="button"
             className="ob-chip"
@@ -1110,25 +1113,25 @@ function DateStep({
             onClick={() => set({ moveDate: s.iso, moveDateAnswered: true })}
           >
             {s.label}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="ob-chip"
           aria-pressed={unsure}
           onClick={() => set({ moveDate: null, moveDateAnswered: true })}
         >
           Ainda não sei
-        </button>
+        </Button>
       </div>
-      <details className="ob-date-picker">
-        <summary>Escolher um dia no calendário</summary>
+      <Disclosure className="ob-date-picker">
+        <DisclosureTrigger>Escolher um dia no calendário</DisclosureTrigger>
         <CalendarPicker
           value={answers.moveDate}
           reduced={reduced}
           onSelect={(iso) => set({ moveDate: iso, moveDateAnswered: true })}
         />
-      </details>
+      </Disclosure>
       <div className="ob-date-summary" aria-live="polite">
         <span>Mudança prevista</span>
         <strong>
@@ -1273,7 +1276,7 @@ function StateStep({
       <p className="ob-sub">
         {context}
       </p>
-      <button
+      <Button variant="brand" size="brand"
         type="button"
         className="ob-locate"
         onClick={detect}
@@ -1285,7 +1288,7 @@ function StateStep({
           <MapPin size={17} />
         )}
         {status === "loading" ? "Buscando…" : "Usar minha localização"}
-      </button>
+      </Button>
       <p className="ob-locate-note" role="status">
         {message}
       </p>
@@ -1298,23 +1301,17 @@ function StateStep({
       {cities.length > 0 && (
         <fieldset className="ob-city">
           <legend>E a cidade? (opcional)</legend>
-          <div className="ob-city-chips">
+          <RadioGroup value={city ?? ""} onValueChange={value => onCityChange(value || null)} aria-label="Cidade" className="ob-city-chips">
             {[...cities, null].map((entry) => {
               const id = entry?.id ?? "";
               return (
-                <label key={id || "outra"} className="ob-city-chip">
-                  <input
-                    type="radio"
-                    name="ob-city"
-                    value={id}
-                    checked={(city ?? "") === id}
-                    onChange={() => onCityChange(entry?.id ?? null)}
-                  />
+                <Label htmlFor={`ob-city-${id || "other"}`} key={id || "outra"} className="ob-city-chip">
+                  <RadioGroupItem id={`ob-city-${id || "other"}`} value={id} className="choice-control" />
                   <span>{entry?.name ?? "Outra cidade"}</span>
-                </label>
+                </Label>
               );
             })}
-          </div>
+          </RadioGroup>
           <p className="ob-city-note" role="status">
             {chosen && chosen.traits.length > 0
               ? `${chosen.name} tem ${chosen.traits.map((trait) => TRAIT_COPY[trait]).join("; ")}. Vou incluir itens para isso.`
@@ -1349,31 +1346,25 @@ function PeopleStep({
       <p className="ob-sub">
         {journeyFor(answers).peopleHint}
       </p>
-      <fieldset className="ob-fieldset">
+      <RadioGroup asChild value={String(people)} onValueChange={value => onChange(Number(value))} aria-label="Número de moradores"><fieldset className="ob-fieldset">
         <legend className="ob-sr">Número de moradores</legend>
         <Stagger className="ob-people" reduced={reduced}>
           {[1, 2, 3, 4, 5].map((n) => (
-            <motion.label
+            <MotionLabel
               key={n}
+              htmlFor={`ob-people-${n}`}
               className="ob-person"
               data-selected={people === n}
               variants={reduced ? undefined : itemVariants}
               whileTap={reduced ? undefined : { scale: 0.96 }}
             >
-              <input
-                type="radio"
-                name="people"
-                value={n}
-                checked={people === n}
-                onChange={() => onChange(n)}
-                aria-label={n === 5 ? "5 ou mais pessoas" : plural(n, "pessoa", "pessoas")}
-              />
+              <RadioGroupItem id={`ob-people-${n}`} value={String(n)} className="choice-control" aria-label={n === 5 ? "5 ou mais pessoas" : plural(n, "pessoa", "pessoas")} />
               <strong>{n === 5 ? "5+" : n}</strong>
               <small>{PEOPLE_CAPTION[n - 1]}</small>
-            </motion.label>
+            </MotionLabel>
           ))}
         </Stagger>
-      </fieldset>
+      </fieldset></RadioGroup>
       <p className="ob-live" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
@@ -1457,8 +1448,8 @@ function RoomsStep({
         reduced={reduced}
       />
       {moreOptions.length > 0 && (
-        <details className="ob-extra-rooms">
-          <summary>Outros ambientes{moreOptions.some((option) => rooms.includes(option.value)) ? ` (${moreOptions.filter((option) => rooms.includes(option.value)).length} selecionado${moreOptions.filter((option) => rooms.includes(option.value)).length > 1 ? "s" : ""})` : ""}</summary>
+        <Disclosure className="ob-extra-rooms">
+          <DisclosureTrigger>Outros ambientes{moreOptions.some((option) => rooms.includes(option.value)) ? ` (${moreOptions.filter((option) => rooms.includes(option.value)).length} selecionado${moreOptions.filter((option) => rooms.includes(option.value)).length > 1 ? "s" : ""})` : ""}</DisclosureTrigger>
           <CheckOptions
             legend="Outros espaços da casa"
             name="rooms"
@@ -1467,7 +1458,7 @@ function RoomsStep({
             onToggle={onToggle}
             reduced={reduced}
           />
-        </details>
+        </Disclosure>
       )}
       <p className="ob-live" aria-live="polite">
         {rooms.length === 0 ? (
@@ -2102,7 +2093,7 @@ function CompareStep({
 
 /* ---------------------------------------------------------------- salvar */
 
-const BENEFITS: { Icon: LucideIcon; text: string }[] = [
+const BENEFITS: { Icon: IconComponent; text: string }[] = [
   { Icon: ListChecks, text: "Marque o que já comprou e acompanhe o progresso de cada ambiente" },
   { Icon: Wallet, text: "Anote preço e link de cada item e veja quanto já gastou" },
   { Icon: Receipt, text: "Registre descontos e cashback e veja o gasto líquido" },
@@ -2195,14 +2186,14 @@ function SaveStep({
             {error}
           </div>
         )}
-        <button type="submit" className="ob-cta" disabled={submitting}>
+        <Button variant="brand" size="brand" type="submit" className="ob-cta" disabled={submitting}>
           {submitting ? (
             <LoaderCircle size={18} className="animate-spin" />
           ) : (
             "Criar meu plano"
           )}
           {!submitting && <ArrowRight size={18} />}
-        </button>
+        </Button>
       </form>
       <p className="ob-privacy">
         Guardamos as suas respostas (como estado, data da mudança e faixa de

@@ -658,7 +658,7 @@
 .ob-date-picker {
   margin-top: 2px;
 }
-.ob-date-picker summary {
+.ob-date-picker [data-slot="collapsible-trigger"] {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -672,21 +672,21 @@
   cursor: pointer;
   list-style: none;
 }
-.ob-date-picker summary::-webkit-details-marker {
+.ob-date-picker [data-slot="collapsible-trigger"]::-webkit-details-marker {
   display: none;
 }
-.ob-date-picker[open] summary {
+.ob-date-picker[data-state="open"] [data-slot="collapsible-trigger"] {
   margin-bottom: 10px;
   background: var(--ob-selected);
 }
-.ob-date-picker summary:focus-visible {
+.ob-date-picker [data-slot="collapsible-trigger"]:focus-visible {
   outline: 3px solid var(--ob-wood);
   outline-offset: 3px;
 }
 .ob-extra-rooms {
   margin-top: 10px;
 }
-.ob-extra-rooms summary {
+.ob-extra-rooms [data-slot="collapsible-trigger"] {
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -1718,7 +1718,7 @@
     min-height: 52px;
     border-radius: 14px;
   }
-  .ob-date-picker summary {
+  .ob-date-picker [data-slot="collapsible-trigger"] {
     min-height: 48px;
     background: #faf7f1;
   }

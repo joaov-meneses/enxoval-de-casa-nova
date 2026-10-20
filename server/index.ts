@@ -79,6 +79,7 @@ const httpServer = app.listen(port, "0.0.0.0", () => {
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
+    logger.info({ event: 'server.stopping', signal }, 'Server shutdown started.');
     // Let request completion logs reach the queue before flushing telemetry.
     const deadline = setTimeout(() => httpServer.closeAllConnections(), 5000);
     deadline.unref();

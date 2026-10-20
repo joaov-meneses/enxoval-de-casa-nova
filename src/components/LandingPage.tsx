@@ -1,3 +1,7 @@
+import { Card } from "@/src/components/ui/card";
+import { Badge } from "@/src/components/ui/badge";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "./ui/accordion";
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
@@ -18,7 +22,7 @@ import {
   Sofa,
   WashingMachine,
   X,
-} from "lucide-react";
+} from "@/src/components/icons";
 import { Brand } from "./Brand";
 import { HowItWorks } from "./HowItWorks";
 import { Nino } from "./Nino";
@@ -297,18 +301,18 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
           <a href="#planos" onClick={() => { trackLandingCta('view_pricing', 'navigation'); closeMenu(); }}>
             Preços
           </a>
-          {!authLoading && <a className="cm-nav-login cm-btn cm-login-secondary" href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'navigation')}>
+          {!authLoading && <Button asChild variant="brand" size="brand"><a className={`cm-nav-login cm-btn ${signedIn ? "cm-btn-primary is-signed-in" : "cm-login-secondary"}`} href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'navigation')}>
             {signedIn ? "Meu lar" : "Entrar"}
-          </a>}
+          </a></Button>}
         </nav>
         <div className="cm-header-actions">
-          {!authLoading && <a className={`cm-login cm-login-secondary cm-btn cm-btn-sm${signedIn ? ' is-signed-in' : ''}`} href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'header')}>
+          {!authLoading && <Button asChild variant="brand" size="brand"><a className={`cm-login cm-btn cm-btn-sm ${signedIn ? "cm-btn-primary is-signed-in" : "cm-login-secondary"}`} href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'header')}>
             {signedIn ? "Meu lar" : "Entrar"}
-          </a>}
-          {!signedIn && !authLoading && <a className="cm-btn cm-btn-primary cm-btn-sm cm-trial-cta" href={start} onClick={() => trackStart('header')}>
+          </a></Button>}
+          {!signedIn && !authLoading && <Button asChild variant="brand" size="brand"><a className="cm-btn cm-btn-primary cm-btn-sm cm-trial-cta" href={start} onClick={() => trackStart('header')}>
             Testar por 2 dias
-          </a>}
-          <button
+          </a></Button>}
+          <Button variant="brand" size="brand"
             type="button"
             className="cm-menu-toggle"
             aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
@@ -316,7 +320,7 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
             onClick={() => setMenuOpen(!menuOpen)}
           >
             {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -334,16 +338,16 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
               artificial e celebra cada conquista do seu novo lar.
             </p>
             <div className="cm-hero-actions">
-              <a className="cm-btn cm-btn-primary cm-btn-lg cm-trial-cta" href={start} onClick={() => trackStart('hero')}>
+              <Button asChild variant="brand" size="brand"><a className="cm-btn cm-btn-primary cm-btn-lg cm-trial-cta" href={start} onClick={() => trackStart('hero')}>
                 {startLabel} <ArrowRight size={18} />
-              </a>
-              <a
+              </a></Button>
+              <Button asChild variant="brand" size="brand"><a
                 className="cm-btn cm-btn-ghost cm-btn-lg"
                 href="#como-funciona"
                 onClick={() => trackLandingCta('view_how_it_works', 'hero')}
               >
                 Ver como funciona
-              </a>
+              </a></Button>
             </div>
             <ul className="cm-hero-notes">
               <li>
@@ -408,7 +412,7 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
           </div>
           <div className="cm-features">
             {FEATURES.map((feature) => (
-              <article className="cm-card" key={feature.title}>
+              <Card key={feature.title} asChild className="block gap-0"><article className="cm-card">
                 <span className="cm-card-icon">
                   <feature.icon size={24} strokeWidth={1.7} aria-hidden="true" />
                 </span>
@@ -423,7 +427,7 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
                     ))}
                   </ul>
                 )}
-              </article>
+              </article></Card>
             ))}
           </div>
         </section>
@@ -436,12 +440,11 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
           </div>
           <div className="cm-plans">
             {PLANS.map((plan) => (
-              <article
-                key={plan.id}
+              <Card key={plan.id} asChild className="block gap-0"><article
                 className={`cm-plan${plan.featured ? " is-featured" : ""}`}
               >
                 {plan.badge && (
-                  <span className="cm-plan-badge">{plan.badge}</span>
+                  <Badge asChild variant="outline"><span className="cm-plan-badge">{plan.badge}</span></Badge>
                 )}
                 <h3>{plan.name}</h3>
                 <p className="cm-plan-price">
@@ -449,13 +452,13 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
                   {plan.per && <span>{plan.per}</span>}
                 </p>
                 <p className="cm-plan-billing">{plan.billing}</p>
-                <a
+                <Button asChild variant="brand" size="brand"><a
                   className={`cm-btn ${plan.featured ? "cm-btn-primary" : "cm-btn-outline"}`}
                   href={start}
                   onClick={() => trackStart('pricing')}
                 >
                   {signedIn || authLoading ? "Acessar meu lar" : plan.cta}
-                </a>
+                </a></Button>
                 <ul>
                   {plan.features.map((feature) => (
                     <li key={feature}>
@@ -463,7 +466,7 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
                     </li>
                   ))}
                 </ul>
-              </article>
+              </article></Card>
             ))}
           </div>
           <p className="cm-disclaimer">
@@ -477,39 +480,23 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
             <span className="cm-eyebrow">Dúvidas</span>
             <h2>Conversa franca, do jeito que a gente gosta.</h2>
           </div>
-          <div className="cm-faq-list">
+          <Accordion type="single" collapsible className="cm-faq-list">
             {FAQS.map(([question, answer], index) => (
-              <div className="cm-faq-item" key={question}>
-                <h3>
-                  <button
-                    type="button"
-                    aria-expanded={faq === index}
-                    aria-controls={`cm-faq-${index}`}
-                    onClick={() => setFaq(faq === index ? null : index)}
-                  >
-                    {question}
-                    <ChevronDown size={18} aria-hidden="true" />
-                  </button>
-                </h3>
-                <div
-                  id={`cm-faq-${index}`}
-                  role="region"
-                  hidden={faq !== index}
-                >
-                  <p>{answer}</p>
-                </div>
-              </div>
+              <AccordionItem className="cm-faq-item" key={question} value={`faq-${index}`}>
+                <AccordionTrigger>{question}</AccordionTrigger>
+                <AccordionContent><p>{answer}</p></AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         </section>
 
         <section className="cm-final cm-wrap">
           <Nino pose="wave" size={120} className="cm-final-nino" />
           <h2>Toda casa começa com um primeiro passo.</h2>
           <p>Que tal colocar a cama ou o chuveiro na lista agora?</p>
-          <a className="cm-btn cm-btn-primary cm-btn-lg" href={start} onClick={() => trackStart('footer_cta')}>
+          <Button asChild variant="brand" size="brand"><a className="cm-btn cm-btn-primary cm-btn-lg" href={start} onClick={() => trackStart('footer_cta')}>
             {signedIn || authLoading ? "Acessar meu lar" : "Testar por 2 dias"} <ArrowRight size={18} />
-          </a>
+          </a></Button>
           {!signedIn && !authLoading && <small>Cartão necessário. Cancele antes do fim para evitar a cobrança.</small>}
         </section>
       </main>

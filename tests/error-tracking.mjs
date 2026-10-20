@@ -11,14 +11,17 @@ import { exceptionProperties } from '../shared/errorTracking.ts';
 import { createErrorTracking, errorTrackingHandler } from '../server/errorTracking.ts';
 import { HttpError, asyncHandler } from '../server/security.ts';
 
-test('exception sanitizer preserves source coordinates and chunk IDs, removes free text and request data', () => {
+test('exceptions preserve original messages, source context and diagnostic properties', () => {
   const result = exceptionProperties({
     email: 'PRIVATE_EMAIL', $current_url: 'PRIVATE_URL', $set: { password: 'PRIVATE_PASSWORD' },
     $exception_list: [{ type: 'TypeError', value: 'PRIVATE_MESSAGE', mechanism: { type: 'generic', data: 'PRIVATE_MECHANISM' },
       stacktrace: { frames: [{ platform: 'node:javascript', filename: 'C:\\Users\\PRIVATE_USER\\dist\\server.js?token=PRIVATE_TOKEN', function: 'createItem', lineno: 12, colno: 8, chunk_id: '1234-abcd', vars: { body: 'PRIVATE_BODY' }, context_line: 'PRIVATE_SOURCE' }] } }],
   });
-  assert.equal(JSON.stringify(result).includes('PRIVATE_'), false);
-  assert.equal(result.$exception_list[0].stacktrace.frames[0].filename, 'server.js');
+  assert.equal(result.$exception_list[0].value, 'PRIVATE_MESSAGE');
+  assert.equal(result.email, 'PRIVATE_EMAIL');
+  assert.equal(result.$set.password, 'PRIVATE_PASSWORD');
+  assert.equal(result.$exception_list[0].stacktrace.frames[0].context_line, 'PRIVATE_SOURCE');
+  assert.match(result.$exception_list[0].stacktrace.frames[0].filename, /PRIVATE_USER/);
   assert.equal(result.$exception_list[0].stacktrace.frames[0].chunk_id, '1234-abcd');
   assert.equal(result.$exception_list[0].stacktrace.frames[0].lineno, 12);
 });
@@ -29,7 +32,7 @@ test('server is disabled without token, by explicit switch, and in development b
   assert.equal(createErrorTracking({ POSTHOG_KEY: 'test', POSTHOG_ERROR_TRACKING: 'false' }, true), null);
 });
 
-test('Express forwards only unexpected failures once, preserves responses, and tolerates telemetry failure', async () => {
+test('Express forwards all failures including admin and 4xx, preserves responses and tolerates telemetry failure', async () => {
   const captured = [];
   const app = express();
   app.get('/expected', () => { throw new HttpError(403, 'Denied'); });
@@ -46,13 +49,15 @@ test('Express forwards only unexpected failures once, preserves responses, and t
     const failure = await fetch(`${base}/failure?token=PRIVATE_TOKEN`, { headers: { authorization: 'PRIVATE_AUTH' } });
     assert.equal(failure.status, 500);
     assert.deepEqual(await failure.json(), { error: 'failed' });
-    assert.equal(captured.length, 1);
-    assert.equal(captured[0].length, 1);
+    assert.equal(captured.length, 3);
+    assert.equal(captured[0].length, 3);
+    assert.equal(captured[2][2].url, '/failure?token=PRIVATE_TOKEN');
+    assert.equal(captured[2][2].headers.authorization, 'PRIVATE_AUTH');
     assert.ok(captured[0][0] instanceof Error);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
-test('real Node SDK exception payload is sanitized before transport (no external requests)', async () => {
+test('real Node SDK preserves the raw exception before transport (no external requests)', async () => {
   const batches = [];
   const client = new PostHog('phc_test', {
     host: 'https://posthog.invalid', disableGeoip: true, disableCompression: true, fetchRetryCount: 0,
@@ -66,7 +71,8 @@ test('real Node SDK exception payload is sanitized before transport (no external
     client.captureException(new TypeError('PRIVATE_EMAIL PRIVATE_PASSWORD'), undefined, { body: 'PRIVATE_BODY' });
     await client.flush();
     assert.equal(batches.length, 1);
-    assert.equal(JSON.stringify(batches).includes('PRIVATE_'), false);
+    assert.equal(batches[0].batch[0].properties.$exception_list[0].value, 'PRIVATE_EMAIL PRIVATE_PASSWORD');
+    assert.equal(batches[0].batch[0].properties.body, 'PRIVATE_BODY');
     const event = batches[0].batch[0];
     assert.equal(event.event, '$exception');
     assert.equal(event.properties.$exception_list[0].type, 'TypeError');

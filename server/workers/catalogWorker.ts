@@ -206,7 +206,8 @@ export async function precomputeUrgencies(limit = 600, log: (message: string) =>
 }
 
 export async function runCatalogRefresh(options: CatalogRefreshOptions = {}): Promise<CatalogRefreshSummary> {
-  const log = options.log ?? (() => {});
+  const log = options.log ?? (message => logger.info({ event: 'catalog.refresh.progress' }, message));
+  logger.info({ event: 'catalog.refresh.started', urgency: options.urgency, urgencyLimit: options.urgencyLimit }, 'Catalog refresh started.');
   const lockClient = await getPool().connect();
   try {
     const lock = await lockClient.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [ADVISORY_LOCK_KEY]);
@@ -234,7 +235,7 @@ export async function runCatalogRefresh(options: CatalogRefreshOptions = {}): Pr
 /** Agenda a rotina dentro do servidor. A primeira rodada sai alguns minutos depois de subir, fora do caminho do boot. */
 export function startCatalogScheduler() {
   const run = () =>
-    runCatalogRefresh({ log: message => console.log(`[catalog] ${message}`) })
+    runCatalogRefresh()
       .then(summary => logger.info({ event: 'catalog.refresh.completed', ...summary }, 'Rotina do catálogo concluída.'))
       .catch(err => logger.error({ event: 'catalog.refresh.failed', err }, 'Rotina do catálogo falhou.'));
   setTimeout(run, 5 * 60_000).unref();

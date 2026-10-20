@@ -1,7 +1,7 @@
 import { PostHog } from 'posthog-node';
 import type { ErrorRequestHandler } from 'express';
 import { exceptionProperties } from '../shared/errorTracking.ts';
-import { isProduction } from './logger.ts';
+import { isProduction, serializeError } from './logger.ts';
 import { requestId } from './posthogLogs.ts';
 
 export function createErrorTracking(env = process.env, production = isProduction) {
@@ -30,15 +30,15 @@ export async function stopErrorTracking() {
 
 export function errorTrackingHandler(sink: Pick<PostHog, 'captureException'> | null): ErrorRequestHandler {
   return (error, req, _res, next) => {
-    const status = Number(error?.status ?? error?.statusCode);
-    if (!(status >= 400 && status < 500) && !/^\/(?:api\/)?admin(?:\/|$)/.test(req.path)) {
-      // Only the server-generated UUID correlates exceptions and logs.
-      const id = requestId(req.id);
-      try {
-        if (id) sink?.captureException(error, undefined, { request_id: id });
-        else sink?.captureException(error);
-      } catch { /* Telemetry never changes the response. */ }
-    }
+    const id = requestId(req.id);
+    try {
+      sink?.captureException(error, undefined, {
+        ...(id ? { request_id: id } : {}),
+        method: req.method, url: req.originalUrl || req.url,
+        params: req.params, query: req.query, body: req.body, headers: req.headers,
+        original_error: serializeError(error),
+      });
+    } catch { /* Telemetry never changes the response. */ }
     next(error);
   };
 }

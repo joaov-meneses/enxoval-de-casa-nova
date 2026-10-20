@@ -1,0 +1,907 @@
+/* Completion effects keep surrounding rows stable and controls available. */
+.workspace-app .item-row > .item-row-inner {
+  position: relative;
+  isolation: isolate;
+  padding-bottom: 4px;
+}
+.workspace-app .item-row-controls:not(:has(.reorder-handle)) {
+  min-height: 44px;
+}
+/* A transparent pencil drawing follows each rendered line of the name. */
+.workspace-app .item-row .item-name {
+  position: relative;
+}
+.workspace-app .item-row.checked .item-name {
+  text-decoration: none;
+}
+.item-name-scribble {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--cm-action);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.45;
+}
+.item-name-scribble path {
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.item-row.is-completing .item-name-scribble path {
+  animation: item-pencil-draw var(--pencil-duration) linear var(--pencil-delay)
+    both;
+}
+@keyframes item-pencil-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The whole summary opens details; the footer is a compact secondary control. */
+.workspace-app .item-footer {
+  display: flex;
+  justify-content: center;
+}
+.workspace-app .item-footer .item-expand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  width: 100%;
+  min-height: 24px;
+  padding: 0 12px 3px;
+  color: #756455;
+  border-radius: 0 0 8px 8px;
+}
+.workspace-app .item-footer .item-expand:hover {
+  background: #ae7b4520;
+  color: #87412c;
+}
+.workspace-app .item-footer .item-expand:focus-visible {
+  outline-offset: -3px;
+}
+
+/* Each environment is one bounded surface, including its drag handle. */
+.workspace-app .environment-row {
+  position: relative;
+  border: 1px solid #cdb89a;
+  background: #ede0cb;
+  box-shadow: 0 1px 2px #6246300c;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.workspace-app .environment-row.active {
+  border-color: #a34c30;
+  background: #e4cfb3;
+}
+.workspace-app .environment-chips .environment-row,
+.workspace-app .environment-chips-row > .environment-row.environment-all {
+  overflow: hidden;
+  padding: 0 2px 0 12px;
+  min-height: 46px;
+  background: #ede0cb;
+  border-color: #c4aa86;
+}
+.workspace-app .environment-chips .environment-row.active,
+.workspace-app
+  .environment-chips-row
+  > .environment-row.environment-all.active {
+  background: var(--cm-action);
+  border-color: var(--cm-action);
+}
+.workspace-app .environment-row button.environment-select {
+  min-height: 44px;
+  color: #53452f;
+}
+.workspace-app .environment-chips .environment-row.active .environment-select {
+  color: #fff;
+}
+.workspace-app .environment-chips .environment-row .reorder-handle {
+  width: 32px;
+  min-width: 32px;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.workspace-app .environment-row .reorder-handle,
+.workspace-app .environment-row .reorder-handle:hover,
+.workspace-app .environment-row .reorder-handle:active {
+  transform: none;
+}
+.workspace-app .environment-row .reorder-handle svg {
+  flex-shrink: 0;
+  transform: none;
+}
+.workspace-app .environment-row.is-activating {
+  animation: environment-activate 340ms ease-out;
+}
+.workspace-app .sortable-entry.is-dragging {
+  z-index: 20 !important;
+}
+.workspace-app .sortable-entry.is-dragging .environment-row {
+  animation: none;
+  transform: none;
+  box-shadow: 0 4px 12px #60452b24;
+}
+@keyframes environment-activate {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .environment-row:not(.active):hover {
+    background: #e3cfb0;
+    border-color: #a7855d;
+    box-shadow: 0 2px 6px #60452b20;
+  }
+  .workspace-app .environment-row .environment-select:hover > span {
+    transform: translateX(2px);
+  }
+  .workspace-app .environment-row .environment-select:hover > svg {
+    transform: scale(1.08);
+  }
+}
+@media (hover: none) {
+  .workspace-app .environment-row .environment-select > span,
+  .workspace-app .environment-row .environment-select > svg {
+    transform: none;
+  }
+}
+/* Desktop navigation uses a filled current room and quiet, neutral alternatives. */
+.workspace-app .sidebar-rooms .environment-row {
+  --environment-ink: #53452f;
+  --environment-control: #79685c;
+  --environment-delete: #c4766d;
+  --environment-delete-hover: #f0c7bf;
+  background: #fdfcf8;
+  border-color: #ded3c3;
+  box-shadow: none;
+  overflow: hidden;
+}
+.workspace-app .sidebar-rooms .environment-row.active {
+  --environment-ink: #fff;
+  --environment-control: #fff;
+  --environment-delete: #fff;
+  --environment-delete-hover: #ffffff40;
+  background: var(--cm-action);
+  border-color: #873c25;
+}
+.workspace-app .sidebar-rooms .environment-row .environment-select,
+.workspace-app .sidebar-rooms .environment-row .environment-select > small {
+  color: var(--environment-ink);
+}
+.workspace-app .sidebar-rooms .environment-row .environment-select > svg {
+  color: inherit;
+}
+.workspace-app .sidebar-rooms .environment-row .environment-rename,
+.workspace-app .sidebar-rooms .environment-row .reorder-handle {
+  color: var(--environment-control);
+}
+.workspace-app .sidebar-rooms .environment-row button.environment-delete {
+  color: var(--environment-delete);
+}
+.workspace-app .sidebar-rooms .environment-row button.environment-rename {
+  transform: none;
+}
+.workspace-app .sidebar-rooms .environment-row.active .environment-select > span {
+  font-weight: 700;
+}
+.workspace-app .sidebar-rooms .environment-row.active .reorder-handle:focus-visible {
+  outline-color: #fff;
+  background: #ffffff20;
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .sidebar-rooms .environment-row:not(.active):hover {
+    background: #f6eee3;
+    box-shadow: none;
+  }
+  .workspace-app .sidebar-rooms .environment-row.active:hover {
+    background: #9b4529;
+  }
+  .workspace-app .sidebar-rooms .environment-row.active .environment-rename:hover,
+  .workspace-app .sidebar-rooms .environment-row.active .reorder-handle:hover {
+    background: #ffffff20;
+  }
+  .workspace-app .sidebar-rooms .environment-row button.environment-delete:is(:hover, :focus-visible):not(:disabled) {
+    background: var(--environment-delete-hover);
+  }
+}
+
+/* A quiet breadcrumb surface identifies the home currently open. */
+.workspace-app .desktop-app-header h1 {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #f3ebe0;
+  line-height: 1.4;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-app .item-row.is-completing .item-name-scribble path,
+  .workspace-app .environment-row.is-activating {
+    animation: none;
+  }
+  .workspace-app .environment-row,
+  .workspace-app .environment-row button,
+  .workspace-app .environment-row .environment-select > span,
+  .workspace-app .environment-row .environment-select > svg {
+    transition: none;
+  }
+  .workspace-app .environment-row:hover .environment-select > span,
+  .workspace-app .environment-row:hover .environment-select > svg {
+    transform: none;
+  }
+}
+
+/* Intrinsic-width mobile chips never squeeze labels or detach their handles. */
+.workspace-app .environment-tabs-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 8px 0 0;
+  padding: 2px 0 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 2px;
+}
+.workspace-app .environment-chips-row {
+  width: max-content;
+  min-width: 100%;
+  gap: 8px;
+  align-items: center;
+  padding: 0;
+}
+.workspace-app .environment-chips-row > .environment-chips {
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 0;
+  gap: 8px;
+  padding: 0;
+}
+.workspace-app .environment-chips .sortable-entry {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.workspace-app .environment-chips .environment-row {
+  display: grid;
+  grid-template-columns: minmax(44px, 1fr) 44px;
+  gap: 0;
+  padding: 0;
+  min-height: 46px;
+  max-width: min(260px, calc(100vw - 64px));
+}
+.workspace-app .environment-chips .environment-row .environment-select,
+.workspace-app
+  .environment-chips-row
+  > .environment-row.environment-all
+  .environment-select {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.workspace-app .environment-chips .environment-row .environment-select {
+  padding-right: 4px;
+}
+.workspace-app .environment-chips .environment-row .reorder-handle {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+}
+.workspace-app .environment-chips-row > .environment-row.environment-all {
+  flex: 0 0 auto;
+  display: flex;
+  padding: 0;
+  min-height: 46px;
+}
+.workspace-app
+  .environment-chips-row
+  > .environment-all
+  .environment-select
+  > span {
+  text-align: center;
+}
+
+.workspace-app .environment-chips .environment-row .environment-select > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-app
+  .environment-chips-row
+  > .environment-row.environment-all
+  .environment-select {
+  min-width: 64px;
+}
+
+/* One shared width keeps Todos and room chips visually balanced. */
+.workspace-app .environment-chips-row {
+  --environment-chip-width: 132px;
+}
+.workspace-app .environment-chips .sortable-entry,
+.workspace-app .environment-chips-row > .environment-row.environment-all {
+  flex: 0 0 var(--environment-chip-width);
+  width: var(--environment-chip-width);
+}
+.workspace-app .environment-chips .environment-row {
+  width: var(--environment-chip-width);
+  max-width: none;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+}
+.workspace-app .environment-chips .environment-row .environment-select {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.workspace-app .environment-chips .environment-row .reorder-handle {
+  grid-column: 3;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+  width: 32px;
+  min-width: 32px;
+}
+.workspace-app .environment-chips-row > .environment-all .environment-select {
+  width: 100%;
+  justify-content: center;
+}
+.workspace-app .item-row.is-completing {
+  animation: item-confirmation 720ms ease-out both;
+}
+@keyframes item-confirmation {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  35% {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px #5b633f18;
+  }
+}
+
+/* Expand the summary smoothly and reveal its cards in a short sequence. */
+.workspace-app .stats-insights-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  margin-top: 0;
+  transition:
+    grid-template-rows 280ms ease,
+    opacity 180ms ease,
+    margin-top 280ms ease,
+    visibility 280ms;
+}
+.workspace-app .stats-insights-reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  margin-top: 12px;
+}
+.workspace-app .stats-insights-reveal > .stats-insights-clip {
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.workspace-app .stats-insights-reveal[data-open="true"] .stats-insight {
+  animation: stats-card-reveal 300ms ease-out both;
+}
+.workspace-app
+  .stats-insights-reveal[data-open="true"]
+  .stats-insight:nth-child(2) {
+  animation-delay: 65ms;
+}
+@keyframes stats-card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The same rising surface for Add, Import, Export and the editing forms. */
+.casamia-dialog[data-state="open"] {
+  animation: clipboard-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes clipboard-rise {
+  from {
+    transform: translateY(100%);
+    opacity: 0.65;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (max-width: 767px) {
+  .casamia-dialog::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 10px auto -4px;
+    border-radius: 4px;
+    background: #cbbda8;
+  }
+}
+@media (min-width: 768px) {
+  .casamia-dialog[data-state="open"] {
+    animation-name: clipboard-rise-desktop;
+  }
+}
+@keyframes clipboard-rise-desktop {
+  from {
+    transform: translate(-50%, calc(-50% + 36px));
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%);
+    opacity: 1;
+  }
+}
+.export-sheet-actions {
+  display: grid;
+  gap: 8px;
+}
+.export-sheet-actions > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 1px solid #e9dfce;
+  border-radius: 10px;
+  text-align: left;
+  color: #4a3228;
+  background: #fbf7ef;
+}
+.export-sheet-actions > button > span {
+  display: grid;
+  gap: 2px;
+}
+.export-sheet-actions small {
+  font-size: 12px;
+  color: #756455;
+}
+.export-sheet-formats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.export-sheet-formats > button {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid #cdb89a;
+  border-radius: 10px;
+}
+.export-sheet-formats > button[aria-checked="true"] {
+  border-color: #a34c30;
+  background: #f2e2ce;
+}
+.export-sheet-caption {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #756455;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-app .item-row.is-completing,
+  .workspace-app .stats-insights-reveal[data-open="true"] .stats-insight,
+  .casamia-dialog[data-state="open"] {
+    animation: none;
+  }
+  .workspace-app .stats-insights-reveal {
+    transition: none;
+  }
+}
+
+.export-menu-panel[data-state="open"] {
+  animation: export-panel-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes export-panel-rise {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .export-menu-panel[data-state="open"] {
+    animation: none;
+  }
+}
+
+/* Symmetric gutters center each name across the pill and keep the handle separate. */
+.workspace-app .environment-chips .environment-row .environment-select {
+  justify-content: center;
+  padding-inline: 32px;
+}
+.workspace-app .environment-chips .environment-row .environment-select > span {
+  text-align: center;
+}
+.workspace-app .environment-chips-row > .environment-row.environment-all {
+  border-color: #b18b60;
+}
+.workspace-app .environment-chips-row > .environment-row.environment-all.active {
+  border-color: #873c25;
+}
+.workspace-app .item-row {
+  position: relative;
+}
+.workspace-app .item-row > .item-row-inner {
+  cursor: pointer;
+}
+.item-chalk-stroke {
+  position: absolute;
+  inset: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+  animation: item-chalk-fade 740ms linear both;
+}
+.item-chalk-reveal {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: item-chalk-draw 600ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes item-chalk-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes item-chalk-fade {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  72% {
+    opacity: 0.48;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* Space inside the clipping surface preserves the rounded border and shadow. */
+.workspace-app .stats-insights-clip > .stats-insights {
+  margin: 0;
+  padding: 3px;
+  border: 0;
+}
+@media (max-width: 1023px) {
+  .workspace-app .item-row .item-name {
+    font-size: 16px;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  .workspace-app .item-row > .item-row-inner {
+    padding-top: 12px;
+    padding-bottom: 8px;
+  }
+  .workspace-app .item-row .item-meta {
+    margin-top: 6px;
+    row-gap: 5px;
+    line-height: 1.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-chalk-stroke {
+    display: none;
+    animation: none;
+  }
+  .item-chalk-reveal {
+    animation: none;
+  }
+}
+
+/* Pending purchases lead the visual hierarchy; completed items stay readable and quieter. */
+.workspace-app .item-row:not(.checked):not(.inactive) {
+  --item-surface: #fff1db;
+  background: var(--item-surface);
+  border-color: #cda477;
+  box-shadow:
+    inset 3px 0 0 #b5532f,
+    0 2px 7px #6b442414;
+}
+.workspace-app .item-row:not(.checked):not(.inactive) .item-name {
+  color: var(--cm-text);
+  font-weight: 650;
+}
+.workspace-app .item-row.checked {
+  --item-surface: #eceee7;
+  background: var(--item-surface);
+  border-color: #c8cebc;
+  box-shadow: none;
+}
+.workspace-app .item-row.checked .item-name {
+  color: #5c6151;
+  font-weight: 500;
+}
+.workspace-app .item-row.inactive {
+  --item-surface: #efebe5;
+  background: var(--item-surface);
+  border-color: #d7cebf;
+  box-shadow: none;
+}
+/* Light metadata surfaces remain distinct from the warm and completed cards. */
+.workspace-app .item-row .item-meta {
+  color: #5f493a;
+}
+.workspace-app .item-row .item-category-tag,
+.workspace-app .item-row .item-quantity-tag,
+.workspace-app .item-row .item-meta-price,
+.workspace-app .item-row .item-price {
+  background: #fffdf8;
+  border: 1px solid #cbb396;
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: #513d2d;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: center;
+}
+.workspace-app .item-row .item-status-tag,
+.workspace-app .item-row .item-status {
+  border: 1px solid color-mix(in srgb, currentColor 40%, white);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.workspace-app .item-row .status-needed {
+  background: #fbe1cc;
+  color: #8b3f25;
+  border-color: #cb9776;
+}
+.workspace-app .item-row .item-added {
+  color: #675344;
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .item-row:not(.checked):not(.inactive):hover {
+    border-color: #b5532f;
+  }
+  .workspace-app .item-row.checked:hover {
+    border-color: #adb795;
+  }
+}
+
+/* Shared summary typography applies to Todos and every selected environment. */
+.workspace-app .stats-compact-percent {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--cm-text);
+}
+.workspace-app .stats-compact-percent small {
+  font-size: 15px;
+}
+.workspace-app .stats-compact-detail {
+  font-size: 13px;
+  font-weight: 600;
+  color: #514132;
+  line-height: 1.4;
+}
+.workspace-app .stats-compact-toggle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cm-action-hover);
+}
+.workspace-app .stats-compact-grid dt {
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: #514132;
+}
+.workspace-app .stats-compact-grid dd {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--cm-text);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.workspace-app .stats-compact-grid .money {
+  display: inline;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.workspace-app .stats-scope {
+  font-size: 13px;
+  font-weight: 600;
+  color: #594839;
+}
+.workspace-app .stats-insight-label,
+.workspace-app .workspace-stats .stat-label,
+.workspace-app .workspace-stats .stat-next-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4c3b2f;
+}
+.workspace-app .stats-insight > strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cm-text);
+}
+.workspace-app .stats-insight > strong > small {
+  font-size: 12px;
+}
+.workspace-app .stats-insight p,
+.workspace-app .workspace-stats .stat-detail {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #594839;
+}
+.workspace-app .workspace-stats .stat-sublabel,
+.workspace-app .workspace-stats .stat-receipt dt {
+  font-size: 13px;
+  font-weight: 650;
+  color: #514132;
+}
+.workspace-app .workspace-stats .stat-receipt dd {
+  font-weight: 600;
+}
+.workspace-app .stat-room-name,
+.workspace-app .environment-select > span {
+  font-weight: 600;
+}
+.workspace-app .overview-room-body > strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cm-text);
+}
+.workspace-app .overview-room-meta {
+  font-size: 13px;
+  font-weight: 500;
+  color: #594839;
+}
+@media (max-width: 359px) {
+  .workspace-app .stats-compact-percent {
+    font-size: 24px;
+  }
+  .workspace-app .stats-compact-detail,
+  .workspace-app .stats-compact-toggle {
+    font-size: 12px;
+  }
+  .workspace-app .stats-compact-grid {
+    gap: 6px;
+  }
+  .workspace-app .stats-compact-grid dd {
+    font-size: 15px;
+  }
+}
+
+/* The edit surface is a lighter continuation of each item's current state. */
+.workspace-app .item-row .item-inline-panel {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--item-surface) 75%, white),
+    color-mix(in srgb, var(--item-surface) 20%, white)
+  );
+  border-top-color: color-mix(in srgb, var(--item-surface) 75%, #82735e);
+  border-radius: 0;
+}
+.workspace-app .item-row.expanded .item-footer {
+  background: var(--item-surface);
+  border-radius: 0 0 8px 8px;
+}
+.workspace-app .item-field-link > label {
+  justify-content: center;
+  text-align: center;
+}
+/* The sticky wrapper stays clear; only the floating buttons have a glass surface. */
+.workspace-app .item-row .item-inline-actions {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  gap: 10px;
+}
+.workspace-app .item-row .item-inline-actions .button {
+  min-height: 44px;
+  border: 1px solid #9d7756;
+  border-radius: 12px;
+  background: #ffffff80;
+  color: #4a3228;
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 5px 16px #5b3b2514;
+}
+.workspace-app .item-row .item-inline-actions .button-dark {
+  background: linear-gradient(135deg, #b5532fe6, #9a4529eb);
+  border: 2px solid #873c25;
+  color: #fff;
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .item-row .item-inline-actions .button-outline:hover {
+    background: #ffffffb3;
+  }
+  .workspace-app .item-row .item-inline-actions .button-dark:hover {
+    background: #9a4529ed;
+  }
+}
+/* The square visual keeps the existing checkbox semantics and animated check. */
+.workspace-app .item-row-controls .item-check {
+  position: relative;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  border: 1.5px solid #a77c50;
+  border-radius: 6px;
+  background: #fffdf7;
+  transition:
+    transform 160ms ease-out,
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
+}
+.workspace-app .item-row-controls .item-check:focus-visible {
+  outline: 2px solid var(--cm-action);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.workspace-app .item-row-controls .item-check[data-pointer-focus="true"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+.workspace-app .item-row-controls .item-check::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 10px;
+}
+.workspace-app .item-row-controls .item-check[data-state="checked"] {
+  background: #758151;
+  border-color: #5f6b45;
+  color: #fff;
+}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .workspace-app .item-row-controls .item-check:not(:disabled):hover {
+    background: #f8e4c8;
+    border-color: var(--cm-action);
+  }
+  .workspace-app .item-row-controls .item-check[data-state="checked"]:not(:disabled):hover {
+    background: #647143;
+    border-color: #536039;
+  }
+}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .workspace-app .item-row-controls .item-check:not(:disabled):hover {
+    transform: translateY(-1px) scale(1.07);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-app .item-row-controls .item-check {
+    transition: none;
+  }
+}

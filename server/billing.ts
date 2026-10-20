@@ -237,13 +237,14 @@ export function registerBillingWebhook(app: express.Express) {
     let event: Stripe.Event;
     try {
       event = getStripe().webhooks.constructEvent(req.body, signature, secret);
-    } catch {
+    } catch (err) {
+      getLogger().warn({ event: 'billing.webhook.signature_failed', err }, 'Webhook signature validation failed.');
       res.status(400).json({ error: 'Assinatura inválida.' });
       return;
     }
     try {
       await handleStripeEvent(event);
-      getLogger().info({ event: 'billing.webhook.completed', stripeEventType: event.type }, 'Evento Stripe processado.');
+      getLogger().info({ event: 'billing.webhook.completed', stripeEventId: event.id, stripeEventType: event.type, stripeEvent: event }, 'Evento Stripe processado.');
       res.json({ received: true });
     } catch (err) {
       // Uma falha nossa devolve 500 para a Stripe tentar o evento de novo (a marca de "já processado" volta atrás junto).

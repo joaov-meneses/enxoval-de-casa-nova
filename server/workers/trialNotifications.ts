@@ -27,7 +27,7 @@ export async function sendTrialNotifications() {
           if (fresh.rowCount) await sendMail(trialEmail({ to: user.email, endsAt: user.trial_ends_at, reminder: kind === 'ending' }));
         }
       });
-    } catch (err) { logger.error({ event: 'trial.notification.failed', err }, 'Falha no aviso do trial; nova tentativa na próxima rodada.'); }
+    } catch (err) { logger.error({ event: 'trial.notification.failed', userId: id, err }, 'Falha no aviso do trial; nova tentativa na próxima rodada.'); }
   }
 }
 
@@ -36,7 +36,8 @@ export function startTrialNotifications() {
   const run = async () => {
     if (running) return;
     running = true;
-    try { await sendTrialNotifications(); }
+    logger.info({ event: 'trial.worker.started' }, 'Trial notification run started.');
+    try { await sendTrialNotifications(); logger.info({ event: 'trial.worker.completed' }, 'Trial notification run completed.'); }
     catch (err) { logger.error({ event: 'trial.worker.failed', err }, 'Falha na rotina de avisos do trial.'); }
     finally { running = false; }
   };

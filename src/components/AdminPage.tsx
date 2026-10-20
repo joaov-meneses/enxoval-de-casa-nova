@@ -1,3 +1,7 @@
+import { Badge } from "@/src/components/ui/badge";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
 import {
   useCallback,
   useEffect,
@@ -21,7 +25,7 @@ import {
   UserCheck,
   UserRoundX,
   Users,
-} from "lucide-react";
+} from "@/src/components/icons";
 import {
   adminLogin,
   adminLogout,
@@ -241,9 +245,9 @@ export function AdminPage() {
             acesso.
           </p>
           <form className="auth-form" onSubmit={signIn} aria-busy={busy}>
-            <label htmlFor="admin-login">
+            <Label htmlFor="admin-login">
               Login administrativo
-              <input
+              <Input
                 id="admin-login"
                 value={login}
                 onChange={(event) => setLogin(event.target.value)}
@@ -253,11 +257,11 @@ export function AdminPage() {
                 disabled={busy}
                 placeholder="Seu login de gestão"
               />
-            </label>
-            <label htmlFor="admin-password">
+            </Label>
+            <Label htmlFor="admin-password">
               Senha administrativa
               <span className="password-field">
-                <input
+                <Input
                   id="admin-password"
                   type={visible ? "text" : "password"}
                   value={password}
@@ -267,21 +271,21 @@ export function AdminPage() {
                   maxLength={512}
                   disabled={busy}
                 />
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
                   onClick={() => setVisible(!visible)}
                 >
                   {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                </Button>
               </span>
-            </label>
+            </Label>
             {error && (
               <div className="form-error" role="alert">
                 {error}
               </div>
             )}
-            <button
+            <Button variant="brand" size="brand"
               className="button button-dark"
               disabled={busy}
               type="submit"
@@ -293,7 +297,7 @@ export function AdminPage() {
                   Entrar na gestão <ArrowRight size={18} />
                 </>
               )}
-            </button>
+            </Button>
           </form>
           <a className="account-signout" href="/login">
             <ArrowLeft size={16} /> Voltar ao login do aplicativo
@@ -329,13 +333,13 @@ export function AdminPage() {
           <span className="admin-session-label">
             <ShieldCheck size={16} /> {session}
           </span>
-          <button
+          <Button variant="brand" size="brand"
             className="button button-outline"
             onClick={() => void signOut()}
             disabled={busy}
           >
             <LogOut size={16} /> Sair
-          </button>
+          </Button>
         </div>
       </header>
       <main className="admin-main">
@@ -345,14 +349,14 @@ export function AdminPage() {
             <h1>Cuidado com cada acesso.</h1>
             <p>Encontre uma conta, acompanhe seu status e ajude a recomeçar.</p>
           </div>
-          <button
+          <Button variant="brand" size="brand"
             className="button button-outline"
             onClick={() => void refresh()}
             disabled={refreshing || busy}
           >
             <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />{" "}
             Atualizar
-          </button>
+          </Button>
         </section>
         <div className="admin-summary">
           <div>
@@ -381,16 +385,16 @@ export function AdminPage() {
         >
           <div className="admin-users-heading">
             <h2 id="users-title">Usuários</h2>
-            <label className="admin-search">
+            <Label className="admin-search">
               <Search size={18} aria-hidden="true" />
-              <input
+              <Input
                 aria-label="Buscar usuários"
                 type="search"
                 placeholder="Busque por nome, e-mail ou IP"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-            </label>
+            </Label>
           </div>
           <div
             className="admin-filters"
@@ -405,7 +409,7 @@ export function AdminPage() {
                 ["reset", "Troca pendente"],
               ] as const
             ).map(([value, label]) => (
-              <button
+              <Button variant="brand" size="brand"
                 key={value}
                 aria-pressed={filter === value}
                 className={filter === value ? "active" : ""}
@@ -413,7 +417,7 @@ export function AdminPage() {
               >
                 {label}
                 <span>{counts[value]}</span>
-              </button>
+              </Button>
             ))}
           </div>
           {error && (
@@ -438,19 +442,19 @@ export function AdminPage() {
                   </div>
                 </div>
                 <div className="admin-user-status">
-                  <span
+                  <Badge asChild variant="outline"><span
                     className={`admin-badge ${user.isActive ? "active" : "inactive"}`}
                   >
                     {user.isActive ? "Ativo" : "Inativo"}
-                  </span>
+                  </span></Badge>
                   {user.mustChangePassword && (
-                    <span className="admin-badge pending">
+                    <Badge asChild variant="outline"><span className="admin-badge pending">
                       {user.passwordResetExpiresAt &&
                       new Date(user.passwordResetExpiresAt).getTime() <=
                         Date.now()
                         ? "Senha temporária expirada"
                         : "Troca de senha pendente"}
-                    </span>
+                    </span></Badge>
                   )}
                 </div>
                 <div className="admin-user-activity">
@@ -466,22 +470,22 @@ export function AdminPage() {
                   </small>
                 </div>
                 <div className="admin-user-actions">
-                  <button
+                  <Button variant="brand" size="brand"
                     className="button button-outline"
                     disabled={!user.isActive || busy}
                     onClick={() => openAction(user, "reset")}
                     aria-label={`Redefinir senha de ${user.email}`}
                   >
                     <KeyRound size={16} /> Redefinir senha
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="brand" size="brand"
                     className="admin-status-action"
                     disabled={busy}
                     onClick={() => openAction(user, "status")}
                     aria-label={`${user.isActive ? "Desativar" : "Reativar"} ${user.email}`}
                   >
                     {user.isActive ? "Desativar conta" : "Reativar conta"}
-                  </button>
+                  </Button>
                 </div>
               </article>
             ))}
@@ -543,12 +547,12 @@ export function AdminPage() {
                   Envie esta senha diretamente à pessoa. Ela precisará escolher
                   uma nova senha antes de acessar o enxoval.
                 </p>
-                <label
+                <Label
                   className="admin-temporary-label"
                   htmlFor="temporary-password"
                 >
                   Senha temporária
-                  <input
+                  <Input
                     id="temporary-password"
                     ref={temporaryRef}
                     readOnly
@@ -557,14 +561,14 @@ export function AdminPage() {
                     spellCheck={false}
                     onFocus={(event) => event.target.select()}
                   />
-                </label>
-                <button
+                </Label>
+                <Button variant="brand" size="brand"
                   className="button button-outline admin-copy"
                   onClick={() => void copyPassword()}
                 >
                   {copied ? <Check size={17} /> : <Copy size={17} />}
                   {copied ? "Senha copiada" : "Copiar senha"}
-                </button>
+                </Button>
                 <p className="admin-temporary-note">
                   Válida até {date(temporary.expiresAt)}. Esta senha aparece
                   apenas agora; ao fechar, será necessário gerar outra se você
@@ -575,7 +579,7 @@ export function AdminPage() {
                     {dialogError}
                   </div>
                 )}
-                <button
+                <Button variant="brand" size="brand"
                   className="button button-dark"
                   onClick={() => {
                     setAction(null);
@@ -583,7 +587,7 @@ export function AdminPage() {
                   }}
                 >
                   Já copiei, concluir
-                </button>
+                </Button>
               </>
             ) : (
               <>
@@ -600,15 +604,15 @@ export function AdminPage() {
                   </div>
                 )}
                 <div className="admin-dialog-actions">
-                  <button
+                  <Button variant="brand" size="brand"
                     className="button button-outline"
                     data-dialog-autofocus
                     disabled={busy}
                     onClick={() => setAction(null)}
                   >
                     Cancelar
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="brand" size="brand"
                     className={`button ${action.kind === "status" && action.user.isActive ? "admin-danger-button" : "button-dark"}`}
                     disabled={busy}
                     onClick={() => void confirmAction()}
@@ -622,7 +626,7 @@ export function AdminPage() {
                     ) : (
                       "Reativar conta"
                     )}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

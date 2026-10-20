@@ -536,8 +536,8 @@
 }
 
 /* Sugestões regionais */
-.pp-suggestions summary,
-.pp-how summary {
+.pp-suggestions [data-slot="collapsible-trigger"],
+.pp-how [data-slot="collapsible-trigger"] {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -546,14 +546,14 @@
   color: #3b2a20;
   list-style: none;
 }
-.pp-suggestions summary::-webkit-details-marker,
-.pp-how summary::-webkit-details-marker {
+.pp-suggestions [data-slot="collapsible-trigger"]::-webkit-details-marker,
+.pp-how [data-slot="collapsible-trigger"]::-webkit-details-marker {
   display: none;
 }
-.pp-suggestions summary span {
+.pp-suggestions [data-slot="collapsible-trigger"] span {
   flex: 1;
 }
-.pp-suggestions[open] summary > svg:last-child {
+.pp-suggestions[data-state="open"] [data-slot="collapsible-trigger"] > svg:last-child {
   transform: rotate(180deg);
 }
 .pp-suggest-list {
@@ -1083,17 +1083,17 @@
   border-radius: 11px;
   background: #eef4f8;
 }
-.pp-how summary {
+.pp-how [data-slot="collapsible-trigger"] {
   gap: 12px;
   padding: 12px 14px;
   min-height: 56px;
   border-radius: 11px;
   font-weight: 400;
 }
-.pp-how summary:hover {
+.pp-how [data-slot="collapsible-trigger"]:hover {
   background: #e4eef5;
 }
-.pp-how summary:focus-visible {
+.pp-how [data-slot="collapsible-trigger"]:focus-visible {
   outline: 2px solid #244b66;
   outline-offset: 2px;
 }
@@ -1127,7 +1127,7 @@
   color: #17415c;
   transition: transform 0.15s ease;
 }
-.pp-how[open] .pp-how-chevron {
+.pp-how[data-state="open"] .pp-how-chevron {
   transform: rotate(180deg);
 }
 .pp-how ul {
@@ -1135,7 +1135,7 @@
   padding: 4px 16px 16px 36px;
   color: #26323b;
 }
-.pp-how[open] summary {
+.pp-how[data-state="open"] [data-slot="collapsible-trigger"] {
   border-bottom: 1px solid #c9dbe8;
   border-radius: 11px 11px 0 0;
 }
@@ -1216,7 +1216,7 @@
   .pp-tier strong {
     font-size: 14px;
   }
-  .pp-how summary {
+  .pp-how [data-slot="collapsible-trigger"] {
     padding: 10px 12px;
     min-height: 52px;
     gap: 10px;
@@ -1403,7 +1403,7 @@
   background: #fffdf9;
   padding: 0 12px;
 }
-.pp-room-group > summary {
+.pp-room-group > [data-slot="collapsible-trigger"] {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1412,16 +1412,16 @@
   list-style: none;
   color: #4f362b;
 }
-.pp-room-group > summary::-webkit-details-marker { display: none; }
-.pp-room-group > summary:focus-visible {
+.pp-room-group > [data-slot="collapsible-trigger"]::-webkit-details-marker { display: none; }
+.pp-room-group > [data-slot="collapsible-trigger"]:focus-visible {
   outline: 2px solid #c2603f;
   outline-offset: 3px;
   border-radius: 6px;
 }
 .pp-room-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
 .pp-room-count { font-size: 12px; color: #6a5b50; }
-.pp-room-group > summary > svg { flex-shrink: 0; }
-.pp-room-group[open] > summary > svg { transform: rotate(180deg); }
+.pp-room-group > [data-slot="collapsible-trigger"] > svg { flex-shrink: 0; }
+.pp-room-group[data-state="open"] > [data-slot="collapsible-trigger"] > svg { transform: rotate(180deg); }
 .pp-room-group .pp-rows { margin-top: 0; }
 .pp-room-group .pp-row:first-child { border-top-color: #efe6d6; }
 .pp-price-estimate { display: grid; gap: 3px; }
@@ -1489,7 +1489,7 @@
   .pp-figures dd { margin: 0; font-size: 12px; overflow-wrap: normal; }
   .pp-room-groups { gap: 8px; }
   .pp-room-group { padding: 0 8px; }
-  .pp-room-group > summary { gap: 6px; }
+  .pp-room-group > [data-slot="collapsible-trigger"] { gap: 6px; }
   .pp-room-name { font-size: 13px; }
   .pp-room-count { font-size: 11px; }
   .pp-row { padding: 10px 0; margin: 0; }
@@ -1501,6 +1501,36 @@
   .pp-row-week .casamia-select-popup { width: 100%; max-width: 100%; }
   .pp-nino-result, .pp-nino-ranking li { flex-wrap: wrap; gap: 8px; }
   .pp-nino-result > div, .pp-nino-ranking li > div { flex-basis: 100%; }
-  .pp-how summary { gap: 8px; padding: 10px; }
+  .pp-how [data-slot="collapsible-trigger"] { gap: 8px; padding: 10px; }
   .pp-how-text strong { font-size: 14px; }
 }
+
+/* Radix keeps the content mounted during closing; height returns to auto after opening
+   so expanding rooms or changing weeks never clips the parent period. */
+.pp [data-slot="collapsible-content"] {
+  --pp-content-gap: 0px;
+  overflow: hidden;
+}
+.pp [data-slot="collapsible-content"][data-state="open"] {
+  animation: pp-content-open 280ms cubic-bezier(.22, 1, .36, 1);
+}
+.pp [data-slot="collapsible-content"][data-state="closed"] {
+  animation: pp-content-close 220ms ease-in-out;
+}
+@keyframes pp-content-open {
+  from { height: 0; margin-top: 0; opacity: 0; }
+  to { height: var(--radix-collapsible-content-height); margin-top: var(--pp-content-gap); opacity: 1; }
+}
+@keyframes pp-content-close {
+  from { height: var(--radix-collapsible-content-height); margin-top: var(--pp-content-gap); opacity: 1; }
+  to { height: 0; margin-top: 0; opacity: 0; }
+}
+.pp .pp-room-group > [data-slot="collapsible-trigger"] > svg {
+  transition: transform 220ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp [data-slot="collapsible-content"][data-state] { animation: none; }
+  .pp .pp-room-group > [data-slot="collapsible-trigger"] > svg { transition: none; }
+}
+
+.pp .pp-period-body { --pp-content-gap: 14px; }

@@ -12,17 +12,9 @@ let posthogLogs: ReturnType<typeof createPosthogLogs> = null;
 try { posthogLogs = createPosthogLogs(process.env, isProduction); } catch { /* A configuration failure must not prevent startup. */ }
 export const stopPosthogLogs = async () => { await posthogLogs?.shutdown(); };
 
-// Whitelist error fields: database details, SQL parameters and parser bodies may contain secrets.
+// Include original error fields and nested causes without omission or masking.
 export function serializeError(value: unknown) {
-  const error = value instanceof Error ? value : new Error('Erro lançado sem instância de Error.');
-  const serialized = pino.stdSerializers.err(error);
-  return {
-    type: serialized.type,
-    message: serialized.message,
-    stack: serialized.stack,
-    code: typeof serialized.code === 'string' ? serialized.code : undefined,
-    status: typeof serialized.status === 'number' ? serialized.status : undefined,
-  };
+  return value instanceof Error ? pino.stdSerializers.errWithCause(value) : value as any;
 }
 
 export function createLogger(destination?: DestinationStream, remote = destination ? null : posthogLogs) {
@@ -32,10 +24,6 @@ export function createLogger(destination?: DestinationStream, remote = destinati
     timestamp: pino.stdTimeFunctions.isoTime,
     serializers: { err: serializeError },
     hooks: { streamWrite: line => { try { remote?.write(line); } catch { /* Preserve local logging. */ } return line; } },
-    redact: {
-      paths: ['password', 'confirmation', 'token', 'secret', 'authorization', 'cookie', 'apiKey', '*.password', '*.token', '*.secret', '*.authorization', '*.cookie', '*.apiKey'],
-      censor: '[REDACTED]',
-    },
     ...(!destination && (process.env.LOG_FORMAT === 'pretty' || (!isProduction && process.env.LOG_FORMAT !== 'json')) ? {
       transport: { target: 'pino-pretty', options: { colorize: process.stdout.isTTY === true, translateTime: 'SYS:standard', errorLikeObjectKeys: ['err'], ignore: 'pid,hostname' } },
     } : {}),

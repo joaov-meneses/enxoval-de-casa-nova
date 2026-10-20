@@ -541,7 +541,7 @@
   font-size: 12.5px;
   color: #5b4d43;
 }
-.fb-tech summary {
+.fb-tech [data-slot="collapsible-trigger"] {
   cursor: pointer;
   font-weight: 700;
   color: #17415c;

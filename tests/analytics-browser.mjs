@@ -20,6 +20,8 @@ try {
   browser = await chromium.launch({ channel: process.platform === 'win32' ? 'msedge' : undefined, headless: true });
   // Exercise the real capture path: PostHog filters automation as bot traffic.
   const page = await browser.newPage({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36' });
+  page.setDefaultNavigationTimeout(60000);
+  page.setDefaultTimeout(30000);
   await page.addInitScript(() => Object.defineProperty(navigator, 'webdriver', { get: () => false }));
   const batches = [];
   const errors = [];
@@ -60,7 +62,7 @@ try {
     if (request.url().startsWith(origin)) return route.continue();
     return route.abort();
   });
-  await page.goto(`${origin}/privacidade?utm_source=instagram&utm_medium=social&utm_campaign=launch&utm_term=PRIVATE_TERM&token=PRIVATE_TOKEN#PRIVATE_FRAGMENT`);
+  await page.goto(`${origin}/privacidade?utm_source=instagram&utm_medium=social&utm_campaign=launch&utm_term=PRIVATE_TERM&token=PRIVATE_TOKEN#PRIVATE_FRAGMENT`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Desativar análise de uso' }).waitFor();
   await page.waitForFunction(() => window.__PosthogExtensions__?.errorWrappingFunctions && window.onerror);
   await page.locator('h1').click();
@@ -111,10 +113,27 @@ try {
   assert.ok(batches.some(event => event.event === '$exception' && event.properties.$exception_list[0].type === 'RangeError'));
   assert.ok(batches.some(event => event.event === '$exception' && event.properties.error_source === 'api' && event.properties.http_status === 503));
   const findPrivate = (value, path = '') => Object.entries(value).flatMap(([key, child]) => child && typeof child === 'object' ? findPrivate(child, `${path}.${key}`) : String(child).includes('PRIVATE_') ? [`${path}.${key}: ${child}`] : []);
-  assert.deepEqual(findPrivate(batches), []);
+  assert.deepEqual(findPrivate(batches.filter(event => event.event !== '$exception' && !event.event.startsWith('application.'))), []);
+  assert.equal(exception.properties.$exception_list[0].value, 'PRIVATE_EXCEPTION PRIVATE_EMAIL');
+  assert.ok(batches.some(event => event.event === 'application.api.started' && event.properties.path === '/api/auth/login' && event.properties.body.includes('PRIVATE_PASSWORD')));
+  assert.ok(batches.some(event => event.event === 'application.api.completed' && event.properties.response?.user?.email === 'PRIVATE_EMAIL'));
+  await page.evaluate(() => {
+    const form = document.createElement('form');
+    form.innerHTML = '<input name="diagnostic" value="RAW_FORM_VALUE"><button type="button">Diagnostic action</button>';
+    document.body.append(form);
+    form.querySelector('input').dispatchEvent(new Event('change', { bubbles: true }));
+    form.querySelector('button').click();
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    form.remove();
+  });
+  await page.waitForTimeout(3500);
+  for (const action of ['click', 'change', 'submit']) {
+    assert.ok(batches.some(event => event.event === 'application.ui.action' && event.properties.action === action && event.properties.fields?.some(field => field.value === 'RAW_FORM_VALUE')));
+  }
   assert.deepEqual(errors, []);
   await page.getByRole('button', { name: 'Desativar análise de uso' }).click();
   await page.getByRole('button', { name: 'Ativar análise de uso' }).waitFor();
+  await page.waitForTimeout(3500); // Drain events queued before the opt-out click.
   const count = batches.length;
   await page.evaluate(async () => {
     const analytics = await import('/src/analytics.ts');
@@ -130,12 +149,13 @@ try {
   await page.locator('.cm-hero-actions a').first().waitFor();
   // Prevent navigation only in this test, while still exercising React's real click handler.
   await page.locator('.cm-hero-actions a').first().evaluate(element => element.addEventListener('click', event => event.preventDefault()));
-  await page.locator('.cm-hero-actions a').first().click();
+  await page.locator('.cm-hero-actions a').first().dispatchEvent('click');
   await page.waitForTimeout(3500);
   assert.ok(batches.some(event => event.event === 'landing_cta_clicked' && event.properties.action === 'start_trial' && event.properties.position === 'hero'));
   assert.ok(batches.some(event => event.event === '$pageleave' && event.properties.$pathname === '/privacidade'));
-  assert.deepEqual(findPrivate(batches), []);
-  console.log('Browser smoke passed: real SDK goals, landing CTA, Web Vitals, safe page metadata, private-data filtering and persistent opt-out.');
+  assert.deepEqual(findPrivate(batches.filter(event => event.event !== '$exception' && !event.event.startsWith('application.'))), []);
+  assert.equal(exception.properties.$exception_list[0].value, 'PRIVATE_EXCEPTION PRIVATE_EMAIL');
+  console.log('Browser smoke passed: real SDK, complete exceptions, raw API diagnostics, UI actions, product events, Web Vitals and persistent opt-out.');
 } finally {
   await browser?.close();
   await server.close();

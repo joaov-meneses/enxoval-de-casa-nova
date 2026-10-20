@@ -5,6 +5,10 @@
   min-height: 42px;
   gap: 9px;
 }
+.desktop-actions-trigger[data-pointer-focus="true"]:focus {
+  outline: none;
+  box-shadow: none;
+}
 .desktop-actions-trigger .desktop-actions-avatar {
   display: grid;
   place-items: center;

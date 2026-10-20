@@ -1,0 +1,162 @@
+/* shadcn/ui semantic tokens mapped to the Casa Mia palette. */
+:root {
+  --background: #fbf3e6;
+  --foreground: #3b2a20;
+  --card: #fffdf8;
+  --card-foreground: #3b2a20;
+  --popover: #fffdf8;
+  --popover-foreground: #3b2a20;
+  --primary: #b5532f;
+  --primary-foreground: #ffffff;
+  --secondary: #efe7da;
+  --secondary-foreground: #3b2a20;
+  --muted-foreground: #78695e;
+  --accent: #f3ebe0;
+  --accent-foreground: #8b4329;
+  --destructive: #b42318;
+  --border: #e8dccb;
+  --input: #d7c7b5;
+  --ring: #a34c30;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--sand);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Portals share one stacking scale, including selects opened inside a dialog. */
+[data-slot="dialog-overlay"],
+[data-slot="sheet-overlay"] {
+  z-index: 60;
+}
+[data-slot="dialog-content"],
+[data-slot="sheet-content"] {
+  z-index: 61;
+}
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="popover-content"],
+[data-slot="tooltip-content"] {
+  z-index: 80;
+}
+.dialog-layer [data-slot="dialog-overlay"],
+.workspace-menu-layer [data-slot="sheet-overlay"] {
+  position: absolute;
+}
+.workspace-menu-panel[data-slot="sheet-content"] {
+  gap: 0;
+  max-width: none;
+}
+[data-slot="select-trigger"] {
+  width: 100%;
+}
+[data-slot="select-content"] {
+  max-width: calc(100vw - 24px);
+}
+[data-slot="select-item"] {
+  min-height: 40px;
+  white-space: normal;
+}
+[data-slot="dropdown-menu-content"].desktop-actions-popup,
+[data-slot="dropdown-menu-content"].export-menu-panel {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  max-height: min(420px, var(--radix-dropdown-menu-content-available-height));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot] {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* The choice cards keep their full clickable label and visible branded tick. */
+.choice-control {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  border: 0;
+}
+label:has(> .choice-control) {
+  position: relative;
+}
+label:has(> .choice-control:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.ob-city-chip:has([data-state="checked"]) > span {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+[data-slot="collapsible-trigger"] {
+  text-align: left;
+}
+
+.auth-tabs[data-slot="tabs-list"] {
+  width: 100%;
+  height: auto;
+}
+.profile-tabs[data-slot="tabs-list"] {
+  width: 100%;
+  height: auto;
+}
+.profile-tabs[data-slot="tabs-list"] [data-slot="tabs-trigger"] {
+  height: auto;
+  white-space: normal;
+}
+.profile-tabs [data-state="active"] {
+  color: var(--primary);
+}
+
+/* Period headings stay distinct from selectable weeks in the portaled menu. */
+.casamia-select-grouped [data-slot="select-group"] + [data-slot="select-group"] {
+  border-top: 1px solid #d8c3a8;
+  margin-top: 8px;
+  padding-top: 6px;
+}
+.casamia-select-grouped [data-slot="select-label"] {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--cm-action);
+  border-radius: 5px;
+  background: #f3e4d1;
+  color: #783b28;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.casamia-select-grouped [data-slot="select-item"] + [data-slot="select-item"] {
+  border-top: 1px solid #f0e8dc;
+}

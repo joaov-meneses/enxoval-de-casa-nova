@@ -1,81 +1,55 @@
-# Logs do servidor
+# Logs completos da aplicacao
 
-O servidor usa [Pino](https://github.com/pinojs/pino) e [pino-http](https://github.com/pinojs/pino-http). Todas as requisições que chegam ao Express são registradas: API, webhook Stripe, páginas, arquivos estáticos e caminhos inexistentes. A instrumentação vem antes dos parsers, incluindo falhas por JSON inválido e corpo acima do limite.
+O backend usa Pino e pino-http. Toda requisicao que chega ao Express gera inicio e conclusao, falha ou interrupcao, inclusive autenticacao, administracao, webhook, arquivos e rotas inexistentes. O middleware vem antes dos parsers e o registro final registra novamente a requisicao depois do processamento.
 
-## Consultar e configurar
+## Dados registrados
 
-Os logs saem em stdout e podem ser consultados no terminal de `npm run dev` ou no coletor da hospedagem. Em desenvolvimento, `pino-pretty` formata horário, nível, contexto e stack em várias linhas. Em produção (`NODE_ENV=production` ou `--production`), cada evento ocupa uma linha JSON para pesquisa e agregação.
+O registro preserva os dados reais: URL com query, parametros, corpo recebido, headers, IP, conta quando identificada, status, headers e corpo de resposta da API, duracao e contexto personalizado. Binarios da API sao representados integralmente em base64, com tamanho. Corpos de arquivos estaticos nao sao duplicados nos logs. O `reqId` gerado pelo servidor aparece no header `X-Request-Id`, nos logs e no `request_id` das excecoes e das chamadas do navegador.
 
-Variáveis opcionais em `.env.local`, `.env` ou no ambiente da hospedagem:
+Erros preservam tipo, mensagem, stack, causas, erros agregados e propriedades adicionais. Nao ha substituicao de mensagens, lista de campos permitidos ou mascaramento de senhas/tokens nos registros de diagnostico. Erros do parser preservam o diagnostico original; a resposta publica continua com a mensagem existente.
 
-| Variável | Padrão | Uso |
+Tambem ha registros estruturados de e-mails (conteudo, destinatario, resultado e falha do provedor), cache, chamadas e respostas do Jev, scraping e fallbacks, transacoes, precos por produto, alertas, catalogo, notificacoes do trial, retencao de IPs e encerramento. Os scripts de migracao, catalogo e precos usam o mesmo logger e esvaziam o envio ao terminar.
+
+## PostHog Logs
+
+Com `POSTHOG_KEY` ou `VITE_POSTHOG_KEY` contendo `phc_...`, o backend envia OTLP HTTP para `/i/v1/logs`. O corpo de cada registro e o JSON completo indentado. Atributos indexaveis incluem `event.name`, `request.id`, `user.id`, metodo, rota, status, duracao, `exception.message` e `exception.stacktrace`.
+
+Todos os eventos emitidos pelo logger sao encaminhados: sucessos, avisos, erros e nomes novos. Nao existe amostragem por sucesso nem teto por minuto na aplicacao. `POSTHOG_LOGS_MAX_PER_MINUTE` nao e mais utilizado. O nivel do Pino continua determinando o que e emitido.
+
+| Variavel | Padrao | Uso |
 | --- | --- | --- |
-| `LOG_LEVEL` | `info` | Nível mínimo: `trace`, `debug`, `info`, `warn`, `error`, `fatal`; `silent` desativa |
-| `LOG_FORMAT` | Automático por ambiente | `pretty` para leitura humana; `json` para saída estruturada |
-| `LOG_SLOW_REQUEST_MS` | `1000` | Tempo a partir do qual a conclusão recebe `warn` e `slow: true` |
+| `LOG_LEVEL` | `info` | Nivel minimo do logger; `debug` e `trace` habilitam esses niveis quando usados |
+| `LOG_FORMAT` | Automatico | `pretty` em desenvolvimento; `json` em producao |
+| `LOG_SLOW_REQUEST_MS` | `1000` | Marca requisicoes lentas com `warn` |
+| `POSTHOG_LOGS` | Ativo com token em producao | `false` desativa o envio remoto |
+| `POSTHOG_HOST` | `https://us.i.posthog.com` | Host de ingestao; alternativa `VITE_POSTHOG_HOST` |
+| `POSTHOG_ENABLE_DEV` | `false` | `true` habilita telemetria do servidor em desenvolvimento |
 
-Com `LOG_LEVEL=warn`, entradas e conclusões normais são filtradas. Use `info` para acompanhar todas as rotas. O nível `debug` permite eventos adicionais que venham a ser instrumentados; ele não habilita captura de corpos ou consultas SQL.
+Consulte [PostHog Logs](https://us.posthog.com/project/665798/logs). Para achar uma acao, filtre por `request.id`, `user.id` ou `event.name` e abra o corpo JSON. Erros tambem aparecem no Error Tracking com mensagem e stack originais.
 
-## Informações disponíveis
+## Navegador
 
-- `event`: início (`http.request.started`), conclusão (`http.request.completed`), falha com erro (`http.request.failed`) ou interrupção pelo cliente (`http.request.aborted`). Uma resposta 4xx enviada diretamente pela rota aparece como `completed`, com nível `warn` e mensagem de recusa.
-- `reqId`: UUID gerado pelo servidor e devolvido no cabeçalho `X-Request-Id`. Permite relacionar início, eventos internos e conclusão. IDs enviados pelo cliente não são reutilizados.
-- `req`: método, caminho sem query string, endereço IP conforme a configuração de proxy do Express, user-agent limitado e tamanho informado do corpo.
-- `route`: padrão da rota atendida na conclusão, por exemplo `/api/items/:id`.
-- `res`: status HTTP e tamanho da resposta quando disponível.
-- `responseTime`: duração em milissegundos, incluindo leitura e processamento do corpo.
-- `userId`: identificador interno, quando a autenticação de usuário resolve uma sessão. Não registra nome nem e-mail. Não é preenchido em rotas sem sessão ou na autenticação administrativa separada.
-- `err`: tipo, mensagem, stack (incluindo causas), código e status quando disponíveis.
-- `service`, `environment`, `pid` e `time`: identificação da aplicação, ambiente, processo e horário ISO.
+Eventos `application.navigation`, `application.ui.action` e `application.api.started/completed/failed` aparecem nos eventos do PostHog. Incluem URL real, cliques, alteracoes de campos, envios de formularios e chamadas da API com entrada, resultado, status, duracao e ID de requisicao. As rotas administrativas tambem sao cobertas. Os eventos de produto e Web Vitals mantem seus schemas; os dados completos ficam nos eventos operacionais e excecoes.
 
-Respostas 4xx usam `warn`; falhas 5xx usam `error`; requisições lentas e conexões interrompidas usam `warn`. Erros esperados mantêm a resposta pública existente; erros internos devolvem mensagem genérica ao cliente, com detalhes disponíveis no log. Erros que chegam ao middleware ficam associados ao log de conclusão, sem um segundo evento de erro do middleware.
+`VITE_POSTHOG_KEY` configura o projeto e `VITE_POSTHOG_ENABLE_DEV=true` habilita desenvolvimento. O opt-out e Do Not Track continuam sendo respeitados no navegador. Logs do servidor sao independentes dessa preferencia.
 
-Também há eventos para início do servidor, migrações, porta indisponível, falhas de conexões ociosas do banco, envio de convites, recuperação de senha, notificações da central de ajuda e operações de cobrança. Falhas de webhook incluem o ID e tipo do evento Stripe.
+## Cobertura e entrega
 
-## Envio ao PostHog Logs
+[Inventario de rotas e acoes](logging-coverage.md) documenta a cobertura central. Cobertura de instrumentacao nao e garantia de entrega de 100% dos eventos: bloqueadores, opt-out, falta de token, `LOG_LEVEL`, indisponibilidade de rede, limites de ingestao/tamanho e encerramento abrupto podem impedir envio. A fila OTLP e em memoria (512 registros, lotes de 50 a cada 5 segundos), sem persistencia para reenvio. O stdout continua sendo a copia local do backend. Dados omitidos de eventos antigos nao podem ser recuperados por esta alteracao.
 
-O backend envia uma cópia filtrada dos logs pelo protocolo OpenTelemetry/OTLP HTTP para o mesmo projeto usado no Error Tracking. O recurso fica ativo em produção quando há um token público `phc_...` em `POSTHOG_KEY` ou `VITE_POSTHOG_KEY`. Não precisa de chave pessoal, de outro serviço nem de novas variáveis obrigatórias no deploy.
+## Validacao
 
-| Variável | Padrão | Uso |
-| --- | --- | --- |
-| `POSTHOG_LOGS` | Ativo em produção com token | `false` desativa somente o envio remoto; stdout continua funcionando |
-| `POSTHOG_LOGS_MAX_PER_MINUTE` | `600` | Teto de registros por minuto e por processo (máximo configurável: `6000`) |
-| `POSTHOG_HOST` | `https://us.i.posthog.com` | Host de ingestão; usa `VITE_POSTHOG_HOST` como alternativa. O caminho OTLP é `/i/v1/logs` |
-| `POSTHOG_ENABLE_DEV` | `false` | `true` permite envio em desenvolvimento; compartilha a configuração do Error Tracking |
+- `npm run test:logging`: HTTP real, entrada e resposta completas, erros, causas, parser, correlacao, lentidao e interrupcao.
+- `npm run test:posthog-logs`: formato, todos os eventos/sucessos, transporte OTLP local e falhas do exportador.
+- `npm run test:error-tracking`: payload real do SDK Node e preservacao de mensagem/contexto.
+- `npm run test:analytics` e `npm run test:analytics-browser`: SDK do navegador, excecoes, acoes, dados reais de API e opt-out.
 
-São enviados `warn`, `error` e `fatal` dos eventos conhecidos, incluindo falhas HTTP, banco, Stripe, e-mail, Nino/Jev e rotinas. Em `info`, somente inicialização, migrações, processamento de webhook e resumos das rotinas de catálogo/preços. Sucessos selecionados usam no máximo 20% do teto; avisos e erros podem usar todo o orçamento restante. Requisições normais e eventos de início de requisição ficam somente nos logs locais. Novos eventos precisam entrar explicitamente na lista permitida de `server/posthogLogs.ts`.
+Simulacao Postman local, sem enviar dados ao projeto real:
 
-O corpo remoto contém somente o nome fixo do evento. Os atributos permitidos são UUID de requisição gerado pelo servidor, método, padrão de rota da API registrado no Express, status, duração, lentidão, tipo/código de erro de listas fechadas, tipo conhecido de evento Stripe e contadores das rotinas. Não envia IP, user-agent, identificação de usuário, URL/caminho real, parâmetros, conteúdo de conversa, corpos, headers, mensagens/stacks de erro nem IDs da Stripe. O recurso OpenTelemetry contém apenas serviço `casamia` e ambiente. Não há coleta automática de console, requisições ou atributos da máquina.
-
-A fila tem até 512 registros, lotes de até 50 e envio a cada 5 segundos ou ao completar um lote. Falhas de transporte não alteram as respostas do app nem geram novos logs recursivos. Não há armazenamento persistente para reenvio: excedentes de volume/fila e lotes com falha podem não chegar ao PostHog; os logs locais continuam disponíveis. O encerramento por SIGTERM/SIGINT espera até 5 segundos por requisições abertas e tenta esvaziar a fila por até 2,5 segundos. Falhas de inicialização também tentam enviar o último log antes de sair.
-
-Os limites de Logs são separados dos limites de exceções do Error Tracking. Esses logs são uma amostra operacional, não uma fonte para contar pagamentos, usuários ou receita.
-
-Depois do deploy, abra [PostHog Logs do projeto](https://us.posthog.com/project/665798/logs), selecione serviço `casamia` e ambiente `production`. Busque `server.listening`, `billing.webhook.failed`, `jev.request.failed` ou `http.request.failed`. O atributo `request.id` corresponde ao `X-Request-Id` da resposta e ao `request_id` da exceção capturada pelo middleware do Express. Mensagens/stacks completas permanecem nos logs locais; exceções sanitizadas e source maps pertencem ao Error Tracking.
-
-Referência: [instalação de Logs com Node.js](https://posthog.com/docs/logs/installation/nodejs).
-
-## Adicionar contexto em novas operações
-
-Dentro de uma rota ou função chamada por ela, use o logger do contexto assíncrono:
-
-```ts
-import { getLogger } from './logger.ts';
-
-getLogger().info({ event: 'operation.completed', itemId }, 'Operação concluída.');
-getLogger().error({ event: 'operation.failed', err }, 'Não foi possível concluir a operação.');
+```powershell
+postman simulation run postman/simulations/observability.sim.yaml --port 4900 --output ndjson --no-history
+# Em outro terminal:
+node --import tsx tests/observability-simulation.mjs
 ```
 
-`getLogger()` mantém `reqId` em chamadas assíncronas e, após a resolução da sessão, inclui `userId`. Fora de uma requisição, retorna o logger da aplicação. Passe a instância original do erro em `err` para preservar stack e causas.
-
-## Dados sensíveis
-
-Os logs HTTP não serializam corpos, valores de query strings, cookies, cabeçalhos de autorização, assinaturas Stripe ou cabeçalhos completos das respostas. Erros usam uma lista de campos permitidos para não copiar detalhes SQL, parâmetros, corpos do parser e outras propriedades anexadas. O erro de JSON inválido é substituído por uma mensagem segura, pois o parser pode incluir trechos do corpo na mensagem original.
-
-Há também redação de campos comuns de senha, token e segredo, na raiz e no primeiro nível. Mensagens de erro, caminhos, user-agent e campos personalizados continuam sendo texto: ao adicionar novos eventos, evite colocar credenciais, conteúdo pessoal ou URLs assinadas nesses campos. Rotas futuras com tokens no próprio caminho exigem sanitização explícita.
-
-## Validação
-
-`npm run test:logging` executa um servidor HTTP local sem banco e verifica correlação de chamadas concorrentes, níveis, stacks e causas, rota parametrizada, webhook com corpo cru, respostas 403/404/429/500, JSON inválido, limite de corpo, lentidão, interrupção da conexão e ausência de dados sensíveis conhecidos.
-
-`npm run test:posthog-logs` verifica a lista de campos exportáveis, desligamento por ambiente/token, teto de volume e reinício da janela, falhas de transporte e um fluxo real Pino → Express → OpenTelemetry → coletor HTTP local. Também verifica a correlação com exceções e a ausência de dados sensíveis no payload OTLP, sem enviar eventos de teste ao PostHog.
+O mock foi criado localmente a partir de `postman/contracts/telemetry.openapi.yaml`, um contrato minimo do envelope OTLP usado pelo exportador instalado. O teste executa Express, Pino e o exportador reais; o mock substitui apenas o coletor remoto. Nao verifica o painel nem os limites do PostHog em producao.

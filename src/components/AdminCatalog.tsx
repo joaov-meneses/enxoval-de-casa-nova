@@ -1,5 +1,10 @@
+import { Badge } from "@/src/components/ui/badge";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
+import { NativeSelect, NativeSelectOption } from "@/src/components/ui/native-select";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Combine, LoaderCircle, Pencil, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Check, Combine, LoaderCircle, Pencil, Search, Sparkles, Trash2, X } from "@/src/components/icons";
 import {
   completeAdminCatalogItem,
   deleteAdminCatalogAlias,
@@ -68,9 +73,9 @@ function MergePicker({ item, onMerge, onCancel }: { item: AdminCatalogItem; onMe
 
   return (
     <div className="cat-admin-merge">
-      <label className="admin-search">
+      <Label className="admin-search">
         <Search size={16} aria-hidden="true" />
-        <input
+        <Input
           autoFocus
           type="search"
           aria-label={`Mesclar "${item.name}" em qual item?`}
@@ -78,20 +83,20 @@ function MergePicker({ item, onMerge, onCancel }: { item: AdminCatalogItem; onMe
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-      </label>
+      </Label>
       <ul>
         {results.map((candidate) => (
           <li key={candidate.id}>
-            <button type="button" onClick={() => onMerge(candidate)}>
+            <Button variant="brand" size="brand" type="button" onClick={() => onMerge(candidate)}>
               Juntar em <strong>{candidate.name}</strong>
               {candidate.room && <small>{ROOM_CATEGORY_NAME[candidate.room]}</small>}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>
-      <button type="button" className="cat-admin-link" onClick={onCancel}>
+      <Button variant="brand" size="brand" type="button" className="cat-admin-link" onClick={onCancel}>
         Cancelar
-      </button>
+      </Button>
     </div>
   );
 }
@@ -210,22 +215,22 @@ export function AdminCatalog({ onError }: { onError: (err: unknown) => void }) {
               ["approved", "Aprovados"],
             ] as const
           ).map(([status, label]) => (
-            <button key={status} type="button" aria-pressed={filter === status} onClick={() => setFilter(status)}>
+            <Button variant="brand" size="brand" key={status} type="button" aria-pressed={filter === status} onClick={() => setFilter(status)}>
               {label}
               <span>{count(status)}</span>
-            </button>
+            </Button>
           ))}
         </div>
-        <label className="admin-search">
+        <Label className="admin-search">
           <Search size={18} aria-hidden="true" />
-          <input
+          <Input
             aria-label="Buscar no catálogo"
             type="search"
             placeholder="Busque por nome ou apelido"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-        </label>
+        </Label>
       </div>
 
       {items === null ? (
@@ -255,7 +260,7 @@ export function AdminCatalog({ onError }: { onError: (err: unknown) => void }) {
                       {item.functionGroup ? ` · grupo ${item.functionGroup}` : ""}
                     </small>
                   </div>
-                  <span className="admin-badge pending">{SOURCE_LABEL[item.source]}</span>
+                  <Badge asChild variant="outline"><span className="admin-badge pending">{SOURCE_LABEL[item.source]}</span></Badge>
                   <span className="cat-admin-usage">
                     {item.usage} {item.usage === 1 ? "item em listas" : "itens em listas"}
                   </span>
@@ -266,7 +271,7 @@ export function AdminCatalog({ onError }: { onError: (err: unknown) => void }) {
                     {item.aliases.map((alias) => (
                       <li key={alias.key}>
                         {alias.alias}
-                        <button
+                        <Button variant="brand" size="brand"
                           type="button"
                           aria-label={`Desfazer o apelido "${alias.alias}"`}
                           title={`Origem: ${alias.source}. Desfazer desliga os itens que entraram por este apelido.`}
@@ -274,7 +279,7 @@ export function AdminCatalog({ onError }: { onError: (err: unknown) => void }) {
                           onClick={() => void act(item.id, () => deleteAdminCatalogAlias(alias.key))}
                         >
                           <X size={13} aria-hidden="true" />
-                        </button>
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -288,78 +293,78 @@ export function AdminCatalog({ onError }: { onError: (err: unknown) => void }) {
                       saveDraft(item, draft);
                     }}
                   >
-                    <label>
+                    <Label>
                       Nome
-                      <input
+                      <Input
                         required
                         maxLength={120}
                         value={draft.name}
                         onChange={(event) => setEditing({ id: item.id, draft: { ...draft, name: event.target.value } })}
                       />
-                    </label>
-                    <label>
+                    </Label>
+                    <Label>
                       Cômodo
-                      <select value={draft.room} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, room: event.target.value as Draft["room"] } })}>
-                        <option value="">Não definido</option>
+                      <NativeSelect value={draft.room} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, room: event.target.value as Draft["room"] } })}>
+                        <NativeSelectOption value="">Não definido</NativeSelectOption>
                         {Object.entries(ROOM_CATEGORY_NAME).map(([room, label]) => (
-                          <option key={room} value={room}>
+                          <NativeSelectOption key={room} value={room}>
                             {label}
-                          </option>
+                          </NativeSelectOption>
                         ))}
-                      </select>
-                    </label>
-                    <label>
+                      </NativeSelect>
+                    </Label>
+                    <Label>
                       Prioridade
-                      <select value={draft.priority} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, priority: event.target.value as Draft["priority"] } })}>
-                        <option value="essential">Essencial</option>
-                        <option value="optional">Opcional</option>
-                      </select>
-                    </label>
-                    <label>
+                      <NativeSelect value={draft.priority} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, priority: event.target.value as Draft["priority"] } })}>
+                        <NativeSelectOption value="essential">Essencial</NativeSelectOption>
+                        <NativeSelectOption value="optional">Opcional</NativeSelectOption>
+                      </NativeSelect>
+                    </Label>
+                    <Label>
                       Quando
-                      <select value={draft.timing} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, timing: event.target.value as Draft["timing"] } })}>
-                        <option value="">Pode esperar</option>
-                        <option value="first_night">Primeira noite</option>
-                        <option value="first_week">Primeira semana</option>
-                      </select>
-                    </label>
-                    <label>
+                      <NativeSelect value={draft.timing} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, timing: event.target.value as Draft["timing"] } })}>
+                        <NativeSelectOption value="">Pode esperar</NativeSelectOption>
+                        <NativeSelectOption value="first_night">Primeira noite</NativeSelectOption>
+                        <NativeSelectOption value="first_week">Primeira semana</NativeSelectOption>
+                      </NativeSelect>
+                    </Label>
+                    <Label>
                       Entrega (semanas)
-                      <input
+                      <Input
                         type="number"
                         min={0}
                         max={26}
                         value={draft.leadTimeWeeks}
                         onChange={(event) => setEditing({ id: item.id, draft: { ...draft, leadTimeWeeks: event.target.value } })}
                       />
-                    </label>
-                    <label>
+                    </Label>
+                    <Label>
                       Faixa de preço
-                      <select value={draft.priceCategory} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, priceCategory: event.target.value as Draft["priceCategory"] } })}>
-                        <option value="">Não definida</option>
-                        <option value="1">1 · até R$ 80</option>
-                        <option value="2">2 · R$ 80 a 250</option>
-                        <option value="3">3 · R$ 250 a 1.200</option>
-                        <option value="4">4 · acima de R$ 1.200</option>
-                      </select>
-                    </label>
-                    <label>
+                      <NativeSelect value={draft.priceCategory} onChange={(event) => setEditing({ id: item.id, draft: { ...draft, priceCategory: event.target.value as Draft["priceCategory"] } })}>
+                        <NativeSelectOption value="">Não definida</NativeSelectOption>
+                        <NativeSelectOption value="1">1 · até R$ 80</NativeSelectOption>
+                        <NativeSelectOption value="2">2 · R$ 80 a 250</NativeSelectOption>
+                        <NativeSelectOption value="3">3 · R$ 250 a 1.200</NativeSelectOption>
+                        <NativeSelectOption value="4">4 · acima de R$ 1.200</NativeSelectOption>
+                      </NativeSelect>
+                    </Label>
+                    <Label>
                       Grupo de função
-                      <input
+                      <Input
                         placeholder="ex.: fritura-sem-oleo"
                         pattern="[a-z0-9\-]{2,60}"
                         title="Letras minúsculas, números e hífen"
                         value={draft.functionGroup}
                         onChange={(event) => setEditing({ id: item.id, draft: { ...draft, functionGroup: event.target.value } })}
                       />
-                    </label>
+                    </Label>
                     <div className="cat-admin-actions">
-                      <button type="submit" className="button button-dark" disabled={busy}>
+                      <Button variant="brand" size="brand" type="submit" className="button button-dark" disabled={busy}>
                         Salvar
-                      </button>
-                      <button type="button" className="button button-outline" onClick={() => setEditing(null)}>
+                      </Button>
+                      <Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => setEditing(null)}>
                         Cancelar
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 )}
@@ -375,17 +380,17 @@ export function AdminCatalog({ onError }: { onError: (err: unknown) => void }) {
                 {!draft && merging !== item.id && (
                   <div className="cat-admin-actions">
                     {item.status === "pending_review" && (
-                      <button
+                      <Button variant="brand" size="brand"
                         type="button"
                         className="button button-dark"
                         disabled={busy}
                         onClick={() => void act(item.id, () => updateAdminCatalogItem(item.id, { status: "approved" }))}
                       >
                         <Check size={16} aria-hidden="true" /> Aprovar
-                      </button>
+                      </Button>
                     )}
                     {item.status === "pending_review" && (
-                      <button
+                      <Button variant="brand" size="brand"
                         type="button"
                         className="button button-outline"
                         disabled={busy}
@@ -393,27 +398,27 @@ export function AdminCatalog({ onError }: { onError: (err: unknown) => void }) {
                         onClick={() => void act(item.id, () => completeAdminCatalogItem(item.id))}
                       >
                         <Sparkles size={15} aria-hidden="true" /> Completar com o Jev
-                      </button>
+                      </Button>
                     )}
-                    <button type="button" className="button button-outline" disabled={busy} onClick={() => setEditing({ id: item.id, draft: toDraft(item) })}>
+                    <Button variant="brand" size="brand" type="button" className="button button-outline" disabled={busy} onClick={() => setEditing({ id: item.id, draft: toDraft(item) })}>
                       <Pencil size={15} aria-hidden="true" /> Corrigir
-                    </button>
-                    <button type="button" className="button button-outline" disabled={busy} onClick={() => setMerging(item.id)}>
+                    </Button>
+                    <Button variant="brand" size="brand" type="button" className="button button-outline" disabled={busy} onClick={() => setMerging(item.id)}>
                       <Combine size={15} aria-hidden="true" /> Mesclar
-                    </button>
+                    </Button>
                     {confirmDelete === item.id ? (
-                      <button
+                      <Button variant="brand" size="brand"
                         type="button"
                         className="button admin-danger-button"
                         disabled={busy}
                         onClick={() => void act(item.id, () => deleteAdminCatalogItem(item.id))}
                       >
                         Confirmar: recusar
-                      </button>
+                      </Button>
                     ) : (
-                      <button type="button" className="admin-status-action" disabled={busy} onClick={() => setConfirmDelete(item.id)}>
+                      <Button variant="brand" size="brand" type="button" className="admin-status-action" disabled={busy} onClick={() => setConfirmDelete(item.id)}>
                         <Trash2 size={15} aria-hidden="true" /> Recusar
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}

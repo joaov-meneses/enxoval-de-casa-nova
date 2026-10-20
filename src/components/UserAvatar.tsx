@@ -1,3 +1,4 @@
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 export function UserAvatar({
   name,
   src,
@@ -8,8 +9,11 @@ export function UserAvatar({
   className?: string;
 }) {
   return (
-    <span className={`user-avatar ${className}`} aria-hidden="true">
-      {src ? <img src={src} alt="" /> : name.slice(0, 1).toUpperCase()}
-    </span>
+    <Avatar className={`user-avatar ${className}`} aria-hidden="true">
+      {src && <AvatarImage src={src} alt="" />}
+      <AvatarFallback className="bg-transparent text-inherit">
+        {name.slice(0, 1).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
   );
 }

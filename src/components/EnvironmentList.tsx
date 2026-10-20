@@ -1,4 +1,6 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/src/components/ui/button";
+import { Pencil, Trash2 } from "@/src/components/icons";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import { isInactiveStatus } from "../itemStatus";
 import { SortableList } from "./SortableList";
@@ -33,6 +35,16 @@ export function EnvironmentList({
     total: number;
   };
 }) {
+  const [activated, setActivated] = useState<string | null>(null);
+  function activate(id: string, select: () => void) {
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) setActivated(id);
+    select();
+  }
+  function finishActivation(id: string, animationName: string) {
+    if (animationName === "environment-activate") {
+      setActivated(current => current === id ? null : current);
+    }
+  }
   const list = (
     <SortableList
       items={categories}
@@ -43,14 +55,16 @@ export function EnvironmentList({
       className={horizontal ? "environment-chips" : "environment-list"}
       render={(category, handle) => (
         <div
-          className={`environment-row ${activeId === category.id ? "active" : ""}`}
+          className={`environment-row ${activeId === category.id ? "active" : ""} ${activated === category.id ? "is-activating" : ""}`}
+          onAnimationEnd={event => finishActivation(category.id, event.animationName)}
         >
           {!horizontal && handle}
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="environment-select"
+            title={category.name}
             disabled={disabled}
-            onClick={() => onSelect(category.id)}
+            onClick={() => activate(category.id, () => onSelect(category.id))}
             aria-current={activeId === category.id ? "true" : undefined}
           >
             {!horizontal && <RoomIcon name={category.name} />}
@@ -66,10 +80,10 @@ export function EnvironmentList({
                 }
               </small>
             )}
-          </button>
+          </Button>
           {horizontal && handle}
           {!horizontal && (
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               className="environment-rename"
               aria-label={`Editar ambiente ${category.name}`}
@@ -77,10 +91,10 @@ export function EnvironmentList({
               disabled={disabled}
             >
               <Pencil size={14} />
-            </button>
+            </Button>
           )}
           {!horizontal && onDelete && (
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               className="environment-rename environment-delete"
               aria-label={`Excluir ambiente ${category.name}`}
@@ -88,7 +102,7 @@ export function EnvironmentList({
               disabled={disabled}
             >
               <Trash2 size={14} />
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -98,17 +112,18 @@ export function EnvironmentList({
   return (
     <div className="environment-chips-row">
       <div
-        className={`environment-row environment-all ${allOption.active ? "active" : ""}`}
+        className={`environment-row environment-all ${allOption.active ? "active" : ""} ${activated === "all" ? "is-activating" : ""}`}
+        onAnimationEnd={event => finishActivation("all", event.animationName)}
       >
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="environment-select"
           disabled={disabled}
-          onClick={allOption.onSelect}
+          onClick={() => activate("all", allOption.onSelect)}
           aria-current={allOption.active ? "true" : undefined}
         >
           <span>Todos</span>
-        </button>
+        </Button>
       </div>
       {list}
     </div>

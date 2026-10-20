@@ -1,10 +1,11 @@
+import { Button } from "@/src/components/ui/button";
 import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError, acknowledgePassNotice, formatBillingAmount, acknowledgeTrialNotice, fetchBillingStatus, startCheckout, syncBilling, type BillingStatus } from '../api';
 import { PlanSelection } from './PlanSelection';
 import { Brand } from './Brand';
 import { Dialog } from './Dialog';
 import { Nino } from './Nino';
-import { CalendarClock, CreditCard, CircleCheck, ListChecks, Wallet, Users } from 'lucide-react';
+import { CalendarClock, CreditCard, CircleCheck, ListChecks, Wallet, Users } from "@/src/components/icons";
 import './subscription.css';
 
 const SubscriptionCheck = createContext<(() => Promise<boolean>) | null>(null);
@@ -105,9 +106,9 @@ export function SubscriptionAccess({ children, enxovalId, onChanged, onLogout }:
   if (!allowed) return <main className="subscription-page"><section className="subscription-card">
     <div className="subscription-brand-row">
       <a href="/" aria-label="Casa Mia, página inicial"><Brand /></a>
-      {onLogout && <button type="button" className="subscription-signout" aria-label="Sair da conta" onClick={onLogout}>Sair</button>}
+      {onLogout && <Button variant="brand" size="brand" type="button" className="subscription-signout" aria-label="Sair da conta" onClick={onLogout}>Sair</Button>}
     </div>
-    {!status ? <><h1>Verificando seu acesso…</h1>{notice}<button className="button button-outline" onClick={() => void refresh()}>Tentar novamente</button></> : <>
+    {!status ? <><h1>Verificando seu acesso…</h1>{notice}<Button variant="brand" size="brand" className="button button-outline" onClick={() => void refresh()}>Tentar novamente</Button></> : <>
       <div className={`subscription-intro${status.isOwner ? ' subscription-promise' : ''}`}>
         <div className="subscription-promise-copy">
           {status.isOwner && <span className="subscription-eyebrow">{status.trialUsed ? 'SEU PLANEJAMENTO CONTINUA AQUI' : 'SEU PLANO ESTÁ SALVO'}</span>}
@@ -155,7 +156,7 @@ export function SubscriptionAccess({ children, enxovalId, onChanged, onLogout }:
       {notice}
       </div>
       <div className="subscription-trial-footer">
-        <button className="button button-dark subscription-trial-continue" disabled={noticeBusy} onClick={() => void dismissNotice()}>{noticeBusy ? 'Continuando…' : 'Continuar para meu enxoval'}</button>
+        <Button variant="brand" size="brand" className="button button-dark subscription-trial-continue" disabled={noticeBusy} onClick={() => void dismissNotice()}>{noticeBusy ? 'Continuando…' : 'Continuar para meu enxoval'}</Button>
       </div>
     </Dialog>
     {children}

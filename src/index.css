@@ -1,5 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap");
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "./shadcn.css";
 @import "./product.css";
 @import "./onboarding.css";
 @import "./privacy.css";
@@ -8,6 +10,7 @@
 @import "./planning.css";
 @import "./feedback.css";
 @import "./catalog-admin.css";
+@import "./workspace-interactions.css";
 
 @theme {
   --font-sans: "Nunito Variable", "Nunito", ui-sans-serif, system-ui, sans-serif;

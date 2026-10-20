@@ -1,8 +1,8 @@
 import express, { type Request, type Router } from "express";
 import { getPool } from "./database.ts";
 import { asyncHandler, HttpError, rateLimit } from "./security.ts";
-import { processImage } from "./services/itemImages.ts";
-import { MAX_IMAGE_UPLOAD_BYTES } from "../src/itemImages.ts";
+import { processImage } from "./services/imageProcessing.ts";
+import { MAX_IMAGE_UPLOAD_BYTES } from "../src/imageUploadLimits.ts";
 import type { AuthUser } from "../src/types.ts";
 
 async function profileOf(userId: string) {

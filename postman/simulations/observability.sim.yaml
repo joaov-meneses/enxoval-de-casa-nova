@@ -1,0 +1,5 @@
+simulation: observability
+routing: path
+mocks:
+  - routeKey: i
+    path: ../mocks/telemetry/config.yaml

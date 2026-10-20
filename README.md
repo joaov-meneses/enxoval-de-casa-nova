@@ -8,7 +8,7 @@ A estratégia de marca, o tom de voz, a paleta e o modelo de negócio estão em 
 
 A integração opcional de análise de uso com PostHog, suas variáveis, eventos e sugestões de painéis estão em [docs/analytics.md](docs/analytics.md).
 
-Os logs estruturados do backend e o envio filtrado ao PostHog Logs estão em [docs/logs.md](docs/logs.md).
+Os logs estruturados do backend e o envio completo ao PostHog Logs estão em [docs/logs.md](docs/logs.md).
 
 ## Sumário
 

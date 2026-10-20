@@ -1,3 +1,8 @@
+import { Badge } from "@/src/components/ui/badge";
+import { Button } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
+import { Label } from "@/src/components/ui/label";
+import { DropdownMenuItem, DropdownMenuSeparator } from "./components/ui/dropdown-menu";
 import { DesktopActionsMenu } from "./components/DesktopActionsMenu";
 import { ProfileDialog } from "./components/ProfileDialog";
 import { UserAvatar } from "./components/UserAvatar";
@@ -35,7 +40,7 @@ import {
   Percent,
   CalendarClock,
   MessageCircleHeart,
-} from "lucide-react";
+} from "@/src/components/icons";
 import type {
   AuthUser,
   BootstrapData,
@@ -1089,7 +1094,6 @@ export default function App() {
       payload.targetPriceCents = updates.targetPriceCents;
     if (typeof updates.priceAlertEnabled === "boolean")
       payload.priceAlertEnabled = updates.priceAlertEnabled;
-    if (updates.imageUrl !== undefined) payload.imageUrl = updates.imageUrl;
     if (updates.trackedProductUrl !== undefined) payload.trackedProductUrl = updates.trackedProductUrl;
     if (updates.initialPriceCents !== undefined) payload.initialPriceCents = updates.initialPriceCents;
     if (updates.selectedVariation !== undefined) payload.selectedVariation = updates.selectedVariation;
@@ -1812,7 +1816,6 @@ export default function App() {
       categoryName={categoryById.get(item.categoryId)?.name ?? item.category}
       showUpdatedAt={isShowingLatestChanges}
       updatedAtLabel={formatUpdatedAt(item.updatedAt)}
-      enxovalId={activeEnxoval?.id}
       onUpdate={updateItem}
       onDelete={openDeleteItem}
     />
@@ -1910,35 +1913,35 @@ export default function App() {
               disabled={isWorkspaceLoading || isOrdering}
             />
             {!user.isGuest && (
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="workspace-picker-create"
                 onClick={openCreateEnxoval}
                 disabled={isWorkspaceLoading || isOrdering}
               >
                 <Plus size={15} /> Criar novo enxoval
-              </button>
+              </Button>
             )}
           </div>
           <nav
             className="workspace-navigation"
             aria-label="Navegação do enxoval"
           >
-            <button
+            <Button variant="brand" size="brand"
               className={workspaceView === "overview" ? "active" : ""}
               onClick={() => setWorkspaceView("overview")}
             >
               <LayoutDashboard size={18} /> Visão geral
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               className={workspaceView === "plan" ? "active" : ""}
               aria-current={workspaceView === "plan" ? "page" : undefined}
               onClick={() => setWorkspaceView("plan")}
               disabled={!hasEnxoval}
             >
               <CalendarClock size={18} /> Planejamento
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               className={
                 workspaceView === "list" && isAllEnvironments ? "active" : ""
               }
@@ -1950,17 +1953,17 @@ export default function App() {
               onClick={showAllItems}
             >
               <ListChecks size={18} /> Meu enxoval <span>{items.length}</span>
-            </button>
+            </Button>
           </nav>
           <div className="sidebar-section-title">
             AMBIENTES{" "}
-            <button
+            <Button variant="brand" size="brand"
               aria-label="Adicionar ambiente"
               onClick={openCreateCategory}
               disabled={!hasEnxoval}
             >
               <Plus size={16} />
-            </button>
+            </Button>
           </div>
           <nav
             className="sidebar-rooms"
@@ -1978,13 +1981,13 @@ export default function App() {
             />
           </nav>
           <div className="sidebar-bottom">
-            <button type="button" className="sidebar-profile sidebar-profile-button" onClick={() => setIsProfileOpen(true)} aria-label="Abrir meu perfil">
+            <Button variant="brand" size="brand" type="button" className="sidebar-profile sidebar-profile-button" onClick={() => setIsProfileOpen(true)} aria-label="Abrir meu perfil">
               <UserAvatar name={user.name} src={user.avatarUrl} />
               <span>
                 <strong>{user.name}</strong>
                 <small>{user.email}</small>
               </span>
-            </button>
+            </Button>
           </div>
         </motion.aside>
         <div className="desktop-app-header">
@@ -1993,20 +1996,20 @@ export default function App() {
             <h1>{activeEnxoval?.name ?? "Bem-vindo ao Casa Mia"}</h1>
             {activeEnxoval?.role === "owner" && (
               <>
-                <button
+                <Button variant="brand" size="brand"
                   className="title-edit-button"
                   aria-label="Editar nome do enxoval"
                   onClick={openRenameEnxoval}
                 >
                   <Pencil size={15} />
-                </button>
-                <button
+                </Button>
+                <Button variant="brand" size="brand"
                   className="title-edit-button title-delete-button"
                   aria-label="Excluir enxoval"
                   onClick={openDeleteEnxoval}
                 >
                   <Trash2 size={15} />
-                </button>
+                </Button>
               </>
             )}
           </span>
@@ -2015,58 +2018,58 @@ export default function App() {
             {hasEnxoval && (
               <>
                 {isOwner ? (
-                  <button
+                  <DropdownMenuItem asChild><Button variant="brand" size="brand"
                     className="desktop-menu-item"
                     onClick={openInvite}
                   >
                     <UserPlus size={16} /> Convidar
-                  </button>
+                  </Button></DropdownMenuItem>
                 ) : (
                   <>
-                    <span className="shared-badge">
+                    <Badge asChild variant="outline"><span className="shared-badge">
                       Convidado de {activeEnxoval?.ownerName}
-                    </span>
-                    <button
+                    </span></Badge>
+                    <DropdownMenuItem asChild><Button variant="brand" size="brand"
                       type="button"
                       className="desktop-menu-item"
                       onClick={openLeaveEnxoval}
                     >
                       <DoorOpen size={16} /> Sair do enxoval
-                    </button>
+                    </Button></DropdownMenuItem>
                   </>
                 )}
-                <button
+                <DropdownMenuItem asChild><Button variant="brand" size="brand"
                   className="desktop-menu-item"
                   aria-label="Descontos e cashback"
                   title="Descontos e cashback"
                   onClick={openDiscounts}
                 >
                   <Percent size={16} /> Descontos
-                </button>
+                </Button></DropdownMenuItem>
               </>
             )}
-            <button type="button" className="desktop-menu-item" onClick={() => setIsProfileOpen(true)}><UserRound size={16} /> Meu perfil</button>
-            <div className="desktop-menu-separator" role="separator" />
-            <button
+            <DropdownMenuItem asChild><Button variant="brand" size="brand" type="button" className="desktop-menu-item" onClick={() => setIsProfileOpen(true)}><UserRound size={16} /> Meu perfil</Button></DropdownMenuItem>
+            <DropdownMenuSeparator className="desktop-menu-separator" />
+            <DropdownMenuItem asChild><Button variant="brand" size="brand"
               type="button"
               className="desktop-menu-item"
               aria-label="Central de ajuda: relatar um problema ou sugerir uma melhoria"
               title="Relatar um problema ou sugerir uma melhoria"
               onClick={(event) => {
-                helpTriggerRef.current = event.currentTarget.closest('.desktop-actions-menu')?.querySelector<HTMLButtonElement>('.desktop-actions-trigger') ?? event.currentTarget;
+                helpTriggerRef.current = document.querySelector<HTMLButtonElement>('.desktop-actions-trigger') ?? event.currentTarget;
                 setIsFeedbackOpen(true);
               }}
             >
               <MessageCircleHeart size={16} /> Ajuda e sugestões
-            </button>
-            <button
+            </Button></DropdownMenuItem>
+            <DropdownMenuItem asChild><Button variant="brand" size="brand"
               type="button"
               className="desktop-menu-item"
               aria-label="Sair da conta"
               onClick={() => void handleLogout()}
             >
               <LogOut size={16} /> Sair
-            </button>
+            </Button></DropdownMenuItem>
             </DesktopActionsMenu>
           </div>
         </div>
@@ -2112,17 +2115,17 @@ export default function App() {
                   {activeEnxoval?.name ?? "Meu enxoval"}
                 </h1>
                 {activeEnxoval?.role === "owner" && (
-                  <button
+                  <Button variant="brand" size="brand"
                     className="title-edit-button"
                     aria-label="Editar nome do enxoval"
                     onClick={openRenameEnxoval}
                   >
                     <Pencil size={17} />
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               className="workspace-menu-trigger workspace-menu-trigger-icon"
               aria-label="Abrir menu do enxoval"
@@ -2131,14 +2134,14 @@ export default function App() {
               onClick={openWorkspaceMenu}
             >
               <Menu size={26} strokeWidth={1.8} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
           {hasEnxoval && workspaceView === "list" && (
             <>
               <motion.div
                 layoutScroll
                 ref={chipsScrollRef}
-                className="max-w-2xl mx-auto mt-5 sm:mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar transition-[margin] duration-300 ease-out"
+                className="environment-tabs-scroll no-scrollbar"
                 style={categoryBarStyle}
               >
                 <EnvironmentList
@@ -2236,24 +2239,24 @@ export default function App() {
                   {!isSearching &&
                     !isShowingLatestChanges &&
                     activeCategory && (
-                      <button
+                      <Button variant="brand" size="brand"
                         className="title-edit-button"
                         aria-label={`Editar ambiente ${activeCategory.name}`}
                         onClick={() => openRenameCategory(activeCategory)}
                       >
                         <Pencil size={16} />
-                      </button>
+                      </Button>
                     )}
                   {!isSearching &&
                     !isShowingLatestChanges &&
                     activeCategory && (
-                      <button
+                      <Button variant="brand" size="brand"
                         className="title-edit-button title-delete-button"
                         aria-label={`Excluir ambiente ${activeCategory.name}`}
                         onClick={() => openDeleteCategory(activeCategory)}
                       >
                         <Trash2 size={16} />
-                      </button>
+                      </Button>
                     )}
                 </div>
                 <div className="list-heading-actions">
@@ -2269,12 +2272,12 @@ export default function App() {
                     enxovalName={activeEnxoval!.name}
                     activeCategoryId={activeCategory?.id}
                   />
-                  <button
+                  <Button variant="brand" size="brand"
                     className="button button-dark button-small desktop-add-item"
                     onClick={() => setIsAddModalOpen(true)}
                   >
                     <Plus size={17} /> Adicionar item
-                  </button>
+                  </Button>
                 </div>
               </div>
               <div className="list-search mb-4 flex items-center gap-2">
@@ -2283,7 +2286,7 @@ export default function App() {
                     size={18}
                     className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
                   />
-                  <input
+                  <Input
                     type="search"
                     aria-label={searchScopeLabel}
                     value={searchQuery}
@@ -2292,7 +2295,7 @@ export default function App() {
                     className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-11 text-base text-stone-800 shadow-sm outline-none transition focus:border-brand-wood focus:ring-2 focus:ring-brand-wood/30"
                   />
                   {searchQuery && (
-                    <button
+                    <Button variant="brand" size="brand"
                       type="button"
                       onClick={() => setSearchQuery("")}
                       aria-label="Limpar busca"
@@ -2300,10 +2303,10 @@ export default function App() {
                       className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
                     >
                       <X size={16} />
-                    </button>
+                    </Button>
                   )}
                 </div>
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   onClick={() => setIsFilterOpen(true)}
                   aria-label="Abrir filtros"
@@ -2316,7 +2319,7 @@ export default function App() {
                       {activeFilterCount}
                     </span>
                   )}
-                </button>
+                </Button>
               </div>
 
               <div
@@ -2393,21 +2396,21 @@ export default function App() {
                 <p className="text-sm text-stone-500 mb-6">
                   Comece com a lista sugerida ou monte uma lista vazia.
                 </p>
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   onClick={openCreateEnxoval}
                   className="inline-flex items-center justify-center gap-2 bg-brand-dark text-white rounded-xl px-5 py-3 text-base font-medium hover:bg-black transition-colors"
                 >
                   <ListPlus size={18} />
                   Criar enxoval
-                </button>
+                </Button>
               </div>
             </div>
           ) : null}
         </main>
 
         <nav className="mobile-bottom-nav" aria-label="Navegação do aplicativo">
-          <button
+          <Button variant="brand" size="brand"
             className={workspaceView === "overview" ? "active" : ""}
             aria-current={workspaceView === "overview" ? "page" : undefined}
             onClick={() => {
@@ -2417,16 +2420,16 @@ export default function App() {
           >
             <LayoutDashboard size={19} />
             Visão geral
-          </button>
-          <button
+          </Button>
+          <Button variant="brand" size="brand"
             className={workspaceView === "list" ? "active" : ""}
             aria-current={workspaceView === "list" ? "page" : undefined}
             onClick={showAllItems}
           >
             <ListChecks size={19} />
             Meu enxoval
-          </button>
-          <button
+          </Button>
+          <Button variant="brand" size="brand"
             className={workspaceView === "plan" ? "active" : ""}
             aria-current={workspaceView === "plan" ? "page" : undefined}
             onClick={() => {
@@ -2437,9 +2440,9 @@ export default function App() {
           >
             <CalendarClock size={19} />
             Planejamento
-          </button>
+          </Button>
         </nav>
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="mobile-fab-add"
           aria-label="Adicionar item ou ambiente"
@@ -2448,7 +2451,7 @@ export default function App() {
           disabled={!hasEnxoval}
         >
           <Plus size={26} strokeWidth={2.5} aria-hidden="true" />
-        </button>
+        </Button>
       </div>
       <FeedbackDialog
         open={isFeedbackOpen}
@@ -2509,8 +2512,8 @@ export default function App() {
           onSubmit={handleRenameCategory}
           className="environment-rename-form"
         >
-          <label htmlFor="rename-environment">Nome do ambiente</label>
-          <input
+          <Label htmlFor="rename-environment">Nome do ambiente</Label>
+          <Input
             id="rename-environment"
             value={renameCategoryName}
             onChange={(event) =>
@@ -2533,21 +2536,21 @@ export default function App() {
             </div>
           )}
           <div>
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               className="button button-outline"
               disabled={isDialogSubmitting}
               onClick={() => setCategoryToRename(null)}
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               type="submit"
               className="button button-dark"
               disabled={isDialogSubmitting || !renameCategoryName.trim()}
             >
               {isDialogSubmitting ? "Salvando…" : "Salvar ambiente"}
-            </button>
+            </Button>
           </div>
         </form>
       </Dialog>
@@ -2571,7 +2574,7 @@ export default function App() {
               Mostrar
             </h4>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => {
                   setShowOnlyPricedItems(false);
@@ -2582,8 +2585,8 @@ export default function App() {
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${!hasItemFilters ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
                 Todos
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => {
                   setShowOnlyPricedItems((current) => !current);
@@ -2592,8 +2595,8 @@ export default function App() {
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${showOnlyPricedItems ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
                 Com preço
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => {
                   setShowOnlyUnpricedItems((current) => !current);
@@ -2602,14 +2605,14 @@ export default function App() {
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${showOnlyUnpricedItems ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
                 Sem preço
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => setShowOnlyCheckedItems((current) => !current)}
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${showOnlyCheckedItems ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
                 Checados
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -2637,32 +2640,32 @@ export default function App() {
               Ordenar
             </h4>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => setItemSortMode("manual")}
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium ${itemSortMode === "manual" ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600"}`}
               >
                 Minha ordem
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => setItemSortMode("name")}
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${itemSortMode === "name" ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
                 Nome A-Z
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => setItemSortMode("updated")}
                 className={`rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${itemSortMode === "updated" ? "border-brand-wood bg-brand-beige/20 text-brand-dark" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}
               >
                 Últimas alterações
-              </button>
+              </Button>
             </div>
           </div>
 
           <div className="flex justify-end gap-2 border-t border-stone-100 pt-4">
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => {
                 setShowOnlyPricedItems(false);
@@ -2675,14 +2678,14 @@ export default function App() {
               className="rounded-xl bg-stone-100 px-4 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Limpar
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => setIsFilterOpen(false)}
               className="rounded-xl bg-brand-dark px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-black"
             >
               Concluir
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>
@@ -2697,10 +2700,10 @@ export default function App() {
           className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
+            <Label className="block text-sm font-medium text-stone-700 mb-1">
               Nome do ambiente
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               aria-label="Nome do ambiente"
               maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
@@ -2729,7 +2732,7 @@ export default function App() {
             </p>
           )}
 
-          <button
+          <Button variant="brand" size="brand"
             type="submit"
             disabled={
               !newCategoryName.trim() || isDialogSubmitting || !activeEnxoval
@@ -2737,7 +2740,7 @@ export default function App() {
             className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDialogSubmitting ? "Criando..." : "Criar ambiente"}
-          </button>
+          </Button>
         </form>
       </Dialog>
 
@@ -2752,10 +2755,10 @@ export default function App() {
           className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
+            <Label className="block text-sm font-medium text-stone-700 mb-1">
               Nome do enxoval
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               aria-label="Nome do enxoval"
               value={newEnxovalName}
@@ -2766,24 +2769,24 @@ export default function App() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
+            <Label className="block text-sm font-medium text-stone-700 mb-1">
               Modelo inicial
-            </label>
+            </Label>
             <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone-100 p-1">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => setNewEnxovalUseDefaultTemplate(true)}
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${newEnxovalUseDefaultTemplate ? "bg-white text-brand-dark shadow-sm" : "text-stone-500 hover:text-stone-700"}`}
               >
                 Lista sugerida
-              </button>
-              <button
+              </Button>
+              <Button variant="brand" size="brand"
                 type="button"
                 onClick={() => setNewEnxovalUseDefaultTemplate(false)}
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${!newEnxovalUseDefaultTemplate ? "bg-white text-brand-dark shadow-sm" : "text-stone-500 hover:text-stone-700"}`}
               >
                 Vazio
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -2796,13 +2799,13 @@ export default function App() {
             </p>
           )}
 
-          <button
+          <Button variant="brand" size="brand"
             type="submit"
             disabled={!newEnxovalName.trim() || isDialogSubmitting}
             className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDialogSubmitting ? "Criando..." : "Criar enxoval"}
-          </button>
+          </Button>
         </form>
       </Dialog>
 
@@ -2821,12 +2824,12 @@ export default function App() {
             </p>
 
             <div>
-              <label
+              <Label
                 htmlFor="discount-category"
                 className="block text-sm font-medium text-stone-700 mb-1"
               >
                 Ambiente
-              </label>
+              </Label>
               <Select
                 id="discount-category"
                 value={discountCategoryId}
@@ -2845,12 +2848,12 @@ export default function App() {
             </div>
 
             <div>
-              <label
+              <Label
                 htmlFor="discount-item"
                 className="block text-sm font-medium text-stone-700 mb-1"
               >
                 Item
-              </label>
+              </Label>
               <Select
                 id="discount-item"
                 value={discountItemId}
@@ -2868,13 +2871,13 @@ export default function App() {
             </div>
 
             <div>
-              <label
+              <Label
                 htmlFor="discount-value"
                 className="block text-sm font-medium text-stone-700 mb-1"
               >
                 Valor do desconto ou cashback
-              </label>
-              <input
+              </Label>
+              <Input
                 id="discount-value"
                 type="text"
                 inputMode="numeric"
@@ -2905,7 +2908,7 @@ export default function App() {
               </p>
             )}
 
-            <button
+            <Button variant="brand" size="brand"
               type="submit"
               disabled={
                 isDialogSubmitting ||
@@ -2917,7 +2920,7 @@ export default function App() {
               className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDialogSubmitting ? "Salvando..." : "Salvar desconto"}
-            </button>
+            </Button>
           </form>
 
           <section aria-label="Descontos registrados">
@@ -2933,7 +2936,7 @@ export default function App() {
               <ul className="divide-y divide-stone-100">
                 {registeredDiscountItems.map((item) => (
                   <li key={item.id} className="flex items-center gap-2 py-2">
-                    <button
+                    <Button variant="brand" size="brand"
                       type="button"
                       onClick={() => selectDiscountItem(item.id)}
                       disabled={isDialogSubmitting}
@@ -2949,8 +2952,8 @@ export default function App() {
                         · - {formatCurrency(item.discountCents)} de{" "}
                         {formatCurrency(item.priceCents)}
                       </span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="brand" size="brand"
                       type="button"
                       onClick={() => void saveItemDiscount(item.id, 0)}
                       disabled={isDialogSubmitting}
@@ -2958,7 +2961,7 @@ export default function App() {
                       className="rounded-lg px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-50"
                     >
                       Remover
-                    </button>
+                    </Button>
                   </li>
                 ))}
                 {enxovalDiscountCents > 0 && (
@@ -2971,7 +2974,7 @@ export default function App() {
                         Sem item vinculado · - {savedDiscountText}
                       </span>
                     </span>
-                    <button
+                    <Button variant="brand" size="brand"
                       type="button"
                       onClick={() => void removeGeneralDiscount()}
                       disabled={isDialogSubmitting}
@@ -2979,7 +2982,7 @@ export default function App() {
                       className="rounded-lg px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-50"
                     >
                       Remover
-                    </button>
+                    </Button>
                   </li>
                 )}
               </ul>
@@ -3027,10 +3030,10 @@ export default function App() {
           className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
+            <Label className="block text-sm font-medium text-stone-700 mb-1">
               Nome do enxoval
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               aria-label="Nome do enxoval"
               value={renameEnxovalName}
@@ -3049,13 +3052,13 @@ export default function App() {
             </p>
           )}
 
-          <button
+          <Button variant="brand" size="brand"
             type="submit"
             disabled={!renameEnxovalName.trim() || isDialogSubmitting}
             className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDialogSubmitting ? "Salvando..." : "Salvar nome"}
-          </button>
+          </Button>
         </form>
       </Dialog>
 
@@ -3083,7 +3086,7 @@ export default function App() {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => setIsDeleteEnxovalOpen(false)}
               data-dialog-autofocus
@@ -3091,15 +3094,15 @@ export default function App() {
               className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => void handleDeleteEnxoval()}
               disabled={isDialogSubmitting || !activeEnxoval}
               className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDialogSubmitting ? "Excluindo..." : "Excluir"}
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>
@@ -3128,7 +3131,7 @@ export default function App() {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => setIsLeaveEnxovalOpen(false)}
               data-dialog-autofocus
@@ -3136,15 +3139,15 @@ export default function App() {
               className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => void handleLeaveEnxoval()}
               disabled={isDialogSubmitting || !activeEnxoval}
               className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDialogSubmitting ? "Saindo..." : "Sair do enxoval"}
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>
@@ -3178,7 +3181,7 @@ export default function App() {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => setCategoryToDelete(null)}
               data-dialog-autofocus
@@ -3186,15 +3189,15 @@ export default function App() {
               className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => void handleDeleteCategory()}
               disabled={isDialogSubmitting || !categoryToDelete}
               className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDialogSubmitting ? "Excluindo..." : "Excluir ambiente"}
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>
@@ -3221,7 +3224,7 @@ export default function App() {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => setItemToDelete(null)}
               data-dialog-autofocus
@@ -3229,15 +3232,15 @@ export default function App() {
               className="py-4 bg-stone-100 text-stone-700 rounded-xl font-medium text-base hover:bg-stone-200 transition-colors disabled:opacity-50"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               type="button"
               onClick={() => void handleDeleteItem()}
               disabled={isDialogSubmitting || !itemToDelete}
               className="py-4 bg-red-600 text-white rounded-xl font-medium text-base hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isDialogSubmitting ? "Excluindo..." : "Excluir"}
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>
@@ -3252,10 +3255,10 @@ export default function App() {
           className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-stone-700 mb-1">
+            <Label className="block text-sm font-medium text-stone-700 mb-1">
               E-mail da pessoa
-            </label>
-            <input
+            </Label>
+            <Input
               type="email"
               aria-label="E-mail da pessoa"
               value={inviteEmail}
@@ -3288,7 +3291,7 @@ export default function App() {
                         dono
                       </span>
                     ) : (
-                      <button
+                      <Button variant="brand" size="brand"
                         type="button"
                         className={`invite-remove ${memberToRemoveId === member.id ? "is-confirming" : ""}`}
                         disabled={isDialogSubmitting}
@@ -3303,7 +3306,7 @@ export default function App() {
                         {memberToRemoveId === member.id
                           ? "Confirmar remoção"
                           : "Remover"}
-                      </button>
+                      </Button>
                     )}
                   </li>
                 ))}
@@ -3323,7 +3326,7 @@ export default function App() {
                       <strong>{invitation.email}</strong>
                       <small>Aguardando aceite</small>
                     </span>
-                    <button
+                    <Button variant="brand" size="brand"
                       type="button"
                       className="invite-remove"
                       disabled={isDialogSubmitting}
@@ -3331,7 +3334,7 @@ export default function App() {
                       aria-label={`Cancelar convite de ${invitation.email}`}
                     >
                       Cancelar
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -3356,7 +3359,7 @@ export default function App() {
             </p>
           )}
 
-          <button
+          <Button variant="brand" size="brand"
             type="submit"
             disabled={
               !inviteEmail.trim() || isDialogSubmitting || !activeEnxoval
@@ -3364,7 +3367,7 @@ export default function App() {
             className="w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDialogSubmitting ? "Enviando..." : "Enviar convite"}
-          </button>
+          </Button>
         </form>
       </Dialog>
       <PaywallDialog

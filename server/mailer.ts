@@ -1,8 +1,6 @@
+import { getLogger } from './logger.ts';
 // E-mail transacional do Casa Mia (redefinição de senha e convite para um enxoval).
 // Provedor: Resend, pela API HTTP, quando RESEND_API_KEY e MAIL_FROM estão configurados.
-// Sem configuração, em desenvolvimento a mensagem aparece no console do servidor (com o link); em produção nada
-// é impresso além de um aviso, porque os links (redefinição, convite) são segredos e não devem ir para os logs.
-
 export interface MailMessage {
   to: string;
   subject: string;
@@ -55,6 +53,19 @@ export function canDeliverMail() {
 }
 
 export async function sendMail(message: MailMessage) {
+  const started = Date.now();
+  const log = getLogger().child({ mail: message, driver: mailDriver() });
+  log.info({ event: 'mail.started' }, 'Preparing transactional email.');
+  try {
+    await deliverMail(message);
+    log.info({ event: canDeliverMail() ? 'mail.completed' : 'mail.skipped', duration_ms: Date.now() - started }, 'Email delivery finished.');
+  } catch (err) {
+    log.error({ event: 'mail.failed', err, duration_ms: Date.now() - started }, 'Email delivery failed.');
+    throw err;
+  }
+}
+
+async function deliverMail(message: MailMessage) {
   const driver = mailDriver();
   if (driver === "memory") {
     mailOutbox.push(message);
@@ -75,21 +86,14 @@ export async function sendMail(message: MailMessage) {
         html: message.html,
       }),
     });
+    const detail = await response.text();
+    getLogger().info({ event: 'mail.provider.response', status: response.status, body: detail, to: message.to }, 'Email provider response.');
     if (!response.ok) {
-      const detail = (await response.text().catch(() => "")).slice(0, 200);
       throw new Error(`O provedor de e-mail respondeu ${response.status}. ${detail}`);
     }
     return;
   }
-  if (isProductionServer()) {
-    console.warn(
-      "E-mail não enviado: configure RESEND_API_KEY e MAIL_FROM para habilitar a recuperação de senha por e-mail.",
-    );
-    return;
-  }
-  console.log(
-    `\n[e-mail simulado] Para: ${message.to}\nAssunto: ${message.subject}\n\n${message.text}\n`,
-  );
+  getLogger().warn({ event: 'mail.simulated', mail: message, production: isProductionServer() }, 'Email provider is not configured.');
 }
 
 function escapeHtml(value: string) {

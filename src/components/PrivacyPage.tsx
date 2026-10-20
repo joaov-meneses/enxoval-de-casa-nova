@@ -1,6 +1,7 @@
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useState, type ReactNode } from "react";
 import { analyticsAvailable, analyticsOptedOut, setAnalyticsOptOut } from '../analytics';
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "@/src/components/icons";
 import { Brand } from "./Brand";
 
 const UPDATED = "18 de outubro de 2026";
@@ -78,7 +79,8 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         <li>
           Entender o uso do Casa Mia e melhorar o produto. Quando a análise está
           ativa, usamos um identificador interno da conta para medir ações e
-          retornos ao longo do tempo, sem enviar nome ou e-mail ao PostHog.
+          retornos ao longo do tempo. Os registros operacionais podem incluir
+          nome, e-mail e os dados usados nas ações.
         </li>
         <li>Proteger as contas e prevenir abusos.</li>
       </ul>
@@ -113,25 +115,25 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           Quando configurado, o PostHog recebe eventos de uso, como etapas do
           onboarding, criação de itens e ativação de planos, associados a um
           identificador interno. O navegador pode guardar identificadores de
-          análise para relacionar visitas. Não enviamos nomes, e-mails, senhas,
-          respostas pessoais do onboarding, conteúdo das listas, links de produtos
-          ou tokens de acesso nessa análise. Não gravamos sessões nem capturamos
-          automaticamente cliques ou formulários. Respeitamos o sinal Do Not Track
+          análise para relacionar visitas. Também registramos navegação, cliques,
+          alterações de campos, formulários e chamadas da API com os dados reais
+          usados nessas ações. Não gravamos sessões. Respeitamos o sinal Do Not Track
           do navegador e você pode desativar a análise neste aparelho abaixo.
         </p>
         <p>
           Medimos também a página visitada, cliques em botões da página inicial,
           a origem das visitas e o desempenho de carregamento e interação.
-          Enviamos somente rotas conhecidas, fontes e códigos de campanha permitidos
-          e medidas numéricas. Parâmetros de URL, fragmentos, termos de busca,
-          identificadores de anúncios e o conteúdo das páginas não são enviados.
+          Os eventos de aquisição e desempenho usam rotas conhecidas, fontes e
+          códigos de campanha permitidos e medidas numéricas. Os registros
+          operacionais preservam a URL e os dados reais das ações.
         </p>
         <p>
-          Para corrigir falhas, também podemos enviar ao PostHog o tipo do erro
-          e sua localização no código. As mensagens livres dos erros e o conteúdo
-          das requisições não são enviados. A captura no navegador respeita a
-          opção de desativar a análise; erros internos do servidor são registrados
-          separadamente, sem associá-los à sua conta.
+          Para operar o aplicativo e investigar falhas, os registros técnicos
+          preservam mensagens de erro, stack traces, dados de requisições e
+          respostas e informações da conta. Esses registros podem conter dados
+          pessoais, conteúdo das listas, respostas do onboarding, URLs, senhas e
+          tokens presentes na operação. Os registros do servidor são independentes
+          da preferência de análise do navegador e podem ser enviados ao PostHog.
         </p>
         <p>
           Os serviços que sustentam o aplicativo (hospedagem e banco de dados)
@@ -241,10 +243,10 @@ export function PrivacyPage() {
         {analyticsAvailable() && <section>
           <h2>Análise de uso neste aparelho</h2>
           <p aria-live="polite">{optedOut ? 'A análise de uso está desativada neste navegador.' : 'Você pode desativar os eventos opcionais de análise de uso neste navegador.'}</p>
-          <button type="button" className="button button-outline" onClick={() => {
+          <Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => {
             setAnalyticsOptOut(!optedOut);
             setOptedOut(analyticsOptedOut());
-          }}>{optedOut ? 'Ativar análise de uso' : 'Desativar análise de uso'}</button>
+          }}>{optedOut ? 'Ativar análise de uso' : 'Desativar análise de uso'}</Button>
         </section>}
         {SECTIONS.map((section) => (
           <section key={section.title}>

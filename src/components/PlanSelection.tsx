@@ -1,7 +1,11 @@
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Label } from "@/src/components/ui/label";
+import { Button } from "@/src/components/ui/button";
+import { Disclosure, DisclosureTrigger } from "@/src/components/ui/disclosure";
 import { useEffect, useState } from 'react';
 import { fetchBillingOffers, formatBillingAmount, type BillingOffer, type PaidPlanId } from '../api';
 import { PASS_MONTHS } from '../plans';
-import { ArrowRight, Bell, Check, CircleHelp, CreditCard, LockKeyhole } from 'lucide-react';
+import { ArrowRight, Bell, Check, CircleHelp, CreditCard, LockKeyhole } from "@/src/components/icons";
 import { Dialog } from './Dialog';
 import { capture } from '../analytics';
 
@@ -35,10 +39,10 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
     ? Math.floor((1 - passOffer.amount / annualMonthlyCost) * 100)
     : 0;
   return <div className="subscription-plan-selection">
-    <fieldset className="subscription-plan-options" disabled={busy || disabled}>
+    <RadioGroup asChild value={selected} onValueChange={value => setSelected(value as PaidPlanId)} disabled={busy || disabled} aria-label="Escolha seu plano"><fieldset className="subscription-plan-options" disabled={busy || disabled}>
       <legend className="sr-only">Escolha seu plano</legend>
-      {orderedOffers.map(offer => <label key={offer.id} className={`subscription-plan-option subscription-plan-${offer.id}${selected === offer.id ? ' is-selected' : ''}${offer.id === 'pass' && selected === 'pass' && !busy && !disabled ? ' subscription-pass-pulse' : ''}`}>
-        <input type="radio" name="subscription-plan" value={offer.id} checked={selected === offer.id} onChange={() => setSelected(offer.id)} />
+      {orderedOffers.map(offer => <Label key={offer.id} htmlFor={`subscription-plan-${offer.id}`} className={`subscription-plan-option subscription-plan-${offer.id}${selected === offer.id ? ' is-selected' : ''}${offer.id === 'pass' && selected === 'pass' && !busy && !disabled ? ' subscription-pass-pulse' : ''}`}>
+        <RadioGroupItem id={`subscription-plan-${offer.id}`} value={offer.id} className="choice-control" />
         <span className="subscription-plan-content"><strong>{offer.name}</strong>
           <span className="subscription-plan-price-row">
             <span className="subscription-plan-price">{formatBillingAmount(offer)}{offer.id === 'monthly' && <small>/mês</small>}</span>
@@ -47,18 +51,18 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
           <span className="subscription-plan-term">{offer.id === 'monthly' ? trialUsed ? 'Renovação mensal' : '2 dias grátis' : <><span>{PASS_MONTHS} meses de acesso</span><span>Pagamento único</span></>}</span>
           {offer.id === 'pass' && <span className="subscription-plan-equivalent"><span>Equivale a</span><span>{formatBillingAmount({ amount: offer.amount / PASS_MONTHS, currency: offer.currency })}/mês</span></span>}
         </span>
-      </label>)}
-    </fieldset>
-    {error ? <><p role="alert">{error}</p><button className="button button-outline" onClick={() => setAttempt(value => value + 1)}>Carregar planos novamente</button></> : !offers.length ? <p role="status">Carregando planos…</p> : <>
+      </Label>)}
+    </fieldset></RadioGroup>
+    {error ? <><p role="alert">{error}</p><Button variant="brand" size="brand" className="button button-outline" onClick={() => setAttempt(value => value + 1)}>Carregar planos novamente</Button></> : !offers.length ? <p role="status">Carregando planos…</p> : <>
       <div className="subscription-plan-help">
-      <details className="subscription-included">
-        <summary aria-label="Recursos incluídos nos dois planos">O que está incluído</summary>
+      <Disclosure className="subscription-included">
+        <DisclosureTrigger aria-label="Recursos incluídos nos dois planos">O que está incluído</DisclosureTrigger>
         <ul>
           {['Ambientes e itens sem limite', 'Controle de gastos, links e prioridades', 'Convide quem organiza a casa com você', 'Importação e exportação da sua lista'].map(text => <li key={text}><Check size={15} aria-hidden="true" />{text}</li>)}
         </ul>
         {savings > 0 && <p className="subscription-savings-explanation">A economia do Passe compara {PASS_MONTHS} meses de acesso com {PASS_MONTHS} mensalidades de {formatBillingAmount(monthlyOffer)} ({formatBillingAmount({ amount: annualMonthlyCost, currency: monthlyOffer!.currency })} no total).</p>}
-      </details>
-      {monthly && !trialUsed && monthlyOffer && <button type="button" className="subscription-trial-help" aria-haspopup="dialog" disabled={busy} onClick={() => setShowTrialHelp(true)}><CircleHelp size={16} aria-hidden="true" /><span>Como funcionam os 2 dias grátis?</span></button>}
+      </Disclosure>
+      {monthly && !trialUsed && monthlyOffer && <Button variant="brand" size="brand" type="button" className="subscription-trial-help" aria-haspopup="dialog" disabled={busy} onClick={() => setShowTrialHelp(true)}><CircleHelp size={16} aria-hidden="true" /><span>Como funcionam os 2 dias grátis?</span></Button>}
       </div>
       <div className="subscription-plan-checkout">
         <p className="subscription-plan-summary" aria-live="polite">
@@ -68,7 +72,7 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
               : `2 dias grátis; depois, ${formatBillingAmount(selectedOffer)}/mês automaticamente. Cancele no teste para não pagar.`
             : `Cobrança única agora, sem teste grátis. ${PASS_MONTHS} meses de acesso, sem renovação automática.`}
         </p>
-        <button className={`button button-dark${!monthly && !busy && !disabled ? ' subscription-pass-cta-pulse' : ''}`} disabled={busy || disabled} onClick={() => onChoose(selected)}>{busy ? 'Abrindo…' : monthly ? trialUsed ? 'Ativar plano Mensal' : 'Começar teste de 2 dias' : 'Continuar com o Passe'}{!busy && <ArrowRight size={18} aria-hidden="true" />}</button>
+        <Button variant="brand" size="brand" className={`button button-dark${!monthly && !busy && !disabled ? ' subscription-pass-cta-pulse' : ''}`} disabled={busy || disabled} onClick={() => onChoose(selected)}>{busy ? 'Abrindo…' : monthly ? trialUsed ? 'Ativar plano Mensal' : 'Começar teste de 2 dias' : 'Continuar com o Passe'}{!busy && <ArrowRight size={18} aria-hidden="true" />}</Button>
         <p className="subscription-plan-note"><LockKeyhole size={13} aria-hidden="true" /> Checkout seguro pela Stripe</p>
       </div>
     </>}
@@ -83,7 +87,7 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
         <div className="subscription-trial-cancel"><strong>Não quer continuar?</strong><p>Cancele antes do fim das 48 horas em “Meu perfil” → “Assinatura” e você não paga.</p></div>
         <p className="subscription-trial-scope">O teste é exclusivo do Mensal. O Passe da Casa Nova tem pagamento único na contratação, sem teste grátis.</p>
       </div>
-      <div className="subscription-trial-explanation-footer"><button type="button" className="button button-dark" onClick={() => setShowTrialHelp(false)}>Entendi</button></div>
+      <div className="subscription-trial-explanation-footer"><Button variant="brand" size="brand" type="button" className="button button-dark" onClick={() => setShowTrialHelp(false)}>Entendi</Button></div>
     </Dialog>
   </div>;
 }

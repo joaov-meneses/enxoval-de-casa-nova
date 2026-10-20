@@ -1,3 +1,4 @@
+import { getLogger } from '../logger.ts';
 // Lê o link de um produto de loja online e devolve nome, foto, preço e variações.
 //
 // Como a página é obtida (para na primeira camada que funcionar):
@@ -352,6 +353,7 @@ async function fetchPage(start: URL): Promise<RawResponse> {
     const response = await chromeGet(start);
     if (response) return response;
   } catch (error) {
+    getLogger().warn({ event: 'scraper.read.failed', err: error }, 'Scraper read attempt failed.');
     if (error instanceof ScrapeError && error.code === 'invalid_url') throw error;
   }
   return safeGet(start);
@@ -416,7 +418,7 @@ async function fetchViaUnlocker(target: URL): Promise<RawResponse | null> {
   if (!settings) return null;
   assertAllowedUrl(target);
   if (!takeUnlockerBudget()) {
-    console.warn('[scraper] teto diário do desbloqueador atingido (SCRAPER_API_DAILY_LIMIT).');
+    getLogger().warn({ event: 'scraper.budget_exhausted', url: target.href, provider: settings.name }, 'Scraper daily budget exhausted.');
     return null;
   }
   const response = await safeGet(buildUnlockerUrl(settings.name, settings.key, target.href, process.env.SCRAPER_API_PARAMS), {
@@ -424,8 +426,8 @@ async function fetchViaUnlocker(target: URL): Promise<RawResponse | null> {
     timeoutMs: UNLOCKER_TIMEOUT_MS,
   });
   if (response.status !== 200) {
-    // A chave e a URL nunca vão para o log; só o código e o começo da resposta do serviço.
-    console.warn(`[scraper] ${settings.name} respondeu ${response.status}: ${response.body.slice(0, 160).replace(/\s+/g, ' ')}`);
+
+    getLogger().warn({ event: 'scraper.provider.failed', provider: settings.name, url: target.href, status: response.status, body: response.body }, 'Scraper provider failed.');
     if (response.status === 404 || response.status === 410) return { ...response, url: target };
     return null;
   }
@@ -918,6 +920,7 @@ async function readDirect(start: URL): Promise<PageRead> {
     const response = await fetchPage(start);
     return { ...readPage(response), finalUrl: response.url.href };
   } catch (error) {
+    getLogger().warn({ event: 'scraper.read.failed', url: start.href, layer: 'direct', err: error }, 'Scraper read attempt failed.');
     if (error instanceof ScrapeError && error.code === 'invalid_url') throw error;
     return { page: null, finalUrl: start.href, error: error instanceof ScrapeError ? error : new ScrapeError('failed', 'Não foi possível acessar a loja.') };
   }
@@ -928,6 +931,7 @@ async function readUnlocked(target: URL): Promise<PageRead | null> {
     const response = await fetchViaUnlocker(target);
     return response ? { ...readPage(response), finalUrl: response.url.href } : null;
   } catch (error) {
+    getLogger().warn({ event: 'scraper.read.failed', url: target.href, layer: 'unlocker', err: error }, 'Scraper read attempt failed.');
     if (error instanceof ScrapeError && error.code === 'invalid_url') throw error;
     return null;
   }
@@ -1026,11 +1030,11 @@ export async function scrapeProduct(rawUrl: string, options: ScrapeOptions = {})
   const found = mergeExtractions(api, read.page);
   if (!found.title) {
     const guessed = options.allowPartial ? titleFromUrl(read.finalUrl) ?? titleFromUrl(url) : undefined;
-    console.info(`[scraper] ${domainOf(url)} ${trail.join(' ')} -> ${guessed ? 'só o nome do link' : (read.error?.code ?? 'sem dados')}`);
+    getLogger().warn({ event: 'scraper.partial', url, finalUrl: read.finalUrl, trail, guessed, err: read.error, extracted: found }, 'Scraper returned partial data.');
     if (guessed) return { ...buildPreview(url, read.finalUrl, { ...emptyExtraction(), title: guessed }), partial: true };
     throw read.error ?? new ScrapeError('no_data', NO_DATA_MESSAGE);
   }
-  if (trail.some(step => !step.endsWith('=ok'))) console.info(`[scraper] ${domainOf(url)} ${trail.join(' ')} -> ok`);
+  getLogger().info({ event: 'scraper.completed', url, finalUrl: read.finalUrl, trail, extracted: found }, 'Product scraping completed.');
   return buildPreview(url, read.finalUrl, found);
 }
 

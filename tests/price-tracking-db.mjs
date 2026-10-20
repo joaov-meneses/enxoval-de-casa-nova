@@ -112,7 +112,7 @@ try {
   const item = first.data.item;
   assert.equal(item.link, `${productUrl}`, "o link do item vira o do produto acompanhado (sem rastreio)");
   assert.equal(item.selectedVariation, "220V");
-  assert.equal(item.imageUrl, "https://img.loja-teste.com.br/af.jpg");
+  assert.ok(!Object.hasOwn(item, "imageUrl"));
   assert.equal(item.priceTracking.initialPriceCents, 40000);
   assert.equal(item.priceTracking.currentPriceCents, 40000);
   assert.equal(item.priceTracking.targetPriceCents, 30000);

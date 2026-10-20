@@ -1,5 +1,10 @@
+import { Badge } from "@/src/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { Pencil, LockKeyhole, CreditCard, Home, ShieldCheck, UserRound } from "lucide-react";
+import { Pencil, LockKeyhole, CreditCard, Home, ShieldCheck, UserRound } from "@/src/components/icons";
 import { Dialog } from "./Dialog";
 import { ProfilePhotoEditor } from "./ProfilePhotoEditor";
 import { Select } from "./Select";
@@ -203,65 +208,23 @@ export function ProfileDialog({
               <span>{user.email}</span>
             </div>
           </div>
-          <div
-            className="profile-tabs"
-            role="tablist"
-            aria-label="Configurações do perfil"
-          >
-            {sections.map(({ id: tab, label, Icon }, index) => (
-              <button
-                key={tab}
-                type="button"
-                id={`${id}-tab-${tab}`}
-                role="tab"
-                aria-selected={section === tab}
-                aria-controls={`${id}-panel`}
-                tabIndex={section === tab ? 0 : -1}
-                onClick={() => {
-                  setSection(tab);
-                  setError("");
-                  setMessage("");
-                }}
-                onKeyDown={(event) => {
-                  const next =
-                    event.key === "ArrowRight"
-                      ? (index + 1) % 3
-                      : event.key === "ArrowLeft"
-                        ? (index + 2) % 3
-                        : event.key === "Home"
-                          ? 0
-                          : event.key === "End"
-                            ? 2
-                            : null;
-                  if (next !== null) {
-                    event.preventDefault();
-                    setSection(sections[next].id);
-                    document
-                      .getElementById(`${id}-tab-${sections[next].id}`)
-                      ?.focus();
-                  }
-                }}
-              >
-                <Icon size={17} aria-hidden="true" />
-                {label}
-              </button>
-            ))}
-          </div>
+          <Tabs value={section} onValueChange={value => { setSection(value as typeof section); setError(""); setMessage(""); }}>
+          <TabsList className="profile-tabs" aria-label="Configurações do perfil">
+            {sections.map(({ id: tab, label, Icon }) => <TabsTrigger key={tab} value={tab}>
+              <Icon size={17} aria-hidden="true" />{label}
+            </TabsTrigger>)}
+          </TabsList>
           {loading ? (
             <p role="status">Carregando suas informações…</p>
           ) : (
-            <div
-              role="tabpanel"
-              id={`${id}-panel`}
-              aria-labelledby={`${id}-tab-${section}`}
-            >
+            <TabsContent key={section} value={section}>
               {section === "profile" && (
                 <>
                   <form className="profile-form" onSubmit={saveProfile}>
-                    <label htmlFor={`${id}-name`}>Seu nome</label>
+                    <Label htmlFor={`${id}-name`}>Seu nome</Label>
                     <div className="profile-editable-field">
-                      <input id={`${id}-name`} value={name} onChange={event => setName(event.target.value)} minLength={2} maxLength={80} autoComplete="name" required disabled={busy || !editingName} />
-                      <button type="button" aria-label="Alterar seu nome" title="Alterar seu nome" disabled={busy || editingName} onClick={() => { setEditingName(true); requestAnimationFrame(() => document.getElementById(`${id}-name`)?.focus()); }}><Pencil size={18} aria-hidden="true" /></button>
+                      <Input id={`${id}-name`} value={name} onChange={event => setName(event.target.value)} minLength={2} maxLength={80} autoComplete="name" required disabled={busy || !editingName} />
+                      <Button variant="brand" size="brand" type="button" aria-label="Alterar seu nome" title="Alterar seu nome" disabled={busy || editingName} onClick={() => { setEditingName(true); requestAnimationFrame(() => document.getElementById(`${id}-name`)?.focus()); }}><Pencil size={18} aria-hidden="true" /></Button>
                     </div>
                     <span id={`${id}-email-label`} className="profile-field-label">E-mail de acesso</span>
                     <div className="profile-email-info" aria-labelledby={`${id}-email-label`}><LockKeyhole size={16} aria-hidden="true" /><span>{user.email}</span></div>
@@ -269,13 +232,13 @@ export function ProfileDialog({
                       Seu e-mail identifica a conta e recebe os avisos da
                       assinatura.
                     </small>
-                    <button
+                    <Button variant="brand" size="brand"
                       className="button button-dark"
                       type="submit"
                       disabled={busy || !editingName || name.trim().length < 2}
                     >
                       {busy ? "Salvando…" : "Salvar perfil"}
-                    </button>
+                    </Button>
                   </form>
                   <section className="profile-security">
                     <h3>
@@ -285,7 +248,7 @@ export function ProfileDialog({
                     <p>
                       Receba no seu e-mail um link para criar uma nova senha.
                     </p>
-                    <button
+                    <Button variant="brand" size="brand"
                       className="button button-outline button-small"
                       disabled={busy}
                       onClick={() =>
@@ -298,7 +261,7 @@ export function ProfileDialog({
                       }
                     >
                       Redefinir senha por e-mail
-                    </button>
+                    </Button>
                     {profile?.createdAt && (
                       <small>
                         Conta criada em{" "}
@@ -324,13 +287,13 @@ export function ProfileDialog({
                       </p>
                     )}
                     <fieldset disabled={busy || enxoval.role !== "owner"}>
-                      <label htmlFor={`${id}-home`}>Nome do lar</label>
+                      <Label htmlFor={`${id}-home`}>Nome do lar</Label>
                       <div className="profile-editable-field">
-                        <input id={`${id}-home`} value={homeName} onChange={event => setHomeName(event.target.value)} maxLength={100} required disabled={!editingHome} />
-                        <button type="button" aria-label="Alterar nome do lar" title="Alterar nome do lar" disabled={editingHome} onClick={() => { setEditingHome(true); requestAnimationFrame(() => document.getElementById(`${id}-home`)?.focus()); }}><Pencil size={18} aria-hidden="true" /></button>
+                        <Input id={`${id}-home`} value={homeName} onChange={event => setHomeName(event.target.value)} maxLength={100} required disabled={!editingHome} />
+                        <Button variant="brand" size="brand" type="button" aria-label="Alterar nome do lar" title="Alterar nome do lar" disabled={editingHome} onClick={() => { setEditingHome(true); requestAnimationFrame(() => document.getElementById(`${id}-home`)?.focus()); }}><Pencil size={18} aria-hidden="true" /></Button>
                       </div>
-                      <label htmlFor={`${id}-date`}>Data da mudança</label>
-                      <input
+                      <Label htmlFor={`${id}-date`}>Data da mudança</Label>
+                      <Input
                         id={`${id}-date`}
                         type="date"
                         value={moveDate}
@@ -338,7 +301,7 @@ export function ProfileDialog({
                       />
                       <div className="profile-field-grid">
                         <div>
-                          <label htmlFor={`${id}-state`}>Estado</label>
+                          <Label htmlFor={`${id}-state`}>Estado</Label>
                           <Select
                             id={`${id}-state`}
                             value={state}
@@ -357,9 +320,9 @@ export function ProfileDialog({
                           />
                         </div>
                         <div>
-                          <label htmlFor={`${id}-city`}>
+                          <Label htmlFor={`${id}-city`}>
                             Cidade de referência
-                          </label>
+                          </Label>
                           <Select
                             id={`${id}-city`}
                             value={city}
@@ -377,7 +340,7 @@ export function ProfileDialog({
                           />
                         </div>
                       </div>
-                      <label htmlFor={`${id}-tier`}>Perfil de gasto</label>
+                      <Label htmlFor={`${id}-tier`}>Perfil de gasto</Label>
                       <Select
                         id={`${id}-tier`}
                         value={tier}
@@ -392,13 +355,13 @@ export function ProfileDialog({
                       />
                     </fieldset>
                     {enxoval.role === "owner" && (
-                      <button
+                      <Button variant="brand" size="brand"
                         className="button button-dark"
                         type="submit"
                         disabled={busy || !homeName.trim()}
                       >
                         {busy ? "Salvando…" : "Salvar informações do lar"}
-                      </button>
+                      </Button>
                     )}
                   </form>
                 ) : (
@@ -408,7 +371,7 @@ export function ProfileDialog({
                 ))}
               {section === "billing" && (
                 <section className="profile-billing">
-                  <span className="profile-plan-badge">{planName}</span>
+                  <Badge asChild variant="outline"><span className="profile-plan-badge">{planName}</span></Badge>
                   {user.isGuest ? (
                     <p>
                       O acesso a cada enxoval depende da assinatura de quem
@@ -462,7 +425,7 @@ export function ProfileDialog({
                       )}
                       <div className="profile-billing-actions">
                         {billing?.canManage && (
-                          <button
+                          <Button variant="brand" size="brand"
                             className="button button-dark"
                             disabled={busy}
                             onClick={() =>
@@ -473,10 +436,10 @@ export function ProfileDialog({
                             }
                           >
                             Gerenciar assinatura e cartão
-                          </button>
+                          </Button>
                         )}
                         {billing?.plan === "free" && (
-                          <button
+                          <Button variant="brand" size="brand"
                             className="button button-dark"
                             disabled={busy || !billing.available}
                             onClick={() =>
@@ -487,24 +450,25 @@ export function ProfileDialog({
                             }
                           >
                             Escolher plano
-                          </button>
+                          </Button>
                         )}
                         {canCancel && (
-                          <button
+                          <Button variant="brand" size="brand"
                             className="button button-outline profile-cancel-button"
                             disabled={busy}
                             onClick={() => setConfirmCancel(true)}
                           >
                             Cancelar assinatura
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </>
                   )}
                 </section>
               )}
-            </div>
+            </TabsContent>
           )}
+          </Tabs>
           {error && (
             <p className="profile-error" role="alert">
               {error}
@@ -542,15 +506,15 @@ export function ProfileDialog({
             </p>
           )}
           <div className="subscription-dialog-actions">
-            <button
+            <Button variant="brand" size="brand"
               className="button button-outline"
               disabled={busy}
               onClick={() => setConfirmCancel(false)}
               data-dialog-autofocus
             >
               Continuar usando
-            </button>
-            <button
+            </Button>
+            <Button variant="brand" size="brand"
               className="button button-dark"
               disabled={busy}
               onClick={() =>
@@ -569,7 +533,7 @@ export function ProfileDialog({
               }
             >
               {busy ? "Cancelando…" : "Confirmar cancelamento"}
-            </button>
+            </Button>
           </div>
         </div>
       </Dialog>

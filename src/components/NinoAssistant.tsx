@@ -1,5 +1,7 @@
+import { Label } from "@/src/components/ui/label";
+import { Button } from "@/src/components/ui/button";
 import { useId, useMemo, useState } from "react";
-import { AlertCircle, ListOrdered, Plus, Sparkles } from "lucide-react";
+import { AlertCircle, ListOrdered, Plus, Sparkles } from "@/src/components/icons";
 import { prioritizeEnvironment, recommendNextItem } from "../api";
 import { useJevEnabled } from "../hooks/useJevEnabled";
 import { isDoneStatus, isInactiveStatus } from "../itemStatus";
@@ -187,7 +189,7 @@ export function NinoAssistant({
       )}
 
       <div className="pp-nino-block">
-        <label htmlFor={`${baseId}-room`}>Qual o próximo item de um ambiente?</label>
+        <Label htmlFor={`${baseId}-room`}>Qual o próximo item de um ambiente?</Label>
         <div className="pp-nino-row">
           <Select
             id={`${baseId}-room`}
@@ -199,14 +201,14 @@ export function NinoAssistant({
               setNext(null);
             }}
           />
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="button button-outline button-small"
             disabled={busy !== null}
             onClick={() => void askNext()}
           >
             {busy === "next" ? "Pensando…" : "Pedir sugestão"}
-          </button>
+          </Button>
         </div>
         {next && !recommendation && (
           <p className="pp-hint" role="status">
@@ -236,7 +238,7 @@ export function NinoAssistant({
                         · {option.essential ? "essencial" : "opcional"} em {recommendation.categoryName}
                       </span>
                     </div>
-                    <button
+                    <Button variant="brand" size="brand"
                       type="button"
                       className="button button-outline button-small"
                       disabled={busy !== null}
@@ -244,7 +246,7 @@ export function NinoAssistant({
                     >
                       <Plus size={14} aria-hidden="true" />
                       {adding === option.name ? "Adicionando…" : "Adicionar"}
-                    </button>
+                    </Button>
                   </li>
                 ),
               )}
@@ -254,7 +256,7 @@ export function NinoAssistant({
       </div>
 
       <div className="pp-nino-block">
-        <label htmlFor={`${baseId}-urgency`}>O que comprar primeiro?</label>
+        <Label htmlFor={`${baseId}-urgency`}>O que comprar primeiro?</Label>
         <div className="pp-nino-row">
           <Select
             id={`${baseId}-urgency`}
@@ -263,15 +265,15 @@ export function NinoAssistant({
             options={categories.map((category) => ({ value: category.id, label: category.name }))}
             onChange={(value) => setUrgencyCategoryId(value)}
           />
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="button button-outline button-small"
             disabled={busy !== null || urgencyPendingCount === 0}
             onClick={() => void askUrgency()}
           >
             <ListOrdered size={14} aria-hidden="true" />
-            {busy === "urgency" ? "Pensando…" : `Ver os ${TOP_URGENT} prioritários`}
-          </button>
+            {busy === "urgency" ? "Pensando…" : "Ver os itens prioritários"}
+          </Button>
         </div>
         {urgencyPendingCount === 0 && (
           <p className="pp-hint">Este ambiente não tem itens pendentes para priorizar.</p>

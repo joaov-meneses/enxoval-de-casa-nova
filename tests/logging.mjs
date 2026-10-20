@@ -23,6 +23,7 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     res.json({ received: true });
   });
   app.use(express.json({ limit: '1kb' }));
+  app.post('/api/echo/:id', (req, res) => res.json({ received: req.body }));
   const router = express.Router();
   router.get('/items/:id', asyncHandler(async (req, res) => {
     setLogUser(`user-${req.params.id}`);
@@ -70,6 +71,12 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
       assert.equal(scoped.find(log => log.event === 'item.loaded').userId, `user-${id}`);
       assert.equal(typeof completed.responseTime, 'number');
     }
+    const echo = await call('/api/echo/raw-id?email=real@example.test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Real input', password: 'original-password' }) });
+    const echoLog = logs.find(log => log.reqId === echo.id && log.res);
+    assert.equal(echoLog.req.body.password, 'original-password');
+    assert.equal(echoLog.req.params.id, 'raw-id');
+    assert.equal(echoLog.req.query.email, 'real@example.test');
+    assert.equal(echoLog.res.body.received.name, 'Real input');
     const expected = await call('/expected');
     assert.equal(expected.response.status, 403);
     assert.deepEqual(JSON.parse(expected.body), { error: 'Acesso negado.', code: 'FORBIDDEN' });
@@ -82,8 +89,11 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     const failedLog = logs.find(log => log.reqId === failure.id && log.event === 'http.request.failed');
     assert.equal(failedLog.level, 50);
     assert.match(failedLog.err.stack, /Banco indisponível/);
-    assert.match(failedLog.err.stack, /Conexão encerrada/);
+    assert.match(failedLog.err.cause.stack, /Conexão encerrada/);
     assert.equal(failedLog.err.code, 'ECONNRESET');
+    assert.equal(failedLog.err.detail, 'PRIVATE_SQL_DETAIL');
+    assert.equal(failedLog.err.query, 'PRIVATE_SQL_QUERY');
+    assert.equal(failedLog.err.password, 'ERROR_PASSWORD_SECRET');
     const direct = await call('/direct-error');
     assert.equal(logs.find(log => log.reqId === direct.id && log.res).level, 40);
     const malformed = await call('/json', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"password":"MALFORMED_PASSWORD_SECRET", invalid}' });
@@ -109,10 +119,13 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     // Let the server process the socket close event.
     for (let i = 0; i < 50 && !logs.some(log => log.event === 'http.request.aborted'); i++) await delay(10);
     assert.equal(logs.find(log => log.event === 'http.request.aborted').level, 40);
-    const output = JSON.stringify(logs);
-    for (const secret of ['QUERY_TOKEN_SECRET', 'PRIVATE_EMAIL', 'AUTH_SECRET', 'COOKIE_SECRET', 'UNTRUSTED_ID', 'RESPONSE_BODY_SECRET', 'RESPONSE_COOKIE_SECRET', 'PRIVATE_SQL_DETAIL', 'PRIVATE_SQL_QUERY', 'ERROR_PASSWORD_SECRET', 'MALFORMED_PASSWORD_SECRET', 'LARGE_BODY_SECRET', 'STRIPE_SIGNATURE_SECRET']) {
-      assert.equal(output.includes(secret), false, `Dado sensível apareceu nos logs: ${secret}`);
-    }
+    const completed = logs.find(log => log.reqId === one.id && log.res);
+    assert.equal(completed.req.query.token, 'QUERY_TOKEN_SECRET');
+    assert.equal(completed.req.headers.authorization, 'Bearer AUTH_SECRET');
+    assert.equal(completed.res.headers['set-cookie'], 'session=RESPONSE_COOKIE_SECRET');
+    assert.equal(completed.res.body.password, 'RESPONSE_BODY_SECRET');
+    const malformedLog = logs.find(log => log.reqId === malformed.id && log.res);
+    assert.match(malformedLog.err.body, /MALFORMED_PASSWORD_SECRET/);
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));

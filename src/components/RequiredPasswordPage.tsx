@@ -1,3 +1,6 @@
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -6,7 +9,7 @@ import {
   KeyRound,
   LoaderCircle,
   LogOut,
-} from "lucide-react";
+} from "@/src/components/icons";
 import { changeRequiredPassword } from "../api";
 import type { AuthUser, BootstrapData } from "../types";
 import { Brand } from "./Brand";
@@ -67,10 +70,10 @@ export function RequiredPasswordPage({
         </p>
         <div className="account-identity">{user.email}</div>
         <form className="auth-form" onSubmit={submit} aria-busy={busy}>
-          <label htmlFor="new-password">
+          <Label htmlFor="new-password">
             Nova senha
             <span className="password-field">
-              <input
+              <Input
                 id="new-password"
                 type={visible ? "text" : "password"}
                 autoComplete="new-password"
@@ -82,18 +85,18 @@ export function RequiredPasswordPage({
                 placeholder="Pelo menos 8 caracteres"
                 disabled={busy}
               />
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
                 onClick={() => setVisible(!visible)}
               >
                 {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+              </Button>
             </span>
-          </label>
-          <label htmlFor="confirm-password">
+          </Label>
+          <Label htmlFor="confirm-password">
             Confirme a nova senha
-            <input
+            <Input
               id="confirm-password"
               type={visible ? "text" : "password"}
               autoComplete="new-password"
@@ -105,7 +108,7 @@ export function RequiredPasswordPage({
               placeholder="Digite novamente"
               disabled={busy}
             />
-          </label>
+          </Label>
           <p className="account-password-hint">
             Escolha uma senha diferente da temporária. Seus itens e listas
             continuam salvos.
@@ -115,7 +118,7 @@ export function RequiredPasswordPage({
               {error}
             </div>
           )}
-          <button className="button button-dark" type="submit" disabled={busy}>
+          <Button variant="brand" size="brand" className="button button-dark" type="submit" disabled={busy}>
             {busy ? (
               <LoaderCircle className="animate-spin" size={18} />
             ) : (
@@ -123,15 +126,15 @@ export function RequiredPasswordPage({
                 Salvar senha e continuar <ArrowRight size={18} />
               </>
             )}
-          </button>
+          </Button>
         </form>
-        <button
+        <Button variant="brand" size="brand"
           className="account-signout"
           disabled={busy}
           onClick={() => void onLogout()}
         >
           <LogOut size={16} /> Sair desta conta
-        </button>
+        </Button>
       </section>
       <p className="account-access-footer">Seu lar, tomando forma.</p>
     </main>

@@ -27,7 +27,7 @@ try {
     await page.locator('.workspace-app').waitFor();
     await page.locator(width>=1024?'.workspace-sidebar':'.mobile-bottom-nav').getByRole('button',{name:/^Meu enxoval/}).click();
     const row=page.locator('[data-item-id=bed]');
-    const check=row.getByRole('checkbox');
+    const check=row.getByRole('checkbox',{includeHidden:true});
     await check.click();
     const dialog=page.getByRole('dialog',{name:'Como você conseguiu?',exact:true});
     await dialog.waitFor();
@@ -50,7 +50,8 @@ try {
     const decoration=await cards.nth(0).evaluate(element=>({outline:getComputedStyle(element).outlineStyle,shadow:getComputedStyle(element).boxShadow}));
     assert.equal(decoration.outline,'none');assert.equal(decoration.shadow,'none','seleção tem apenas uma borda');
     await dialog.getByRole('radio',{name:/^Comprei/}).focus();
-    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown',{delay:50});
+    await page.waitForFunction(()=>document.querySelector('[data-slot=radio-group-item][value=received]')?.getAttribute('aria-checked')==='true');
     assert.equal(await dialog.getByRole('radio',{name:/^Ganhei/}).isChecked(),true,'setas do teclado continuam funcionando');
     assert.equal(await cards.nth(1).evaluate(element=>getComputedStyle(element).borderColor),'rgb(111, 52, 31)','foco de teclado usa a mesma borda');
     await page.screenshot({path:`tmp/item-completion-${width}.png`,fullPage:false});

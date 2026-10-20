@@ -1,5 +1,6 @@
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
-import { Check } from "lucide-react";
+import { Check } from "@/src/components/icons";
 import { Dialog } from "./Dialog";
 import { Nino } from "./Nino";
 import { capture } from '../analytics';
@@ -166,14 +167,14 @@ export function PaywallDialog({
                 : "Nada foi cobrado. Quando quiser, é só conhecer os planos de novo."}
             </p>
           </div>
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="button button-dark"
             onClick={close}
             data-dialog-autofocus
           >
             Continuar
-          </button>
+          </Button>
         </div>
       </Dialog>
     );
@@ -205,7 +206,7 @@ export function PaywallDialog({
                 {offer.per}
               </span>
               <span className="paywall-plan-billing">{offer.billing}</span>
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className={`button button-small ${offer.featured ? "button-dark" : "button-outline"} paywall-plan-action`}
                 disabled={pendingPlan !== null}
@@ -219,7 +220,7 @@ export function PaywallDialog({
                       ? "Estender"
                       : "Comprar"
                     : "Assinar"}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -239,13 +240,13 @@ export function PaywallDialog({
           O pagamento é feito num ambiente seguro da Stripe. Tudo o que você já
           cadastrou continua com você, mesmo quando o acesso termina.
         </p>
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="button button-outline"
           onClick={close}
         >
           Agora não
-        </button>
+        </Button>
       </div>
     </Dialog>
   );

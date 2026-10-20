@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { startActionLogging } from './analytics/operations';
 import { exceptionProperties } from '../shared/errorTracking';
 import { allowedProperties, EVENT_PROPERTIES, safeRoute, scrubSdkProperties, type AnalyticsEvent, type AnalyticsProperties } from './analytics/events';
 import type { AuthUser } from './types';
@@ -8,6 +9,7 @@ let enabled = false;
 let identifiedUser: string | null = null;
 let openedSession: string | null = null;
 let lastPage = '';
+let lastOperationalPage = '';
 const emitted = new Set<string>();
 const ONCE_STORAGE = 'casamia:analytics:checkouts';
 const SESSION_STORAGE = 'casamia:analytics:app-session';
@@ -58,7 +60,11 @@ export function trackLandingCta(action: 'start_trial' | 'open_app' | 'login' | '
   capture('landing_cta_clicked', { action, position });
 }
 
-export function captureError(error: unknown, context?: { error_source: 'api'; http_status?: number }) {
+export function captureOperational(event: `application.${string}`, properties: Record<string, unknown> = {}) {
+  safely(() => posthog.capture(event, { ...properties, url: window.location.href, timestamp: new Date().toISOString() }));
+}
+
+export function captureError(error: unknown, context?: Record<string, unknown>) {
   if (import.meta.env.VITE_POSTHOG_ERROR_TRACKING === 'false') return;
   safely(() => posthog.captureException(error, context));
 }
@@ -128,6 +134,11 @@ export function setAnalyticsOptOut(optOut: boolean) {
 }
 
 export function trackPageview() {
+  const location = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (location !== lastOperationalPage) {
+    lastOperationalPage = location;
+    captureOperational('application.navigation', { path: window.location.pathname, search: window.location.search, hash: window.location.hash });
+  }
   const route = safeRoute(window.location.pathname);
   if (route === lastPage) return;
   trackPageleave();
@@ -144,7 +155,7 @@ function trackPageleave() {
 
 export function startAnalytics() {
   const env = import.meta.env;
-  if (!env.VITE_POSTHOG_KEY?.trim() || (env.DEV && env.VITE_POSTHOG_ENABLE_DEV !== 'true') || /^\/admin(?:\/|$)/.test(window.location.pathname)) return () => {};
+  if (!env.VITE_POSTHOG_KEY?.trim() || (env.DEV && env.VITE_POSTHOG_ENABLE_DEV !== 'true')) return () => {};
   try {
     posthog.init(env.VITE_POSTHOG_KEY.trim(), {
       api_host: env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
@@ -164,7 +175,8 @@ export function startAnalytics() {
       save_referrer: false, save_campaign_params: false,
       respect_dnt: true, ip: false,
       before_send: event => {
-        if (/^\/admin(?:\/|$)/.test(window.location.pathname)) return null;
+        if (event?.event.startsWith('application.')) return { ...event, properties: { ...event.properties, ...trafficProperties() } };
+        if (/^\/admin(?:\/|$)/.test(window.location.pathname) && event?.event !== '$exception') return null;
         if (event?.event === '$exception') {
           if (env.VITE_POSTHOG_ERROR_TRACKING === 'false') return null;
           return {
@@ -210,6 +222,7 @@ export function startAnalytics() {
     });
     enabled = true;
   } catch { return () => {}; }
+  const stopActionLogging = startActionLogging(captureOperational);
   trackPageview();
   if (new URLSearchParams(window.location.search).get('assinatura') === 'cancelada') capture('checkout_canceled');
   const expire = () => resetAnalytics();
@@ -230,6 +243,7 @@ export function startAnalytics() {
   window.addEventListener('focus', visible);
   document.addEventListener('visibilitychange', visible);
   return () => {
+    stopActionLogging();
     if (window.history.pushState === push) window.history.pushState = originalPush;
     if (window.history.replaceState === replace) window.history.replaceState = originalReplace;
     window.removeEventListener('popstate', trackPageview);

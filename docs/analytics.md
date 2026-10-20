@@ -7,7 +7,7 @@
 3. Execute `npm run build` e publique o build. Variáveis `VITE_*` são incorporadas ao JavaScript pelo Vite; alterar só o ambiente do servidor já compilado não muda a configuração.
 4. Para validar com `npm run dev`, configure também `VITE_POSTHOG_ENABLE_DEV=true` e reinicie o servidor. Prefira um projeto de desenvolvimento separado.
 
-Sem token, o SDK não é inicializado e nenhum evento é enviado. Desenvolvimento fica desligado por padrão. Rotas `/admin` e suas subrotas não inicializam o SDK. Não foi criada nenhuma chave, conta ou painel remoto por esta integração.
+Sem token, o SDK não é inicializado e nenhum evento é enviado. Desenvolvimento fica desligado por padrão. Rotas `/admin` e suas subrotas também registram diagnósticos operacionais e exceções. Não foi criada nenhuma chave, conta ou painel remoto por esta integração.
 
 ## Eventos
 
@@ -36,9 +36,9 @@ Os eventos DOM `casamia:onboarding` continuam funcionando. Os nomes legados `sig
 
 A resposta autenticada de bootstrap, login, cadastro ou aceite de convite identifica a pessoa pelo ID interno da conta, com `plan` e `is_guest`. Assim, eventos anônimos anteriores podem ser ligados à conta e retornos em outros aparelhos podem ser analisados. Logout, expiração de sessão e troca de conta reiniciam a identidade do navegador.
 
-O esquema permite apenas propriedades explícitas de cada evento. Nome, e-mail, senha, respostas pessoais, nomes de ambientes/itens, preços, descrições e links de produtos não são enviados. URLs, títulos, referrers e parâmetros adicionados pelo SDK são removidos, inclusive em objetos aninhados. Depois disso, o código reconstrói os campos padrão de Web Analytics com rotas públicas conhecidas, domínio da aplicação, origens conhecidas e códigos de campanha permitidos. Nenhuma URL bruta é encaminhada.
+Os eventos de produto usam apenas propriedades explícitas de cada esquema e metadados de Web Analytics com rotas e campanhas conhecidas. Os diagnósticos operacionais `application.*` e as exceções preservam os dados reais, incluindo URLs, conteúdo de campos, entradas e respostas da API. Esses registros podem conter dados pessoais e credenciais presentes na operação.
 
-Autocapture de cliques, gravação de sessões, heatmaps, pesquisas e feature flags estão desligados. Web Vitals captura somente métricas de desempenho, e Error Tracking captura exceções conforme as seções abaixo. A configuração desativa o uso de IP para geolocalização no PostHog; como em qualquer requisição de rede, o serviço ainda recebe a conexão do navegador. O SDK respeita Do Not Track. A página `/privacidade` permite desativar ou reativar a análise neste navegador quando a integração está configurada; a preferência é mantida pelo SDK.
+O autocapture nativo do SDK, gravação de sessões, heatmaps, pesquisas e feature flags estão desligados. A aplicação registra cliques, alterações de campos e formulários por listeners próprios. Web Vitals captura métricas de desempenho, e Error Tracking captura exceções conforme as seções abaixo. A configuração desativa o uso de IP para geolocalização no PostHog; como em qualquer requisição de rede, o serviço ainda recebe a conexão do navegador. O SDK respeita Do Not Track. A página `/privacidade` permite desativar ou reativar a análise neste navegador quando a integração está configurada; a preferência é mantida pelo SDK.
 
 ## Web Analytics
 
@@ -78,7 +78,7 @@ Em `/web`, clique em **Add conversion goal** e selecione uma dessas ações para
 
 ### Desempenho
 
-`capture_performance` coleta LCP, INP, CLS e FCP via `$web_vitals`. A integração preserva valores numéricos e identificadores técnicos; remove entradas brutas, atribuição de elementos DOM e URLs de recursos. Métricas atrasadas conservam a rota sanitizada da página que as produziu. Não há gravação de sessão, instrumentação de conteúdo ou coleta de payloads de rede. `VITE_POSTHOG_WEB_VITALS=false` desliga a captura. A disponibilidade de cada métrica depende do navegador, do carregamento e das interações reais; sem interação pode não haver INP. A medição usa a navegação inicial da página, sem ativar APIs experimentais de navegação SPA.
+`capture_performance` coleta LCP, INP, CLS e FCP via `$web_vitals`. A integração preserva valores numéricos e identificadores técnicos; remove entradas brutas, atribuição de elementos DOM e URLs de recursos. Métricas atrasadas conservam a rota sanitizada da página que as produziu. Web Vitals nao inclui gravacao de sessao, conteudo ou payloads de rede; os registros operacionais completos sao descritos abaixo. `VITE_POSTHOG_WEB_VITALS=false` desliga a captura. A disponibilidade de cada métrica depende do navegador, do carregamento e das interações reais; sem interação pode não haver INP. A medição usa a navegação inicial da página, sem ativar APIs experimentais de navegação SPA.
 
 ### Equipe e testes
 
@@ -94,11 +94,11 @@ Todas as opções `VITE_*` exigem novo build e publicação. A configuração re
 
 ## Error Tracking
 
-Com o token configurado, o navegador captura erros não tratados e rejeições de promises; React 19 encaminha erros de renderização pelos callbacks da raiz. Falhas de rede e respostas HTTP 5xx da API também são capturadas quando tratadas pela interface. Respostas 4xx, cancelamentos via AbortError e chamadas administrativas são excluídos dessa captura manual. Não capturamos console.error. `VITE_POSTHOG_ERROR_TRACKING=false` desliga erros no navegador sem desligar os eventos de produto. O opt-out e Do Not Track continuam valendo.
+Com o token configurado, o navegador captura erros nao tratados, rejeicoes de promises, erros de renderizacao do React e falhas da API, incluindo 4xx e rotas administrativas. Cancelamentos AbortError geram registro operacional, sem excecao manual adicional. `VITE_POSTHOG_ERROR_TRACKING=false` desliga a captura de excecoes; opt-out e Do Not Track continuam valendo no navegador.
 
-O servidor usa `posthog-node`, com `POSTHOG_KEY` (ou `VITE_POSTHOG_KEY` como alternativa) e `POSTHOG_HOST`. A captura fica ativa em produção quando há token; `POSTHOG_ERROR_TRACKING=false` a desliga. Em desenvolvimento exige `POSTHOG_ENABLE_DEV=true`, separadamente da opção do navegador. O middleware vem antes do handler de resposta do Express, encaminha exceções inesperadas e ignora erros 4xx e rotas administrativas. O SDK também captura falhas não tratadas do processo. SIGTERM/SIGINT fazem um envio final limitado a dois segundos. Erros capturados não alteram as respostas da API.
+O servidor usa `posthog-node` com `POSTHOG_KEY` (alternativa `VITE_POSTHOG_KEY`) e `POSTHOG_HOST`. Em producao fica ativo com token; em desenvolvimento exige `POSTHOG_ENABLE_DEV=true`. `POSTHOG_ERROR_TRACKING=false` desliga excecoes do servidor. O middleware encaminha os erros recebidos, incluindo 4xx e administracao, com contexto e ID da requisicao. As respostas publicas da API permanecem iguais.
 
-Exceções usam uma lista própria de campos permitidos: tipo, mecanismo, nome do arquivo, função, linha, coluna e identificadores técnicos de source map/release. **Mensagens livres são omitidas por completo**, pois podem conter nomes, e-mails, dados SQL ou tokens. Também excluímos corpo, headers, cookies, parâmetros, URLs, variáveis e trechos de código dos eventos. Isso reduz o detalhe textual disponível: a investigação usa tipo e localização da falha. No navegador, o SDK mantém a identidade/sessão já existente; o servidor não encaminha conta nem requisição e não cria perfis de pessoa para esses erros. A captura de erros internos do servidor independe da preferência de análise do navegador.
+Excecoes preservam integralmente o payload produzido pelo SDK: mensagem, tipo, causas, mecanismo, frames, caminhos, source context e propriedades diagnosticas. Nao ha omissao ou mascaramento textual. Eventos operacionais `application.*` tambem preservam dados reais de navegacao, cliques, campos, formularios e chamadas da API. Os eventos de produto e Web Vitals continuam com seus schemas. Consulte [logs.md](logs.md) e [logging-coverage.md](logging-coverage.md) para detalhes e limites de entrega.
 
 ### Source maps no build
 
@@ -112,9 +112,9 @@ As variáveis `VITE_*` precisam estar configuradas antes do build. As variáveis
 
 Referências: [captura de exceções](https://posthog.com/docs/error-tracking/capture), [Node/Express](https://posthog.com/docs/error-tracking/installation/node) e [source maps pela CLI](https://posthog.com/docs/error-tracking/upload-source-maps/cli).
 
-`npm run test:error-tracking` cobre remoção de dados sensíveis, middleware Express, exclusão de erros esperados e o payload do SDK Node real com transporte local. `npm run test:analytics` cobre o filtro do navegador e o desligamento da captura. `npm run test:analytics-browser` verifica o SDK JavaScript real, incluindo exceções e opt-out, interceptando as requisições sem enviar dados ao PostHog.
+`npm run test:error-tracking` cobre preservacao dos dados originais, middleware Express, erros esperados e administrativos e o payload do SDK Node real com transporte local. `npm run test:analytics` cobre o filtro do navegador e o desligamento da captura. `npm run test:analytics-browser` verifica o SDK JavaScript real, incluindo exceções e opt-out, interceptando as requisições sem enviar dados ao PostHog.
 
-Para evitar duplicar a confirmação do mesmo checkout na aba, guardamos apenas localmente uma lista limitada de chaves de deduplicação no `sessionStorage`. Nenhum ID de checkout é enviado como propriedade de evento. A deduplicação é uma conveniência do cliente, não um registro financeiro.
+Para evitar duplicar a confirmação do mesmo checkout na aba, guardamos apenas localmente uma lista limitada de chaves de deduplicação no `sessionStorage`. O evento de conversao usa metadados limitados; o contexto operacional da chamada preserva o ID real do checkout. A deduplicação é uma conveniência do cliente, não um registro financeiro.
 
 ## Painéis sugeridos
 

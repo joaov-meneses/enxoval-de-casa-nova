@@ -15,9 +15,10 @@ export function startUserIpRetention() {
   const run = async () => {
     if (running) return;
     running = true;
+    logger.info({ event: 'user_ip_events.retention_started' }, 'IP retention run started.');
     try {
       const deleted = await pruneUserIpEvents();
-      if (deleted) logger.info({ event: 'user_ip_events.pruned', deleted }, 'Registros de IP expirados removidos.');
+      logger.info({ event: 'user_ip_events.pruned', deleted }, 'Registros de IP expirados removidos.');
     } catch (err) {
       logger.error({ event: 'user_ip_events.retention_failed', err }, 'Falha ao remover registros de IP expirados.');
     } finally {

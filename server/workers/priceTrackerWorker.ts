@@ -154,7 +154,8 @@ async function collectOpportunities(
 
 /** Uma rodada completa. Devolve o resumo; se outra rodada já está em andamento, não faz nada (`skipped`). */
 export async function runPriceTracker(options: PriceTrackerOptions = {}): Promise<PriceTrackerSummary> {
-  const log = options.log ?? (() => undefined);
+  const log = options.log ?? (message => logger.info({ event: 'prices.refresh.progress' }, message));
+  logger.info({ event: 'prices.refresh.started', options: { limit: options.limit, force: options.force } }, 'Price refresh started.');
   const sleep = options.sleep ?? wait;
   const scrape = options.scrape ?? scrapeProduct;
   const summary: PriceTrackerSummary = { checked: 0, updated: 0, failed: 0, alertsSent: 0, skipped: false };
@@ -180,9 +181,11 @@ export async function runPriceTracker(options: PriceTrackerOptions = {}): Promis
           const outcome = await recordScrape(getPool(), product.id, preview);
           await collectOpportunities(product.id, product.url, preview, outcome, outbox);
           summary.updated += 1;
+          logger.info({ event: 'prices.product.completed', product, preview, outcome }, 'Product price updated.');
           log(`ok ${product.url} -> ${preview.priceCents ?? 'sem preço'}`);
         } catch (error) {
           summary.failed += 1;
+          logger.error({ event: 'prices.product.failed', product, err: error }, 'Product price refresh failed.');
           await recordScrapeFailure(getPool(), product.id, error);
           log(`falhou ${product.url}: ${error instanceof ScrapeError ? error.code : (error as Error).message}`);
         }
@@ -198,6 +201,7 @@ export async function runPriceTracker(options: PriceTrackerOptions = {}): Promis
               await getPool().query('UPDATE items SET last_alert_price_cents = $2 WHERE id = $1', [item.itemId, item.alertedPriceCents]);
             }
           } catch (error) {
+            logger.error({ event: 'prices.alert.failed', email, items, err: error }, 'Price alert failed.');
             log(`e-mail não enviado: ${(error as Error).message}`);
           }
         }
@@ -217,10 +221,9 @@ export async function runPriceTracker(options: PriceTrackerOptions = {}): Promis
  */
 export function startPriceTrackerScheduler() {
   const run = () => {
-    runPriceTracker({ log: message => console.log(`[preços] ${message}`) })
+    runPriceTracker()
       .then(summary => {
         logger.info({ event: 'prices.refresh.completed', ...summary }, 'Rotina de preços concluída.');
-        if (!summary.skipped && summary.checked > 0) console.log(`[preços] ${summary.updated} atualizados, ${summary.failed} com falha, ${summary.alertsSent} e-mails.`);
       })
       .catch(err => logger.error({ event: 'prices.refresh.failed', err }, 'Rotina de preços interrompida.'));
   };

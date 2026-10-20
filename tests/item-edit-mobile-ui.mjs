@@ -6,7 +6,7 @@ try {
   for(const width of [320,768]) {
     const page=await browser.newPage({viewport:{width,height:width===320?568:900},reducedMotion:'reduce'});
     const home={id:'home',name:'Nossa casa nova',ownerId:'owner',role:'owner',discountCents:0,moveDate:null,state:'BA',city:null,spendingTier:'equilibrado'};
-    let items=['Cama','Cesto'].map((name,index)=>({id:`item-${index}`,name,categoryId:'bedroom',category:'Quarto',checked:false,status:'needed',link:'',description:'',priceCents:null,quantity:1,discountCents:0,sortOrder:index,buyWeek:null,priceCategory:null,priority:null,timing:null,updatedAt:'2026-10-18T12:00:00Z',imageUrl:null}));
+    let items=['Cama','Cesto'].map((name,index)=>({id:`item-${index}`,name,categoryId:'bedroom',category:'Quarto',checked:false,status:'needed',link:'',description:'',priceCents:null,quantity:1,discountCents:0,sortOrder:index,buyWeek:null,priceCategory:null,priority:null,timing:null,updatedAt:'2026-10-18T12:00:00Z',imageUrl:'https://example.invalid/legacy-item.jpg'}));
     await page.route('**/api/**',route=>{
       const path=new URL(route.request().url()).pathname;
       if(path==='/api/bootstrap')return route.fulfill({json:{user:{id:'owner',name:'Ana',email:'ana@example.invalid',plan:'monthly',isGuest:false,onboardingCompleted:true},enxovais:[home],activeEnxoval:home,members:[],categories:[{id:'bedroom',name:'Quarto',sortOrder:0}],items}});
@@ -25,6 +25,8 @@ try {
     assert.equal(await fab.isVisible(),true);
     await first.getByRole('button',{name:'Abrir detalhes de Cama',exact:true}).click();
     assert.equal(await fab.isVisible(),false,'abrir um item oculta o botão flutuante');
+    assert.equal(await first.locator('img, input[type=file]').count(),0,'imagem antiga e envio não aparecem na edição');
+    assert.equal(await first.getByText(/Enviar imagem|Trocar imagem|Link da imagem/).count(),0);
     await second.getByRole('button',{name:'Abrir detalhes de Cesto',exact:true}).click();
     await first.getByRole('button',{name:'Cancelar',exact:true}).click();
     assert.equal(await fab.isVisible(),false,'continua oculto se ainda há outro item aberto');

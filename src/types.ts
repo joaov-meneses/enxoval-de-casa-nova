@@ -131,7 +131,6 @@ export interface ItemTrackingInput {
   initialPriceCents?: number | null;
   targetPriceCents?: number | null;
   selectedVariation?: string | null;
-  imageUrl?: string | null;
   priceBasis?: PriceBasis;
   priceAlertEnabled?: boolean;
 }
@@ -220,8 +219,6 @@ export interface EnxovalItem {
   catalog?: CatalogItemMeta | null;
   updatedAt: string;
   createdAt?: string;
-  /** Foto do produto, quando o item veio do link de uma loja. */
-  imageUrl?: string | null;
   /** Variação escolhida na importação, como "220V" ou "110V · Preto". */
   selectedVariation?: string | null;
   priceTracking?: ItemPriceTracking | null;

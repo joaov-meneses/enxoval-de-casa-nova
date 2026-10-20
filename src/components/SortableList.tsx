@@ -1,6 +1,7 @@
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Reorder, useDragControls } from "motion/react";
-import { GripVertical } from "lucide-react";
+import { GripVertical } from "@/src/components/icons";
 
 interface Entry {
   id: string;
@@ -141,8 +142,9 @@ function SortableEntry<T extends Entry>({
   onEnd: () => void;
 }) {
   const controls = useDragControls();
+  const [dragging, setDragging] = useState(false);
   const handle = (
-    <button
+    <Button variant="brand" size="brand"
       type="button"
       className="reorder-handle"
       disabled={disabled}
@@ -168,8 +170,8 @@ function SortableEntry<T extends Entry>({
         }
       }}
     >
-      <GripVertical size={17} aria-hidden="true" />
-    </button>
+      <GripVertical size={17} aria-hidden="true" animate={false} animateOnHover={false} animateOnTap={false} />
+    </Button>
   );
   return (
     <Reorder.Item
@@ -180,9 +182,10 @@ function SortableEntry<T extends Entry>({
       dragListener={false}
       dragControls={controls}
       drag={disabled ? false : axis}
-      onDragStart={onStart}
-      onDragEnd={onEnd}
-      className="sortable-entry"
+      dragMomentum={false}
+      onDragStart={() => { setDragging(true); onStart(); }}
+      onDragEnd={() => { setDragging(false); onEnd(); }}
+      className={`sortable-entry${dragging ? " is-dragging" : ""}`}
       style={{ position: "relative" }}
     >
       {render(item, handle)}

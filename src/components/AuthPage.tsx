@@ -1,3 +1,7 @@
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
@@ -7,7 +11,7 @@ import {
   Heart,
   LoaderCircle,
   ShieldCheck,
-} from "lucide-react";
+} from "@/src/components/icons";
 import { login, register } from "../api";
 import type { BootstrapData } from "../types";
 import { Brand } from "./Brand";
@@ -79,42 +83,14 @@ export function AuthPage({
 
       <div className="auth-door">
         {!compact && <Nino pose="wave" size={104} className="auth-nino" />}
-        <div className="auth-card">
-          <div
-            className="auth-tabs"
-            data-mode={mode}
-            role="tablist"
-            aria-label="Entrar ou criar conta"
-          >
-            <button
-              type="button"
-              role="tab"
-              id="auth-tab-login"
-              aria-selected={mode === "login"}
-              aria-controls="auth-panel-login"
-              className="auth-tab"
-              onClick={() => setMode("login")}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="auth-tab-register"
-              aria-selected={mode === "register"}
-              aria-controls="auth-panel-register"
-              className="auth-tab"
-              onClick={() => setMode("register")}
-            >
-              Criar conta
-            </button>
-          </div>
-          {mode === "login" ? (
-            <LoginPanel onAuthenticated={onAuthenticated} onSwitchToRegister={() => setMode("register")} />
-          ) : (
-            <RegisterPanel onSwitchToLogin={() => setMode("login")} />
-          )}
-        </div>
+        <Tabs value={mode} onValueChange={value => setMode(value as typeof mode)} className="auth-card">
+          <TabsList className="auth-tabs" data-mode={mode} aria-label="Entrar ou criar conta">
+            <TabsTrigger value="login" className="auth-tab">Entrar</TabsTrigger>
+            <TabsTrigger value="register" className="auth-tab">Criar conta</TabsTrigger>
+          </TabsList>
+          <TabsContent value="login"><LoginPanel onAuthenticated={onAuthenticated} onSwitchToRegister={() => setMode("register")} /></TabsContent>
+          <TabsContent value="register"><RegisterPanel onSwitchToLogin={() => setMode("login")} /></TabsContent>
+        </Tabs>
         <p className="auth-footnote">
           Pequenos planos. Grandes começos. <Heart size={12} aria-hidden="true" />
         </p>
@@ -131,14 +107,14 @@ function PasswordToggle({
   onToggle: () => void;
 }) {
   return (
-    <button
+    <Button variant="brand" size="brand"
       type="button"
       aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
       aria-pressed={visible}
       onClick={onToggle}
     >
       {visible ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
-    </button>
+    </Button>
   );
 }
 
@@ -188,8 +164,6 @@ function LoginPanel({
     <section
       id="auth-panel-login"
       className="auth-panel"
-      role="tabpanel"
-      aria-labelledby="auth-tab-login"
     >
       <header className="auth-heading">
         <h1>Entre, a casa é sua.</h1>
@@ -197,8 +171,8 @@ function LoginPanel({
       </header>
       <form onSubmit={submit} className="auth-form auth-fields">
         <div className="auth-field">
-          <label htmlFor="auth-email">Seu e-mail</label>
-          <input
+          <Label htmlFor="auth-email">Seu e-mail</Label>
+          <Input
             type="email"
             id="auth-email"
             value={email}
@@ -213,7 +187,7 @@ function LoginPanel({
         </div>
         <div className="auth-field">
           <div className="auth-field-head">
-            <label htmlFor="auth-password">Sua senha</label>
+            <Label htmlFor="auth-password">Sua senha</Label>
             <a
               className="auth-forgot"
               href="/esqueci-senha"
@@ -231,7 +205,7 @@ function LoginPanel({
             </a>
           </div>
           <span className="password-field">
-            <input
+            <Input
               type={visible ? "text" : "password"}
               id="auth-password"
               value={password}
@@ -248,7 +222,7 @@ function LoginPanel({
             {error}
           </div>
         )}
-        <button
+        <Button variant="brand" size="brand"
           type="submit"
           disabled={submitting}
           className="button button-dark"
@@ -259,13 +233,13 @@ function LoginPanel({
             "Entrar no meu enxoval"
           )}
           {!submitting && <ArrowRight size={18} aria-hidden="true" />}
-        </button>
+        </Button>
       </form>
       <p className="auth-switch">
         Ainda não tem conta?{" "}
-        <button type="button" className="auth-switch-link" onClick={onSwitchToRegister}>
+        <Button variant="brand" size="brand" type="button" className="auth-switch-link" onClick={onSwitchToRegister}>
           Crie a sua grátis
-        </button>
+        </Button>
       </p>
       <p className="auth-note">
         <ShieldCheck size={15} aria-hidden="true" /> Teste completo por 2 dias. Cancele antes da cobrança.
@@ -309,8 +283,6 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
     <section
       id="auth-panel-register"
       className="auth-panel"
-      role="tabpanel"
-      aria-labelledby="auth-tab-register"
     >
       <header className="auth-heading">
         <h1>Crie sua conta grátis.</h1>
@@ -318,8 +290,8 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
       </header>
       <form onSubmit={submit} className="auth-form auth-fields">
         <div className="auth-field">
-          <label htmlFor="register-email">Seu e-mail</label>
-          <input
+          <Label htmlFor="register-email">Seu e-mail</Label>
+          <Input
             type="email"
             id="register-email"
             value={email}
@@ -333,9 +305,9 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           />
         </div>
         <div className="auth-field">
-          <label htmlFor="register-password">Crie uma senha</label>
+          <Label htmlFor="register-password">Crie uma senha</Label>
           <span className="password-field">
-            <input
+            <Input
               type={visible ? "text" : "password"}
               id="register-password"
               value={password}
@@ -356,9 +328,9 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           </p>
         </div>
         <div className="auth-field">
-          <label htmlFor="register-password-confirmation">Confirme a senha</label>
+          <Label htmlFor="register-password-confirmation">Confirme a senha</Label>
           <span className="password-field">
-            <input
+            <Input
               type={visible ? "text" : "password"}
               id="register-password-confirmation"
               value={confirmation}
@@ -384,7 +356,7 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             {error}
           </div>
         )}
-        <button
+        <Button variant="brand" size="brand"
           type="submit"
           disabled={submitting}
           className="button button-dark"
@@ -395,13 +367,13 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             "Criar minha conta"
           )}
           {!submitting && <ArrowRight size={18} aria-hidden="true" />}
-        </button>
+        </Button>
       </form>
       <p className="auth-switch">
         Já tem conta?{" "}
-        <button type="button" className="auth-switch-link" onClick={onSwitchToLogin}>
+        <Button variant="brand" size="brand" type="button" className="auth-switch-link" onClick={onSwitchToLogin}>
           Entre por aqui
-        </button>
+        </Button>
       </p>
       <p className="auth-privacy">
         Ao criar a conta, você concorda com a nossa{" "}
