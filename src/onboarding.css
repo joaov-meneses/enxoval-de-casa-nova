@@ -901,15 +901,15 @@
   display: none;
 }
 .ob-wheel-list {
-  cursor: grab;
+  cursor: default;
   touch-action: pan-y;
 }
 .ob-wheel-list[data-dragging="true"] {
-  cursor: grabbing;
+  cursor: default;
   user-select: none;
 }
 .ob-wheel-list[data-dragging="true"] .ob-wheel-item {
-  cursor: grabbing;
+  cursor: default;
 }
 .ob-wheel-list:focus-visible {
   outline: 3px solid #a34c30;

@@ -63,7 +63,6 @@ export async function refreshPriceStats() {
          LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
          WHERE i.catalog_item_id IS NOT NULL
            AND i.quantity = 1
-           AND i.status NOT IN ('not_needed', 'discarded')
            AND COALESCE(i.price_cents, tp.current_price_cents) > 0
          GROUP BY 1, 2, 3
        ),

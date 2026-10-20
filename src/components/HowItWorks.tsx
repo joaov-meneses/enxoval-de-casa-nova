@@ -28,7 +28,7 @@ export const STEPS = [
     title: "Conquiste e risque, item por item",
     text: "Marque cada peça como comprei, ganhei ou já tenho. Preço, link e observações ficam no próprio item, sempre à mão.",
     bullets: [
-      "Comprei, ganhei ou já tenho: cada conquista conta",
+      "Comprados, recebidos ou já em casa: cada conquista conta",
       "Anote preço, link da loja e observações",
       "Importe ou exporte tudo em planilha",
     ],

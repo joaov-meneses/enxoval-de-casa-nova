@@ -32,7 +32,7 @@ async function workspace(page: Page) {
       categoryId: "bedroom",
       category: "Quarto",
       checked: false,
-      status: "needed",
+      status: "researching",
       link: "",
       description: "",
       priceCents: null,

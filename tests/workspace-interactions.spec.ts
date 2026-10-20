@@ -36,7 +36,7 @@ async function workspace(page: Page, longEnvironment = false) {
     categoryId: "bath",
     category: "Banheiro",
     checked: false,
-    status: "needed",
+    status: "researching",
     link: "",
     description: "Jogo de toalhas",
     priceCents: 20000,
@@ -99,7 +99,7 @@ async function workspace(page: Page, longEnvironment = false) {
       const status =
         updates.status ??
         (updates.checked === false
-          ? "needed"
+          ? "researching"
           : updates.checked === true
             ? "bought"
             : item.status);
@@ -186,7 +186,7 @@ for (const width of [
         exact: true,
       });
       await expect(row).not.toHaveClass(/is-completing/);
-      await dialog.getByRole("radio", { name: /^Comprei/ }).click();
+      await dialog.getByRole("radio", { name: /^Comprado/ }).click();
       await dialog.getByRole("button", { name: "Confirmar situação" }).click();
       await expect(row).toHaveClass(/is-completing/);
       await expect(row).toHaveCSS("animation-name", "item-confirmation");
@@ -365,7 +365,7 @@ for (const width of [375, 1440]) {
       name: "Como você conseguiu?",
       exact: true,
     });
-    await dialog.getByRole("radio", { name: /^Ganhei/ }).click();
+    await dialog.getByRole("radio", { name: /^Recebido/ }).click();
     state.fail = true;
     await dialog.getByRole("button", { name: "Confirmar situação" }).click();
     await expect(dialog.getByRole("alert")).toBeVisible();

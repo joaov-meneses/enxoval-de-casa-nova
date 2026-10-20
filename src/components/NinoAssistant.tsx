@@ -4,7 +4,7 @@ import { useId, useMemo, useState } from "react";
 import { AlertCircle, ListOrdered, Plus, Sparkles } from "@/src/components/icons";
 import { prioritizeEnvironment, recommendNextItem } from "../api";
 import { useJevEnabled } from "../hooks/useJevEnabled";
-import { isDoneStatus, isInactiveStatus } from "../itemStatus";
+import { isDoneStatus } from "../itemStatus";
 import { URGENCY_LEVELS, urgencyLabel } from "../planning/purchaseUrgency";
 import type {
   EnxovalCategory,
@@ -84,14 +84,14 @@ export function NinoAssistant({
 
   const pendingOf = (id: string) =>
     items.filter(
-      (item) => item.categoryId === id && !isDoneStatus(item.status) && !isInactiveStatus(item.status),
+      (item) => item.categoryId === id && !isDoneStatus(item.status),
     );
 
   const shownCategory = categories.find((category) => category.id === shownId);
   const shownPending = useMemo(
     () =>
       items.filter(
-        (item) => item.categoryId === shownId && !isDoneStatus(item.status) && !isInactiveStatus(item.status),
+        (item) => item.categoryId === shownId && !isDoneStatus(item.status),
       ),
     [items, shownId],
   );

@@ -51,7 +51,7 @@ function popular(enxovalId) {
     )
     UPDATE items SET
       checked = alvo.feito,
-      status = CASE WHEN NOT alvo.feito THEN 'needed' WHEN alvo.rn % 5 = 0 THEN 'owned' WHEN alvo.rn % 3 = 0 THEN 'received' ELSE 'bought' END,
+      status = CASE WHEN NOT alvo.feito THEN 'researching' WHEN alvo.rn % 5 = 0 THEN 'owned' WHEN alvo.rn % 3 = 0 THEN 'received' ELSE 'bought' END,
       price_cents = CASE WHEN alvo.com_preco AND NOT (alvo.feito AND (alvo.rn % 5 = 0 OR alvo.rn % 3 = 0))
         THEN (1990 + (alvo.rn * 7919) % 28000) / 100 * 100 + 90 END
     FROM alvo WHERE items.id = alvo.id`);

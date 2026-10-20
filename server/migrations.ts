@@ -294,8 +294,15 @@ export async function migrateDatabase() {
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_cents integer;
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_price_cents_non_negative;
     ALTER TABLE items ADD CONSTRAINT items_price_cents_non_negative CHECK (price_cents IS NULL OR price_cents >= 0);
-    ALTER TABLE items ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'needed';
-    UPDATE items SET status = 'bought' WHERE checked AND status = 'needed';
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'researching';
+    ALTER TABLE items ALTER COLUMN status SET DEFAULT 'researching';
+    UPDATE items SET status = CASE WHEN checked THEN 'bought' ELSE 'researching' END
+      WHERE status = 'needed';
+    UPDATE items SET status = 'researching', checked = false
+      WHERE status IN ('not_needed', 'discarded');
+    UPDATE items SET status = 'bought' WHERE checked AND status = 'researching';
+    UPDATE items SET checked = (status IN ('bought', 'received', 'owned'))
+      WHERE checked IS DISTINCT FROM (status IN ('bought', 'received', 'owned'));
     ALTER TABLE items ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0;
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_discount_cents_non_negative;
     ALTER TABLE items ADD CONSTRAINT items_discount_cents_non_negative CHECK (discount_cents >= 0);
@@ -315,7 +322,7 @@ export async function migrateDatabase() {
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_quantity_valid;
     ALTER TABLE items ADD CONSTRAINT items_quantity_valid CHECK (quantity >= 1 AND quantity <= 999);
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_status_valid;
-    ALTER TABLE items ADD CONSTRAINT items_status_valid CHECK (status IN ('needed', 'researching', 'bought', 'received', 'owned', 'not_needed', 'discarded'));
+    ALTER TABLE items ADD CONSTRAINT items_status_valid CHECK (status IN ('researching', 'bought', 'received', 'owned'));
 
     -- Planejamento de compras: data da mudança, localização e perfil de gasto passam a ser do enxoval.
     DO $$

@@ -23,7 +23,6 @@ import {
 } from "./spending";
 import {
   isDoneStatus,
-  isInactiveStatus,
   netPriceCents,
   type ItemStatus,
 } from "../itemStatus";
@@ -381,7 +380,6 @@ export function planPurchases(
   const addLoad = (week: number, cents: number) => load.set(week, (load.get(week) ?? 0) + cents);
 
   items.forEach((item, order) => {
-    if (isInactiveStatus(item.status)) return;
     const meta = itemMeta(item);
     const cost = referenceMidCents(item, tier, meta);
 
@@ -434,7 +432,7 @@ export function planPurchases(
 
 /** Itens que custam dinheiro de verdade: o que foi ganho ou já existe em casa não entra nas contas. */
 function costsMoney(status: ItemStatus) {
-  return status === "needed" || status === "researching" || status === "bought";
+  return status === "researching" || status === "bought";
 }
 
 export type Verdict = "empty" | "no_prices" | "below" | "within" | "above";

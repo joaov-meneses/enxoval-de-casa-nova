@@ -13,6 +13,7 @@ import {
   currentWeek,
   tierTotals,
 } from '../src/planning/purchasePlan.ts';
+import { normalizeItemStatus } from '../src/itemStatus.ts';
 import { bandFor, suggestSpendingTier } from '../src/planning/spending.ts';
 import { emptyAnswers, generatePlan, toPayload } from '../src/onboarding/plan.ts';
 import { citiesOfState, cityMatchesState } from '../src/onboarding/regions.ts';
@@ -22,7 +23,7 @@ const item = (name, category, extra = {}) => ({
   id: `i${++seq}`,
   name,
   category,
-  status: 'needed',
+  status: 'researching',
   priceCents: null,
   discountCents: 0,
   ...extra,
@@ -72,9 +73,11 @@ test('a semana escolhida pela pessoa vale mais que a sugestão', () => {
   assert.equal(placement.source, 'manual');
 });
 
-test('itens fora da lista não ganham semana', () => {
-  const naoPreciso = item('Geladeira', 'Eletrodomésticos', { status: 'not_needed' });
-  assert.equal(planPurchases([naoPreciso], 'equilibrado').has(naoPreciso.id), false);
+test('itens com situações removidas voltam a receber uma semana de compra', () => {
+  for (const status of ['needed', 'not_needed', 'discarded']) {
+    const migrated = item('Geladeira', 'Eletrodomésticos', { status: normalizeItemStatus({ status, checked: false }) });
+    assert.equal(planPurchases([migrated], 'equilibrado').has(migrated.id), true);
+  }
 });
 
 test('os opcionais são distribuídos em vez de caírem todos na mesma semana', () => {

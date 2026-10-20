@@ -109,7 +109,7 @@ test("ambiente do enxoval para um cômodo do catálogo", () => {
 
 test("faixa real de preço substitui a de referência, conforme o perfil de gasto", () => {
   const priceRange = { p10: 100_000, p50: 150_000, p90: 250_000, samples: 12, region: "" };
-  const item = { id: "g", name: "Geladeira", category: "Cozinha", status: "needed", priceCents: null, discountCents: 0, catalog: { priceCategory: 4, priority: "essential", timing: null, leadTimeWeeks: 2, priceRange } };
+  const item = { id: "g", name: "Geladeira", category: "Cozinha", status: "researching", priceCents: null, discountCents: 0, catalog: { priceCategory: 4, priority: "essential", timing: null, leadTimeWeeks: 2, priceRange } };
   assert.deepEqual(itemBand(item, "economico"), { band: { minCents: 100_000, maxCents: 150_000 }, source: "real" });
   assert.deepEqual(itemBand(item, "equilibrado"), { band: { minCents: 100_000, maxCents: 250_000 }, source: "real" });
   assert.deepEqual(itemBand(item, "confortavel"), { band: { minCents: 150_000, maxCents: 250_000 }, source: "real" });
@@ -135,7 +135,7 @@ test("e-mail de preço abaixo do comum", () => {
 });
 
 test("planejamento usa o catálogo mestre e antecipa a compra pelo prazo de entrega", () => {
-  const base = { status: "needed", priceCents: null, discountCents: 0, category: "Quarto" };
+  const base = { status: "researching", priceCents: null, discountCents: 0, category: "Quarto" };
   const plan = planPurchases(
     [
       // Sem catálogo: primeira noite, uma semana antes.

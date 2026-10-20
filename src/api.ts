@@ -19,7 +19,7 @@ import type {
   NextItemRecommendation,
   ScrapedProductPreview,
 } from "./types";
-import { isItemStatus, normalizeItemStatus } from "./itemStatus";
+import { isDoneStatus, isItemStatus, normalizeItemStatus } from "./itemStatus";
 import { SESSION_AUTHENTICATED_EVENT, SESSION_EXPIRED_EVENT } from './sessionActivity';
 import * as analytics from './analytics';
 import { recordApiSuccess } from './analytics/apiEvents';
@@ -63,8 +63,10 @@ function withItemStatus(data: unknown): unknown {
       typeof obj.checked === "boolean" &&
       "categoryId" in obj &&
       !isItemStatus(obj.status)
-    )
-      return { ...obj, status: normalizeItemStatus(obj) };
+    ) {
+      const status = normalizeItemStatus(obj);
+      return { ...obj, status, checked: isDoneStatus(status) };
+    }
     return Object.fromEntries(
       Object.entries(obj).map(([key, value]) => [key, withItemStatus(value)]),
     );

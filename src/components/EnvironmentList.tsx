@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import { Pencil, Trash2 } from "@/src/components/icons";
 import type { EnxovalCategory, EnxovalItem } from "../types";
-import { isInactiveStatus } from "../itemStatus";
 import { SortableList } from "./SortableList";
 import { RoomIcon } from "./WorkspaceOverview";
 
@@ -74,8 +73,7 @@ export function EnvironmentList({
                 {
                   items.filter(
                     (item) =>
-                      item.categoryId === category.id &&
-                      !isInactiveStatus(item.status),
+                      item.categoryId === category.id,
                   ).length
                 }
               </small>

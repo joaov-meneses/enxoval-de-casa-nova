@@ -42,7 +42,7 @@ async function planning(page: Page) {
   ].map((item) => ({
     ...item,
     checked: false,
-    status: "needed",
+    status: "researching",
     link: "",
     description: "",
     priceCents: null,

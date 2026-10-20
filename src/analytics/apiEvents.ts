@@ -1,5 +1,5 @@
 import type { AuthUser } from '../types';
-import { isItemStatus } from '../itemStatus';
+import { DEFAULT_ITEM_STATUS, isItemStatus } from '../itemStatus';
 import type { AnalyticsEvent, AnalyticsProperties } from './events';
 
 export interface AnalyticsSink {
@@ -22,11 +22,11 @@ export function recordApiSuccess(sink: AnalyticsSink, path: string, method: stri
   if (route === '/api/enxovais' && method === 'POST') capture('workspace_created', { template: input.useDefaultTemplate === true });
   if (route === '/api/categories' && method === 'POST') capture('environment_created');
   if (route === '/api/items' && method === 'POST') {
-    capture('item_created', { source: input.placement === 'end' ? 'spreadsheet' : input.link ? 'link' : 'manual', status: isItemStatus(data.item?.status) ? data.item.status : 'needed' });
+    capture('item_created', { source: input.placement === 'end' ? 'spreadsheet' : input.link ? 'link' : 'manual', status: isItemStatus(data.item?.status) ? data.item.status : DEFAULT_ITEM_STATUS });
   }
   if (/^\/api\/items\/[^/]+$/.test(route) && method === 'PATCH') {
     if (isItemStatus(input.status) || typeof input.checked === 'boolean') {
-      const status = isItemStatus(input.status) ? input.status : input.checked ? 'bought' : 'needed';
+      const status = isItemStatus(input.status) ? input.status : input.checked ? 'bought' : DEFAULT_ITEM_STATUS;
       capture('item_status_changed', { status });
       if (status === 'bought') capture('item_purchase_recorded');
     }

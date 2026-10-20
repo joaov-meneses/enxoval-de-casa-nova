@@ -56,7 +56,7 @@ try {
       if (path === '/api/auth/register') return route.fulfill({ json: { user: { id: 'test-user', name: 'PRIVATE_NAME', email: 'PRIVATE_EMAIL' } } });
       if (path === '/api/billing/sync') return route.fulfill({ json: { accessAllowed: true, plan: 'monthly', status: 'trialing' } });
       if (path === '/api/items' && failItemRequest) return route.fulfill({ status: 503, json: { error: 'PRIVATE_SERVER_MESSAGE' } });
-      if (path.startsWith('/api/items')) return route.fulfill({ json: path === '/api/items' ? { item: { status: 'needed' } } : { status: 'bought' } });
+      if (path.startsWith('/api/items')) return route.fulfill({ json: path === '/api/items' ? { item: { status: 'researching' } } : { status: 'bought' } });
       return route.fulfill({ status: 401, json: { error: 'Unauthenticated' } });
     }
     if (request.url().startsWith(origin)) return route.continue();

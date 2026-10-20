@@ -35,7 +35,6 @@ import { ImportItemsButton } from "./ImportItemsDialog";
 import {
   activeItems,
   doneItems,
-  isInactiveStatus,
   isPendingStatus,
   ITEM_STATUSES,
   ITEM_STATUS_META,
@@ -519,22 +518,13 @@ export function WorkspaceOverview({
                   <span>Pendentes</span>
                   <b>{pending.length}</b>
                 </li>
-                {statsItems.length > statsActive.length && (
-                  <li>
-                    <i className="stat-dot stat-dot-out" aria-hidden="true" />
-                    <span>Fora da lista</span>
-                    <b>{statsItems.length - statsActive.length}</b>
-                  </li>
-                )}
               </>
             ) : (
               statusRows.map(({ status, count }) => (
                 <li key={status}>
                   <i
                     className={`stat-dot ${
-                      isInactiveStatus(status)
-                        ? "stat-dot-out"
-                        : isPendingStatus(status)
+                      isPendingStatus(status)
                           ? "stat-dot-todo"
                           : "stat-dot-done"
                     }`}
@@ -701,7 +691,7 @@ export function WorkspaceOverview({
             </>
           ) : (
             <span className="stat-detail">
-              Marque itens como Ganhei ou registre descontos para ver o quanto
+              Marque itens como Recebido ou registre descontos para ver o quanto
               você economizou.
             </span>
           )}

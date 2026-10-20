@@ -110,6 +110,7 @@ import {
   doneItems,
   isItemStatus,
   isPendingStatus,
+  DEFAULT_ITEM_STATUS,
   ITEM_STATUSES,
   ITEM_STATUS_META,
   sumBought,
@@ -1153,7 +1154,7 @@ export default function App() {
       discountCents: 0,
       link: "",
       description: "",
-      status: "needed",
+      status: DEFAULT_ITEM_STATUS,
     },
   ) => {
     if (!activeEnxoval)
@@ -2327,11 +2328,6 @@ export default function App() {
                 onPointerMove={handleCategoryListPointerMove}
                 onPointerUp={handleCategoryListPointerEnd}
                 onPointerCancel={handleCategoryListPointerCancel}
-                className={
-                  canSwipeCategories
-                    ? "cursor-grab active:cursor-grabbing"
-                    : undefined
-                }
                 style={{
                   touchAction: canSwipeCategories ? "pan-y" : undefined,
                 }}

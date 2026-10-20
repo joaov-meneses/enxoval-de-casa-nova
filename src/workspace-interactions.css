@@ -557,6 +557,18 @@
 .workspace-app .item-row > .item-row-inner {
   cursor: pointer;
 }
+.workspace-app .item-row > .item-row-inner:has(.item-title-button:focus-visible) {
+  outline: none;
+}
+.workspace-app .item-row .item-title-button:focus-visible {
+  outline: 2px solid var(--cm-action);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.workspace-app .item-row[data-pointer-focus="true"] .item-title-button:focus {
+  outline: none;
+  box-shadow: none;
+}
 .item-chalk-stroke {
   position: absolute;
   inset: 2px;
@@ -663,6 +675,11 @@
 .workspace-app .item-row .item-quantity-tag,
 .workspace-app .item-row .item-meta-price,
 .workspace-app .item-row .item-price {
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  font-size: 12px;
   background: #fffdf8;
   border: 1px solid #cbb396;
   border-radius: 6px;
@@ -674,7 +691,14 @@
 }
 .workspace-app .item-row .item-status-tag,
 .workspace-app .item-row .item-status {
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
   border: 1px solid color-mix(in srgb, currentColor 40%, white);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
 }

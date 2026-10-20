@@ -1,39 +1,31 @@
 export const ITEM_STATUSES = [
-  "needed",
   "researching",
   "bought",
   "received",
   "owned",
-  "not_needed",
-  "discarded",
 ] as const;
 
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
 
-/** pending: ainda falta resolver · done: conquistado · inactive: fora da lista e dos cálculos. */
-export type ItemStatusGroup = "pending" | "done" | "inactive";
+/** pending: em pesquisa · done: comprado, recebido ou já existente. */
+export type ItemStatusGroup = "pending" | "done";
 
 export const ITEM_STATUS_META: Record<
   ItemStatus,
   { label: string; hint: string; group: ItemStatusGroup }
 > = {
-  needed: {
-    label: "Preciso comprar",
-    hint: "Está na lista e ainda falta comprar.",
-    group: "pending",
-  },
   researching: {
     label: "Pesquisando",
     hint: "Comparando preços e opções.",
     group: "pending",
   },
   bought: {
-    label: "Comprei",
+    label: "Comprado",
     hint: "Entra em Já investimos.",
     group: "done",
   },
   received: {
-    label: "Ganhei",
+    label: "Recebido",
     hint: "Presente ou ganho: entra em Descontos e cashback, não em Já investimos.",
     group: "done",
   },
@@ -42,19 +34,9 @@ export const ITEM_STATUS_META: Record<
     hint: "Já existe em casa, sem custo novo.",
     group: "done",
   },
-  not_needed: {
-    label: "Não preciso",
-    hint: "Sai dos cálculos e do progresso.",
-    group: "inactive",
-  },
-  discarded: {
-    label: "Descartei",
-    hint: "Desisti ou me desfiz do item. Sai dos cálculos.",
-    group: "inactive",
-  },
 };
 
-export const DEFAULT_ITEM_STATUS: ItemStatus = "needed";
+export const DEFAULT_ITEM_STATUS: ItemStatus = "researching";
 
 export function isItemStatus(value: unknown): value is ItemStatus {
   return (
@@ -81,14 +63,10 @@ export function isPendingStatus(status: ItemStatus) {
   return groupOf(status) === "pending";
 }
 
-export function isInactiveStatus(status: ItemStatus) {
-  return groupOf(status) === "inactive";
-}
-
 /**
  * Situação equivalente ao antigo marcador "checked":
- * marcar conserva uma situação já concluída (ou vira "Comprei");
- * desmarcar volta para "Preciso comprar" e não mexe em situações pendentes ou inativas.
+ * marcar conserva uma situação já concluída (ou vira "Comprado");
+ * desmarcar volta para "Pesquisando".
  */
 export function statusFromChecked(
   checked: boolean,
@@ -104,6 +82,7 @@ export function normalizeItemStatus(item: {
   checked?: unknown;
 }): ItemStatus {
   if (isItemStatus(item.status)) return item.status;
+  if (item.status === "not_needed" || item.status === "discarded") return DEFAULT_ITEM_STATUS;
   return item.checked ? "bought" : DEFAULT_ITEM_STATUS;
 }
 
@@ -122,7 +101,7 @@ export function itemPriceCents(item: StatusItem) {
 
 /** O desconto/cashback do item só faz sentido enquanto há compra a fazer ou feita. */
 export function discountApplies(status: ItemStatus) {
-  return status === "needed" || status === "researching" || status === "bought";
+  return status === "researching" || status === "bought";
 }
 
 /** Desconto/cashback informado no item, limitado ao preço e ignorado nas situações sem compra. */
@@ -146,7 +125,7 @@ export function netPriceCents(item: StatusItem) {
 
 /**
  * Valida o desconto de um item e devolve o valor a gravar.
- * Situações sem compra (Ganhei, Já tenho, Não preciso, Descartei) sempre gravam 0.
+ * Situações sem compra (Recebido e Já tenho) sempre gravam 0.
  */
 export function resolveDiscountCents(input: {
   status: ItemStatus;
@@ -167,9 +146,9 @@ export function resolveDiscountCents(input: {
   return { value: raw };
 }
 
-/** Itens que contam para progresso e totais (exclui "Não preciso" e "Descartei"). */
+/** Todos os itens das quatro situações contam para progresso e totais. */
 export function activeItems<T extends StatusItem>(items: T[]) {
-  return items.filter((item) => !isInactiveStatus(item.status));
+  return [...items];
 }
 
 export function doneItems<T extends StatusItem>(items: T[]) {

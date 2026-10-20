@@ -4,25 +4,25 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Gift, House, LoaderCircle, ShoppingBag } from "@/src/components/icons";
 import { Dialog } from "./Dialog";
-import type { ItemStatus } from "../itemStatus";
+import { ITEM_STATUS_META, type ItemStatus } from "../itemStatus";
 import "./itemCompletion.css";
 
 const choices = [
   {
     value: "bought",
-    label: "Comprei",
+    label: ITEM_STATUS_META.bought.label,
     hint: "Uma nova compra para a casa. O valor entra em Já investimos.",
     Icon: ShoppingBag,
   },
   {
     value: "received",
-    label: "Ganhei",
+    label: ITEM_STATUS_META.received.label,
     hint: "Um presente que você recebeu, sem custo de compra.",
     Icon: Gift,
   },
   {
     value: "owned",
-    label: "Já tenho",
+    label: ITEM_STATUS_META.owned.label,
     hint: "Você já tinha este item e vai usá-lo na casa.",
     Icon: House,
   },

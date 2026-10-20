@@ -51,7 +51,7 @@ async function dueProducts(limit: number, force: boolean) {
     FROM tracked_products tp
     WHERE EXISTS (
         SELECT 1 FROM items i
-        WHERE i.tracked_product_id = tp.id AND i.status IN ('needed', 'researching')
+        WHERE i.tracked_product_id = tp.id AND i.status = 'researching'
       )
       AND ($2::boolean OR tp.last_scraped_at IS NULL OR tp.last_scraped_at < now() - interval '12 hours')
     ORDER BY tp.last_scraped_at ASC NULLS FIRST
@@ -101,7 +101,7 @@ async function alertCandidates(productId: string) {
     ) cps ON true
     WHERE i.tracked_product_id = $1
       AND i.price_alert_enabled
-      AND i.status IN ('needed', 'researching')
+      AND i.status = 'researching'
   `, [productId]);
   return result.rows;
 }

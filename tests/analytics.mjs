@@ -18,7 +18,7 @@ function sink() {
 }
 
 test('event schemas strip personal data and unknown properties', () => {
-  assert.deepEqual(allowedProperties('item_created', { source: 'manual', status: 'needed', name: 'Private', email: 'secret@example.com', price: 100 }), { source: 'manual', status: 'needed' });
+  assert.deepEqual(allowedProperties('item_created', { source: 'manual', status: 'researching', name: 'Private', email: 'secret@example.com', price: 100 }), { source: 'manual', status: 'researching' });
   assert.deepEqual(allowedProperties('plan_ready', { items: Infinity, rooms: 2 }), { rooms: 2 });
   assert.equal(safeRoute('/reset/secret'), '/other');
   assert.equal(safeRoute('/app'), '/app');

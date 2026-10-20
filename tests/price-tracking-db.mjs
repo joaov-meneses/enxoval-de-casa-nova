@@ -188,8 +188,8 @@ try {
   await call(`/items/${item.id}`, "PATCH", { status: "bought" });
   await call(`/items/${second.data.item.id}`, "PATCH", { status: "bought" });
   assert.equal((await runPriceTracker({ force: true, sleep: noSleep, scrape })).checked, 0, "itens comprados deixam de ser acompanhados");
-  await call(`/items/${item.id}`, "PATCH", { status: "needed" });
-  await call(`/items/${second.data.item.id}`, "PATCH", { status: "needed" });
+  await call(`/items/${item.id}`, "PATCH", { status: "researching" });
+  await call(`/items/${second.data.item.id}`, "PATCH", { status: "researching" });
 
   // --- histórico e resumo de economia
   const history = await call(`/items/${item.id}/price-history`);

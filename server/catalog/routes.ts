@@ -139,8 +139,8 @@ export function registerCatalogRoutes(router: Router, deps: { requireUser: (req:
       ),
       getPool().query<{ unlinked: number; linked: number; without_urgency: number; aliases: number; price_ranges: number }>(
         `SELECT
-           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NULL AND status NOT IN ('not_needed', 'discarded')) AS unlinked,
-           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NOT NULL AND status NOT IN ('not_needed', 'discarded')) AS linked,
+           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NULL) AS unlinked,
+           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NOT NULL) AS linked,
            (SELECT COUNT(*)::int FROM catalog_items ci WHERE NOT EXISTS (
               SELECT 1 FROM catalog_item_urgency u WHERE u.item_id = ci.id AND u.rubric_version = $1)) AS without_urgency,
            (SELECT COUNT(*)::int FROM catalog_item_aliases) AS aliases,

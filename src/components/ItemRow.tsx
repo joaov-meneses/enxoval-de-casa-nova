@@ -40,7 +40,6 @@ import { priceChange } from "../priceTracking";
 import { PriceHistoryDialog } from "./PriceHistoryDialog";
 import {
   discountApplies,
-  isInactiveStatus,
   ITEM_STATUSES,
   ITEM_STATUS_META,
   netPriceCents,
@@ -138,7 +137,7 @@ export function ItemRow({
   const [alertEnabled, setAlertEnabled] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [completionOpen, setCompletionOpen] = useState(false);
-  const [checkPointerFocus, setCheckPointerFocus] = useState(false);
+  const [pointerFocus, setPointerFocus] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const id = useId();
@@ -309,10 +308,11 @@ export function ItemRow({
   return (
     <div
       data-item-id={item.id}
-      onPointerDownCapture={() => setCheckPointerFocus(true)}
-      onKeyDownCapture={() => setCheckPointerFocus(false)}
+      data-pointer-focus={pointerFocus || undefined}
+      onPointerDownCapture={() => setPointerFocus(true)}
+      onKeyDownCapture={() => setPointerFocus(false)}
 
-      className={`item-row ${item.checked ? "checked" : ""} ${isInactiveStatus(item.status) ? "inactive" : ""} ${expanded ? "expanded" : ""} ${completing ? "is-completing" : ""}`}
+      className={`item-row ${item.checked ? "checked" : ""} ${expanded ? "expanded" : ""} ${completing ? "is-completing" : ""}`}
     >
       {completing && <ItemChalkStroke />}
       <div className="item-row-inner">
@@ -322,8 +322,8 @@ export function ItemRow({
           aria-label={`${item.checked ? "Desmarcar" : "Marcar como conquistado"}: ${item.name}`}
           aria-haspopup={item.checked ? undefined : 'dialog'}
           className="item-check"
-          data-pointer-focus={checkPointerFocus || undefined}
-          onBlur={() => setCheckPointerFocus(false)}
+          data-pointer-focus={pointerFocus || undefined}
+          onBlur={() => setPointerFocus(false)}
           disabled={busy}
           onClick={() => {
             if (!item.checked) { setCompletionOpen(true); return; }
@@ -338,6 +338,7 @@ export function ItemRow({
           <Button variant="brand" size="brand"
             type="button"
             className="item-title-button"
+            onBlur={() => setPointerFocus(false)}
             aria-expanded={expanded}
             aria-controls={`${id}-details`}
             onClick={toggle}
@@ -359,7 +360,7 @@ export function ItemRow({
             {quantity > 1 && (
               <span className="item-quantity-tag">{quantity} un.</span>
             )}
-            {buyPlan && !item.checked && !isInactiveStatus(item.status) && (
+            {buyPlan && !item.checked && (
               <span
                 className={`item-week-tag${buyPlan.overdue ? " is-late" : ""}${buyPlan.manual ? " is-manual" : ""}`}
                 title={buyPlan.reason}

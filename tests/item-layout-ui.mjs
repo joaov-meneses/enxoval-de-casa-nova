@@ -10,7 +10,7 @@ try {
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
     const home={id:'home',name:'Nossa casa nova',ownerId:'owner',ownerName:'Ana',role:'owner',discountCents:0,moveDate:'2027-01-01',state:'BA',city:'salvador',spendingTier:'equilibrado'};
     const categories=[{id:'bedroom',name:'Quarto',sortOrder:0},{id:'bath',name:'Banheiro',sortOrder:1}];
-    let items=['Cama (estrutura ou box)','Cestos organizadores'].map((name,index)=>({id:`item-${index}`,name,categoryId:'bedroom',category:'Quarto',checked:false,status:'needed',link:'',description:'Essencial',priceCents:null,quantity:1,discountCents:0,sortOrder:index,buyWeek:-4,priceCategory:null,priority:null,timing:null,updatedAt:'2026-10-18T12:00:00Z',createdAt:'2026-10-18T12:00:00Z',imageUrl:index?'/fixture.png':null,priceTracking:null}));
+    let items=['Cama (estrutura ou box)','Cestos organizadores'].map((name,index)=>({id:`item-${index}`,name,categoryId:'bedroom',category:'Quarto',checked:false,status:'researching',link:'',description:'Essencial',priceCents:null,quantity:1,discountCents:0,sortOrder:index,buyWeek:-4,priceCategory:null,priority:null,timing:null,updatedAt:'2026-10-18T12:00:00Z',createdAt:'2026-10-18T12:00:00Z',imageUrl:index?'/fixture.png':null,priceTracking:null}));
     let reordered=0;
     await page.route('**/fixture.png',route=>route.fulfill({contentType:'image/png',body:png}));
     await page.route('**/api/**',route=>{

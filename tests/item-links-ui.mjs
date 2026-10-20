@@ -10,7 +10,7 @@ try {
     page.setDefaultTimeout(10000);
     const errors=[]; page.on('pageerror',error=>{errors.push(error.message);console.error('PAGE ERROR',error.message);});
     const home={id:'home',name:'Nossa casa nova',ownerId:'owner',ownerName:'Ana',role:'owner',discountCents:0,moveDate:'2027-01-01',state:'BA',city:'salvador',spendingTier:'equilibrado'};
-    let item={id:'basket',name:'Cestos organizadores',categoryId:'bath',category:'Banheiro',checked:false,status:'needed',link:'',description:'Opcional',priceCents:null,quantity:1,discountCents:0,sortOrder:0,buyWeek:null,priceCategory:null,priority:null,timing:null,updatedAt:'2026-10-18T12:00:00Z',createdAt:'2026-10-18T12:00:00Z',imageUrl:'/fixture.png',priceTracking:null};
+    let item={id:'basket',name:'Cestos organizadores',categoryId:'bath',category:'Banheiro',checked:false,status:'researching',link:'',description:'Opcional',priceCents:null,quantity:1,discountCents:0,sortOrder:0,buyWeek:null,priceCategory:null,priority:null,timing:null,updatedAt:'2026-10-18T12:00:00Z',createdAt:'2026-10-18T12:00:00Z',imageUrl:'/fixture.png',priceTracking:null};
     let extractCount=0; let imageImports=0; let saved;
     let previewMode='normal';
     let releaseSlow; let markSlowStarted;

@@ -2364,13 +2364,13 @@ button.reorder-handle {
   flex-shrink: 0;
   border-radius: 8px;
   color: #79685c;
-  cursor: grab;
+  cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   background: transparent;
 }
 button.reorder-handle:active {
-  cursor: grabbing;
+  cursor: pointer;
   background: #f1e8db;
 }
 /* Anel de foco por dentro do botão: o global (3px, offset 4px) estoura e é cortado pela barra lateral. */
@@ -2757,7 +2757,7 @@ button.reorder-handle:disabled {
   cursor: pointer;
 }
 .item-row-inner > .reorder-handle {
-  cursor: grab;
+  cursor: pointer;
 }
 .item-actions button:last-child:hover {
   color: #615349;
@@ -3144,13 +3144,6 @@ button.reorder-handle:disabled {
 .item-status-tag.status-owned {
   background: #f3ebe0;
   color: #59613e;
-}
-.item-status.status-not_needed,
-.item-status-tag.status-not_needed,
-.item-status.status-discarded,
-.item-status-tag.status-discarded {
-  background: #f8f1e6;
-  color: #6c5e55;
 }
 .item-row.inactive .item-name,
 .item-row.inactive .item-price {
