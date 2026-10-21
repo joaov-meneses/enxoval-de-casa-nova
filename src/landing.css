@@ -1381,3 +1381,148 @@ html {
   .cm-header .cm-menu-toggle { flex: 0 0 44px; width: 44px; height: 44px; }
   .cm-header .cm-nav { padding-inline: 10px; }
 }
+
+/* Progresso por cômodo logo abaixo do hero */
+.cm-rooms-strip {
+  padding-block: clamp(40px, 6vw, 72px) 0;
+}
+.cm-rooms-progress {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.cm-rooms-progress li {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 18px;
+  background: var(--cm-card);
+  border: 1px solid var(--cm-line);
+  border-radius: 22px;
+}
+.cm-rooms-progress li > div {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.cm-rooms-progress .cm-card-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  border-radius: 14px;
+}
+.cm-rooms-progress small {
+  font-size: 13px;
+  color: var(--cm-muted);
+}
+.cm-progress-bar {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  background: var(--cm-sand);
+  border-radius: 999px;
+}
+.cm-progress-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--cm-primary-dark);
+  border-radius: inherit;
+  transform-origin: left;
+  animation: cm-bar-grow 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.cm-rooms-progress .is-complete .cm-progress-bar > span {
+  background: #5c6643;
+}
+@keyframes cm-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Da bagunça à calma */
+.cm-calm-list {
+  display: grid;
+  gap: 14px;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.cm-calm-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+@media (min-width: 700px) {
+  .cm-calm-list li {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+.cm-calm-list p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 16px 20px;
+  font-size: 16px;
+  line-height: 1.5;
+  border-radius: 18px;
+}
+.cm-calm-list span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.cm-calm-before {
+  color: var(--cm-muted);
+  background: var(--cm-sand);
+}
+.cm-calm-after {
+  color: var(--cm-text);
+  background: var(--cm-card);
+  border: 1px solid var(--cm-line);
+}
+.cm-calm-after span {
+  color: #5c6643;
+}
+
+/* Exemplo de sugestões do Nino */
+.cm-nino-demo {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 22px;
+}
+.cm-nino-suggestion {
+  display: grid;
+  gap: 2px;
+  padding: 14px 18px;
+  background: var(--cm-card);
+  border: 1px solid var(--cm-line);
+  border-radius: 18px;
+}
+.cm-nino-suggestion small {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cm-primary-dark);
+}
+.cm-nino-suggestion span {
+  font-size: 14px;
+  color: var(--cm-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-progress-bar > span {
+    animation: none;
+  }
+}

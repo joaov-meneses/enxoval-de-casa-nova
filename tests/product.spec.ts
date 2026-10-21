@@ -33,7 +33,7 @@ test("landing navigation, FAQ and entry routes work", async ({ page }) => {
     .click();
   await expect(page.locator("#planos")).toBeInViewport();
   const question = page.getByRole("button", {
-    name: "Os planos já estão disponíveis para compra?",
+    name: "Já posso assinar um plano?",
   });
   await question.click();
   await expect(question).toHaveAttribute("aria-expanded", "true");

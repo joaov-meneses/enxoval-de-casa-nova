@@ -56,8 +56,8 @@ const FAQS = [
     "Sim. O Casa Mia se ajusta à tela e fica à mão na loja ou no sofá. No celular, você ainda pode adicionar um atalho à tela inicial pelo navegador.",
   ],
   [
-    "Os planos já estão disponíveis para compra?",
-    "O teste completo dura 2 dias, com cartão cadastrado. Depois das 48 horas, a assinatura mensal é cobrada automaticamente. Você pode cancelar no app antes do fim para evitar a cobrança.",
+    "Já posso assinar um plano?",
+    "Sim. O teste completo dura 2 dias, com cartão cadastrado. Depois das 48 horas, a assinatura mensal é cobrada automaticamente; se preferir, escolha o Passe da Casa Nova, com pagamento único e sem renovação. Você pode cancelar no app antes do fim do teste para evitar a cobrança.",
   ],
 ];
 
@@ -139,6 +139,68 @@ const PLANS: Plan[] = PAID_PLAN_OFFERS.map((offer) => ({
   cta: offer.id === "pass" ? "Escolher o Passe" : "Começar teste de 2 dias",
   features: PAID_FEATURES,
 }));
+
+const HERO_BENEFITS = [
+  "Primeiro Dia primeiro",
+  "Quantidades na medida da casa",
+  "Aviso de itens repetidos",
+];
+
+/** Exemplo ilustrativo do progresso por cômodo (não são dados de ninguém). */
+const ROOM_PROGRESS = [
+  { icon: Coffee, name: "Cozinha", done: 9, total: 14 },
+  { icon: BedDouble, name: "Quarto", done: 6, total: 8 },
+  { icon: Bath, name: "Banheiro", done: 7, total: 7 },
+  { icon: Sofa, name: "Sala", done: 2, total: 9 },
+  { icon: WashingMachine, name: "Lavanderia", done: 1, total: 6 },
+];
+
+/** Dores das personas do manual de marca, lado a lado com o que o Casa Mia faz. */
+const CALM_PAIRS = [
+  ["Esquecer o abridor de lata e só perceber na hora de usar", "O essencial do Primeiro Dia vem no começo da lista"],
+  ["Comprar em dobro por insegurança", "Aviso gentil quando um item pode ser repetido"],
+  ["Planilha que ninguém mais atualiza", "Uma lista só, que você e quem mora com você editam juntos"],
+  ["Presente repetido no chá de casa nova", "Convidados reservam um item e a lista mostra o que falta"],
+];
+
+const NINO_SUGGESTIONS = [
+  { label: "Próximo item da Cozinha", title: "Panela de pressão", note: "Essencial do Primeiro Dia" },
+  { label: "Um aviso amigo", title: "Torradeira", note: "Você já tem airfryer e forno elétrico. Dá para deixar para depois." },
+];
+
+/** Faixa logo abaixo do hero: o progresso de cada cômodo, no estilo do app. */
+function RoomProgress() {
+  return (
+    <section className="cm-rooms-strip cm-wrap" aria-labelledby="comodos-titulo">
+      <div className="cm-heading">
+        <span className="cm-eyebrow">Um cômodo de cada vez</span>
+        <h2 id="comodos-titulo">Cada canto da casa, com o seu próprio progresso.</h2>
+        <p>Exemplo de como a sua lista aparece no app.</p>
+      </div>
+      <ul className="cm-rooms-progress">
+        {ROOM_PROGRESS.map((room) => {
+          const complete = room.done === room.total;
+          return (
+            <li key={room.name} className={complete ? "is-complete" : undefined}>
+              <span className="cm-card-icon"><room.icon size={22} strokeWidth={1.7} aria-hidden="true" /></span>
+              <div>
+                <strong>{room.name}</strong>
+                <small>{room.done} de {room.total} itens{complete ? " · Completo" : ""}</small>
+                <span
+                  className="cm-progress-bar"
+                  role="img"
+                  aria-label={`${room.name}: ${room.done} de ${room.total} itens conquistados`}
+                >
+                  <span style={{ width: `${Math.round((room.done / room.total) * 100)}%` }} />
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 const MOCK_ITEMS = [
   { name: "Colchão", room: "Quarto", done: true },
@@ -354,9 +416,11 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
               <li>
                 <Check size={15} /> {signedIn || authLoading ? "Seu enxoval sempre à mão" : "48 horas de acesso completo"}
               </li>
-              <li>
-                <Check size={15} /> Do seu jeito, no seu tempo
-              </li>
+              {HERO_BENEFITS.map((benefit) => (
+                <li key={benefit}>
+                  <Check size={15} /> {benefit}
+                </li>
+              ))}
             </ul>
           </div>
           <div className="cm-hero-visual">
@@ -364,6 +428,8 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
             <Nino pose="wave" size={190} className="cm-hero-nino" />
           </div>
         </section>
+
+        <RoomProgress />
 
         <HowItWorks />
 
@@ -390,6 +456,15 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
                   Na área Ajuda do Nino, escolha um ambiente e peça uma sugestão.
                   Você decide o que entra na lista.
                 </p>
+              </div>
+              <div className="cm-nino-demo" aria-label="Exemplo de sugestões do Nino">
+                {NINO_SUGGESTIONS.map((suggestion) => (
+                  <div className="cm-nino-suggestion" key={suggestion.title}>
+                    <small>{suggestion.label}</small>
+                    <strong>{suggestion.title}</strong>
+                    <span>{suggestion.note}</span>
+                  </div>
+                ))}
               </div>
               <ul className="cm-checks">
                 <li>
@@ -433,10 +508,26 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
           </div>
         </section>
 
+        <section className="cm-section cm-wrap cm-calm" id="da-bagunca-a-calma">
+          <div className="cm-heading">
+            <span className="cm-eyebrow">Da bagunça à calma</span>
+            <h2>Menos susto, mais casa em ordem.</h2>
+            <p>Toda mudança tem os seus imprevistos. Veja o que muda quando a lista cuida deles com você.</p>
+          </div>
+          <ul className="cm-calm-list">
+            {CALM_PAIRS.map(([before, after]) => (
+              <li key={before}>
+                <p className="cm-calm-before"><span>Antes</span>{before}</p>
+                <p className="cm-calm-after"><span>Com o Casa Mia</span>{after}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section className="cm-section cm-wrap" id="planos">
           <div className="cm-heading">
             <span className="cm-eyebrow">Preços</span>
-            <h2>Comece de graça. Cresça quando a casa crescer.</h2>
+            <h2>Teste por 2 dias. Cresça quando a casa crescer.</h2>
             <p>Sem letras miúdas: você vê o que paga antes de escolher.</p>
           </div>
           <div className="cm-plans">
@@ -471,8 +562,8 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
             ))}
           </div>
           <p className="cm-disclaimer">
-            <ShieldCheck size={15} /> Os valores são os previstos para o
-            lançamento. Por enquanto, nenhuma cobrança é realizada.
+            <ShieldCheck size={15} /> O teste de 2 dias pede o cartão. Cancele
+            antes do fim para evitar a cobrança.
           </p>
         </section>
 
@@ -516,6 +607,7 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
         <nav className="cm-footer-links" aria-label="Rodapé">
           <a href="#como-funciona" onClick={() => trackLandingCta('view_how_it_works', 'footer')}>Como Funciona</a>
           <a href="#planos" onClick={() => trackLandingCta('view_pricing', 'footer')}>Preços</a>
+          <a href="/como-o-nino-escolhe">Como o Nino escolhe</a>
           <a href="/privacidade">Privacidade</a>
         </nav>
         <span className="cm-footer-copy">

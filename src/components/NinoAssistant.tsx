@@ -210,6 +210,11 @@ export function NinoAssistant({
             {busy === "next" ? "Pensando…" : "Pedir sugestão"}
           </Button>
         </div>
+        {busy === "next" && (
+          <p className="pp-hint" role="status">
+            O Nino está conferindo a sua casa…
+          </p>
+        )}
         {next && !recommendation && (
           <p className="pp-hint" role="status">
             {NO_SUGGESTION[next.reason ?? "none"] ?? NO_SUGGESTION.none}

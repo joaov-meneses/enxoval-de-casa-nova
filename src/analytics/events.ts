@@ -36,7 +36,7 @@ export function allowedProperties(event: AnalyticsEvent, properties: AnalyticsPr
   }));
 }
 
-export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/esqueci-senha', '/redefinir-senha'];
+export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/como-o-nino-escolhe', '/esqueci-senha', '/redefinir-senha'];
 
 export function safeRoute(pathname: string) {
   return PUBLIC_ROUTES.includes(pathname) ? pathname : '/other';

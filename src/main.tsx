@@ -5,6 +5,7 @@ import App from './App.tsx';
 import { AdminPage } from './components/AdminPage';
 import { ForgotPasswordPage } from './components/ForgotPasswordPage';
 import { InvitationPage } from './components/InvitationPage';
+import { NinoMethodPage } from './components/NinoMethodPage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { PrivacyPage } from './components/PrivacyPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
@@ -43,6 +44,8 @@ createRoot(document.getElementById('root')!, {
       <AdminPage />
     ) : window.location.pathname === '/comecar' ? (
       <OnboardingFlow />
+    ) : window.location.pathname === '/como-o-nino-escolhe' ? (
+      <NinoMethodPage />
     ) : window.location.pathname === '/privacidade' ? (
       <PrivacyPage />
     ) : window.location.pathname === '/esqueci-senha' ? (

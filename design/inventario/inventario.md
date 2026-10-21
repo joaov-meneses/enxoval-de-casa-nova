@@ -79,9 +79,9 @@ Nenhuma cor nova foi criada nesta rodada. O carrossel usa apenas `--cm-bg`, `--c
 
 | Uso | Valor no app | Valor na marca | Divergência |
 |---|---|---|---|
-| Títulos e logotipo | Fraunces com SOFT 100 (`--font-serif`) | Fraunces com SOFT 100 | nenhuma |
-| Interface e inputs | Nunito (`--font-sans`, importada em `src/index.css`) | Nunito | nenhuma. O manual pedia DM Sans; em out/2026 o estudo de tipografia manteve a Nunito e o manual foi atualizado |
-| Preços e números | Nunito, cujos algarismos já são tabulares por padrão | Nunito | nenhuma. Os valores em `T04`, `T06` e `T07` já alinham, porque a Nunito usa figuras tabulares sem precisar de `tabular-nums` |
+| Títulos e logotipo | Fraunces (`--font-serif`) | Fraunces | nenhuma |
+| Interface e inputs | **Nunito** (`--font-sans`, importada em `src/index.css`) | DM Sans | **Divergência.** O app inteiro usa Nunito; DM Sans não é carregada em lugar nenhum. A referência Enxovaly também usa Nunito. Não troquei a fonte global (fora do escopo e afeta todas as telas). O carrossel herda a fonte do app para ficar coerente |
+| Preços e números | Nunito, com figuras tabulares só em poucos pontos (`catalog-admin.css`, `onboarding.css`) | DM Sans com figuras tabulares | **Divergência.** Valores em `T04`, `T06` e `T07` não usam figuras tabulares |
 
 ### Espaçamento, raios e sombras
 
@@ -131,10 +131,10 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 
 | ID | Tela | Problema observado | Princípio ou heurística | Proposta | Status |
 |---|---|---|---|---|---|
-| P01 | Home (FAQ e preços) | A resposta "Os planos já estão disponíveis para compra? Ainda não" e o aviso de que nenhuma cobrança é realizada contradizem T13, que já vende o Passe e o plano mensal | Honestidade com o usuário | Atualizar o texto da FAQ e o aviso da seção de preços | proposta |
+| P01 | Home (FAQ e preços) | A resposta "Os planos já estão disponíveis para compra? Ainda não" e o aviso de que nenhuma cobrança é realizada contradizem T13, que já vende o Passe e o plano mensal | Honestidade com o usuário | Atualizar o texto da FAQ e o aviso da seção de preços **aplicada** (2026-10-20: FAQ e aviso de preços atualizados) |
 | P02 | Home e planos | O Chá de Casa Nova é prometido (home, FAQ, plano pago), mas não existe tela para o convidado | Não prometer o que não existe | Marcar como "em breve" ou priorizar a página pública (ver R04) | proposta |
 | P03 | App (lista e visão geral) | Vocabulário de cobrança: "Atrasado", "Mais atrasado", "Comprar" | Glossário da marca (seção 5) | Trocar pelos termos da tabela da seção 6 | proposta |
-| P04 | Todo o app | DM Sans não é usada; números sem figuras tabulares | Tipografia oficial (seção 7 da marca) | Manual atualizado para Nunito, que já tem algarismos tabulares por padrão (estudo de tipografia, out/2026) | concluída |
+| P04 | Todo o app | DM Sans não é usada; números sem figuras tabulares | Tipografia oficial (seção 7 da marca) | Decidir entre adotar DM Sans ou atualizar o manual para Nunito; aplicar `font-variant-numeric: tabular-nums` nos valores | proposta |
 | P05 | Login e cadastro | No celular a coluna com a foto some, e o carrossel some junto | Mostrar valor antes do cadastro | Avaliar uma versão compacta do carrossel abaixo do formulário no celular | proposta |
 | P06 | Home | A seção "Como funciona" e o carrossel repetem parte do conteúdo (plano, lista, lista a dois) | Clareza e economia de rolagem | Se o carrossel ficar, enxugar os passos de "Como funciona" ou trocar os slides repetidos | proposta |
 
@@ -149,6 +149,13 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 | R05 | Armário / cadastro | Cadastro manual de cada peça | Inteligência prática (seção 2 da marca) | Cadastro por foto com revisão antes de salvar. Recurso novo; não aplicado. O "Importar por link" já cobre parte da dor e entrou no carrossel | proposta |
 | R06 | Planejamento | Compra excessiva por insegurança | Respeito ao bolso (seção 6 da marca) | O slide "Um plano do tamanho da sua casa" destaca as quantidades ajustadas e o que não precisa ser comprado, já presentes no funil | **aplicada em parte** (copy do carrossel) |
 | R07 | Chamada final | Oportunidade de tom acolhedor no fechamento da página | Acolhimento antes da cobrança (seção 2 da marca) | A chamada final da home já usa "Sem pressa. Sem cartão. Do seu jeito." O mesmo tom foi usado no carrossel. Nada alterado na chamada final | já atendida |
+| R08 | Home (nova seção) | A home não nomeia as dores que o Casa Mia resolve | Respeito ao bolso; acolhimento | Seção curta "da bagunça à calma" em pares dor e solução, com as dores das personas da marca e sem culpar quem usa planilha **aplicada** (seção "Da bagunça à calma" na home) |
+| R09 | Home (hero) | As duas marcas sob o botão ("Do seu jeito, no seu tempo") são genéricas | Clareza do valor | Trocar por três benefícios concretos: Primeiro Dia primeiro, quantidades na medida da casa, aviso de repetição **aplicada** (três benefícios no hero) |
+| R10 | Home (abaixo do hero) | O mock mostra um resumo, não o progresso por cômodo | Progresso visual concreto | Faixa com os cômodos e o progresso de cada um, ligada ao R02 **aplicada** (faixa de progresso por cômodo abaixo do hero) |
+| R11 | Funil `/comecar` e "Ajuda do Nino" | Cálculo do plano sem estado visual de espera | Nino Pensativo (seção 3 da marca) | Mensagens curtas em sequência com o Nino de pranchetinha, só quando o cálculo demorar, sem movimento para quem pede menos **aplicada em parte** (o funil já tinha "Montando o plano"; adicionado aviso de espera na Ajuda do Nino) |
+| R12 | Home (seção do Nino) | A seção do Nino é só texto | Inteligência prática | Mock com cartões de sugestão do Nino. Não mostrar chat livre: o Jev responde com opções tipadas **aplicada** (cartões de sugestão do Nino na home) |
+| R13 | Rodapé | Não há explicação de como as sugestões são feitas | Honestidade antes do cartão | Página curta "Como o Nino escolhe" no rodapé **aplicada** (página `/como-o-nino-escolhe` e link no rodapé) |
+| P07 | Home (preços) | O título "Comece de graça" convive com teste de 2 dias com cartão e, abaixo, "nenhuma cobrança é realizada" (ver P01) | Honestidade com o usuário | Alinhar título, aviso e FAQ ao modelo real de cobrança **aplicada** (2026-10-20: título, aviso e FAQ alinhados ao teste de 2 dias) |
 
 ## 9. Carrossel de funcionalidades
 
