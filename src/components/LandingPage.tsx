@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Coffee,
   HeartHandshake,
+  Home,
   LayoutGrid,
   Link2,
   ListChecks,
@@ -302,12 +303,12 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
             Preços
           </a>
           {!authLoading && <Button asChild variant="brand" size="brand"><a className={`cm-nav-login cm-btn ${signedIn ? "cm-btn-primary is-signed-in" : "cm-login-secondary"}`} href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'navigation')}>
-            {signedIn ? "Meu lar" : "Entrar"}
+            {signedIn ? <><Home size={18} /> Acessar meu lar</> : "Entrar"}
           </a></Button>}
         </nav>
         <div className="cm-header-actions">
           {!authLoading && <Button asChild variant="brand" size="brand"><a className={`cm-login cm-btn cm-btn-sm ${signedIn ? "cm-btn-primary is-signed-in" : "cm-login-secondary"}`} href={signedIn ? "/app" : "/login"} onClick={() => trackLandingCta(signedIn ? 'open_app' : 'login', 'header')}>
-            {signedIn ? "Meu lar" : "Entrar"}
+            {signedIn ? <><Home size={18} /> Acessar meu lar</> : "Entrar"}
           </a></Button>}
           {!signedIn && !authLoading && <Button asChild variant="brand" size="brand"><a className="cm-btn cm-btn-primary cm-btn-sm cm-trial-cta" href={start} onClick={() => trackStart('header')}>
             Testar por 2 dias

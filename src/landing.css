@@ -96,10 +96,11 @@
 }
 .cm-btn-ghost {
   color: var(--cm-text);
-  background: var(--cm-tint);
+  border-color: var(--cm-primary-dark);
+  background: #fff9ef;
 }
 .cm-btn-ghost:hover {
-  background: color-mix(in oklab, var(--cm-sand) 48%, var(--cm-bg));
+  background: var(--cm-tint);
 }
 .cm-btn-sm {
   min-height: 40px;
@@ -160,6 +161,9 @@ html {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
   padding: 10px 16px;
   font-size: 15px;
   font-weight: 700;
