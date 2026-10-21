@@ -2,11 +2,15 @@
  * Nino, o mascote do Casa Mia: uma casinha-chaveiro viva, com a barriguinha em arco
  * (que se ilumina) e uma chave dourada na alça. A arte fica em `public/brand`.
  *
- * Poses: "wave" (acenando, boas-vindas) e "think" (com a pranchetinha e a trena, calculando).
+ * Poses: "wave" (acenando, boas-vindas), "think" (com a pranchetinha e a trena, calculando),
+ * "happy" (andando feliz e acenando, item riscado da lista) e "celebrate" (braços erguidos com
+ * uma plantinha, cômodo ou casa concluídos).
  */
 const POSES = {
   wave: { src: "/brand/nino.webp", fallback: "/brand/nino.png", width: 809, height: 952 },
   think: { src: "/brand/nino-plan.webp", fallback: "/brand/nino-plan.png", width: 749, height: 962 },
+  happy: { src: "/brand/nino-happy.webp", fallback: "/brand/nino-happy.png", width: 820, height: 1077 },
+  celebrate: { src: "/brand/nino-celebrate.webp", fallback: "/brand/nino-celebrate.png", width: 820, height: 964 },
 } as const;
 
 export function Nino({

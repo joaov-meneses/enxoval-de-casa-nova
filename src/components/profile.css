@@ -6,8 +6,8 @@
   height: 40px;
   overflow: hidden;
   border-radius: 50%;
-  background: #eee4d2;
-  color: #a34c30;
+  background: color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg));
+  color: var(--cm-primary-dark);
   font-weight: 700;
 }
 .user-avatar img {
@@ -21,7 +21,7 @@
   border-radius: 12px;
 }
 .sidebar-profile-button:hover {
-  background: #f5eddf;
+  background: color-mix(in oklab, var(--cm-success) 4%, var(--cm-bg));
 }
 .casamia-dialog.profile-dialog {
   max-width: 680px;
@@ -58,39 +58,39 @@
 }
 .profile-avatar-edit { position: relative; flex-shrink: 0; width: 68px; height: 68px; padding: 2px; border-radius: 50%; cursor: pointer; }
 .profile-avatar-edit:hover { box-shadow: 0 0 0 3px #b5532f33; }
-.profile-avatar-edit:focus-visible { outline: 3px solid #b5532f; outline-offset: 3px; }
-.profile-summary .profile-avatar-edit .profile-avatar-camera { position: absolute; right: -2px; bottom: -1px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #a34c30; color: #fffdf8; border: 2px solid #fffdf8; box-shadow: 0 2px 5px #3b2a2026; }
+.profile-avatar-edit:focus-visible { outline: 3px solid var(--cm-action); outline-offset: 3px; }
+.profile-summary .profile-avatar-edit .profile-avatar-camera { position: absolute; right: -2px; bottom: -1px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--cm-primary-dark); color: color-mix(in oklab, var(--cm-bg) 22%, #fff); border: 2px solid color-mix(in oklab, var(--cm-bg) 22%, #fff); box-shadow: 0 2px 5px #3b2a2026; }
 .profile-avatar-camera svg { width: 18px; height: 18px; stroke-width: 2.25; }
 .profile-editable-field { display: flex; align-items: center; position: relative; }
 .profile-editable-field input { padding-right: 52px; }
-.profile-editable-field input:disabled { opacity: 1; color: #79685a; -webkit-text-fill-color: #79685a; background: #f5f0e7; cursor: default; }
-.profile-editable-field button { position: absolute; right: 3px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; color: #a34c30; }
-.profile-editable-field button:hover:not(:disabled) { background: #ecdfcc; }
+.profile-editable-field input:disabled { opacity: 1; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); -webkit-text-fill-color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); background: color-mix(in oklab, var(--cm-sand) 22%, #fff); cursor: default; }
+.profile-editable-field button { position: absolute; right: 3px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; color: var(--cm-primary-dark); }
+.profile-editable-field button:hover:not(:disabled) { background: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-bg)); }
 .profile-editable-field button:disabled { opacity: .35; }
 .profile-field-label { font-weight: 700; margin-top: 7px; }
-.profile-email-info { display: flex; align-items: center; gap: 10px; padding: 12px 0; color: #79685a; font-size: 14px; }
+.profile-email-info { display: flex; align-items: center; gap: 10px; padding: 12px 0; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); font-size: 14px; }
 .profile-email-info span { min-width: 0; overflow-wrap: anywhere; }
 .profile-email-info svg { flex-shrink: 0; }
 .profile-photo-dialog { max-width: 440px; }
 .profile-photo-picker { display: grid; gap: 12px; }
-.profile-photo-picker > p { margin: 0 0 8px; color: #79685a; }
+.profile-photo-picker > p { margin: 0 0 8px; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); }
 .profile-photo-picker > .button { min-height: 48px; justify-content: center; gap: 12px; }
-.profile-photo-picker small { font-size: 12px; line-height: 1.6; color: #79685a; }
+.profile-photo-picker small { font-size: 12px; line-height: 1.6; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); }
 .profile-camera-preview { position: relative; }
-.profile-camera-preview video, .profile-camera-photo { display: block; width: 100%; max-height: 38dvh; object-fit: cover; aspect-ratio: 1; border-radius: 14px; background: #eee4d2; }
+.profile-camera-preview video, .profile-camera-photo { display: block; width: 100%; max-height: 38dvh; object-fit: cover; aspect-ratio: 1; border-radius: 14px; background: color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg)); }
 .profile-summary > div {
   min-width: 0;
   display: grid;
   gap: 4px;
 }
 .profile-summary strong {
-  color: #3b2a20;
+  color: var(--cm-text);
   font-family: var(--serif);
   font-size: 23px;
   overflow-wrap: anywhere;
 }
 .profile-summary span:not(.user-avatar) {
-  color: #79685a;
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
   font-size: 13px;
   overflow-wrap: anywhere;
 }
@@ -99,7 +99,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 4px;
   gap: 4px;
-  background: #f5edde;
+  background: color-mix(in oklab, var(--cm-success) 4%, var(--cm-bg));
   border-radius: 12px;
   margin-bottom: 24px;
 }
@@ -110,13 +110,13 @@
   justify-content: center;
   min-height: 42px;
   border-radius: 9px;
-  color: #786253;
+  color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text));
   font-size: 14px;
   padding: 8px;
 }
 .profile-tabs button[aria-selected="true"] {
-  background: #fffdf8;
-  color: #a34c30;
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
+  color: var(--cm-primary-dark);
   box-shadow: 0 2px 5px #3b2a2012;
   font-weight: 700;
 }
@@ -134,7 +134,7 @@
   display: block;
   font-size: 12px;
   line-height: 1.6;
-  color: #79685a;
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
 }
 .profile-form,
 .profile-form fieldset {
@@ -156,15 +156,15 @@
   width: 100%;
   min-height: 44px;
   padding: 11px 13px;
-  border: 1px solid #e4d8c5;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 56%, #fff);
   border-radius: 10px;
-  background: #fffdf8;
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
   font-size: 15px;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .profile-form input[readonly] {
-  background: #f5f0e7;
-  color: #79685a;
+  background: color-mix(in oklab, var(--cm-sand) 22%, #fff);
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
 }
 .profile-form > button {
   justify-self: start;
@@ -184,7 +184,7 @@
 .profile-security {
   margin-top: 28px;
   padding-top: 24px;
-  border-top: 1px solid #e9dece;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 47%, #fff);
 }
 .profile-security h3 {
   display: flex;
@@ -198,7 +198,7 @@
 .profile-info {
   font-size: 14px;
   line-height: 1.7;
-  color: #79685a;
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
   margin: 10px 0;
 }
 .profile-security small {
@@ -208,7 +208,7 @@
   display: inline-block;
   padding: 6px 11px;
   border-radius: 8px;
-  background: #f4e5cf;
+  background: color-mix(in oklab, var(--cm-sand) 24%, var(--cm-bg));
   color: #985332;
   font-size: 13px;
   font-weight: 700;
@@ -217,7 +217,7 @@
 .profile-billing h3 {
   font-family: var(--serif);
   font-size: 25px;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .profile-billing-actions {
   display: flex;
@@ -229,7 +229,7 @@
   min-height: 44px;
 }
 .profile-cancel-button {
-  color: #9b4535;
+  color: color-mix(in oklab, var(--cm-primary-dark) 96%, #000);
 }
 .profile-error,
 .profile-success {
@@ -240,12 +240,12 @@
   line-height: 1.6;
 }
 .profile-error {
-  color: #963f2f;
-  background: #f9eae1;
+  color: color-mix(in oklab, var(--cm-primary-dark) 93%, #000);
+  background: color-mix(in oklab, var(--cm-primary) 14%, #fff);
 }
 .profile-success {
-  color: #52603c;
-  background: #edf1e6;
+  color: color-mix(in oklab, var(--cm-success) 95%, #000);
+  background: color-mix(in oklab, var(--cm-olive-soft) 16%, #fff);
 }
 .profile-entry-mobile {
   width: 100%;

@@ -53,7 +53,8 @@ try {
     await page.keyboard.press('ArrowDown',{delay:50});
     await page.waitForFunction(()=>document.querySelector('[data-slot=radio-group-item][value=received]')?.getAttribute('aria-checked')==='true');
     assert.equal(await dialog.getByRole('radio',{name:/^Recebido/}).isChecked(),true,'setas do teclado continuam funcionando');
-    assert.equal(await cards.nth(1).evaluate(element=>getComputedStyle(element).borderColor),'rgb(111, 52, 31)','foco de teclado usa a mesma borda');
+    const focusBorder=await page.evaluate(()=>{const probe=document.createElement('span');probe.style.color='color-mix(in oklab, var(--cm-primary-dark) 76%, #000)';document.body.append(probe);const color=getComputedStyle(probe).color;probe.remove();return color;});
+    assert.equal(await cards.nth(1).evaluate(element=>getComputedStyle(element).borderColor),focusBorder,'foco de teclado usa a mesma borda');
     await page.screenshot({path:`tmp/item-completion-${width}.png`,fullPage:false});
     await dialog.getByRole('button',{name:'Cancelar',exact:true}).click();
     assert.equal(requests.length,0);

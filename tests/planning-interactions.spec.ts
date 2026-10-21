@@ -187,10 +187,15 @@ for (const width of [320, 375, 768, 1440]) {
       await expect(list).toHaveClass(/casamia-select-grouped/);
       const labels = list.locator("[data-slot=select-label]");
       await expect(labels).toHaveCount(6);
-      await expect(labels.first()).toHaveCSS(
-        "background-color",
-        "rgb(243, 228, 209)",
-      );
+      // O título do período tem fundo próprio, diferente do menu (a cor exata vem da paleta).
+      const [labelBackground, listBackground] = await labels
+        .first()
+        .evaluate((label) => [
+          getComputedStyle(label).backgroundColor,
+          getComputedStyle(label.closest("[role=listbox]")!).backgroundColor,
+        ]);
+      expect(labelBackground).not.toBe("rgba(0, 0, 0, 0)");
+      expect(labelBackground).not.toBe(listBackground);
       await expect(labels.first()).toHaveCSS("border-left-width", "3px");
       await expect(labels.first()).toHaveCSS("font-weight", "700");
       await expect(

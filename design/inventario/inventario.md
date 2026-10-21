@@ -79,9 +79,9 @@ Nenhuma cor nova foi criada nesta rodada. O carrossel usa apenas `--cm-bg`, `--c
 
 | Uso | Valor no app | Valor na marca | Divergência |
 |---|---|---|---|
-| Títulos e logotipo | Fraunces (`--font-serif`) | Fraunces | nenhuma |
-| Interface e inputs | **Nunito** (`--font-sans`, importada em `src/index.css`) | DM Sans | **Divergência.** O app inteiro usa Nunito; DM Sans não é carregada em lugar nenhum. A referência Enxovaly também usa Nunito. Não troquei a fonte global (fora do escopo e afeta todas as telas). O carrossel herda a fonte do app para ficar coerente |
-| Preços e números | Nunito, com figuras tabulares só em poucos pontos (`catalog-admin.css`, `onboarding.css`) | DM Sans com figuras tabulares | **Divergência.** Valores em `T04`, `T06` e `T07` não usam figuras tabulares |
+| Títulos e logotipo | Fraunces com SOFT 100 (`--font-serif`) | Fraunces com SOFT 100 | nenhuma |
+| Interface e inputs | Nunito (`--font-sans`, importada em `src/index.css`) | Nunito | nenhuma. O manual pedia DM Sans; em out/2026 o estudo de tipografia manteve a Nunito e o manual foi atualizado |
+| Preços e números | Nunito, cujos algarismos já são tabulares por padrão | Nunito | nenhuma. Os valores em `T04`, `T06` e `T07` já alinham, porque a Nunito usa figuras tabulares sem precisar de `tabular-nums` |
 
 ### Espaçamento, raios e sombras
 
@@ -134,7 +134,7 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 | P01 | Home (FAQ e preços) | A resposta "Os planos já estão disponíveis para compra? Ainda não" e o aviso de que nenhuma cobrança é realizada contradizem T13, que já vende o Passe e o plano mensal | Honestidade com o usuário | Atualizar o texto da FAQ e o aviso da seção de preços | proposta |
 | P02 | Home e planos | O Chá de Casa Nova é prometido (home, FAQ, plano pago), mas não existe tela para o convidado | Não prometer o que não existe | Marcar como "em breve" ou priorizar a página pública (ver R04) | proposta |
 | P03 | App (lista e visão geral) | Vocabulário de cobrança: "Atrasado", "Mais atrasado", "Comprar" | Glossário da marca (seção 5) | Trocar pelos termos da tabela da seção 6 | proposta |
-| P04 | Todo o app | DM Sans não é usada; números sem figuras tabulares | Tipografia oficial (seção 7 da marca) | Decidir entre adotar DM Sans ou atualizar o manual para Nunito; aplicar `font-variant-numeric: tabular-nums` nos valores | proposta |
+| P04 | Todo o app | DM Sans não é usada; números sem figuras tabulares | Tipografia oficial (seção 7 da marca) | Manual atualizado para Nunito, que já tem algarismos tabulares por padrão (estudo de tipografia, out/2026) | concluída |
 | P05 | Login e cadastro | No celular a coluna com a foto some, e o carrossel some junto | Mostrar valor antes do cadastro | Avaliar uma versão compacta do carrossel abaixo do formulário no celular | proposta |
 | P06 | Home | A seção "Como funciona" e o carrossel repetem parte do conteúdo (plano, lista, lista a dois) | Clareza e economia de rolagem | Se o carrossel ficar, enxugar os passos de "Como funciona" ou trocar os slides repetidos | proposta |
 

@@ -10,9 +10,9 @@
  */
 .auth-shell {
   --auth-door: var(--cm-accent);
-  --auth-card: #fffaf1;
-  --auth-muted: #6a5648;
-  --auth-field-line: #9a8571;
+  --auth-card: color-mix(in oklab, var(--cm-bg) 48%, #fff);
+  --auth-muted: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text));
+  --auth-field-line: color-mix(in oklab, var(--cm-sand) 66%, var(--cm-text));
   --auth-ease: cubic-bezier(0.23, 1, 0.32, 1);
   position: relative;
   isolation: isolate;
@@ -39,7 +39,7 @@
   pointer-events: none;
 }
 .auth-shell ::selection {
-  background: #ead8bf;
+  background: color-mix(in oklab, var(--cm-sand) 46%, var(--cm-bg));
   color: var(--cm-text);
 }
 
@@ -136,7 +136,7 @@
   margin: 0;
   padding-top: 18px;
   font-size: 13px;
-  color: #e6dccb;
+  color: color-mix(in oklab, var(--cm-sand) 50%, #fff);
 }
 
 /* Entrar | Criar conta */
@@ -145,7 +145,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding: 4px;
-  background: #f1e6d4;
+  background: color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
   border-radius: 14px;
 }
 .auth-tabs::before {
@@ -255,7 +255,7 @@
 }
 .auth-shell .auth-form input::placeholder {
   font-size: 15px;
-  color: #7d6b5d;
+  color: color-mix(in oklab, var(--cm-bg) 36%, var(--cm-text));
 }
 .auth-shell .auth-form input:hover {
   border-color: var(--cm-text);
@@ -284,7 +284,7 @@
     color 0.2s;
 }
 .auth-shell .password-field button:hover {
-  background: #f1e6d4;
+  background: color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
   color: var(--cm-text);
 }
 .auth-hint {
@@ -294,13 +294,13 @@
   color: var(--auth-muted);
 }
 .auth-hint.is-error {
-  color: #8f4b37;
+  color: color-mix(in oklab, var(--cm-primary-dark) 84%, var(--cm-text));
   font-weight: 600;
 }
 .auth-shell .form-error {
   padding: 12px 14px;
   font-size: 14px;
-  color: #7e3e2a;
+  color: color-mix(in oklab, var(--cm-primary-dark) 64%, var(--cm-text));
   border-radius: 12px;
 }
 .auth-shell .auth-form > .button {
