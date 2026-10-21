@@ -3128,22 +3128,22 @@ button.reorder-handle:disabled {
 .item-status.status-researching,
 .item-status-tag.status-researching {
   background: color-mix(in oklab, var(--cm-accent) 11%, #fff);
-  color: #5f4f72;
+  color: var(--cm-accent);
 }
 .item-status.status-bought,
 .item-status-tag.status-bought {
-  background: color-mix(in oklab, var(--cm-bg) 95%, var(--cm-text));
-  color: color-mix(in oklab, var(--cm-success) 94%, var(--cm-text));
+  background: color-mix(in oklab, var(--cm-olive-soft) 22%, #fff);
+  color: var(--cm-success);
 }
 .item-status.status-received,
 .item-status-tag.status-received {
-  background: color-mix(in oklab, var(--cm-sand) 18%, var(--cm-bg));
-  color: var(--cm-primary-dark);
+  background: color-mix(in oklab, var(--cm-success) 16%, #fff);
+  color: color-mix(in oklab, var(--cm-success) 85%, #000);
 }
 .item-status.status-owned,
 .item-status-tag.status-owned {
   background: color-mix(in oklab, var(--cm-sand) 28%, #fff);
-  color: color-mix(in oklab, var(--cm-success) 97%, #000);
+  color: color-mix(in oklab, var(--cm-text) 80%, var(--cm-sand));
 }
 .item-row.inactive .item-name,
 .item-row.inactive .item-price {

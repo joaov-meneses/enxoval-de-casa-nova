@@ -36,8 +36,8 @@ const TITLES: Record<LimitCode, string> = {
 const UNLOCKS = [
   "Cômodos e itens ilimitados",
   "Mais de um enxoval",
-  "Lista a dois, em tempo real",
-  "Página do Chá de Casa Nova",
+  "Lista a dois, com quem mora com você",
+  "Página do Chá de Casa Nova (em breve)",
 ];
 
 /**

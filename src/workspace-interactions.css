@@ -642,10 +642,10 @@
 .workspace-app .item-row:not(.checked):not(.inactive) {
   --item-surface: color-mix(in oklab, var(--cm-sand) 4%, var(--cm-bg));
   background: var(--item-surface);
-  border-color: #cda477;
+  border-color: color-mix(in oklab, var(--cm-primary) 32%, var(--cm-sand));
   box-shadow:
-    inset 3px 0 0 #b5532f,
-    0 2px 7px #6b442414;
+    inset 3px 0 0 var(--cm-primary),
+    0 2px 7px color-mix(in oklab, var(--cm-primary-dark) 10%, transparent);
 }
 .workspace-app .item-row:not(.checked):not(.inactive) .item-name {
   color: var(--cm-text);
@@ -658,7 +658,7 @@
   box-shadow: none;
 }
 .workspace-app .item-row.checked .item-name {
-  color: #5c6151;
+  color: color-mix(in oklab, var(--cm-success) 70%, var(--cm-text));
   font-weight: 500;
 }
 .workspace-app .item-row.inactive {
@@ -705,7 +705,7 @@
 .workspace-app .item-row .status-needed {
   background: color-mix(in oklab, var(--cm-primary) 12%, var(--cm-bg));
   color: color-mix(in oklab, var(--cm-primary-dark) 89%, #000);
-  border-color: #cb9776;
+  border-color: color-mix(in oklab, var(--cm-primary) 45%, #fff);
 }
 .workspace-app .item-row .item-added {
   color: color-mix(in oklab, var(--cm-sand) 31%, var(--cm-text));

@@ -281,7 +281,7 @@ export function NinoAssistant({
           </Button>
         </div>
         {urgencyPendingCount === 0 && (
-          <p className="pp-hint">Este ambiente não tem itens pendentes para priorizar.</p>
+          <p className="pp-hint">Este ambiente não tem itens na fila para priorizar.</p>
         )}
         {shownCategory && ranked.length > 0 && (
           <>
