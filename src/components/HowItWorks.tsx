@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Check } from "@/src/components/icons";
+import { useEffect, useRef, type ReactNode } from "react";
+import { Check } from "./landing-icons";
 
 export const STEPS = [
   {
@@ -15,21 +15,22 @@ export const STEPS = [
   },
   {
     title: "Receba um plano feito para o seu lar",
-    text: "O Casa Mia monta a lista por ambiente, com o essencial do primeiro dia no começo e o resto organizado para depois.",
+    text: "O Casa Mia monta a lista por ambiente, pelo clima e por quem mora na casa, com o essencial do Primeiro Dia no começo e sem o que vocês não precisam comprar.",
     bullets: [
-      "Cada ambiente tem o próprio progresso",
-      "Veja quanto falta investir em cada espaço",
-      "Ordene por pendentes ou por mais avançados",
+      "A semana certa de cada item, a partir da data da mudança",
+      "Quanto já foi investido, quanto falta e a faixa de gasto esperada",
+      "Ordene pelo que falta ou pelos mais avançados",
     ],
     image: "/images/como-funciona/passo-2-plano.webp",
     alt: "Visão geral do Casa Mia mostrando 42% conquistado, o resumo de valores investidos e a lista de ambientes (Quarto, Banheiro, Cozinha e Eletrodomésticos) com a barra de progresso e o valor a investir em cada um.",
   },
   {
     title: "Conquiste e risque, item por item",
-    text: "Marque cada peça como comprei, ganhei ou já tenho. Preço, link e observações ficam no próprio item, sempre à mão.",
+    text: "Marque cada peça como comprada, recebida de presente ou que você já tem. Preço, link e observações ficam no próprio item, sempre à mão.",
     bullets: [
       "Comprados, recebidos ou já em casa: cada conquista conta",
-      "Anote preço, link da loja e observações",
+      "Cole o link do Mercado Livre, da Amazon ou do Magalu: nome, foto e preço vêm sozinhos",
+      "Descontos e cashback entram na conta do que vocês economizaram",
       "Importe ou exporte tudo em planilha",
     ],
     image: "/images/como-funciona/passo-3-conquiste.webp",
@@ -40,7 +41,7 @@ export const STEPS = [
     text: "Convide quem vai montar a casa com você. Vocês editam a mesma lista e acompanham as conquistas e o orçamento juntos.",
     bullets: [
       "Convite por e-mail, com aceite pelo link",
-      "Todo mundo vê cada item conquistado",
+      "O que um risca, o outro vê ao abrir o app",
       "Resumo do que já foi investido e do que falta",
     ],
     image: "/images/como-funciona/passo-4-juntos.webp",
@@ -53,7 +54,10 @@ export const STEPS = [
  * e cada etapa entra com as telas reais do app. Sem JavaScript (ou com "reduzir movimento"),
  * tudo aparece de uma vez, sem animação.
  */
-export function HowItWorks() {
+export function HowItWorks({ extras = {} }: {
+  /** Conteúdo extra embaixo dos tópicos de um passo, pelo índice (0 é o primeiro passo). */
+  extras?: Partial<Record<number, ReactNode>>;
+}) {
   const timeline = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
@@ -69,22 +73,30 @@ export function HowItWorks() {
     }
     root.classList.add("is-animated");
 
+    // Uma medição por quadro, com todas as leituras de layout antes das escritas: alternar
+    // getBoundingClientRect e classList a cada passo forçava o navegador a recalcular o layout.
+    let frame = 0;
     const update = () => {
+      frame = 0;
       const mark = window.innerHeight * 0.55;
       const rect = root.getBoundingClientRect();
+      const reached = steps.map((step) => {
+        const box = step.getBoundingClientRect();
+        return box.top + box.height / 2 < mark;
+      });
       const progress = Math.min(
         1,
         Math.max(0, (mark - rect.top) / rect.height),
       );
       root.style.setProperty("--p", progress.toFixed(4));
-      for (const step of steps) {
-        const box = step.getBoundingClientRect();
-        step.classList.toggle("is-reached", box.top + box.height / 2 < mark);
-      }
+      steps.forEach((step, index) => step.classList.toggle("is-reached", reached[index]));
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
     };
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
 
     const reveal = new IntersectionObserver(
       (entries) => {
@@ -99,8 +111,9 @@ export function HowItWorks() {
     for (const step of steps) reveal.observe(step);
 
     return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
       reveal.disconnect();
     };
   }, []);
@@ -127,6 +140,7 @@ export function HowItWorks() {
                     </li>
                   ))}
                 </ul>
+                {extras[index]}
               </div>
               <div className="cm-phone">
                 <img

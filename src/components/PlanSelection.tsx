@@ -8,12 +8,14 @@ import { PASS_MONTHS } from '../plans';
 import { ArrowRight, Bell, Check, CircleHelp, CreditCard, LockKeyhole } from "@/src/components/icons";
 import { Dialog } from './Dialog';
 import { capture } from '../analytics';
+import { readPlanChoice } from '../planChoice';
 
 export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
   trialUsed: boolean; busy: boolean; disabled?: boolean; onChoose: (plan: PaidPlanId) => void;
 }) {
   const [offers, setOffers] = useState<BillingOffer[]>([]);
-  const [selected, setSelected] = useState<PaidPlanId>('pass');
+  // Abre com o plano clicado nos preços da home, quando houver; senão, o Passe.
+  const [selected, setSelected] = useState<PaidPlanId>(() => readPlanChoice() ?? 'pass');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [showTrialHelp, setShowTrialHelp] = useState(false);

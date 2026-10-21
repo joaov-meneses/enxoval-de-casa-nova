@@ -1,0 +1,687 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21T03:04:37+00:00",
+  "title": "Design System: Casa Mia",
+  "extensions": {
+    "colorMeta": {
+      "linho": {
+        "role": "neutral",
+        "displayName": "Linho",
+        "canonical": "oklch(96.6% 0.012 79.8)",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262522",
+          "#44423e",
+          "#64615b",
+          "#86827b",
+          "#a8a49e",
+          "#ccc9c4",
+          "#f0eeea"
+        ]
+      },
+      "cafe-tostado": {
+        "role": "neutral",
+        "displayName": "Café Tostado",
+        "canonical": "oklch(28.9% 0.010 61.1)",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#272523",
+          "#45413f",
+          "#65605d",
+          "#87817c",
+          "#a9a4a0",
+          "#ccc8c5",
+          "#f1eeeb"
+        ]
+      },
+      "terracota-artesanal": {
+        "role": "primary",
+        "displayName": "Terracota Artesanal",
+        "canonical": "oklch(60.1% 0.134 39.0)",
+        "tonalRamp": [
+          "#160703",
+          "#3a1b11",
+          "#633323",
+          "#8e4c36",
+          "#bd674b",
+          "#db8f76",
+          "#f7b8a4",
+          "#ffe2d3"
+        ]
+      },
+      "terracota-profundo": {
+        "role": "primary",
+        "displayName": "Terracota Profundo",
+        "canonical": "oklch(52.2% 0.123 38.3)",
+        "tonalRamp": [
+          "#160703",
+          "#3a1b12",
+          "#633324",
+          "#8f4c37",
+          "#bd674c",
+          "#dc8f76",
+          "#f7b8a4",
+          "#ffe2d3"
+        ]
+      },
+      "terracota-queimado": {
+        "role": "primary",
+        "displayName": "Terracota Queimado",
+        "canonical": "oklch(46.1% 0.109 38.2)",
+        "tonalRamp": [
+          "#150704",
+          "#381c14",
+          "#603527",
+          "#8b4f3c",
+          "#b86a52",
+          "#d7917b",
+          "#f3baa8",
+          "#ffe4d6"
+        ]
+      },
+      "salvia": {
+        "role": "secondary",
+        "displayName": "Sálvia",
+        "canonical": "oklch(51.4% 0.051 134.3)",
+        "tonalRamp": [
+          "#090c07",
+          "#21281d",
+          "#3b4635",
+          "#58674f",
+          "#76896b",
+          "#9aab90",
+          "#c0ceb9",
+          "#e8f2e2"
+        ]
+      },
+      "salvia-clara": {
+        "role": "secondary",
+        "displayName": "Sálvia Clara",
+        "canonical": "oklch(69.5% 0.045 131.1)",
+        "tonalRamp": [
+          "#090c07",
+          "#22271d",
+          "#3d4536",
+          "#5a6650",
+          "#79886d",
+          "#9daa92",
+          "#c2cdba",
+          "#e9f2e3"
+        ]
+      },
+      "salvia-chip": {
+        "role": "secondary",
+        "displayName": "Sálvia de Chip",
+        "canonical": "oklch(92.5% 0.021 124.7)",
+        "tonalRamp": [
+          "#0b0c09",
+          "#242621",
+          "#40433c",
+          "#5f6359",
+          "#7f8577",
+          "#a2a79b",
+          "#c7cbc1",
+          "#edf0e9"
+        ]
+      },
+      "salvia-chip-texto": {
+        "role": "secondary",
+        "displayName": "Texto da Sálvia de Chip",
+        "canonical": "oklch(40.2% 0.039 135.3)",
+        "tonalRamp": [
+          "#090c08",
+          "#22271f",
+          "#3d4538",
+          "#5a6554",
+          "#798871",
+          "#9caa96",
+          "#c2cdbd",
+          "#e9f1e5"
+        ]
+      },
+      "azulejo-noturno": {
+        "role": "tertiary",
+        "displayName": "Azulejo Noturno",
+        "canonical": "oklch(39.7% 0.064 241.1)",
+        "tonalRamp": [
+          "#060c11",
+          "#192731",
+          "#2f4555",
+          "#47657c",
+          "#6087a5",
+          "#88aac4",
+          "#b2cde2",
+          "#ddf2ff"
+        ]
+      },
+      "areia": {
+        "role": "neutral",
+        "displayName": "Areia",
+        "canonical": "oklch(84.2% 0.034 77.6)",
+        "tonalRamp": [
+          "#0d0b07",
+          "#29241d",
+          "#484136",
+          "#6a6050",
+          "#8e806c",
+          "#afa391",
+          "#d1c8b9",
+          "#f5ede3"
+        ]
+      },
+      "areia-escura": {
+        "role": "neutral",
+        "displayName": "Areia Escura",
+        "canonical": "oklch(62.6% 0.035 73.3)",
+        "tonalRamp": [
+          "#0d0b07",
+          "#2a241d",
+          "#494036",
+          "#6b5f50",
+          "#8f806c",
+          "#b1a391",
+          "#d2c7b9",
+          "#f5ede3"
+        ]
+      },
+      "areia-suave": {
+        "role": "neutral",
+        "displayName": "Areia Suave",
+        "canonical": "oklch(94.6% 0.011 71.9)",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#272522",
+          "#44413e",
+          "#65605c",
+          "#87817b",
+          "#a9a49f",
+          "#ccc8c4",
+          "#f1eeeb"
+        ]
+      },
+      "linho-tingido": {
+        "role": "neutral",
+        "displayName": "Linho Tingido",
+        "canonical": "oklch(93.4% 0.018 78.2)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#272521",
+          "#45413b",
+          "#666058",
+          "#888177",
+          "#aaa49b",
+          "#cdc8c1",
+          "#f2eee8"
+        ]
+      },
+      "cartao": {
+        "role": "neutral",
+        "displayName": "Cartão",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "cartao-quente": {
+        "role": "neutral",
+        "displayName": "Cartão Quente",
+        "canonical": "oklch(98.0% 0.006 75.4)",
+        "tonalRamp": [
+          "#0b0b0a",
+          "#262524",
+          "#434240",
+          "#63615e",
+          "#84827e",
+          "#a7a5a1",
+          "#cbc9c6",
+          "#f0eeec"
+        ]
+      },
+      "linha": {
+        "role": "neutral",
+        "displayName": "Linha",
+        "canonical": "oklch(90.4% 0.020 77.3)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#272520",
+          "#46413b",
+          "#666057",
+          "#898176",
+          "#aba49a",
+          "#cec8c0",
+          "#f2eee8"
+        ]
+      },
+      "apoio": {
+        "role": "neutral",
+        "displayName": "Apoio",
+        "canonical": "oklch(50.8% 0.023 64.8)",
+        "tonalRamp": [
+          "#0d0b09",
+          "#292420",
+          "#47413a",
+          "#695f57",
+          "#8c8075",
+          "#aea399",
+          "#d0c7bf",
+          "#f4ede7"
+        ]
+      },
+      "apoio-forte": {
+        "role": "neutral",
+        "displayName": "Apoio Forte",
+        "canonical": "oklch(47.6% 0.018 70.7)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#272421",
+          "#46413c",
+          "#666059",
+          "#898177",
+          "#aba49b",
+          "#cec8c1",
+          "#f2eee9"
+        ]
+      },
+      "hover-quente": {
+        "role": "neutral",
+        "displayName": "Hover Quente",
+        "canonical": "oklch(93.6% 0.019 72.6)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#282421",
+          "#46413b",
+          "#676058",
+          "#8a8176",
+          "#aba49a",
+          "#cec8c0",
+          "#f2eee8"
+        ]
+      },
+      "hover-quente-texto": {
+        "role": "primary",
+        "displayName": "Texto do Hover Quente",
+        "canonical": "oklch(47.0% 0.106 40.0)",
+        "tonalRamp": [
+          "#140704",
+          "#381d13",
+          "#5f3527",
+          "#8a503b",
+          "#b76c51",
+          "#d5927b",
+          "#f2bba8",
+          "#ffe4d6"
+        ]
+      },
+      "trilho-progresso": {
+        "role": "neutral",
+        "displayName": "Trilho de Progresso",
+        "canonical": "oklch(95.7% 0.009 78.3)",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262523",
+          "#44423f",
+          "#63615d",
+          "#85827c",
+          "#a8a4a0",
+          "#cbc9c5",
+          "#f0eeeb"
+        ]
+      },
+      "destrutivo": {
+        "role": "error",
+        "displayName": "Destrutivo",
+        "canonical": "oklch(50.0% 0.182 29.5)",
+        "tonalRamp": [
+          "#160605",
+          "#3a1a16",
+          "#63312a",
+          "#904a40",
+          "#be6558",
+          "#dd8d80",
+          "#f8b6ab",
+          "#ffe1d9"
+        ]
+      },
+      "preco-caiu-fundo": {
+        "role": "status",
+        "displayName": "Preço Caiu (fundo)",
+        "canonical": "oklch(93.9% 0.032 124.5)",
+        "tonalRamp": [
+          "#0a0c08",
+          "#23261f",
+          "#404439",
+          "#5e6454",
+          "#7e8672",
+          "#a1a896",
+          "#c6ccbd",
+          "#ecf0e6"
+        ]
+      },
+      "preco-caiu": {
+        "role": "status",
+        "displayName": "Preço Caiu",
+        "canonical": "oklch(43.2% 0.091 130.2)",
+        "tonalRamp": [
+          "#080d04",
+          "#1f2914",
+          "#384827",
+          "#536a3c",
+          "#708d53",
+          "#95af7c",
+          "#bcd2a9",
+          "#e5f5d7"
+        ]
+      },
+      "preco-subiu-fundo": {
+        "role": "status",
+        "displayName": "Preço Subiu (fundo)",
+        "canonical": "oklch(93.2% 0.022 38.3)",
+        "tonalRamp": [
+          "#0d0a09",
+          "#292422",
+          "#49403d",
+          "#6b5e5a",
+          "#8f7e79",
+          "#b0a19d",
+          "#d2c6c2",
+          "#f5ece9"
+        ]
+      },
+      "preco-subiu": {
+        "role": "status",
+        "displayName": "Preço Subiu",
+        "canonical": "oklch(47.9% 0.134 35.1)",
+        "tonalRamp": [
+          "#160604",
+          "#3a1b13",
+          "#633226",
+          "#8f4b3a",
+          "#be6650",
+          "#dc8e7a",
+          "#f8b7a7",
+          "#ffe2d5"
+        ]
+      },
+      "menor-preco-fundo": {
+        "role": "status",
+        "displayName": "Menor Preço (fundo)",
+        "canonical": "oklch(93.6% 0.045 78.1)",
+        "tonalRamp": [
+          "#0e0b06",
+          "#2a241a",
+          "#4a4031",
+          "#6d5f4a",
+          "#917f65",
+          "#b2a38b",
+          "#d4c7b4",
+          "#f7eddf"
+        ]
+      },
+      "menor-preco": {
+        "role": "status",
+        "displayName": "Menor Preço",
+        "canonical": "oklch(47.8% 0.110 57.2)",
+        "tonalRamp": [
+          "#140802",
+          "#361f0c",
+          "#5d381b",
+          "#86532b",
+          "#b2703c",
+          "#d1966b",
+          "#eebe9b",
+          "#ffe7cd"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Só o título do herói da landing."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Títulos de seção da landing."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Títulos de passo e de bloco."
+      },
+      "card-title": {
+        "displayName": "Card Title",
+        "purpose": "Títulos de cartão no app."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Texto de apoio do herói."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto corrido da interface."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Rótulos de botão."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Etiquetas, metadados e legendas, com algarismos tabulares."
+      },
+      "eyebrow": {
+        "displayName": "Eyebrow",
+        "purpose": "Só na landing, acima de títulos de seção."
+      }
+    },
+    "shadows": [
+      {
+        "name": "respiro-cartao",
+        "value": "0 1px 2px #422d240d, 0 10px 24px -18px #3b2a2040",
+        "purpose": "Cartões e listas da landing em repouso."
+      },
+      {
+        "name": "cartao-elevado",
+        "value": "0 18px 36px -20px #3b2a2059",
+        "purpose": "Hover de cartão e plano em destaque."
+      },
+      {
+        "name": "quase-nada",
+        "value": "0 1px 2px rgba(66,45,36,0.05)",
+        "purpose": "Cartões do Planejamento no app."
+      },
+      {
+        "name": "moldura",
+        "value": "0 24px 48px -28px rgba(59,42,32,0.45)",
+        "purpose": "Telas do app e imagens de destaque na landing."
+      },
+      {
+        "name": "botao-principal",
+        "value": "0 2px 6px #873c2526",
+        "purpose": "Peso leve do botão terracota."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-landing",
+        "value": "cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Entradas, barras de progresso e hover de cartão na landing."
+      },
+      {
+        "name": "ease-out-carrossel",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Carrossel e troca de palavra do herói (0,45s)."
+      },
+      {
+        "name": "duracao-estado",
+        "value": "150ms-300ms",
+        "purpose": "Transições de cor, borda e elevação."
+      },
+      {
+        "name": "pressao",
+        "value": "scale(0.98)",
+        "purpose": "Botão ao ser pressionado."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "xs",
+        "value": "380px"
+      },
+      {
+        "name": "sm",
+        "value": "480px"
+      },
+      {
+        "name": "md",
+        "value": "640px"
+      },
+      {
+        "name": "tablet",
+        "value": "768px"
+      },
+      {
+        "name": "nav",
+        "value": "920px"
+      },
+      {
+        "name": "desktop",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão principal",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "A única ação forte da tela, na landing.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Começar teste de 2 dias <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 22px;font:700 15px/1.25 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#fff;text-decoration:none;background:var(--cm-action,#a34c30);border:1.5px solid var(--cm-action,#a34c30);border-radius:14px;box-shadow:0 2px 6px #873c2526;transition:background-color .15s,border-color .15s,transform .15s}.ds-btn-primary:hover{background:var(--cm-action-hover,#8a3f27);border-color:var(--cm-action-hover,#8a3f27)}.ds-btn-primary:active{transform:scale(.98)}.ds-btn-primary:focus-visible{outline:3px solid var(--cm-primary-dark,#a34c30);outline-offset:4px}"
+    },
+    {
+      "name": "Botão de apoio",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Ações secundárias: Entrar, Ver como funciona, plano não destacado.",
+      "html": "<a class=\"ds-btn-secondary\" href=\"#\">Ver como funciona</a>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;min-height:44px;padding:0 22px;font:700 15px/1.25 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#a34c30;text-decoration:none;background:#fff;border:1.5px solid #a34c30;border-radius:14px;transition:background-color .15s,border-color .15s,color .15s,transform .15s}.ds-btn-secondary:hover{color:#8a3f27;border-color:#8a3f27;background:#f0e8dc}.ds-btn-secondary:active{transform:scale(.98)}.ds-btn-secondary:focus-visible{outline:3px solid #a34c30;outline-offset:4px}"
+    },
+    {
+      "name": "Botão do app",
+      "kind": "button",
+      "refersTo": "button-app",
+      "description": "Botão principal dentro do app.",
+      "html": "<button class=\"ds-btn-app\" type=\"button\">Adicionar item</button>",
+      "css": ".ds-btn-app{display:inline-flex;align-items:center;min-height:50px;padding:13px 23px;font:600 14px/1.4 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#fff;background:#a34c30;border:1px solid transparent;border-radius:7px;cursor:pointer;transition:background .2s,transform .2s,box-shadow .2s}.ds-btn-app:hover{background:#8a3f27;transform:translateY(-2px);box-shadow:0 5px 14px #432e2415}.ds-btn-app:focus-visible{outline:3px solid #a34c30;outline-offset:4px}"
+    },
+    {
+      "name": "Campo",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Input do shadcn com rótulo acima.",
+      "html": "<label class=\"ds-field\"><span>Nome do item</span><input class=\"ds-input\" placeholder=\"Panela de pressão\"></label>",
+      "css": ".ds-field{display:grid;gap:6px;font:600 13px/1.4 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#2f2a26}.ds-input{height:36px;padding:4px 12px;font:400 14px 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#2f2a26;background:transparent;border:1px solid #958571;border-radius:10px}.ds-input::placeholder{color:#6f6358}.ds-input:focus-visible{outline:2px solid #a34c30;outline-offset:2px}"
+    },
+    {
+      "name": "Chip de cômodo",
+      "kind": "chip",
+      "refersTo": "chip-room",
+      "description": "Etiqueta de cômodo e de semana.",
+      "html": "<span class=\"ds-chip\">Cozinha</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;padding:6px 11px;font:700 12px/1.4 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#3f4d38;background:#e3e9da;border-radius:999px}"
+    },
+    {
+      "name": "Cartão da landing",
+      "kind": "card",
+      "refersTo": "card-landing",
+      "description": "Recurso ou benefício na landing.",
+      "html": "<article class=\"ds-card\"><h3>Lista a dois</h3><p>Casais e moradores na mesma lista: o que um risca, o outro vê ao abrir o app.</p></article>",
+      "css": ".ds-card{max-width:320px;padding:30px 26px 28px;text-align:center;background:#fbf8f4;border:1px solid #e7ded1;border-radius:24px;box-shadow:0 1px 2px #422d240d,0 10px 24px -18px #3b2a2040;transition:transform .25s cubic-bezier(.22,1,.36,1),box-shadow .25s}.ds-card:hover{transform:translateY(-3px);box-shadow:0 18px 36px -20px #3b2a2059}.ds-card h3{margin:0 0 8px;font:600 20px/1.25 'Fraunces Variable','Fraunces',ui-serif,Georgia,serif;color:#2f2a26}.ds-card p{margin:0;font:400 15px/1.6 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#635b52}"
+    },
+    {
+      "name": "Linha de item",
+      "kind": "custom",
+      "refersTo": "item-row",
+      "description": "Item da lista com círculo de conquista; conquistado fica riscado.",
+      "html": "<div class=\"ds-item\"><span class=\"ds-check\" role=\"checkbox\" aria-checked=\"true\" tabindex=\"0\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg></span><span class=\"ds-item-name\">Jogo de lençol casal</span><span class=\"ds-item-meta\">Quarto · 2 un.</span><strong>R$ 189,90</strong></div>",
+      "css": ".ds-item{display:flex;align-items:center;gap:14px;padding:17px 18px;font:500 13px/1.35 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#5b6e50;background:#fff;border:1px solid #e7ded1;border-radius:8px}.ds-item:hover{border-color:#d7c6ad}.ds-check{display:grid;place-items:center;width:23px;height:23px;color:#fff;background:#93a386;border:1.5px solid #93a386;border-radius:50%}.ds-check:focus-visible{outline:2px solid #a34c30;outline-offset:2px}.ds-item-name{flex:1;text-decoration:line-through}.ds-item-meta{font:600 12px/1.4 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#6f6358}.ds-item strong{font-variant-numeric:tabular-nums;color:#5b6e50}"
+    },
+    {
+      "name": "Progresso do cômodo",
+      "kind": "custom",
+      "description": "Cômodo com fração escrita e barra fina.",
+      "html": "<div class=\"ds-room\"><strong>Cozinha</strong><small>9 de 14 itens</small><span class=\"ds-bar\" role=\"img\" aria-label=\"Cozinha: 9 de 14 itens conquistados\"><span style=\"width:64%\"></span></span></div>",
+      "css": ".ds-room{display:grid;gap:4px;max-width:240px;padding:18px;background:#fbf8f4;border:1px solid #e7ded1;border-radius:22px}.ds-room strong{font:700 15px 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#2f2a26}.ds-room small{font:400 13px 'Nunito Variable','Nunito',ui-sans-serif,system-ui,sans-serif;color:#635b52}.ds-bar{display:block;height:8px;overflow:hidden;background:#f4f0ea;border-radius:999px;box-shadow:inset 0 0 0 1px #e7ded1}.ds-bar>span{display:block;height:100%;background:#a34c30;border-radius:inherit}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A prancheta do Nino",
+    "overview": "O Casa Mia é uma lista organizada com afeto. A interface se comporta como a pranchetinha que o Nino carrega: papel claro de linho, anotações em café tostado, o traço terracota que marca o que importa e o risco que celebra cada item conquistado. A ordem é a forma de cuidado: nada grita, tudo tem lugar, e o próximo passo está sempre visível.\n\nA densidade é de lista, não de painel. Linhas de item, cômodos e progresso aparecem em superfícies quase planas, separadas por bordas finas de areia, com respiro generoso entre grupos. A landing ganha mais escala e calor (títulos em Fraunces grande, o Nino como personagem, telas reais do app), mas fala a mesma língua de papel, traço e check.\n\nOs componentes são artesanais e táteis no comportamento: cantos macios, alvos de toque grandes, o botão que sobe no hover e encolhe ao toque, o check que se preenche de sálvia e risca o nome. Textura de material e contornos de costura ainda não existem no código; se entrarem, devem nascer dos mesmos tokens e continuar discretos.",
+    "keyCharacteristics": [
+      "Linho (#f8f3eb) como papel de fundo, branco para cartões, café tostado para o texto.",
+      "Uma única ação forte por tela, em terracota profundo; o terracota oficial fica para marca e áreas grandes.",
+      "Conquista em sálvia e sempre com redundância: check preenchido mais nome riscado mais número escrito.",
+      "Superfícies quase planas: a borda separa, a sombra só respira.",
+      "Fraunces com SOFT 100 nos títulos, Nunito em toda a interface e nos números.",
+      "O Nino é o único personagem; a interface não ganha ilustrações concorrentes."
+    ],
+    "rules": [
+      {
+        "name": "The Mistura de Base Rule",
+        "body": "No código, cada tom é um `color-mix` das cores-base de `src/index.css` (`--cm-bg`, `--cm-text`, `--cm-primary`, `--cm-primary-dark`, `--cm-success`, `--cm-accent`, `--cm-olive-soft`, `--cm-sand`, `--cm-action`, `--cm-action-hover`). Recolorir é mudar só a base. Nunca redefina uma cor-base a partir dela mesma num escopo menor: o ciclo invalida todas as variáveis que dependem dela.",
+        "section": "colors"
+      },
+      {
+        "name": "The Terracota Certo Rule",
+        "body": "Texto branco só sobre `terracota-profundo` ou `terracota-queimado`. `terracota-artesanal` dá 4,2:1 com branco e 3,8:1 sobre o linho: é cor de marca, não de botão nem de texto pequeno.",
+        "section": "colors"
+      },
+      {
+        "name": "The Conquista Redundante Rule",
+        "body": "Nenhum estado depende só de cor: o item conquistado é riscado, o progresso tem número escrito, o cômodo completo diz \"Completo\".",
+        "section": "colors"
+      },
+      {
+        "name": "The SOFT Rule",
+        "body": "A Fraunces é sempre carregada com `SOFT@100` na URL do Google Fonts; sem o eixo, as pontas voltam retas e o título deixa de parecer o Nino.",
+        "section": "typography"
+      },
+      {
+        "name": "The Números em Nunito Rule",
+        "body": "Preços, quantidades e percentuais ficam em Nunito com `tabular-nums`. A Fraunces não tem algarismos tabulares e nunca entra em colunas de valores.",
+        "section": "typography"
+      },
+      {
+        "name": "The Borda Primeiro Rule",
+        "body": "Se dois elementos precisam se separar, use a borda `linha` ou um tom de fundo antes de pensar em sombra. Halos coloridos sem deslocamento são decoração e não entram.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Canto Proporcional Rule",
+        "body": "Quanto maior a superfície, maior o raio; nunca um raio grande em elemento pequeno nem canto vivo em cartão.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** usar uma única ação terracota profunda por tela; o resto é botão de apoio branco com contorno.",
+      "**Do** separar superfícies com a borda `linha` (#e7ded1) e tons de fundo antes de recorrer a sombra.",
+      "**Do** escrever todo tom novo como `color-mix` das cores-base de `src/index.css`.",
+      "**Do** manter texto a 4,5:1 (3:1 a partir de 24px) e foco visível em 3px terracota profundo.",
+      "**Do** usar a arte oficial do Nino (`public/brand/`) sem redesenhar, recolorir ou adicionar acessórios.",
+      "**Do** limitar movimento automático a menos de 5 s e respeitar `prefers-reduced-motion`; transições de 150 a 300ms."
+    ],
+    "donts": [
+      "**Don't** usar `terracota-artesanal` (#c2603f) como fundo de botão com texto branco ou em texto abaixo de 24px.",
+      "**Don't** usar vermelho para orçamento ou preço: \"acima da faixa\" é salmão (`preco-subiu-fundo`).",
+      "**Don't** usar emoji ou glifos como ícone: ícones são Lucide em traço, 16px dentro de botões.",
+      "**Don't** colocar a Fraunces em colunas de valores nem trocar a Nunito por DM Sans.",
+      "**Don't** criar cartões com borda colorida grossa de um lado só nem halos coloridos sem deslocamento.",
+      "**Don't** deixar animação em loop infinito chamando atenção (CTA pulando, plano pulsando)."
+    ]
+  }
+}

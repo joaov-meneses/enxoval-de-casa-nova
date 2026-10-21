@@ -1,16 +1,21 @@
 import { TooltipProvider } from "./components/ui/tooltip";
-import {StrictMode} from 'react';
+import {lazy, StrictMode, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
-import { AdminPage } from './components/AdminPage';
-import { ForgotPasswordPage } from './components/ForgotPasswordPage';
-import { InvitationPage } from './components/InvitationPage';
-import OnboardingFlow from './components/onboarding/OnboardingFlow';
-import { PrivacyPage } from './components/PrivacyPage';
-import { ResetPasswordPage } from './components/ResetPasswordPage';
+import { LandingRoute } from './LandingRoute';
 import './index.css';
 import { startSessionActivity } from './sessionActivity';
 import { startAnalytics, captureError } from './analytics';
+import { capturePlanChoiceFromUrl } from './planChoice';
+
+// Cada rota vira um pedaço próprio do pacote: a home não baixa o app, o admin nem o onboarding.
+const App = lazy(() => import('./App.tsx'));
+const AdminPage = lazy(() => import('./components/AdminPage').then((m) => ({ default: m.AdminPage })));
+const ForgotPasswordPage = lazy(() => import('./components/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })));
+const InvitationPage = lazy(() => import('./components/InvitationPage').then((m) => ({ default: m.InvitationPage })));
+const NinoMethodPage = lazy(() => import('./components/NinoMethodPage').then((m) => ({ default: m.NinoMethodPage })));
+const OnboardingFlow = lazy(() => import('./components/onboarding/OnboardingFlow'));
+const PrivacyPage = lazy(() => import('./components/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
+const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })));
 
 // /signup antigo: a conta só é criada no fim do funil de onboarding.
 // Checkouts antigos voltavam para o onboarding; preserve a confirmação ao abrir o enxoval.
@@ -27,6 +32,8 @@ if (
   window.history.replaceState({}, '', '/cadastro');
 }
 
+capturePlanChoiceFromUrl();
+
 const stopAnalytics = startAnalytics();
 if (import.meta.hot) import.meta.hot.dispose(stopAnalytics);
 
@@ -39,10 +46,15 @@ createRoot(document.getElementById('root')!, {
 }).render(
   <StrictMode>
     <TooltipProvider>
-    {/^\/admin(?:\/|$)/.test(window.location.pathname) ? (
+    <Suspense fallback={null}>
+    {window.location.pathname === '/' ? (
+      <LandingRoute />
+    ) : /^\/admin(?:\/|$)/.test(window.location.pathname) ? (
       <AdminPage />
     ) : window.location.pathname === '/comecar' ? (
       <OnboardingFlow />
+    ) : window.location.pathname === '/como-o-nino-escolhe' ? (
+      <NinoMethodPage />
     ) : window.location.pathname === '/privacidade' ? (
       <PrivacyPage />
     ) : window.location.pathname === '/esqueci-senha' ? (
@@ -54,6 +66,7 @@ createRoot(document.getElementById('root')!, {
     ) : (
       <App />
     )}
+    </Suspense>
     </TooltipProvider>
   </StrictMode>,
 );

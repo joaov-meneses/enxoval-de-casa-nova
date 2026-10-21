@@ -50,7 +50,8 @@ try {
     }
     const dialog=page.getByRole('dialog',{name:'Meu perfil',exact:true});
     await dialog.getByLabel('Seu nome',{exact:true}).waitFor();
-    assert.equal(await dialog.locator('.profile-avatar-camera').evaluate(element=>getComputedStyle(element).color),'rgb(255, 253, 248)');
+    const cameraInk=await page.evaluate(()=>{const probe=document.createElement('span');probe.style.color='color-mix(in oklab, var(--cm-bg) 22%, #fff)';document.body.append(probe);const color=getComputedStyle(probe).color;probe.remove();return color;});
+    assert.equal(await dialog.locator('.profile-avatar-camera').evaluate(element=>getComputedStyle(element).color),cameraInk);
     assert.equal(await dialog.locator('.profile-avatar-camera svg').evaluate(element=>getComputedStyle(element).width),'18px');
     await page.screenshot({path:`tmp/profile-personal-${width}.png`,fullPage:false});
     assert.equal(await dialog.getByLabel('Seu nome',{exact:true}).isDisabled(),true);

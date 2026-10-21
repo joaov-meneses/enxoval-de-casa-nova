@@ -328,7 +328,7 @@ function PeriodCard({
                 <span className="pp-period-sub">
                   {moveDate ? periodDates(moveDate, period) : period.hint} ·{" "}
                   {entries.length === 0
-                    ? "Nada pendente"
+                    ? "Nada na fila"
                     : `${entries.length} ${entries.length === 1 ? "item a resolver" : "itens a resolver"}`}
                 </span>
                 {verdict !== "empty" && (

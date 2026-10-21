@@ -58,12 +58,12 @@
   width: 100%;
   min-height: 24px;
   padding: 0 12px 3px;
-  color: #756455;
+  color: color-mix(in oklab, var(--cm-bg) 32%, var(--cm-text));
   border-radius: 0 0 8px 8px;
 }
 .workspace-app .item-footer .item-expand:hover {
   background: #ae7b4520;
-  color: #87412c;
+  color: color-mix(in oklab, var(--cm-primary-dark) 73%, var(--cm-text));
 }
 .workspace-app .item-footer .item-expand:focus-visible {
   outline-offset: -3px;
@@ -72,8 +72,8 @@
 /* Each environment is one bounded surface, including its drag handle. */
 .workspace-app .environment-row {
   position: relative;
-  border: 1px solid #cdb89a;
-  background: #ede0cb;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 99%, var(--cm-text));
+  background: color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg));
   box-shadow: 0 1px 2px #6246300c;
   transition:
     background-color 180ms ease,
@@ -81,16 +81,16 @@
     box-shadow 180ms ease;
 }
 .workspace-app .environment-row.active {
-  border-color: #a34c30;
-  background: #e4cfb3;
+  border-color: var(--cm-primary-dark);
+  background: color-mix(in oklab, var(--cm-sand) 61%, var(--cm-bg));
 }
 .workspace-app .environment-chips .environment-row,
 .workspace-app .environment-chips-row > .environment-row.environment-all {
   overflow: hidden;
   padding: 0 2px 0 12px;
   min-height: 46px;
-  background: #ede0cb;
-  border-color: #c4aa86;
+  background: color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg));
+  border-color: color-mix(in oklab, var(--cm-sand) 91%, var(--cm-text));
 }
 .workspace-app .environment-chips .environment-row.active,
 .workspace-app
@@ -101,7 +101,7 @@
 }
 .workspace-app .environment-row button.environment-select {
   min-height: 44px;
-  color: #53452f;
+  color: color-mix(in oklab, var(--cm-success) 50%, var(--cm-text));
 }
 .workspace-app .environment-chips .environment-row.active .environment-select {
   color: #fff;
@@ -147,7 +147,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .workspace-app .environment-row:not(.active):hover {
-    background: #e3cfb0;
+    background: color-mix(in oklab, var(--cm-sand) 62%, var(--cm-bg));
     border-color: #a7855d;
     box-shadow: 0 2px 6px #60452b20;
   }
@@ -166,12 +166,12 @@
 }
 /* Desktop navigation uses a filled current room and quiet, neutral alternatives. */
 .workspace-app .sidebar-rooms .environment-row {
-  --environment-ink: #53452f;
-  --environment-control: #79685c;
+  --environment-ink: color-mix(in oklab, var(--cm-success) 50%, var(--cm-text));
+  --environment-control: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
   --environment-delete: #c4766d;
-  --environment-delete-hover: #f0c7bf;
-  background: #fdfcf8;
-  border-color: #ded3c3;
+  --environment-delete-hover: color-mix(in oklab, var(--cm-primary) 34%, #fff);
+  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
+  border-color: color-mix(in oklab, var(--cm-bg) 86%, var(--cm-text));
   box-shadow: none;
   overflow: hidden;
 }
@@ -181,7 +181,7 @@
   --environment-delete: #fff;
   --environment-delete-hover: #ffffff40;
   background: var(--cm-action);
-  border-color: #873c25;
+  border-color: color-mix(in oklab, var(--cm-primary-dark) 87%, #000);
 }
 .workspace-app .sidebar-rooms .environment-row .environment-select,
 .workspace-app .sidebar-rooms .environment-row .environment-select > small {
@@ -209,11 +209,11 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .workspace-app .sidebar-rooms .environment-row:not(.active):hover {
-    background: #f6eee3;
+    background: color-mix(in oklab, var(--cm-bg) 98%, var(--cm-text));
     box-shadow: none;
   }
   .workspace-app .sidebar-rooms .environment-row.active:hover {
-    background: #9b4529;
+    background: color-mix(in oklab, var(--cm-primary-dark) 96%, #000);
   }
   .workspace-app .sidebar-rooms .environment-row.active .environment-rename:hover,
   .workspace-app .sidebar-rooms .environment-row.active .reorder-handle:hover {
@@ -228,7 +228,7 @@
 .workspace-app .desktop-app-header h1 {
   padding: 5px 10px;
   border-radius: 8px;
-  background: #f3ebe0;
+  background: color-mix(in oklab, var(--cm-sand) 28%, #fff);
   line-height: 1.4;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -443,7 +443,7 @@
     height: 4px;
     margin: 10px auto -4px;
     border-radius: 4px;
-    background: #cbbda8;
+    background: color-mix(in oklab, var(--cm-bg) 76%, var(--cm-text));
   }
 }
 @media (min-width: 768px) {
@@ -472,11 +472,11 @@
   width: 100%;
   min-height: 52px;
   padding: 10px 12px;
-  border: 1px solid #e9dfce;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 46%, #fff);
   border-radius: 10px;
   text-align: left;
-  color: #4a3228;
-  background: #fbf7ef;
+  color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text));
+  background: color-mix(in oklab, var(--cm-bg) 67%, #fff);
 }
 .export-sheet-actions > button > span {
   display: grid;
@@ -484,7 +484,7 @@
 }
 .export-sheet-actions small {
   font-size: 12px;
-  color: #756455;
+  color: color-mix(in oklab, var(--cm-bg) 32%, var(--cm-text));
 }
 .export-sheet-formats {
   display: flex;
@@ -495,17 +495,17 @@
   flex: 1;
   min-height: 44px;
   padding: 8px;
-  border: 1px solid #cdb89a;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 99%, var(--cm-text));
   border-radius: 10px;
 }
 .export-sheet-formats > button[aria-checked="true"] {
-  border-color: #a34c30;
-  background: #f2e2ce;
+  border-color: var(--cm-primary-dark);
+  background: color-mix(in oklab, var(--cm-sand) 28%, var(--cm-bg));
 }
 .export-sheet-caption {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #756455;
+  color: color-mix(in oklab, var(--cm-bg) 32%, var(--cm-text));
 }
 @media (prefers-reduced-motion: reduce) {
   .workspace-app .item-row.is-completing,
@@ -549,7 +549,7 @@
   border-color: #b18b60;
 }
 .workspace-app .environment-chips-row > .environment-row.environment-all.active {
-  border-color: #873c25;
+  border-color: color-mix(in oklab, var(--cm-primary-dark) 87%, #000);
 }
 .workspace-app .item-row {
   position: relative;
@@ -640,36 +640,36 @@
 
 /* Pending purchases lead the visual hierarchy; completed items stay readable and quieter. */
 .workspace-app .item-row:not(.checked):not(.inactive) {
-  --item-surface: #fff1db;
+  --item-surface: color-mix(in oklab, var(--cm-sand) 4%, var(--cm-bg));
   background: var(--item-surface);
-  border-color: #cda477;
+  border-color: color-mix(in oklab, var(--cm-primary) 32%, var(--cm-sand));
   box-shadow:
-    inset 3px 0 0 #b5532f,
-    0 2px 7px #6b442414;
+    inset 3px 0 0 var(--cm-primary),
+    0 2px 7px color-mix(in oklab, var(--cm-primary-dark) 10%, transparent);
 }
 .workspace-app .item-row:not(.checked):not(.inactive) .item-name {
   color: var(--cm-text);
   font-weight: 650;
 }
 .workspace-app .item-row.checked {
-  --item-surface: #eceee7;
+  --item-surface: color-mix(in oklab, var(--cm-olive-soft) 18%, #fff);
   background: var(--item-surface);
-  border-color: #c8cebc;
+  border-color: color-mix(in oklab, var(--cm-success) 31%, #fff);
   box-shadow: none;
 }
 .workspace-app .item-row.checked .item-name {
-  color: #5c6151;
+  color: color-mix(in oklab, var(--cm-success) 70%, var(--cm-text));
   font-weight: 500;
 }
 .workspace-app .item-row.inactive {
-  --item-surface: #efebe5;
+  --item-surface: color-mix(in oklab, var(--cm-success) 12%, #fff);
   background: var(--item-surface);
-  border-color: #d7cebf;
+  border-color: color-mix(in oklab, var(--cm-bg) 83%, var(--cm-text));
   box-shadow: none;
 }
 /* Light metadata surfaces remain distinct from the warm and completed cards. */
 .workspace-app .item-row .item-meta {
-  color: #5f493a;
+  color: color-mix(in oklab, var(--cm-sand) 25%, var(--cm-text));
 }
 .workspace-app .item-row .item-category-tag,
 .workspace-app .item-row .item-quantity-tag,
@@ -680,11 +680,11 @@
   justify-content: center;
   min-height: 26px;
   font-size: 12px;
-  background: #fffdf8;
-  border: 1px solid #cbb396;
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 96%, var(--cm-text));
   border-radius: 6px;
   padding: 2px 6px;
-  color: #513d2d;
+  color: color-mix(in oklab, var(--cm-sand) 15%, var(--cm-text));
   font-weight: 650;
   line-height: 1.4;
   text-align: center;
@@ -703,19 +703,19 @@
   line-height: 1.4;
 }
 .workspace-app .item-row .status-needed {
-  background: #fbe1cc;
-  color: #8b3f25;
-  border-color: #cb9776;
+  background: color-mix(in oklab, var(--cm-primary) 12%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 89%, #000);
+  border-color: color-mix(in oklab, var(--cm-primary) 45%, #fff);
 }
 .workspace-app .item-row .item-added {
-  color: #675344;
+  color: color-mix(in oklab, var(--cm-sand) 31%, var(--cm-text));
 }
 @media (hover: hover) and (pointer: fine) {
   .workspace-app .item-row:not(.checked):not(.inactive):hover {
-    border-color: #b5532f;
+    border-color: var(--cm-action);
   }
   .workspace-app .item-row.checked:hover {
-    border-color: #adb795;
+    border-color: color-mix(in oklab, var(--cm-olive-soft) 78%, #fff);
   }
 }
 
@@ -731,7 +731,7 @@
 .workspace-app .stats-compact-detail {
   font-size: 13px;
   font-weight: 600;
-  color: #514132;
+  color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
   line-height: 1.4;
 }
 .workspace-app .stats-compact-toggle {
@@ -743,7 +743,7 @@
   font-size: 12px;
   font-weight: 650;
   line-height: 1.35;
-  color: #514132;
+  color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
 }
 .workspace-app .stats-compact-grid dd {
   margin-top: 4px;
@@ -762,14 +762,14 @@
 .workspace-app .stats-scope {
   font-size: 13px;
   font-weight: 600;
-  color: #594839;
+  color: color-mix(in oklab, var(--cm-sand) 23%, var(--cm-text));
 }
 .workspace-app .stats-insight-label,
 .workspace-app .workspace-stats .stat-label,
 .workspace-app .workspace-stats .stat-next-label {
   font-size: 13px;
   font-weight: 700;
-  color: #4c3b2f;
+  color: color-mix(in oklab, var(--cm-bg) 10%, var(--cm-text));
 }
 .workspace-app .stats-insight > strong {
   font-size: 22px;
@@ -784,13 +784,13 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
-  color: #594839;
+  color: color-mix(in oklab, var(--cm-sand) 23%, var(--cm-text));
 }
 .workspace-app .workspace-stats .stat-sublabel,
 .workspace-app .workspace-stats .stat-receipt dt {
   font-size: 13px;
   font-weight: 650;
-  color: #514132;
+  color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
 }
 .workspace-app .workspace-stats .stat-receipt dd {
   font-weight: 600;
@@ -807,7 +807,7 @@
 .workspace-app .overview-room-meta {
   font-size: 13px;
   font-weight: 500;
-  color: #594839;
+  color: color-mix(in oklab, var(--cm-sand) 23%, var(--cm-text));
 }
 @media (max-width: 359px) {
   .workspace-app .stats-compact-percent {
@@ -832,7 +832,7 @@
     color-mix(in srgb, var(--item-surface) 75%, white),
     color-mix(in srgb, var(--item-surface) 20%, white)
   );
-  border-top-color: color-mix(in srgb, var(--item-surface) 75%, #82735e);
+  border-top-color: color-mix(in srgb, var(--item-surface) 75%, color-mix(in oklab, var(--cm-sand) 53%, var(--cm-text)));
   border-radius: 0;
 }
 .workspace-app .item-row.expanded .item-footer {
@@ -857,14 +857,14 @@
   border: 1px solid #9d7756;
   border-radius: 12px;
   background: #ffffff80;
-  color: #4a3228;
+  color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text));
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
   box-shadow: 0 5px 16px #5b3b2514;
 }
 .workspace-app .item-row .item-inline-actions .button-dark {
   background: linear-gradient(135deg, #b5532fe6, #9a4529eb);
-  border: 2px solid #873c25;
+  border: 2px solid color-mix(in oklab, var(--cm-primary-dark) 87%, #000);
   color: #fff;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -883,7 +883,7 @@
   height: 24px;
   border: 1.5px solid #a77c50;
   border-radius: 6px;
-  background: #fffdf7;
+  background: color-mix(in oklab, var(--cm-bg) 24%, #fff);
   transition:
     transform 160ms ease-out,
     background-color 160ms ease-out,
@@ -905,18 +905,18 @@
   border-radius: 10px;
 }
 .workspace-app .item-row-controls .item-check[data-state="checked"] {
-  background: #758151;
-  border-color: #5f6b45;
+  background: color-mix(in oklab, var(--cm-olive-soft) 44%, var(--cm-success));
+  border-color: color-mix(in oklab, var(--cm-olive-soft) 8%, var(--cm-success));
   color: #fff;
 }
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .workspace-app .item-row-controls .item-check:not(:disabled):hover {
-    background: #f8e4c8;
+    background: color-mix(in oklab, var(--cm-sand) 25%, var(--cm-bg));
     border-color: var(--cm-action);
   }
   .workspace-app .item-row-controls .item-check[data-state="checked"]:not(:disabled):hover {
-    background: #647143;
-    border-color: #536039;
+    background: color-mix(in oklab, var(--cm-olive-soft) 17%, var(--cm-success));
+    border-color: color-mix(in oklab, var(--cm-success) 95%, #000);
   }
 }
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {

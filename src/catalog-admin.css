@@ -10,24 +10,24 @@
   flex-direction: column;
   gap: 6px;
   padding: 16px;
-  border: 1px solid #ebddc9;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 37%, var(--cm-bg));
   border-radius: 14px;
   background: #fff;
 }
 .cat-admin-metrics dt {
   font-size: 13px;
-  color: #6e6057;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
 }
 .cat-admin-metrics dd {
   margin: 0;
   font-size: 28px;
   line-height: 1.1;
-  color: #555d3b;
+  color: color-mix(in oklab, var(--cm-success) 94%, #000);
   font-variant-numeric: tabular-nums;
 }
 .cat-admin-metrics small {
   font-size: 12.5px;
-  color: #6e6057;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
 }
 .cat-admin-toolbar {
   display: flex;
@@ -56,13 +56,13 @@
 }
 .cat-admin-title strong {
   font-size: 15px;
-  color: #3b2a20;
+  color: var(--cm-text);
   overflow-wrap: anywhere;
 }
 .cat-admin-title small,
 .cat-admin-usage {
   font-size: 13px;
-  color: #6e6057;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
 }
 .cat-admin-aliases {
   display: flex;
@@ -78,9 +78,9 @@
   gap: 2px;
   padding: 2px 4px 2px 10px;
   border-radius: 999px;
-  background: #f5ecdf;
+  background: color-mix(in oklab, var(--cm-bg) 97%, var(--cm-text));
   font-size: 12.5px;
-  color: #4f362b;
+  color: color-mix(in oklab, var(--cm-sand) 11%, var(--cm-text));
 }
 .cat-admin-aliases button {
   display: grid;
@@ -88,10 +88,10 @@
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  color: #a34c30;
+  color: var(--cm-primary-dark);
 }
 .cat-admin-aliases button:hover {
-  background: #ead9c3;
+  background: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-bg));
 }
 .cat-admin-actions {
   display: flex;
@@ -119,18 +119,18 @@
   display: grid;
   gap: 4px;
   font-size: 13px;
-  color: #6e6057;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
 }
 .cat-admin-form input,
 .cat-admin-form select {
   min-height: 40px;
   padding: 8px 10px;
-  border: 1px solid #e0d3c0;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 62%, #fff);
   border-radius: 10px;
   background: #fff;
   font: inherit;
   font-size: 14px;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .cat-admin-form .cat-admin-actions {
   grid-column: 1 / -1;
@@ -157,20 +157,20 @@
   border-radius: 10px;
   text-align: left;
   font-size: 14px;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .cat-admin-merge li button:hover {
-  background: #f5ecdf;
+  background: color-mix(in oklab, var(--cm-bg) 97%, var(--cm-text));
 }
 .cat-admin-merge small {
   font-size: 12.5px;
-  color: #6e6057;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
 }
 .cat-admin-link {
   justify-self: start;
   min-height: 40px;
   font-size: 13px;
-  color: #a34c30;
+  color: var(--cm-primary-dark);
   text-decoration: underline;
 }
 

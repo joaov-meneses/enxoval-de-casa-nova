@@ -15,8 +15,8 @@
   width: 25px;
   height: 25px;
   border-radius: 50%;
-  background: #eee4d2;
-  color: #8b4b31;
+  background: color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 81%, var(--cm-text));
   font-size: 12px;
 }
 .desktop-actions-trigger > svg {
@@ -34,25 +34,25 @@
   max-height: calc(100dvh - 100px);
   overflow-y: auto;
   padding: 8px;
-  border: 1px solid #e8dccb;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 49%, #fff);
   border-radius: 16px;
-  background: #fffdf8;
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
   box-shadow: 0 16px 48px #3b2a2026;
 }
 .desktop-actions-identity {
   display: grid;
   gap: 3px;
   padding: 12px;
-  border-bottom: 1px solid #eee4d4;
+  border-bottom: 1px solid color-mix(in oklab, var(--cm-sand) 39%, #fff);
   margin-bottom: 6px;
 }
 .desktop-actions-identity strong {
-  color: #3b2a20;
+  color: var(--cm-text);
   font-size: 14px;
   font-weight: 700;
 }
 .desktop-actions-identity span {
-  color: #79685a;
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -68,7 +68,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: #503a2b;
+  color: color-mix(in oklab, var(--cm-sand) 14%, var(--cm-text));
   font-size: 14px;
   font-weight: 500;
   text-align: left;
@@ -80,8 +80,8 @@
 }
 .desktop-actions-popup button:hover,
 .desktop-actions-popup button:focus-visible {
-  background: #f5eddf;
-  color: #8b4329;
+  background: color-mix(in oklab, var(--cm-success) 4%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 77%, var(--cm-text));
   outline: 2px solid transparent;
 }
 .desktop-actions-popup button:focus-visible {
@@ -90,5 +90,5 @@
 .desktop-actions-popup .desktop-menu-separator {
   height: 1px;
   margin: 7px 4px;
-  background: #eee4d4;
+  background: color-mix(in oklab, var(--cm-sand) 39%, #fff);
 }

@@ -244,7 +244,7 @@ type RoomOrder = "default" | "pending" | "progress";
 
 const ROOM_ORDERS: { id: RoomOrder; label: string }[] = [
   { id: "default", label: "Padrão" },
-  { id: "pending", label: "Pendentes" },
+  { id: "pending", label: "Na fila" },
   { id: "progress", label: "Avançados" },
 ];
 
@@ -332,7 +332,7 @@ export function WorkspaceOverview({
     else if (!n) meta.push("Tudo conquistado");
     else if (!checked)
       meta.push(`${n} ${n === 1 ? "item" : "itens"} para começar`);
-    else meta.push(`${n} ${n === 1 ? "pendente" : "pendentes"}`);
+    else meta.push(`${n} na fila`);
     if (n && roomPlanned > 0) meta.push(`${money(roomPlanned)} a investir`);
     else if (!n && roomSpent > 0) meta.push(`${money(roomSpent)} investidos`);
     if (roomUnpriced > 0) meta.push(`${roomUnpriced} sem preço`);
@@ -462,12 +462,12 @@ export function WorkspaceOverview({
         <div className="stats-insights-clip"><div className="stats-insights">
           <Card asChild className="block gap-0"><article className="stats-insight">
             <span className="stats-insight-label">Preços a pesquisar</span>
-            <strong>{unpriced}<small> de {pending.length} pendentes</small></strong>
+            <strong>{unpriced}<small> de {pending.length} na fila</small></strong>
             <p>{unpriced > 0
               ? "Complete os preços para saber quanto falta investir."
               : pending.length > 0
-                ? "Todos os itens pendentes já têm preço informado."
-                : "Nenhuma compra pendente por aqui."}</p>
+                ? "Todos os itens na fila já têm preço informado."
+                : "Nada na fila por aqui."}</p>
             {unpriced > 0 && onShowUnpriced && (
               <Button variant="brand" size="brand" type="button" className="stat-link" onClick={onShowUnpriced}>
                 Revisar preços <ArrowUpRight size={14} aria-hidden="true" />
@@ -515,7 +515,7 @@ export function WorkspaceOverview({
               <>
                 <li>
                   <i className="stat-dot stat-dot-todo" aria-hidden="true" />
-                  <span>Pendentes</span>
+                  <span>Na fila</span>
                   <b>{pending.length}</b>
                 </li>
               </>
@@ -595,12 +595,12 @@ export function WorkspaceOverview({
             </strong>
             <span className="stat-detail">
               {pending.length === 0
-                ? "Nenhum item pendente."
+                ? "Nenhum item na fila."
                 : planned > 0
                   ? `${pending.length} ${
-                      pending.length === 1 ? "item pendente" : "itens pendentes"
+                      pending.length === 1 ? "item na fila" : "itens na fila"
                     }${unpriced > 0 ? `, ${unpriced} sem preço.` : "."}`
-                  : "Sem estimativa: nenhum item pendente tem preço ainda."}
+                  : "Sem estimativa: nenhum item na fila tem preço ainda."}
             </span>
             {unpriced > 0 && onShowUnpriced && (
               <Button variant="brand" size="brand"

@@ -1,5 +1,17 @@
 import { test, expect, type Page } from "@playwright/test";
 
+/** Cor computada de uma expressão CSS da paleta, para comparar sem fixar o hex do tema. */
+async function cssColor(page: Page, expression: string) {
+  return page.evaluate((value) => {
+    const probe = document.createElement("span");
+    probe.style.color = value;
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, expression);
+}
+
 async function workspace(page: Page, longEnvironment = false) {
   const home = {
     id: "home",
@@ -217,7 +229,7 @@ for (const width of [
       }
       const pencil = row.locator(".item-name-scribble");
       await expect(pencil).toBeVisible();
-      await expect(pencil).toHaveCSS("stroke", "rgb(181, 83, 47)");
+      await expect(pencil).toHaveCSS("stroke", await cssColor(page, "var(--cm-action)"));
       await expect(pencil).toHaveCSS("opacity", "0.45");
       await expect(pencil).toHaveCSS("stroke-width", "1.35px");
       await expect(pencil).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -285,10 +297,21 @@ for (const width of [
       const room = environments.locator(".environment-row").first();
       const select = room.locator(".environment-select");
       await expect(room).toHaveCSS("border-top-style", "solid");
-      await expect(room).toHaveCSS("background-color", width < 1024 ? "rgb(237, 224, 203)" : "rgb(253, 252, 248)");
+      await expect(room).toHaveCSS(
+        "background-color",
+        await cssColor(
+          page,
+          width < 1024
+            ? "color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg))"
+            : "color-mix(in oklab, var(--cm-bg) 28%, #fff)",
+        ),
+      );
       if (width >= 1024) {
         await select.hover();
-        await expect(room).toHaveCSS("background-color", "rgb(246, 238, 227)");
+        await expect(room).toHaveCSS(
+          "background-color",
+          await cssColor(page, "color-mix(in oklab, var(--cm-bg) 98%, var(--cm-text))"),
+        );
         await expect(select.locator("span")).not.toHaveCSS("transform", "none");
       }
       await page.evaluate(() => {
