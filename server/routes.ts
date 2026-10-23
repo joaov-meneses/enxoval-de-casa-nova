@@ -460,7 +460,7 @@ const ITEM_SELECT = `
     ) recent
     WHERE v IS NOT NULL
   ) ps ON true
-  -- Lojas do item (até 5), a principal primeiro; o preço lido segue o tipo de preço do item.
+  -- Lojas do item (até 3), a principal primeiro; o preço lido segue o tipo de preço do item.
   LEFT JOIN LATERAL (
     SELECT json_agg(json_build_object(
       'id', o.id, 'url', otp.url, 'domain', otp.domain, 'is_primary', o.is_primary,

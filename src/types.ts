@@ -222,7 +222,7 @@ export interface SavingsSummary {
 /** Como a compra foi paga. Opcional: serve para o resumo por meio de pagamento. */
 export type PaymentMethod = 'pix' | 'credit' | 'debit' | 'boleto' | 'cash' | 'other';
 
-/** Uma loja onde o item está à venda (até 5 por item). A principal define o preço do item. */
+/** Uma loja onde o item está à venda (até 3 por item). A principal define o preço do item. */
 export interface ItemOffer {
   id: string;
   url: string;
