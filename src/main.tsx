@@ -6,6 +6,11 @@ import './index.css';
 import { startSessionActivity } from './sessionActivity';
 import { startAnalytics, captureError } from './analytics';
 import { capturePlanChoiceFromUrl } from './planChoice';
+import { recordTouch } from './analytics/firstTouch';
+import { ConsentBanner } from './components/ConsentBanner';
+
+// Origem da visita (UTM, domínio de origem, página de entrada), lida antes dos redirecionamentos abaixo.
+recordTouch();
 
 // Cada rota vira um pedaço próprio do pacote: a home não baixa o app, o admin nem o onboarding.
 const App = lazy(() => import('./App.tsx'));
@@ -14,8 +19,10 @@ const ForgotPasswordPage = lazy(() => import('./components/ForgotPasswordPage').
 const InvitationPage = lazy(() => import('./components/InvitationPage').then((m) => ({ default: m.InvitationPage })));
 const NinoMethodPage = lazy(() => import('./components/NinoMethodPage').then((m) => ({ default: m.NinoMethodPage })));
 const OnboardingFlow = lazy(() => import('./components/onboarding/OnboardingFlow'));
+const EmailPreferencesPage = lazy(() => import('./components/EmailPreferencesPage').then((m) => ({ default: m.EmailPreferencesPage })));
 const PrivacyPage = lazy(() => import('./components/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
 const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })));
+const VerifyEmailPage = lazy(() => import('./components/EmailVerificationPage').then((m) => ({ default: m.VerifyEmailPage })));
 
 // /signup antigo: a conta só é criada no fim do funil de onboarding.
 // Checkouts antigos voltavam para o onboarding; preserve a confirmação ao abrir o enxoval.
@@ -57,16 +64,29 @@ createRoot(document.getElementById('root')!, {
       <NinoMethodPage />
     ) : window.location.pathname === '/privacidade' ? (
       <PrivacyPage />
+    ) : window.location.pathname === '/preferencias' ? (
+      <EmailPreferencesPage />
     ) : window.location.pathname === '/esqueci-senha' ? (
       <ForgotPasswordPage />
     ) : window.location.pathname === '/redefinir-senha' ? (
       <ResetPasswordPage />
+    ) : window.location.pathname === '/verificar-email' ? (
+      <VerifyEmailPage />
     ) : window.location.pathname === '/convite' ? (
       <InvitationPage />
     ) : (
       <App />
     )}
     </Suspense>
+    <ConsentBanner />
     </TooltipProvider>
   </StrictMode>,
 );
+
+// Modo loja com sinal ruim: a casca do app fica guardada para abrir sem conexão. Só no build de produção, para o
+// service worker não interferir no servidor de desenvolvimento.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  });
+}

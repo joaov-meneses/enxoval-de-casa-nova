@@ -1,0 +1,5 @@
+simulation: jev-verification
+routing: path
+mocks:
+  - routeKey: jev
+    path: ../mocks/jev/config.yaml

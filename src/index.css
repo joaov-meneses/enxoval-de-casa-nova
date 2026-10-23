@@ -67,6 +67,23 @@ body {
   color: var(--color-brand-coffee, #2f2a26);
 }
 
+/* Azulejos do cadastro, compartilhados por todas as rotas. A camada fixa
+   mantém a escala e o degradê em páginas longas, sem interceptar cliques. */
+body {
+  min-height: 100dvh;
+  isolation: isolate;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='56' viewBox='0 0 48 56'%3E%3Cpath d='M10 56V26a14 14 0 0 1 28 0v30' fill='none' stroke='%23ecdcc3' stroke-width='1.5'/%3E%3C/svg%3E");
+  -webkit-mask-image: radial-gradient(ellipse 62% 78% at 50% 62%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 62% 78% at 50% 62%, #000 0%, transparent 78%);
+  pointer-events: none;
+}
+
 /* Destaques e marca usam Fraunces */
 h1,
 h2,

@@ -75,7 +75,7 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
             : `Cobrança única agora, sem teste grátis. ${PASS_MONTHS} meses de acesso, sem renovação automática.`}
         </p>
         <Button variant="brand" size="brand" className={`button button-dark${!monthly && !busy && !disabled ? ' subscription-pass-cta-pulse' : ''}`} disabled={busy || disabled} onClick={() => onChoose(selected)}>{busy ? 'Abrindo…' : monthly ? trialUsed ? 'Ativar plano Mensal' : 'Começar teste de 2 dias' : 'Continuar com o Passe'}{!busy && <ArrowRight size={18} aria-hidden="true" />}</Button>
-        <p className="subscription-plan-note"><LockKeyhole size={13} aria-hidden="true" /> Checkout seguro pela Stripe</p>
+        <p className="subscription-plan-note"><LockKeyhole size={13} aria-hidden="true" />{selectedOffer?.paymentMethods?.includes('pix') ? 'Pix ou cartão · Checkout seguro pela Stripe' : 'Cartão · Checkout seguro pela Stripe'}</p>
       </div>
     </>}
     <Dialog title="Como funcionam os 2 dias grátis?" isOpen={showTrialHelp} onClose={() => setShowTrialHelp(false)} className="subscription-trial-explanation">

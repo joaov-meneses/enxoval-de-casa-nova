@@ -31,7 +31,11 @@ export function recordApiSuccess(sink: AnalyticsSink, path: string, method: stri
       if (status === 'bought') capture('item_purchase_recorded');
     }
     if ('buyWeek' in input) capture('purchase_scheduled');
+    if (typeof input.installments === 'number') capture('installments_set', { installments: input.installments, payment_method: typeof data.paymentMethod === 'string' ? data.paymentMethod : 'none' });
+    if (typeof input.giftFrom === 'string' && input.giftFrom.trim()) capture('gift_logged', { has_message: typeof data.giftMessage === 'string' && data.giftMessage.length > 0 });
+    if (typeof input.warrantyMonths === 'number') capture('warranty_set', { months: input.warrantyMonths });
   }
+  if (/^\/api\/enxovais\/[^/]+$/.test(route) && method === 'PATCH' && typeof input.monthlyBudgetCents === 'number') capture('monthly_budget_set');
   if (/^\/api\/enxovais\/[^/]+$/.test(route) && method === 'PATCH' && ['moveDate', 'spendingTier', 'state', 'city'].some(key => key in input)) capture('planning_updated');
   if (route === '/api/products/extract') capture('product_imported', { has_price: typeof data.priceCents === 'number' });
   if (/^\/api\/items\/[^/]+\/price-history$/.test(route)) capture('price_history_viewed');

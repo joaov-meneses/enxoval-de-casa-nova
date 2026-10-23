@@ -160,7 +160,7 @@ export function PaywallDialog({
       >
         <div className="paywall">
           <div className="paywall-intro">
-            <Nino pose="wave" size={96} />
+            <Nino pose="keys" size={96} />
             <p>
               {result === "success"
                 ? "Obrigado por apoiar o Casa Mia! Estamos liberando o seu plano: em instantes, cômodos e itens ficam sem limites."
@@ -188,7 +188,7 @@ export function PaywallDialog({
     >
       <div className="paywall">
         <div className="paywall-intro">
-          <Nino pose="wave" size={96} />
+          <Nino pose="keys" size={96} />
           <p>Acesso completo a todos os recursos. Sua conta e seus dados ficam preservados após o cancelamento.</p>
         </div>
         <ul className="paywall-plans" aria-label="Planos">

@@ -265,3 +265,51 @@
     width: 100%;
   }
 }
+
+/* E-mails de lembretes e dicas (consentimento de marketing). */
+.profile-optin {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.profile-optin input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--cm-action, #a34c30);
+  cursor: pointer;
+}
+.profile-fiscal {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.profile-fiscal-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 1rem;
+}
+.profile-fiscal-list li {
+  overflow-wrap: anywhere;
+}
+.profile-fiscal-list p {
+  margin: .25rem 0 .5rem;
+}
+.profile-fiscal-select {
+  width: 100%;
+  min-height: 44px;
+  padding: .5rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: var(--background);
+  color: inherit;
+}
+.profile-fiscal-address {
+  margin-top: 1rem;
+}

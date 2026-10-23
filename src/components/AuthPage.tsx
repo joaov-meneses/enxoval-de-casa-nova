@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from "@/src/components/icons";
 import { login, register } from "../api";
+import { isAppPath } from "../appRoute";
 import type { BootstrapData } from "../types";
 import { Brand } from "./Brand";
 import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
@@ -138,7 +139,7 @@ function LoginPanel({
     try {
       const data = await login(email.trim(), password);
       if (data.user.mustChangePassword) {
-        window.history.replaceState({}, "", "/change-password");
+        if (!isAppPath(window.location.pathname)) window.history.replaceState({}, "", "/change-password");
         onAuthenticated(data);
         return;
       }
@@ -147,7 +148,7 @@ function LoginPanel({
         window.location.assign("/comecar");
         return;
       }
-      window.history.replaceState({}, "", "/app");
+      if (!isAppPath(window.location.pathname)) window.history.replaceState({}, "", "/app");
       onAuthenticated(data);
     } catch (err) {
       setError(
@@ -255,6 +256,8 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Consentimento de marketing por e-mail: separado da política e desmarcado por padrão (LGPD).
+  const [emailMarketing, setEmailMarketing] = useState(false);
   const mismatch = confirmation !== "" && confirmation !== password;
 
   async function submit(e: FormEvent) {
@@ -266,9 +269,10 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
     setSubmitting(true);
     setError("");
     try {
-      await register(email.trim(), password);
-      // Conta criada: o funil de perguntas monta o plano e o primeiro enxoval a seguir.
-      window.location.assign("/comecar");
+      const data = await register(email.trim(), password, { emailMarketing });
+      // Conta criada: o funil de perguntas monta o plano e o primeiro enxoval a seguir. Quando o e-mail
+      // ainda precisa ser confirmado, o app mostra antes a tela de confirmação.
+      window.location.assign(data.user.emailVerified === false ? "/app" : "/comecar");
     } catch (err) {
       setError(
         err instanceof Error
@@ -351,6 +355,17 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             </p>
           )}
         </div>
+        <label className="auth-optin">
+          <input
+            type="checkbox"
+            checked={emailMarketing}
+            onChange={(e) => setEmailMarketing(e.target.checked)}
+          />
+          <span>
+            Quero receber por e-mail lembretes da mudança e dicas para montar a casa. Dá para cancelar a qualquer
+            momento.
+          </span>
+        </label>
         {error && (
           <div className="form-error" role="alert">
             {error}

@@ -528,8 +528,10 @@ export async function searchCatalog(query: string, options: { limit?: number; re
  * o nome ou apelido mais longo que aparece inteiro no título.
  */
 export async function findItemInTitle(title: string): Promise<CatalogItem | null> {
-  const catalog = await getCatalogIndex();
-  const key = itemKey(title);
+  return itemInText(await getCatalogIndex(), itemKey(title));
+}
+
+function itemInText(catalog: CatalogIndex, key: string): CatalogItem | null {
   if (!key) return null;
   const padded = ` ${key} `;
   const compact = compactKey(key);
@@ -539,6 +541,34 @@ export async function findItemInTitle(title: string): Promise<CatalogItem | null
     if (contained && (!best || entry.key.length > best.key.length)) best = entry;
   }
   return best ? catalog.items.get(best.itemId) ?? null : null;
+}
+
+/* ------------------------------------------- importação por planilha */
+
+export interface CatalogNameMatch {
+  /**
+   * exact: o próprio item (escrito de outro jeito ou não) · similar: quase igual, provável erro de digitação ·
+   * contained: o nome é uma variação de um item conhecido ("Jogo de cama casal 4 peças"), e só o cômodo vale.
+   */
+  match: 'exact' | 'similar' | 'contained';
+  id: string;
+  name: string;
+  room: RoomKey | null;
+}
+
+/**
+ * Revisão da importação: para cada nome da planilha, o item do catálogo que ele é (ou contém), na mesma ordem. Só
+ * itens aprovados e só o índice em memória: sem Jev, sem gravar apelidos e sem métricas, porque a pessoa ainda pode
+ * desistir do arquivo.
+ */
+export async function matchCatalogNames(names: string[]): Promise<(CatalogNameMatch | null)[]> {
+  const catalog = await getCatalogIndex();
+  return names.map(name => {
+    const found = matchName(catalog, name);
+    const item = found.item ?? itemInText(catalog, found.key);
+    if (!item || item.status !== 'approved') return null;
+    return { match: found.match ?? 'contained', id: item.id, name: item.name, room: item.room };
+  });
 }
 
 /* ------------------------------------------------ compras redundantes */

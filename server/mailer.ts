@@ -6,6 +6,10 @@ export interface MailMessage {
   subject: string;
   text: string;
   html: string;
+  /** Cabeçalhos extras (ex.: List-Unsubscribe nos e-mails de ciclo de vida). */
+  headers?: Record<string, string>;
+  /** Remetente próprio (marketing sai de outro endereço, para não afetar a reputação do transacional). */
+  from?: string;
 }
 
 /** Mensagens "enviadas" quando MAIL_DRIVER=memory. Existe só para os testes lerem o link sem provedor real. */
@@ -79,11 +83,12 @@ async function deliverMail(message: MailMessage) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.MAIL_FROM,
+        from: message.from || process.env.MAIL_FROM,
         to: [message.to],
         subject: message.subject,
         text: message.text,
         html: message.html,
+        ...(message.headers ? { headers: message.headers } : {}),
       }),
     });
     const detail = await response.text();
@@ -96,7 +101,7 @@ async function deliverMail(message: MailMessage) {
   getLogger().warn({ event: 'mail.simulated', mail: message, production: isProductionServer() }, 'Email provider is not configured.');
 }
 
-function escapeHtml(value: string) {
+export function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -109,7 +114,7 @@ function escapeHtml(value: string) {
 const MAIL_SANS = "'Nunito','Segoe UI',Helvetica,Arial,sans-serif";
 const MAIL_SERIF = "'Fraunces',Georgia,'Times New Roman',serif";
 
-function layout(title: string, bodyHtml: string) {
+export function layout(title: string, bodyHtml: string) {
   return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#fbf3e6;padding:32px 16px;font-family:${MAIL_SANS};color:#3b2a20">
 <div style="max-width:480px;margin:0 auto;background:#fffaf1;border:1px solid #ecdcc3;border-radius:16px;padding:32px">
 <p style="margin:0 0 20px;font-family:${MAIL_SERIF};font-size:26px;font-weight:600;color:#c2603f">Casa Mia</p>
@@ -139,6 +144,31 @@ Se não foi você, ignore este e-mail: sua senha continua a mesma.`;
 <p style="margin:0 0 12px;line-height:1.6;font-size:14px">O link vale por ${input.minutes} minutos e só pode ser usado uma vez. Se o botão não abrir, copie este endereço no navegador:</p>
 <p style="margin:0 0 20px;font-size:13px;word-break:break-all;color:#6a5648">${escapeHtml(input.link)}</p>
 <p style="margin:0;line-height:1.6;font-size:14px;color:#6a5648">Se não foi você, ignore este e-mail: sua senha continua a mesma.</p>`,
+  );
+  return { to: input.to, subject, text, html };
+}
+
+export function emailVerificationEmail(input: {
+  to: string;
+  name: string;
+  link: string;
+  hours: number;
+}): MailMessage {
+  const subject = "Confirme seu e-mail no Casa Mia";
+  const text = `Olá, ${input.name}.
+
+Falta só confirmar que este e-mail é seu para começar a montar o plano da sua casa nova. Abra o link abaixo. Ele vale por ${input.hours} horas:
+
+${input.link}
+
+Se você não criou uma conta no Casa Mia, ignore este e-mail.`;
+  const html = layout(
+    "Confirme seu e-mail",
+    `<p style="margin:0 0 16px;line-height:1.6">Olá, ${escapeHtml(input.name)}. Falta só confirmar que este e-mail é seu para começar a montar o plano da sua casa nova.</p>
+<p style="margin:0 0 24px"><a href="${escapeHtml(input.link)}" style="display:inline-block;background:#b5532f;color:#ffffff;text-decoration:none;padding:14px 22px;border-radius:10px;font-weight:600">Confirmar e-mail</a></p>
+<p style="margin:0 0 12px;line-height:1.6;font-size:14px">O link vale por ${input.hours} horas. Se o botão não abrir, copie este endereço no navegador:</p>
+<p style="margin:0 0 20px;font-size:13px;word-break:break-all;color:#6a5648">${escapeHtml(input.link)}</p>
+<p style="margin:0;line-height:1.6;font-size:14px;color:#6a5648">Se você não criou uma conta no Casa Mia, ignore este e-mail.</p>`,
   );
   return { to: input.to, subject, text, html };
 }
@@ -236,6 +266,8 @@ export interface PriceOpportunity {
   url: string;
   /** Faixa comum do item (p10 a p90), vinda só de agregados de várias listas, quando há amostra suficiente. */
   commonRange?: { p10: number; p90: number } | null;
+  /** Loja do preço avisado ("Amazon"): com várias lojas por item, o aviso diz em qual. */
+  storeName?: string;
 }
 
 const brl = new Intl.NumberFormat("pt-BR", {
@@ -251,7 +283,7 @@ const REASON_TEXT: Record<PriceOpportunity["reason"], string> = {
 
 function opportunityLine(opportunity: PriceOpportunity) {
   const verb = opportunity.reason === "below_common" ? "está por" : "caiu para";
-  return `${opportunity.itemName} ${verb} ${brl.format(opportunity.priceCents / 100)} (${REASON_TEXT[opportunity.reason]})`;
+  return `${opportunity.itemName} ${verb} ${brl.format(opportunity.priceCents / 100)}${opportunity.storeName ? ` ${/^(Mercado Livre|KaBuM!)$/.test(opportunity.storeName) ? "no" : "na"} ${opportunity.storeName}` : ""} (${REASON_TEXT[opportunity.reason]})`;
 }
 
 function commonRangeText(opportunity: PriceOpportunity) {
@@ -299,4 +331,36 @@ export function trialEmail(input: { to: string; endsAt: Date; reminder: boolean 
   const subject = input.reminder ? 'Seu teste do Casa Mia termina em até 24 horas' : 'Seu teste de 2 dias do Casa Mia começou';
   const text = `${input.reminder ? 'Seu teste está acabando.' : 'Você tem 48 horas completas de acesso a todos os recursos, incluindo convidados, importação e exportação.'} O teste termina em ${deadline} (horário de Brasília). Após esse horário, o valor mensal informado no checkout será cobrado automaticamente no cartão cadastrado. Para evitar a cobrança, cancele antes desse horário em ${appBaseUrl()}/app, no botão "Cancelar assinatura". O cancelamento bloqueia imediatamente o acesso ao enxoval para você e seus convidados, inclusive importação e exportação. Sua conta e seus dados serão preservados.`;
   return { to: input.to, subject, text, html: layout(subject, `<p style="line-height:1.6">${escapeHtml(text)}</p>`) };
+}
+
+/** Aviso de garantia: um e-mail por pessoa, com os itens cuja garantia vence em até 30 (ou 7) dias. */
+export function warrantyEmail(input: {
+  to: string;
+  name: string;
+  items: { itemName: string; enxovalName: string; until: string; daysLeft: number }[];
+}): MailMessage {
+  const many = input.items.length > 1;
+  const date = (iso: string) => iso.split("-").reverse().join("/");
+  const left = (days: number) => (days === 0 ? "vence hoje" : days === 1 ? "vence amanhã" : `vence em ${days} dias`);
+  const subject = many
+    ? `${input.items.length} garantias do seu enxoval estão perto de vencer`
+    : `A garantia de ${input.items[0].itemName} ${left(input.items[0].daysLeft)}`;
+  const lines = input.items.map(item => `${item.itemName}: garantia ${left(item.daysLeft)} (${date(item.until)})`);
+  const settings = `${appBaseUrl() ?? ""}/app`;
+  const text = `Olá, ${input.name}.
+
+${many ? "Estas garantias estão perto de vencer:" : "Uma garantia está perto de vencer:"}
+
+${lines.map(line => `- ${line}`).join("\n")}
+
+Se algo deu problema, este é o momento de acionar a loja ou o fabricante. A nota e o certificado ficam guardados no item, em ${settings}.
+Para não receber estes avisos, desligue "Avisar antes de a garantia vencer" no seu perfil.`;
+  const html = layout(
+    many ? "Garantias perto de vencer" : "Garantia perto de vencer",
+    `<p style="margin:0 0 16px;line-height:1.6">Olá, ${escapeHtml(input.name)}. ${many ? "Estas garantias estão perto de vencer:" : "Uma garantia está perto de vencer:"}</p>
+${input.items.map((item, index) => `<p style="margin:0 0 12px;line-height:1.5"><strong>${escapeHtml(lines[index])}</strong><br><span style="font-size:13px;color:#6a5648">${escapeHtml(item.enxovalName)}</span></p>`).join("\n")}
+<p style="margin:16px 0 0;line-height:1.6">Se algo deu problema, este é o momento de acionar a loja ou o fabricante. A nota e o certificado ficam guardados no item: <a href="${escapeHtml(settings)}" style="color:#b5532f;font-weight:600">abrir o Casa Mia</a>.</p>
+<p style="margin:16px 0 0;line-height:1.6;font-size:14px;color:#6a5648">Para não receber estes avisos, desligue "Avisar antes de a garantia vencer" no seu perfil.</p>`,
+  );
+  return { to: input.to, subject, text, html };
 }

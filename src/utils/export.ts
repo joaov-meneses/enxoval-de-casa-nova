@@ -2,6 +2,7 @@ import type { EnxovalItem } from "../types";
 import { capture } from '../analytics';
 import { normalizeQuantity } from "../itemQuantity";
 import { discountApplies, statusLabel } from "../itemStatus";
+import { installmentPlan, PAYMENT_METHOD_LABEL } from "../planning/installments";
 
 /** Colunas da planilha, na ordem. A importação reconhece estes mesmos títulos. */
 export const ITEM_COLUMN_HEADERS = [
@@ -13,7 +14,25 @@ export const ITEM_COLUMN_HEADERS = [
   "Desconto/cashback (R$)",
   "Link",
   "Observações",
+  // Fase 11.1: parcelas e pagamento. A importação ignora estas colunas.
+  "Parcelas",
+  "Valor da parcela (R$)",
+  "Primeira parcela",
+  "Meio de pagamento",
 ] as const;
+
+/** Parcelas, valor da parcela, mês da primeira parcela (MM/AAAA) e meio de pagamento de um item. */
+function installmentCells(item: EnxovalItem) {
+  const plan = installmentPlan(item);
+  const count = item.installments ?? 1;
+  const first = item.firstInstallmentOn ?? (item.status === "bought" ? item.purchasedAt : null) ?? null;
+  return {
+    count,
+    perCents: plan && count > 1 ? plan.amounts.at(-1)! : null,
+    first: first ? `${first.slice(5, 7)}/${first.slice(0, 4)}` : "",
+    method: item.paymentMethod ? PAYMENT_METHOD_LABEL[item.paymentMethod] : "",
+  };
+}
 
 export type ExportFormat = "csv" | "xlsx";
 
@@ -40,6 +59,10 @@ export function createCsv(items: EnxovalItem[]) {
           : "",
         i.link,
         i.description,
+        String(installmentCells(i).count),
+        installmentCells(i).perCents === null ? "" : (installmentCells(i).perCents! / 100).toFixed(2).replace(".", ","),
+        installmentCells(i).first,
+        installmentCells(i).method,
       ]),
     ]
       .map((row) => row.map(cell).join(";"))
@@ -73,6 +96,10 @@ export function createSheetData(items: EnxovalItem[]) {
         : null,
       text(i.link),
       text(i.description),
+      { value: installmentCells(i).count, type: Number },
+      installmentCells(i).perCents === null ? null : money(installmentCells(i).perCents!),
+      text(installmentCells(i).first),
+      text(installmentCells(i).method),
     ]),
   ];
 }
@@ -86,6 +113,10 @@ export const XLSX_COLUMNS = [
   { width: 22 },
   { width: 36 },
   { width: 40 },
+  { width: 10 },
+  { width: 20 },
+  { width: 16 },
+  { width: 20 },
 ];
 
 export async function createXlsxBlob(items: EnxovalItem[]): Promise<Blob> {

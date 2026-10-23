@@ -12,6 +12,7 @@ import {
   ListChecks,
   MessageCircleHeart,
   UserRound,
+  ShoppingBag,
 } from "@/src/components/icons";
 import type {
   AuthUser,
@@ -23,7 +24,7 @@ import type {
 import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 import { Select } from "./Select";
 import { EnvironmentList } from "./EnvironmentList";
-import { activeItems } from "../itemStatus";
+import { activeItems, doneItems } from "../itemStatus";
 import { enxovalSelectOptions } from "../enxovais";
 import { UserAvatar } from './UserAvatar';
 
@@ -55,6 +56,8 @@ interface WorkspaceMenuProps {
   /** Abre a central de ajuda (relatar problema ou sugerir melhoria). */
   onHelp: () => void;
   onProfile: () => void;
+  /** Modo loja: só o que falta, com letra grande, para riscar rápido na loja física. */
+  onStoreMode?: () => void;
 }
 
 export function WorkspaceMenu(props: WorkspaceMenuProps) {
@@ -71,7 +74,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
         onCloseAutoFocus={event => { event.preventDefault(); props.triggerRef.current?.focus(); }}>
         <div className="workspace-menu-heading">
           <div>
-            <span className="workspace-menu-eyebrow">SEU CANTINHO</span>
             <SheetTitle id="workspace-menu-title">Menu do enxoval</SheetTitle>
           </div>
           <Button variant="brand" size="brand"
@@ -114,6 +116,16 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               </Button>
             )}
           </section>
+          {hasEnxoval && props.onStoreMode && (
+            <Button variant="brand" size="brand"
+              type="button"
+              className="workspace-menu-create workspace-menu-store"
+              disabled={props.busy}
+              onClick={() => run(props.onStoreMode!)}
+            >
+              <ShoppingBag size={17} /> Estou na loja
+            </Button>
+          )}
           {hasEnxoval && !isOwner && (
             <section
               className="workspace-menu-invite workspace-menu-guest"
@@ -203,7 +215,14 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 >
                   <ListChecks size={18} strokeWidth={1.6} aria-hidden="true" />
                   <span>Todos</span>
-                  <small>{activeItems(props.items).length}</small>
+                  <small className="environment-progress">
+                    <span className="environment-count" aria-hidden="true">
+                      {doneItems(props.items).length}/{activeItems(props.items).length}
+                    </span>
+                    <span className="sr-only">
+                      , {doneItems(props.items).length} de {activeItems(props.items).length} conquistados
+                    </span>
+                  </small>
                 </Button>
               </div>
               <EnvironmentList

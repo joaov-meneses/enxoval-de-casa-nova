@@ -1,0 +1,147 @@
+openapi: 3.0.3
+info:
+  title: Casa Mia — Pagamentos e notas fiscais
+  version: 2.0.0
+  description: >-
+    Checkout hospedado na Stripe. Pix no Passe em BRL, cartão no Mensal.
+    NFS-e direta pelo Emissor Público Nacional com mTLS e DPS assinada. Emissão pelo worker
+    por checkout pago do Passe ou invoice.paid do Mensal com valor positivo.
+    Inbox durável com transmissão desligada. DPS e número estáveis por pagamento e ambiente.
+    Momento da emissão e competência configurados por orientação contábil; padrão manual.
+servers:
+  - url: http://localhost:3000/api
+security:
+  - session: []
+paths:
+  /billing/checkout:
+    post:
+      operationId: createCheckout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan]
+              properties:
+                plan: {type: string, enum: [monthly, pass]}
+                returnTo:
+                  type: string
+                  maxLength: 2048
+                  example: /app/123e4567-e89b-12d3-a456-426614174000/plano
+                  description: >-
+                    Caminho local reconhecido do app, sem query ou fragmento, usado no sucesso
+                    e cancelamento. Opcional; valores invalidos retornam para /app.
+                    O cache do checkout mensal considera esse caminho.
+      responses:
+        '200':
+          description: Checkout criado; não comprova pagamento nem libera acesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: {type: string, format: uri}
+        '400': {description: Plano inválido}
+        '401': {description: Sessão ausente}
+        '403': {description: Convidado não pode contratar plano}
+        '409': {description: Plano em vigor incompatível com nova contratação}
+        '503': {description: Checkout indisponível}
+  /billing/fiscal:
+    get:
+      operationId: getFiscalBilling
+      responses:
+        '200':
+          description: >-
+            Dados e até 50 notas exclusivamente do titular autenticado, inclusive
+            após término do acesso. Cache-Control no-store. Status pending,
+            processing, authorized, cancelled, needs_data, rejected ou failed.
+            XML nacional usa rota autenticada local; URLs históricas usam HTTPS. Homologação é identificada explicitamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled, requireAddress, profile, invoices]
+                properties:
+                  enabled: {type: boolean}
+                  requireAddress: {type: boolean}
+                  profile:
+                    type: object
+                    required: [name, document]
+                    properties:
+                      name: {type: string}
+                      document: {type: string}
+                      address: {type: object, nullable: true, description: 'Endereço interno do tomador, convertido para o leiaute nacional da DPS.'}
+                  invoices:
+                    type: array
+                    items: {type: object}
+        '401': {description: Sessão ausente}
+  /billing/fiscal/{id}/xml:
+    get:
+      operationId: downloadFiscalXml
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: XML autorizado do titular. Cache-Control no-store.}
+        '401': {description: Sess?o ausente}
+        '404': {description: Nota n?o encontrada para este titular ou XML indispon?vel}
+  /billing/fiscal/profile:
+    put:
+      operationId: updateFiscalProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, document]
+              properties:
+                name: {type: string, minLength: 2, maxLength: 120}
+                document: {type: string, description: CPF ou CNPJ numérico com dígitos verificadores válidos. Aceita formatação.}
+                address:
+                  type: object
+                  description: Obrigatório quando requireAddress=true. Não altera notas autorizadas.
+                  required: [logradouro, numero, bairro, codigo_municipio, uf, cep]
+                  properties:
+                    logradouro: {type: string, maxLength: 150}
+                    numero: {type: string, maxLength: 150}
+                    complemento: {type: string, maxLength: 150}
+                    bairro: {type: string, maxLength: 150}
+                    codigo_municipio: {type: string, pattern: '^\d{7}$'}
+                    uf: {type: string, pattern: '^[A-Z]{2}$'}
+                    cep: {type: string, description: CEP com oito dígitos; aceita hífen.}
+      responses:
+        '200': {description: Dados salvos; notas needs_data são recolocadas na fila. Notas emitidas permanecem imutáveis.}
+        '400': {description: Nome ou CPF/CNPJ inválido}
+        '401': {description: Sessão ausente}
+        '403': {description: Convidado não pode alterar dados fiscais}
+  /billing/webhook:
+    post:
+      security: []
+      operationId: stripeWebhook
+      parameters:
+        - in: header
+          name: Stripe-Signature
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 'Evento assinado conforme contrato Stripe. charge.refunded e refund.created/updated/failed registram pendência de revisão fiscal e de acesso, inclusive com emissão desabilitada. Não cancelam notas, acesso nem movimentam dinheiro.'
+      responses:
+        '200': {description: Evento processado ou ignorado. Duplicatas não duplicam acesso ou emissão. Provedor fiscal é chamado pelo worker.}
+        '400': {description: 'Assinatura ausente, inválida ou expirada'}
+        '500': {description: Falha na persistência; Stripe deve reenviar o evento}
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: enxoval_session

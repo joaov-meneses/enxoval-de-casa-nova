@@ -250,8 +250,8 @@ Considerando um mix de adesão realista entre os planos:
 4. **Gateway de Pagamento Oficial: Stripe Brasil + Automação Fiscal:**
    * **Processamento Stripe (Cartão + Pix):** mix de 75% Cartão (3,99% + R$ 0,39) e 25% Pix (1,19%): **~R$ 2.325,00 / mês**.
    * **Stripe Billing (0,5%):** dunning inteligente com IA (Smart Retries) e Customer Portal pronto: **~R$ 306,00 / mês**.
-   * **API de Automação de NFS-e (Focus NFe / PlugNotas):** emissão automática de notas fiscais vinculada aos webhooks da Stripe: **~R$ 130,00 / mês**.
-   * *Subtotal Stripe + Fiscal:* **~R$ 2.761,00 / mês** (~4,5% sobre o faturamento).
+   * **NFS-e por integração direta com o Emissor Público Nacional:** sem mensalidade de intermediário; prever certificado ICP-Brasil, operação e manutenção da integração (custos a confirmar).
+   * *Subtotal das taxas Stripe:* **~R$ 2.631,00 / mês**. Certificado e operação fiscal pendentes de orçamento; total geral a revisar.
 5. **Reserva Técnica, Domínios e Ferramental de Suporte:**
    * **~R$ 500,00 / mês**.
 

@@ -3,7 +3,7 @@
   display: grid;
   place-items: center;
   padding: 32px 24px;
-  background: radial-gradient(ellipse at top, color-mix(in oklab, var(--cm-sand) 25%, var(--cm-bg)), transparent 70%), var(--cm-bg);
+  background: transparent;
   color: var(--cm-text);
 }
 .subscription-card {
@@ -149,8 +149,8 @@
 .subscription-trial-explanation-footer .button { width: 100%; min-height: 44px; }
 
 @media (max-width: 480px) {
-  .subscription-page { padding: 0; display: block; background: color-mix(in oklab, var(--cm-bg) 48%, #fff); }
-  .subscription-card { max-width: none; min-height: 100dvh; align-content: start; padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); gap: 14px; border: 0; border-radius: 0; box-shadow: none; background: color-mix(in oklab, var(--cm-bg) 48%, #fff); }
+  .subscription-page { padding: 0; display: block; background: transparent; }
+  .subscription-card { max-width: none; min-height: 100dvh; align-content: start; padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); gap: 14px; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
   .subscription-card:has(.subscription-benefits) { grid-template-rows: auto auto auto minmax(min-content, 1fr); align-content: stretch; }
   .subscription-card h1 { font-size: 28px; line-height: 1.1; max-width: 20ch; }
   .subscription-promise { grid-template-columns: minmax(0, 1fr) 88px; gap: 12px; }
@@ -217,4 +217,36 @@
   .subscription-trial-welcome { gap: 14px; margin-bottom: 16px; }
   .subscription-trial-welcome p { font-size: 14px; line-height: 1.5; }
   .subscription-trial-details { padding: 16px; gap: 14px; }
+}
+.subscription-fiscal-notice {
+  margin: 0;
+  padding: .75rem 1rem;
+  background: #fff5dc;
+  color: #634d26;
+  font-size: .875rem;
+  text-align: center;
+}
+
+.subscription-connection-notice {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(680px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--cm-line, #e7ded1);
+  border-radius: 12px;
+  background: var(--cm-bg);
+  color: var(--cm-text);
+  box-shadow: 0 4px 18px #3b2a2014;
+  font-size: 14px;
+}
+.subscription-connection-notice .button { flex: none; min-height: 44px; }
+@media (max-width: 1023px) {
+  .subscription-connection-notice { bottom: 88px; flex-wrap: wrap; gap: 8px; }
 }

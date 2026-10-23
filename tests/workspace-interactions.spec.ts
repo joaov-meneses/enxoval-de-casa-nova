@@ -296,23 +296,24 @@ for (const width of [
       );
       const room = environments.locator(".environment-row").first();
       const select = room.locator(".environment-select");
-      await expect(room).toHaveCSS("border-top-style", "solid");
-      await expect(room).toHaveCSS(
-        "background-color",
-        await cssColor(
-          page,
-          width < 1024
-            ? "color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg))"
-            : "color-mix(in oklab, var(--cm-bg) 28%, #fff)",
-        ),
-      );
-      if (width >= 1024) {
+      if (width < 1024) {
+        await expect(room).toHaveCSS("border-top-style", "solid");
+        await expect(room).toHaveCSS(
+          "background-color",
+          await cssColor(page, "color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg))"),
+        );
+      } else {
+        // Na barra lateral, o ambiente é uma linha de navegação lisa; alça e "⋯" só aparecem ao passar o mouse.
+        await expect(room).toHaveCSS("border-top-style", "none");
+        await expect(room).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+        await expect(room.locator(".environment-menu-trigger")).toHaveCSS("opacity", "0");
         await select.hover();
         await expect(room).toHaveCSS(
           "background-color",
-          await cssColor(page, "color-mix(in oklab, var(--cm-bg) 98%, var(--cm-text))"),
+          await cssColor(page, "color-mix(in oklab, var(--cm-sand) 23%, #fff)"),
         );
-        await expect(select.locator("span")).not.toHaveCSS("transform", "none");
+        await expect(room.locator(".environment-menu-trigger")).toHaveCSS("opacity", "1");
+        await expect(select.locator("> span").first()).not.toHaveCSS("transform", "none");
       }
       await page.evaluate(() => {
         document.addEventListener("animationstart", (event) => {
@@ -598,7 +599,7 @@ for (const reduced of [false, true]) {
     await expect(exportTrigger).toBeFocused();
     await page
       .locator(".mobile-bottom-nav")
-      .getByRole("button", { name: /Visão geral/ })
+      .getByRole("button", { name: /Meu Lar/ })
       .click();
     await page
       .getByRole("button", { name: "Novo ambiente", exact: true })

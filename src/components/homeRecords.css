@@ -1,0 +1,103 @@
+/* Meu Lar: presentes e documentos da casa (Fase 11). */
+.home-records {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 70%, #fff);
+  border-radius: 18px;
+  background: #fff;
+}
+.home-records-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.home-records-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+.home-records-head a.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.home-records-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.home-records-summary strong {
+  color: var(--cm-primary-dark);
+}
+.home-records-list,
+.home-records-warranties {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.home-records-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 50%, #fff);
+}
+.home-records-list li:first-child {
+  border-top: 0;
+}
+.home-records-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.home-records-name a {
+  color: var(--cm-text);
+  overflow-wrap: anywhere;
+}
+.home-records-name small {
+  font-size: 12px;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.home-records-name q {
+  font-size: 13px;
+  font-style: italic;
+  color: color-mix(in oklab, var(--cm-bg) 15%, var(--cm-text));
+}
+.home-records-status {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--cm-primary-dark);
+  white-space: nowrap;
+}
+.home-records-status.is-done {
+  color: color-mix(in oklab, var(--cm-success) 95%, #000);
+}
+.home-records-warranties li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+.home-records-warranties li > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--cm-success);
+}
+.home-records-warranties li.is-soon > svg {
+  color: #8a4a0b;
+}

@@ -330,7 +330,7 @@
 }
 .pp-now {
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -361,9 +361,10 @@
   background: color-mix(in oklab, var(--cm-olive-soft) 12%, var(--cm-bg));
   color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
+/* "Passou da semana sugerida" é informação para reagendar, nunca alarme (Acolhimento antes da cobrança). */
 .pp-badge.is-late {
-  background: color-mix(in oklab, var(--cm-primary) 19%, #fff);
-  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-verdict.is-within {
   background: color-mix(in oklab, var(--cm-olive-soft) 12%, var(--cm-bg));
@@ -406,7 +407,7 @@
   align-items: center;
   gap: 3px;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
@@ -488,7 +489,8 @@
   color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 .pp-late {
-  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-row-reason {
   display: inline-flex;
@@ -618,8 +620,8 @@
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cm-accent) 40%, #fff);
 }
 .item-week-tag.is-late {
-  background: color-mix(in oklab, var(--cm-primary) 19%, #fff);
-  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 
 @media (max-width: 980px) {
@@ -662,7 +664,7 @@
   }
   .pp-summary span {
     grid-column: 1;
-    font-size: 11px;
+    font-size: 12px;
   }
   .pp-summary strong {
     grid-column: 2;
@@ -714,7 +716,7 @@
   }
   .pp-badge {
     padding: 2px 8px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .pp-figures {
     margin-top: 10px;
@@ -725,7 +727,7 @@
     gap: 8px;
   }
   .pp-figures dt {
-    font-size: 11px;
+    font-size: 12px;
   }
   .pp-figures dd {
     font-size: 12.5px;
@@ -752,7 +754,7 @@
   }
   .pp-row-price {
     grid-area: price;
-    font-size: 11.5px;
+    font-size: 12px;
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -768,7 +770,7 @@
     line-height: 1.3;
   }
   .pp-row-meta {
-    font-size: 11.5px;
+    font-size: 12px;
   }
   .pp-row-reason {
     display: none;
@@ -856,20 +858,20 @@
 }
 .pp-summary > div.is-planned {
   background: color-mix(in oklab, var(--cm-accent) 9%, #fff);
-  border-color: #c4d9e8;
+  border-color: color-mix(in oklab, var(--cm-accent) 22%, #fff);
 }
 .pp-summary > div.is-spent {
-  background: #e5eed8;
-  border-color: #cbdcb4;
+  background: color-mix(in oklab, var(--cm-olive-soft) 22%, #fff);
+  border-color: color-mix(in oklab, var(--cm-olive-soft) 45%, #fff);
 }
 .pp-summary > div.is-band span {
-  color: #6b4a1f;
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-summary > div.is-planned span {
   color: color-mix(in oklab, var(--cm-accent) 91%, #000);
 }
 .pp-summary > div.is-spent span {
-  color: #33471f;
+  color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
 .pp-summary strong {
   font-weight: 600;
@@ -903,7 +905,7 @@
   background: color-mix(in oklab, var(--cm-bg) 41%, #fff);
   border-width: 2px;
   padding: 19px 20px;
-  box-shadow: 0 2px 8px #c2603f1f;
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--cm-primary) 12%, transparent);
 }
 .pp-period-toggle {
   align-items: center;
@@ -927,20 +929,20 @@
   color: color-mix(in oklab, var(--cm-bg) 11%, var(--cm-text));
 }
 .pp-badge.is-done {
-  background: #dcebc8;
-  color: #26401a;
+  background: color-mix(in oklab, var(--cm-olive-soft) 30%, #fff);
+  color: color-mix(in oklab, var(--cm-success) 75%, #000);
 }
 .pp-badge.is-late {
-  background: #a8421f;
-  color: #fff;
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-verdict.is-no_prices {
   background: color-mix(in oklab, var(--cm-bg) 93%, var(--cm-text));
   color: color-mix(in oklab, var(--cm-bg) 11%, var(--cm-text));
 }
 .pp-verdict.is-within {
-  background: #dcebc8;
-  color: #26401a;
+  background: color-mix(in oklab, var(--cm-olive-soft) 30%, #fff);
+  color: color-mix(in oklab, var(--cm-success) 75%, #000);
 }
 .pp-verdict.is-below {
   background: color-mix(in oklab, var(--cm-accent) 15%, #fff);
@@ -948,7 +950,7 @@
 }
 .pp-verdict.is-above {
   background: color-mix(in oklab, var(--cm-primary) 17%, var(--cm-bg));
-  color: #7a2a12;
+  color: color-mix(in oklab, var(--cm-primary-dark) 80%, #000);
 }
 
 /* Corpo da etapa: números num painel próprio, itens em branco */
@@ -1004,7 +1006,7 @@
 }
 .pp-row-week button.casamia-select-trigger {
   background: color-mix(in oklab, var(--cm-accent) 6%, #fff);
-  border-color: #b9d0e0;
+  border-color: color-mix(in oklab, var(--cm-accent) 28%, #fff);
   color: color-mix(in oklab, var(--cm-accent) 82%, #000);
   font-weight: 600;
 }
@@ -1015,7 +1017,7 @@
   color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
 }
 .pp-late {
-  color: #a8421f;
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 
 @media (max-width: 720px) {
@@ -1079,7 +1081,7 @@
 /* Mini FAQ: "Como a semana é sugerida?" */
 .pp-how {
   padding: 0;
-  border: 1px solid #b9d0e0;
+  border: 1px solid color-mix(in oklab, var(--cm-accent) 28%, #fff);
   border-radius: 11px;
   background: color-mix(in oklab, var(--cm-accent) 6%, #fff);
 }
@@ -1189,7 +1191,7 @@
   }
   /* A descrição da cidade (clima) vira uma linha de apoio para as duas colunas. */
   .pp-field small {
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.4;
   }
   .pp-tiers {
@@ -1254,7 +1256,7 @@
 @media (max-width: 720px) {
   .pp-city-note {
     margin-top: 8px;
-    font-size: 11.5px;
+    font-size: 12px;
   }
 }
 
@@ -1362,7 +1364,7 @@
 /* Do mais calmo (1) ao mais urgente (8): o tom esquenta a partir de "Na primeira semana". */
 .pp-nino-urgency.is-5 {
   background: color-mix(in oklab, var(--cm-sand) 15%, var(--cm-bg));
-  color: #6b4a1f;
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-nino-urgency.is-6 {
   background: color-mix(in oklab, var(--cm-primary) 11%, var(--cm-bg));
@@ -1425,7 +1427,7 @@
 .pp-room-group .pp-rows { margin-top: 0; }
 .pp-room-group .pp-row:first-child { border-top-color: color-mix(in oklab, var(--cm-success) 8%, var(--cm-bg)); }
 .pp-price-estimate { display: grid; gap: 3px; }
-.pp-price-label { font-size: 11px; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); font-weight: 400; }
+.pp-price-label { font-size: 12px; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); font-weight: 400; }
 .pp-price-range {
   display: flex;
   justify-content: flex-end;
@@ -1481,17 +1483,17 @@
   .pp-step { width: 24px; height: 24px; font-size: 12px; }
   .pp-period-name { font-size: 15px; line-height: 1.3; }
   .pp-period-band { display: none; }
-  .pp-now { font-size: 10px; }
+  .pp-now { font-size: 12px; }
   .pp-figures { padding: 10px; }
   .pp-figures dl { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .pp-figures dl > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 8px; }
-  .pp-figures dt { font-size: 11px; }
+  .pp-figures dt { font-size: 12px; }
   .pp-figures dd { margin: 0; font-size: 12px; overflow-wrap: normal; }
   .pp-room-groups { gap: 8px; }
   .pp-room-group { padding: 0 8px; }
   .pp-room-group > [data-slot="collapsible-trigger"] { gap: 6px; }
   .pp-room-name { font-size: 13px; }
-  .pp-room-count { font-size: 11px; }
+  .pp-room-count { font-size: 12px; }
   .pp-row { padding: 10px 0; margin: 0; }
   .pp-row-main { gap: 0; }
   .pp-row-meta:empty { display: none; }
@@ -1534,3 +1536,19 @@
 }
 
 .pp .pp-period-body { --pp-content-gap: 14px; }
+
+/* "Ver referência": a faixa do perfil só aparece quando a pessoa pede. */
+.pp-band-reveal {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 2px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--cm-primary-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.pp-band-reveal:hover {
+  color: var(--cm-action-hover);
+}

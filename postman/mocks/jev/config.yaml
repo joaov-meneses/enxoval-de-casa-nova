@@ -1,0 +1,9 @@
+version: 1
+name: Jev availability verification
+slug: jev-verification
+protocol: http
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

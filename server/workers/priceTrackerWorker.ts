@@ -3,7 +3,8 @@
 import { getPool } from '../database.ts';
 import { logger } from '../logger.ts';
 import { canDeliverMail, priceOpportunityEmail, sendMail, type PriceOpportunity } from '../mailer.ts';
-import { ScrapeError, scrapeProduct, type ScrapedProductPreview } from '../services/productScraper.ts';
+import { domainOf, ScrapeError, scrapeProduct, type ScrapedProductPreview } from '../services/productScraper.ts';
+import { storeLabel } from '../../src/priceTracking.ts';
 import { recordScrape, recordScrapeFailure, type ScrapeOutcome } from '../trackedProducts.ts';
 
 export const PRICE_CHECK_INTERVAL_MS = 12 * 60 * 60_000;
@@ -49,10 +50,15 @@ async function dueProducts(limit: number, force: boolean) {
   const result = await getPool().query<DueProduct>(`
     SELECT tp.id, tp.url
     FROM tracked_products tp
-    WHERE EXISTS (
+    WHERE (EXISTS (
         SELECT 1 FROM items i
         WHERE i.tracked_product_id = tp.id AND i.status = 'researching'
-      )
+      ) OR EXISTS (
+        -- Outras lojas do item (Fase 11.5) também são relidas enquanto o item está a comprar.
+        SELECT 1 FROM item_offers o
+        INNER JOIN items i ON i.id = o.item_id
+        WHERE o.tracked_product_id = tp.id AND i.status = 'researching'
+      ))
       AND ($2::boolean OR tp.last_scraped_at IS NULL OR tp.last_scraped_at < now() - interval '12 hours')
     ORDER BY tp.last_scraped_at ASC NULLS FIRST
     LIMIT $1
@@ -99,7 +105,8 @@ async function alertCandidates(productId: string) {
       ORDER BY ps.region DESC
       LIMIT 1
     ) cps ON true
-    WHERE i.tracked_product_id = $1
+    WHERE (i.tracked_product_id = $1
+        OR EXISTS (SELECT 1 FROM item_offers o WHERE o.item_id = i.id AND o.tracked_product_id = $1))
       AND i.price_alert_enabled
       AND i.status = 'researching'
   `, [productId]);
@@ -146,7 +153,7 @@ async function collectOpportunities(
 
     for (const person of candidate.recipients) {
       const entry = outbox.get(person.email) ?? { name: person.name, items: [] };
-      entry.items.push({ itemId: candidate.item_id, alertedPriceCents: current, itemName: candidate.item_name, enxovalName: candidate.enxoval_name, priceCents: current, reason, url: productUrl, commonRange });
+      entry.items.push({ itemId: candidate.item_id, alertedPriceCents: current, itemName: candidate.item_name, enxovalName: candidate.enxoval_name, priceCents: current, reason, url: productUrl, commonRange, storeName: storeLabel(domainOf(productUrl)) });
       outbox.set(person.email, entry);
     }
   }

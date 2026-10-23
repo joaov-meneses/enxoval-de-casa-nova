@@ -8,6 +8,15 @@ import { HttpError } from './security.ts';
 // Keep the original URL and payloads; serialization happens at completion, after parsers.
 const pathname = (req: Request) => req.originalUrl || req.url;
 const route = (req: Request) => req.route?.path ? `${req.baseUrl}${req.route.path}` : undefined;
+// Asset/module loads (including Animate UI), telemetry and keepalives are routine noise.
+// Decide the level again at completion so failures, slow requests and aborts stay visible.
+const isRoutineRequest = (req: Request) => {
+  const path = pathname(req).split('?')[0];
+  return /^\/ingest(?:\/|$)/.test(path)
+    || (req.method === 'POST' && path === '/api/auth/activity')
+    || (['GET', 'HEAD'].includes(req.method)
+      && (path === '/api/health' || !/^\/api(?:\/|$)/.test(path)));
+};
 const payload = (value: unknown) => Buffer.isBuffer(value)
   ? { encoding: 'base64', byteLength: value.length, data: value.toString('base64') }
   : value;
@@ -35,10 +44,11 @@ export function createHttpLogging(baseLogger: Logger = logger): RequestHandler {
       res: (res: Response) => ({ statusCode: res.statusCode, headers: res.getHeaders(), body: res.locals.logBody }),
       err: serializeError,
     },
-    customLogLevel: (_req, res, err) => {
+    customLogLevel: (req, res, err) => {
       if (res.statusCode >= 500) return 'error';
       if (res.statusCode >= 400 || (res.destroyed && !res.writableFinished) || (Date.now() - res[startTime]) >= slowMs) return 'warn';
-      return err || res.err ? 'error' : 'info';
+      if (err || res.err) return 'error';
+      return isRoutineRequest(req) ? 'silent' : 'info';
     },
     customReceivedMessage: req => `Requisição recebida: ${req.method} ${pathname(req)}`,
     customReceivedObject: req => ({ event: 'http.request.started', req }),

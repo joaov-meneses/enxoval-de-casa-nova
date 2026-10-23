@@ -1,3 +1,5 @@
+import { appRouteTemplate } from '../appRoute';
+
 export type AnalyticsProperties = Record<string, string | number | boolean>;
 
 // Explicit schema: never forward forms, API payloads, names, links or free text.
@@ -12,13 +14,19 @@ export const EVENT_PROPERTIES = {
   purchase_scheduled: [], planning_updated: [],
   product_imported: ['has_price'], price_history_viewed: [],
   invitation_sent: [], invitation_accepted: [],
-  nino_used: ['feature'], items_imported: ['count', 'failed', 'stopped'],
+  nino_used: ['feature'], items_imported: ['count', 'failed', 'stopped', 'catalog_applied'],
   items_exported: ['format', 'count'], plans_viewed: ['source', 'reason'],
   checkout_started: ['plan'], checkout_failed: ['plan'], checkout_canceled: [],
   subscription_activated: ['plan', 'trial'], subscription_canceled: [],
   billing_portal_opened: [], $pageview: ['route'],
   $pageleave: ['route'],
   landing_cta_clicked: ['action', 'position'],
+  // Fase 11: parcelas, responsável, presentes, documentos, lojas e modo loja.
+  installments_set: ['installments', 'payment_method'], monthly_budget_set: [],
+  item_assigned: ['self'], gift_logged: ['has_message'], gift_thanked: ['channel'],
+  document_uploaded: ['kind', 'source'], warranty_set: ['months'],
+  offer_added: ['offers'], offer_promoted: ['cheapest'], offer_cheapest_found: ['savings_cents'],
+  store_mode_opened: ['offline'], store_mode_item_checked: ['offline'], store_mode_offline_sync: ['count'],
 } as const;
 
 export type AnalyticsEvent = keyof typeof EVENT_PROPERTIES;
@@ -36,10 +44,12 @@ export function allowedProperties(event: AnalyticsEvent, properties: AnalyticsPr
   }));
 }
 
-export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/como-o-nino-escolhe', '/esqueci-senha', '/redefinir-senha'];
+export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/preferencias', '/como-o-nino-escolhe', '/esqueci-senha', '/redefinir-senha', '/verificar-email'];
 
 export function safeRoute(pathname: string) {
-  return PUBLIC_ROUTES.includes(pathname) ? pathname : '/other';
+  if (PUBLIC_ROUTES.includes(pathname)) return pathname;
+  // Sub-rotas do app viram modelos sem identificador: /app/meu-lar, /app/plano, /app/itens/:ambiente.
+  return appRouteTemplate(pathname) ?? '/other';
 }
 
 export function scrubSdkProperties(value: unknown): unknown {

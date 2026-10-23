@@ -66,7 +66,7 @@ textarea:focus-visible {
 .marketing-page {
   font-family: var(--sans);
   color: var(--ink);
-  background: var(--paper);
+  background: transparent;
   -webkit-font-smoothing: antialiased;
 }
 .skip-link {
@@ -167,12 +167,16 @@ textarea:focus-visible {
   box-shadow: 0 5px 14px #432e2415;
 }
 .button-outline {
-  border-color: color-mix(in oklab, var(--cm-sand) 38%, var(--cm-bg));
-  background: transparent;
+  border-color: var(--input);
+  background: #fff;
   color: var(--ink);
 }
-.button-outline:hover {
-  background: color-mix(in oklab, var(--cm-accent) 4%, var(--cm-bg));
+.button-outline:hover:not(:disabled) {
+  border-color: var(--cm-primary-dark);
+  background: var(--accent);
+}
+.button-outline:focus-visible {
+  border-color: var(--cm-primary-dark);
 }
 .button-small {
   min-height: 42px;
@@ -421,7 +425,7 @@ h2 {
 /* The planner */
 .workspace-app {
   --ink: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text));
-  background: color-mix(in oklab, var(--cm-sand) 13%, #fff);
+  background: transparent;
   color: var(--ink);
   font-family: var(--sans);
   /* Largura da barra lateral: o App a calcula para o maior nome de ambiente caber inteiro, em uma linha. */
@@ -444,57 +448,12 @@ h2 {
 .workspace-sidebar > .brand-link {
   margin: 0 10px 33px;
 }
-.workspace-picker {
-  border: 1px solid color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg));
-  background: color-mix(in oklab, var(--cm-sand) 16%, #fff);
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 24px;
-}
-.workspace-picker > span {
-  font-size: 11px;
-  letter-spacing: 1.3px;
-  color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text));
-  display: block;
-  margin-bottom: 7px;
-}
-.workspace-picker select {
-  background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  width: 100%;
-  text-overflow: ellipsis;
-  color: color-mix(in oklab, var(--cm-success) 99%, var(--cm-text));
-}
-.workspace-picker-create {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  margin-top: 10px;
-  min-height: 38px;
-  border: 1px solid color-mix(in oklab, var(--cm-sand) 74%, #fff);
-  border-radius: 7px;
-  background: color-mix(in oklab, var(--cm-sand) 34%, #fff);
-  color: color-mix(in oklab, var(--cm-success) 87%, #000);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.workspace-picker-create:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--cm-sand) 38%, var(--cm-bg));
-}
-.workspace-picker-create:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 .workspace-navigation {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.workspace-navigation button {
+.workspace-navigation > button {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -505,80 +464,29 @@ h2 {
   text-align: left;
   color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
 }
-.workspace-navigation button.active {
+.workspace-navigation > button.active {
   background: color-mix(in oklab, var(--cm-success) 5%, var(--cm-bg));
   color: color-mix(in oklab, var(--cm-success) 95%, var(--cm-text));
   font-weight: 600;
 }
-.workspace-navigation button > span {
+.workspace-navigation > button > span {
   margin-left: auto;
   background: color-mix(in oklab, var(--cm-sand) 44%, #fff);
   border-radius: 5px;
   font-size: 12px;
   padding: 1px 6px;
 }
-.sidebar-section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
-  margin: 28px 12px 12px;
-}
-.sidebar-section-title button {
-  padding: 4px;
-}
 .sidebar-rooms {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-.sidebar-rooms button {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 11px 14px;
-  border-radius: 7px;
-  text-align: left;
-  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
-  font-size: 13px;
-}
-.sidebar-rooms button > span {
-  flex: 1;
-}
-.sidebar-rooms button > small {
-  font-size: 12px;
-  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
-}
-.sidebar-rooms button.active {
-  color: var(--cm-primary-dark);
-  background: color-mix(in oklab, var(--cm-accent) 4%, var(--cm-bg));
-}
-.sidebar-rooms button:hover,
-.workspace-navigation button:hover {
+.workspace-navigation > button:hover {
   background: color-mix(in oklab, var(--cm-sand) 23%, #fff);
-}
-.sidebar-reorder {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
-  font-size: 12px;
-  padding: 14px;
-  margin-bottom: 20px;
 }
 .sidebar-bottom {
   margin-top: auto;
   padding-top: 20px;
-}
-.sidebar-profile {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 22px;
-  padding-inline: 3px;
 }
 .user-avatar {
   width: 33px;
@@ -590,28 +498,6 @@ h2 {
   font-family: var(--serif);
   color: var(--cm-primary-dark);
   flex-shrink: 0;
-}
-.sidebar-profile > span:nth-child(2) {
-  min-width: 0;
-  flex: 1;
-}
-.sidebar-profile strong {
-  font-size: 13px;
-  font-weight: 600;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sidebar-profile small {
-  display: block;
-  font-size: 12px;
-  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-.sidebar-profile button {
-  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
-  padding: 6px;
 }
 .desktop-app-header {
   display: flex;
@@ -681,7 +567,7 @@ h2 {
   margin-bottom: 26px;
 }
 .workspace-welcome .eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 1.2px;
   color: var(--cm-primary-dark);
 }
@@ -790,17 +676,33 @@ h2 {
   padding: 4px 7px;
   border-radius: 5px;
 }
+/* Search controls share a visible boundary on every page, including admin. */
+input[type="search"] {
+  background: #fff;
+  border-color: var(--input);
+  color: var(--ink);
+}
+input[type="search"]::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+input[type="search"]:enabled:hover {
+  border-color: var(--muted-foreground);
+}
+input[type="search"]:focus-visible {
+  border-color: var(--cm-primary-dark);
+}
 .list-search input {
-  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
-  border-color: color-mix(in oklab, var(--cm-sand) 42%, #fff);
+  background: #fff;
+  border-color: var(--input);
   border-radius: 7px;
   box-shadow: none;
   font-size: 13px;
   padding-block: 12px;
 }
 .list-search > button {
-  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
-  border-color: color-mix(in oklab, var(--cm-sand) 42%, #fff);
+  background: #fff;
+  border-color: var(--input);
   box-shadow: none;
   border-radius: 7px;
   height: 43px;
@@ -1029,7 +931,7 @@ h2 {
 }
 .overview-start {
   font-style: normal;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.02em;
   padding: 2px 8px;
@@ -1057,7 +959,7 @@ h2 {
 .overview-room-meta {
   display: block;
   margin-top: 7px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: color-mix(in oklab, var(--cm-bg) 40%, var(--cm-text));
 }
 @media (min-width: 1100px) {
@@ -1110,7 +1012,7 @@ h2 {
     display: none;
   }
   .workspace-welcome .eyebrow {
-    font-size: 11px;
+    font-size: 12px;
   }
   .workspace-welcome p {
     font-size: 12px;
@@ -1152,7 +1054,7 @@ h2 {
     font-size: 25px;
   }
   .workspace-welcome .eyebrow {
-    font-size: 11px;
+    font-size: 12px;
   }
   .workspace-stats {
     margin-bottom: 25px;
@@ -1252,7 +1154,7 @@ h2 {
   .section-heading .eyebrow,
   .rooms-intro > .eyebrow,
   .faq-section .eyebrow {
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 1.3px;
   }
   .section-heading h2,
@@ -1328,7 +1230,7 @@ h2 {
     max-width: 300px;
   }
   .workspace-welcome .eyebrow {
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 1px;
     max-width: 270px;
   }
@@ -1525,15 +1427,8 @@ h2 {
 }
 
 
-.workspace-navigation button {
+.workspace-navigation > button {
   font-size: 14px;
-}
-.sidebar-rooms button {
-  font-size: 13px;
-}
-.sidebar-section-title,
-.workspace-picker > span {
-  font-size: 12px;
 }
 .item-name {
   font-size: 14px;
@@ -1602,7 +1497,7 @@ h2 {
   align-items: center;
   justify-content: center;
   padding: 40px 24px;
-  background: radial-gradient(ellipse at top, color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg)), var(--cm-bg) 65%);
+  background: transparent;
   color: color-mix(in oklab, var(--cm-primary-dark) 9%, var(--cm-text));
 }
 .account-access-brand { margin-bottom: 28px; }
@@ -1635,7 +1530,7 @@ h2 {
   margin: 20px auto 0; padding: 10px 0; color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text)); font-size: 14px;
 }
 .account-access-footer { font-size: 13px; color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text)); margin-top: 24px; }
-.admin-page { min-height: 100dvh; background: color-mix(in oklab, var(--cm-sand) 13%, #fff); color: color-mix(in oklab, var(--cm-primary-dark) 9%, var(--cm-text)); }
+.admin-page { min-height: 100dvh; background: transparent; color: color-mix(in oklab, var(--cm-primary-dark) 9%, var(--cm-text)); }
 .admin-header {
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
   padding: 20px max(24px, calc((100vw - 1200px) / 2));
@@ -1655,8 +1550,11 @@ h2 {
 .admin-users { border: 1px solid color-mix(in oklab, var(--cm-sand) 37%, var(--cm-bg)); border-radius: 24px; background: color-mix(in oklab, var(--cm-bg) 28%, #fff); padding: 28px; }
 .admin-users-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .admin-users h2 { font-family: var(--serif); font-size: 28px; }
-.admin-search { display: flex; align-items: center; gap: 12px; background: color-mix(in oklab, var(--cm-bg) 48%, #fff); border: 1px solid color-mix(in oklab, var(--cm-sand) 37%, var(--cm-bg)); border-radius: 12px; padding: 0 14px; width: min(100%, 360px); color: color-mix(in oklab, var(--cm-bg) 35%, var(--cm-text)); }
-.admin-search input { min-width: 0; width: 100%; background: transparent; padding: 14px 0; font-size: 14px; color: color-mix(in oklab, var(--cm-primary-dark) 9%, var(--cm-text)); }
+.admin-search { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--input); border-radius: 12px; padding: 0 14px; width: min(100%, 360px); color: var(--muted-foreground); }
+.admin-search:hover { border-color: var(--muted-foreground); }
+.admin-search:focus-within { border-color: var(--cm-primary-dark); outline: 2px solid var(--cm-primary-dark); outline-offset: 2px; }
+.admin-search input { min-width: 0; width: 100%; border: 0; background: transparent; padding: 14px 0; font-size: 14px; color: var(--ink); box-shadow: none; }
+.admin-search input:focus-visible { outline: none; box-shadow: none; }
 .admin-filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 24px 0; }
 .admin-filters button { display: flex; align-items: center; gap: 8px; border-radius: 12px; padding: 10px 14px; font-size: 13px; color: color-mix(in oklab, var(--cm-bg) 28%, var(--cm-text)); min-height: 44px; }
 .admin-filters button.active { background: color-mix(in oklab, var(--cm-bg) 95%, var(--cm-text)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cm-sand) 58%, #fff); color: color-mix(in oklab, var(--cm-sand) 11%, var(--cm-text)); }
@@ -1696,6 +1594,23 @@ h2 {
 .admin-danger-button { background: #a94d44; color: #fff; }
 .admin-danger-button:hover:not(:disabled) { background: #923f37; }
 .admin-page button:disabled { opacity: .5; cursor: not-allowed; }
+.admin-device { display: inline-block; margin: 2px 6px 0 0; padding: 1px 7px; border-radius: 6px; background: color-mix(in oklab, var(--cm-bg) 95%, var(--cm-text)); }
+.admin-bans { margin: 24px 0; }
+.admin-ban-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; align-items: end; padding: 24px 0; }
+.admin-ban-form .admin-ban-notes, .admin-ban-form .form-error { grid-column: 1 / -1; }
+.admin-ban-form > button { grid-column: 4; min-height: 44px; }
+.admin-ban-field { display: grid; gap: 6px; font-size: 13px; }
+.admin-ban-list { display: grid; }
+.admin-ban-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-top: 1px solid color-mix(in oklab, var(--cm-sand) 37%, #fff); }
+.admin-ban-item > div { display: grid; gap: 3px; min-width: 0; }
+.admin-ban-item strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.admin-ban-item small { font-size: 13px; color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text)); overflow-wrap: anywhere; }
+.admin-ban-item.is-ended { opacity: .7; }
+.admin-ban-item .button { min-height: 44px; flex-shrink: 0; }
+@media (max-width: 720px) {
+  .admin-ban-form { grid-template-columns: 1fr; }
+  .admin-ban-form > button { grid-column: 1; }
+}
 @media (max-width: 1000px) {
   .admin-user-row { grid-template-columns: minmax(180px, 1fr) minmax(140px, 1fr) 180px; }
   .admin-user-identity { grid-column: 1 / 3; }
@@ -2751,6 +2666,7 @@ button.reorder-handle:disabled {
 .item-row-inner > .reorder-handle,
 .item-check,
 .item-meta a,
+.item-meta button,
 .item-actions button {
   position: relative;
   z-index: 1;
@@ -3239,7 +3155,7 @@ button.reorder-handle:disabled {
   margin: 6px 0 -4px;
   padding-top: 14px;
   border-top: 1px solid color-mix(in oklab, var(--cm-sand) 37%, #fff);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -3305,7 +3221,8 @@ button.reorder-handle:disabled {
   font-variant-numeric: tabular-nums lining-nums;
 }
 .money small {
-  font-size: 0.62em;
+  /* O "R$" acompanha o número, mas nunca abaixo do piso de 12px do texto de apoio. */
+  font-size: max(0.62em, 12px);
   font-weight: 500;
   letter-spacing: 0;
   margin-right: 0.04em;
@@ -3665,11 +3582,39 @@ button.reorder-handle:disabled {
   line-height: 1.5;
   cursor: pointer;
 }
-.import-check input {
+.import-check input,
+.import-check button[role="checkbox"] {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
+  /* O alvo de toque é o rótulo inteiro: o mínimo de 44px dos botões do diálogo esticaria a caixa. */
+  min-height: 0;
   margin-top: 1px;
+}
+.import-catalog {
+  font-size: 13px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 41%, #fff);
+  border-radius: 12px;
+}
+.import-catalog-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+}
+.import-catalog-head .import-link-button {
+  margin-left: auto;
+}
+.import-catalog ul {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+  list-style: none;
 }
 .import-preview {
   overflow-x: auto;
@@ -3861,7 +3806,7 @@ button.reorder-handle:disabled {
 }
 .stat-top-kind {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: 4px;
   background: color-mix(in oklab, var(--cm-sand) 27%, #fff);
@@ -3937,7 +3882,7 @@ button.reorder-handle:disabled {
   }
   .workspace-app .mobile-header-eyebrow {
     margin: 0 0 2px;
-    font-size: 9.5px;
+    font-size: 12px;
     letter-spacing: 0.14em;
     line-height: 1.2;
   }
@@ -3985,7 +3930,7 @@ button.reorder-handle:disabled {
   }
   .workspace-app .environment-chips .environment-select > small {
     padding: 2px 8px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .workspace-app .environment-chips .reorder-handle {
@@ -4017,7 +3962,7 @@ button.reorder-handle:disabled {
   }
   .workspace-app .environment-chips-row > .environment-row.environment-all small {
     padding: 2px 8px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .workspace-app .environment-chips-row > .environment-row.environment-all.active {
@@ -4105,7 +4050,7 @@ button.reorder-handle:disabled {
     margin: 0;
   }
   .stats-compact-grid dt {
-    font-size: 10.5px;
+    font-size: 12px;
     line-height: 1.3;
     color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
   }
@@ -4152,7 +4097,7 @@ button.reorder-handle:disabled {
   }
   .stats-insight > strong > small {
     display: block;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 400;
     color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
   }
@@ -4185,13 +4130,13 @@ button.reorder-handle:disabled {
   }
   .workspace-app .list-section-heading > div > span {
     padding: 2px 8px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .workspace-app .list-heading-actions {
     gap: 6px;
   }
   .workspace-app .list-heading-actions .export-menu-trigger {
-    min-height: 38px;
+    min-height: 44px;
     padding: 0 14px;
     white-space: nowrap;
   }
@@ -4220,17 +4165,17 @@ button.reorder-handle:disabled {
   .workspace-app .item-meta {
     gap: 4px;
     margin-top: 4px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.4;
   }
   .workspace-app .item-category-tag,
   .workspace-app .item-status-tag {
     padding: 1px 7px;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .workspace-app .item-added {
-    font-size: 11px;
+    font-size: 12px;
   }
   .workspace-app .item-check {
     width: 22px;
@@ -4252,7 +4197,7 @@ button.reorder-handle:disabled {
     min-height: 44px;
     padding: 4px 6px;
     gap: 1px;
-    font-size: 11px;
+    font-size: 12px;
     text-align: center;
   }
   .workspace-app .mobile-bottom-nav button svg {
@@ -4272,7 +4217,7 @@ button.reorder-handle:disabled {
     line-height: 1.5;
   }
   .workspace-app .workspace-welcome .eyebrow {
-    font-size: 9.5px;
+    font-size: 12px;
   }
   .workspace-app .overview-rooms {
     padding: 14px 14px 4px;
@@ -4290,7 +4235,7 @@ button.reorder-handle:disabled {
   }
   .workspace-app .overview-room-meta {
     margin-top: 5px;
-    font-size: 11px;
+    font-size: 12px;
   }
   /* Gaveta */
   .workspace-menu-panel .environment-list {
@@ -4337,7 +4282,8 @@ button.reorder-handle:disabled {
     height: 48px;
     padding: 0;
     color: #fff;
-    background: var(--cm-primary);
+    /* Terracota Certo: ícone branco só sobre o terracota profundo. */
+    background: var(--cm-action);
     border-radius: 50%;
     box-shadow: 0 8px 20px #422d2447;
     transition: transform 0.15s;
@@ -4431,7 +4377,7 @@ button.reorder-handle:disabled {
   }
   .workspace-app .item-inline-grid > label {
     gap: 3px;
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.2;
   }
   .workspace-app .item-inline-grid input,
@@ -4459,7 +4405,7 @@ button.reorder-handle:disabled {
     border-radius: 10px;
   }
   .workspace-app .item-inline-summary-label {
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.2;
   }
   .workspace-app .item-inline-summary strong {
@@ -4611,7 +4557,7 @@ button.reorder-handle:disabled {
 .item-actions button.item-delete,
 .environment-row button.environment-delete,
 .title-delete-button {
-  color: #c4766d;
+  color: color-mix(in oklab, var(--cm-primary-dark) 85%, #fff);
 }
 .item-actions button.item-delete:hover,
 .environment-row button.environment-delete:hover:not(:disabled),
@@ -4629,7 +4575,7 @@ button.reorder-handle:disabled {
 /* Contador do nome do item (limite real de caracteres) */
 .name-counter {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: color-mix(in oklab, var(--cm-bg) 36%, var(--cm-text));
@@ -4723,7 +4669,7 @@ button.reorder-handle:disabled {
 /* Celular: Importar/Exportar viram botões só com ícone */
 @media (max-width: 767px) {
   .workspace-app .list-heading-actions .export-menu-trigger {
-    width: 38px;
+    width: 44px;
     padding: 0;
   }
 }
@@ -4910,7 +4856,7 @@ button.reorder-handle:disabled {
 /* Troca entre enxovais próprios e compartilhados */
 .casamia-select-group {
   padding: 10px 10px 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -5097,6 +5043,11 @@ button.price-badge:hover {
   background: #fbe7c9;
   color: #8a4a0b;
 }
+.price-badge.is-target {
+  background: #dfe9d3;
+  color: #33501a;
+  border-color: #b9cda2;
+}
 .price-badge.is-out {
   background: color-mix(in oklab, var(--cm-accent) 6%, var(--cm-bg));
   color: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text));
@@ -5216,7 +5167,7 @@ button.price-badge:hover {
   stroke-width: 2;
 }
 .price-chart-tick {
-  font-size: 10px;
+  font-size: 12px;
   fill: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text));
 }
 .price-chart-tip {
@@ -5614,7 +5565,7 @@ button.price-badge:hover {
   border-radius: 999px;
   background: color-mix(in oklab, var(--cm-primary) 18%, #fff);
   color: color-mix(in oklab, var(--cm-primary-dark) 90%, #000);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .paywall-plan-price {
@@ -5742,7 +5693,7 @@ button.price-badge:hover {
     gap: 8px 16px;
   }
   .add-item-row-values {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .add-item-final {
     grid-column: 1 / -1;
@@ -6066,4 +6017,284 @@ button.price-badge:hover {
     font-size: 13px;
     gap: 6px;
   }
+}
+
+/* Sem economia registrada, o resumo fica com progresso e dinheiro (a economia aparece com o primeiro valor). */
+.workspace-stats.is-without-savings {
+  grid-template-areas: "progress money";
+}
+@media (min-width: 1180px) {
+  .workspace-stats.is-without-savings {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    grid-template-areas: "progress money";
+  }
+}
+@media (max-width: 1023px) {
+  .stats-compact-grid.is-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 800px) {
+  .workspace-stats.is-without-savings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: "progress money";
+  }
+}
+@container (max-width: 520px) {
+  .workspace-stats.is-without-savings {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "progress"
+      "money";
+  }
+}
+
+/* Aviso de rodapé ("Riscado da lista", "voltou para a fila") com Desfazer. Café sobre o linho, como a barra
+   de ações do item: aparece acima da navegação inferior no celular e no canto inferior no desktop. */
+.undo-toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 40;
+  width: min(440px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.undo-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 14px;
+  background: var(--cm-text);
+  color: color-mix(in oklab, var(--cm-bg) 92%, #fff);
+  box-shadow: 0 10px 28px color-mix(in oklab, var(--cm-text) 28%, transparent);
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: auto;
+  animation: undo-toast-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.undo-toast-icon {
+  flex-shrink: 0;
+  color: var(--cm-olive-soft);
+}
+.undo-toast-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.undo-toast-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--cm-sand) 70%, #fff);
+}
+.undo-toast-action:hover {
+  background: color-mix(in oklab, var(--cm-bg) 12%, transparent);
+}
+.undo-toast-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: color-mix(in oklab, var(--cm-bg) 70%, var(--cm-text));
+}
+.undo-toast-close:hover {
+  background: color-mix(in oklab, var(--cm-bg) 12%, transparent);
+  color: var(--cm-bg);
+}
+.undo-toast-action:focus-visible,
+.undo-toast-close:focus-visible {
+  outline: 2px solid var(--cm-sand);
+  outline-offset: 1px;
+}
+@keyframes undo-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@media (max-width: 1023px) {
+  .undo-toast-region {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  /* O aviso ocupa a faixa do botão de adicionar: o botão some enquanto ele está à vista. */
+  .workspace-app:has(.undo-toast) .mobile-fab-add {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .undo-toast {
+    animation: none;
+  }
+}
+
+/* Novo item: link e detalhes ficam recolhidos atrás de botões de texto, para o formulário começar pelo nome. */
+.add-item-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  align-self: flex-start;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 14px;
+  font-weight: 650;
+  text-align: left;
+  white-space: normal;
+  color: var(--cm-primary-dark);
+}
+.add-item-disclosure:hover {
+  color: var(--cm-action-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.add-item-disclosure-chevron {
+  transition: transform 0.18s;
+}
+.add-item-disclosure[aria-expanded="true"] .add-item-disclosure-chevron {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .add-item-disclosure-chevron {
+    transition: none;
+  }
+}
+
+/* Lápis do título: o desenho continua pequeno, mas o toque alcança 44px. */
+.list-section-heading .title-edit-button,
+.desktop-app-header > span .title-edit-button {
+  position: relative;
+}
+.list-section-heading .title-edit-button::after,
+.desktop-app-header > span .title-edit-button::after {
+  content: "";
+  position: absolute;
+  inset: calc((100% - 44px) / 2);
+  border-radius: 12px;
+}
+
+/* Filtros: o escolhido tem borda, fundo e um visto (nunca só a cor). */
+.workspace-app .filter-option,
+.casamia-dialog .filter-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, #fff);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-bg) 18%, var(--cm-text));
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.casamia-dialog .filter-option:hover {
+  background: color-mix(in oklab, var(--cm-sand) 14%, #fff);
+}
+.casamia-dialog .filter-option.is-selected {
+  border: 1.5px solid var(--cm-primary-dark);
+  background: color-mix(in oklab, var(--cm-sand) 22%, #fff);
+  color: var(--cm-text);
+  font-weight: 700;
+}
+.casamia-dialog .filter-option.is-selected svg {
+  color: var(--cm-primary-dark);
+}
+
+/* Lista vazia: textos com contraste de leitura (antes ~2,4:1). */
+.list-empty-icon {
+  color: color-mix(in oklab, var(--cm-sand) 80%, var(--cm-text));
+}
+.list-empty-title {
+  color: var(--cm-text);
+}
+.list-empty-text {
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+
+/* Erro no topo da lista: mesmo tom do .form-error, com espaço abaixo. */
+.workspace-error {
+  margin-bottom: 16px;
+}
+
+/* Excluir enxoval no menu do desktop: separado das ações comuns pelo tom. */
+.desktop-menu-item-danger {
+  color: color-mix(in oklab, var(--cm-primary-dark) 85%, var(--cm-text));
+}
+
+/* Na lista do celular, o resumo vira uma linha (percentual e conquistados); os valores ficam em Detalhes.
+   O título do ambiente logo abaixo já diz de onde é o resumo. */
+@media (max-width: 1023px) {
+  .workspace-view-list .stats-scope {
+    display: none;
+  }
+  .workspace-view-list .stats-compact[data-open="false"] .stats-compact-grid {
+    display: none;
+  }
+  .workspace-view-list .stats-compact[data-open="false"] .progress-track {
+    margin-bottom: 0;
+  }
+}
+
+/* Celular: "Compartilhado com Léo" abaixo do nome do enxoval, em texto comum (sem caixa-alta acima do título). */
+.mobile-header-shared {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: color-mix(in oklab, var(--cm-success) 85%, var(--cm-text));
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: opacity 0.2s, max-height 0.2s;
+}
+@media (min-width: 1024px) {
+  .mobile-header-shared {
+    display: none;
+  }
+}
+
+/* Desktop: o nome do enxoval é o título da página, na voz da marca (antes era Nunito 13px com cara de migalha). */
+.workspace-app .desktop-app-header h1 {
+  margin: 0;
+  padding: 0;
+  background: none;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--cm-text);
+}
+
+/* Rótulo do seletor de enxoval na barra lateral: texto comum, não caixa-alta. */
+
+/* Dica do Nino no Novo item: areia suave (a superfície do Nino), sem âmbar fora da paleta. */
+.nino-tip {
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, var(--cm-bg));
+  background: color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
+  color: var(--cm-text);
+}
+.nino-tip svg {
+  color: var(--cm-primary-dark);
+}
+/* "Acima do comum" em salmão de preço, nunca vermelho (DESIGN.md). */
+.price-above-hint {
+  color: color-mix(in oklab, var(--cm-primary-dark) 80%, var(--cm-text));
+}
+.nino-tip-close {
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.nino-tip-close:hover {
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
 }
