@@ -88,6 +88,7 @@ Motor em `server/lifecycle/` (regras puras em `policy.ts`, decisão e envio em `
 | Colaboração | `invitation_sent`, `invitation_accepted` |
 | Assistente | `nino_used` (`feature`: `assess_item`, `recommend`, `prioritize`), quando a API informa disponibilidade |
 | Planilhas | `items_imported` (`count`, `failed`, `stopped`, `catalog_applied`: sugestões do catálogo aceitas), `items_exported` (`format`, `count`) |
+| Mais valor na lista (Fase 11) | `installments_set` (`installments`, `payment_method`), `monthly_budget_set`, `item_assigned` (`self`), `gift_logged` (`has_message`), `gift_thanked` (`channel`), `document_uploaded` (`kind`, `source`), `warranty_set` (`months`), `offer_added` (`offers`), `offer_promoted` (`cheapest`), `offer_cheapest_found` (`savings_cents`), `store_mode_opened` / `store_mode_item_checked` (`offline`), `store_mode_offline_sync` (`count`) |
 | Oferta de planos | `plans_viewed` (`source`: `subscription`, `limit`, `menu`; `reason`, quando disponível) |
 | Checkout | `checkout_started` (`plan`), quando a API retorna o endereço; `checkout_failed` (`plan`), em resposta HTTP de erro; `checkout_canceled`, no retorno cancelado |
 | Assinatura | `subscription_activated` (`plan`, `trial`), `subscription_canceled`, `billing_portal_opened` |

@@ -15,7 +15,7 @@
 5. **Analytics (restante):** configuração e validação do Google em produção, conversões de cobranças recorrentes, SEO, funis e dashboards, fluxos adicionais de reengajamento e retorno do provedor de e-mail (Fase 7).
 6. **Idiomas e preço por região:** app só em português e reais (Fase 8).
 7. **Segurança e banimento (restante):** auditoria das ações da equipe, linha do tempo de segurança, contas relacionadas, Turnstile/Cloudflare e lista de e-mails descartáveis (Fase 9).
-8. **Lista "Meu enxoval" (mais valor):** parcelas e fluxo mensal, responsável por item, presentes e agradecimentos, comprovantes e garantias das compras do enxoval, várias lojas por item e modo loja (Fase 11).
+8. **Lista "Meu enxoval" (restante):** bucket de documentos em produção, leitura automática da nota, lembretes de garantia no limite do ciclo de vida e validação do modo loja offline em aparelhos reais (Fase 11).
 
 ---
 
@@ -163,124 +163,15 @@ A funcionalidade que transforma convidados em novos clientes da plataforma.
 
 ---
 
-### FASE 11: Mais Valor na Lista "Meu enxoval"
+### FASE 11: Mais Valor na Lista "Meu enxoval" (restante)
 
-> **Origem:** pesquisa de mercado de 22/10/2026 (registries como Zola e Amazon, listas de desejo como Moonsift, Giftful e Klarna, iCasei, apps de mudança e o YNAB para orçamento).
->
-> As seis frentes abaixo são o que falta. A ordem sugerida está no fim da seção.
+> As seis frentes (parcelas e fluxo mensal, responsável por item, presentes e agradecimentos, comprovantes e garantias, várias lojas por item e modo loja) estão implementadas. Como funcionam e como configurar: [`lista-meu-enxoval-fase11.md`](./lista-meu-enxoval-fase11.md). Falta:
 
-#### 11.1 Planejamento de parcelas e fluxo mensal
-**Por quê:** no Brasil, compra grande de casa é parcelada (10x, 12x sem juros). O casal não quer saber só "quanto falta investir", e sim **quanto da renda de cada mês já está comprometido** até a mudança e depois dela. Nenhum concorrente brasileiro de lista de enxoval faz isso. O YNAB resolve algo parecido com o "needed this month", mas não entende parcelamento.
-
-* **Banco de dados (`items`):**
-  * `installments smallint NOT NULL DEFAULT 1` (1 a 24; `CHECK (installments BETWEEN 1 AND 24)`).
-  * `first_installment_on date`: mês da primeira parcela. Se vier nulo, vale o mês da compra (`purchased_at`, ver abaixo) ou o mês da semana planejada.
-  * `purchased_at date`: hoje o app não guarda quando o item foi comprado. Gravar ao passar para `bought` (pode ser editado) também serve para 11.4 (garantia) e para os relatórios.
-  * `payment_method text`: `pix`, `credit`, `debit`, `boleto`, `cash` ou `other`. Opcional, para o resumo por meio de pagamento.
-  * Juros: guardar `installment_cents integer` (valor de cada parcela) só quando a parcela × N for diferente do preço, ou seja, quando há juros. A diferença aparece como "juros: R$ X".
-* **Enxoval (`enxovais`):** `monthly_budget_cents integer`, o teto mensal que o casal quer respeitar (opcional, só o dono edita, igual à data da mudança).
-* **Interface:**
-  * No `ItemCompletionDialog` (opção *Comprado*), ao lado de "Quanto você pagou?": um seletor "À vista / 2x … 24x" e o meio de pagamento. No formulário do item, a mesma coisa na seção **Valores**.
-  * Para itens ainda pendentes: o campo "Pretendo parcelar em" ajusta a previsão do plano.
-  * Nova seção no **Planejamento**: "Parcelas por mês", com um gráfico de barras mês a mês (parcelas já assumidas + previsão dos pendentes pela semana de compra), a linha do teto mensal e destaque para os meses que estouram o teto.
-  * No resumo "Seu dinheiro": "Comprometido nos próximos 3 meses: R$ X" e "Última parcela: mar/2027".
-  * Na lista: selo "10x R$ 189" na linha do item comprado parcelado.
-* **Regras:**
-  * "Já investimos" continua sendo o valor total da compra (não só as parcelas pagas). O fluxo mensal é uma visão à parte.
-  * Mudar o número de parcelas de um item já comprado recalcula o fluxo; não há histórico de pagamento real (não é app de finanças).
-  * Exportação (`ExportMenu`): incluir as colunas parcelas, valor da parcela, primeira parcela e meio de pagamento.
-* **Analytics:** `installments_set` (número de parcelas, meio de pagamento) e `monthly_budget_set`.
-* **Testes:** cálculo do fluxo (`src/planning/installments.ts`) em `tests/purchase-plan.mjs`: parcelas que atravessam o ano, item sem data, juros, teto estourado.
-
-#### 11.2 Quem compra o quê (responsável por item)
-**Por quê:** a lista a dois já existe (convites), mas não diz quem vai cuidar de cada item. Apps de mudança dividem as tarefas entre as pessoas; num casal, isso evita compra duplicada ("achei que você ia comprar").
-
-* **Banco de dados:** `items.assignee_id uuid REFERENCES users(id) ON DELETE SET NULL`. Só pode ser o dono ou um membro do enxoval (`enxoval_members`), validado no servidor. Quando a pessoa sai do enxoval, os itens dela voltam a ficar sem responsável.
-* **API:** `assigneeId` em `PATCH /items/:id` e na criação; o `GET` do enxoval devolve os membros com nome e avatar (já existe `EnxovalMember`).
-* **Interface:**
-  * Na linha do item: o avatar pequeno do responsável (o `UserAvatar` já existe), com o nome no `title`.
-  * No formulário do item: o campo "Quem vai comprar" com os membros e a opção "Ninguém ainda".
-  * Atalho novo em `ListInsights`: "Meus itens (N)", que só aparece quando o enxoval tem mais de um membro. Filtro no diálogo: "Meus itens / Sem responsável / De [nome]".
-  * O próximo passo (`pickNextStep`) prefere os itens da própria pessoa ou sem responsável.
-  * Toast quando alguém risca um item que estava com outra pessoa: "Ana comprou o Micro-ondas que estava com você". Depende da sincronização ao abrir o app, que já mostra "N itens mudaram desde a última visita".
-* **Regras:** sem responsável continua sendo o padrão. Atribuir não bloqueia ninguém de editar o item.
-* **Analytics:** `item_assigned` (com ou sem responsável próprio).
-
-#### 11.3 Presentes recebidos e agradecimentos
-**Por quê:** o Gift Tracker do Zola guarda *quem deu* cada presente e se o agradecimento já foi enviado, e exporta tudo em CSV. Hoje o status "Ganhei" (`received`) não diz de quem veio. Isto também prepara a Fase 4 (Chá de Casa Nova), em que o convidado se identifica ao reservar.
-
-* **Banco de dados (`items`):**
-  * `gift_from text`: nome livre ("Tia Rosa", "Colegas do trabalho"), até 120 caracteres.
-  * `gift_message text`: o recado que veio com o presente (opcional).
-  * `thanked_at timestamptz`: quando o agradecimento foi marcado como enviado.
-  * Na Fase 4, `gift_reservation_id` liga o item à reserva do convidado; aí `gift_from` vem preenchido.
-* **Interface:**
-  * No `ItemCompletionDialog`, ao escolher *Recebido*: "De quem foi o presente?" (campo opcional com autocompletar dos nomes já usados no enxoval) e o recado.
-  * Na linha do item recebido: o selo "de Tia Rosa", e o selo "Agradecer" enquanto `thanked_at` estiver vazio.
-  * Atalho em `ListInsights`: "N agradecimentos pendentes", que filtra os itens ganhos sem agradecimento.
-  * Ação rápida na linha: "Marquei como agradecido". Botão "Agradecer pelo WhatsApp" que abre `https://wa.me/?text=` com uma mensagem pronta e editável ("Oi, Tia Rosa! O jogo de panelas já está na nossa cozinha…"). A pessoa escolhe o contato no WhatsApp; o app não guarda telefone.
-  * Página "Presentes" no **Meu Lar**: quem deu o quê, total recebido em valor (o `sumReceived` já existe) e exportação em CSV (item, ambiente, de quem, recado, valor, agradecido em).
-* **Privacidade:** nomes de terceiros ficam só no enxoval e saem na exclusão da conta. Atualizar a política de privacidade (dados de terceiros informados pelo usuário).
-* **Analytics:** `gift_logged` (com ou sem recado) e `gift_thanked` (canal: manual ou WhatsApp).
-
-#### 11.4 Comprovantes e garantias das compras do enxoval
-**Por quê:** é o que mantém o app útil **depois** da mudança, quando a lista acaba e o uso cai. Apps de mudança guardam recibos e contratos, e apps de inventário servem para seguro. O lembrete de fim de garantia é um bom gatilho de reengajamento (Fase 7.4).
-
-Esta frente permite guardar as notas fiscais e garantias dos produtos comprados para a casa.
-
-* **Armazenamento:** hoje as imagens (avatar) ficam em `bytea` no Postgres, o que não serve para PDFs e fotos de nota em volume. Usar um bucket de objetos (Cloudflare R2 ou S3, com URL assinada de 5 min) e guardar no banco só a referência. Limite de 10 MB por arquivo e 20 arquivos por item; reaproveitar `prepareImageForUpload` para fotos.
-* **Banco de dados:**
-  * Nova tabela `item_documents`: `id`, `item_id` (FK, `ON DELETE CASCADE`), `enxoval_id`, `kind` (`invoice`, `warranty`, `manual` ou `other`), `storage_key`, `file_name`, `content_type`, `size_bytes`, `uploaded_by` e `created_at`.
-  * Em `items`: `warranty_months smallint` (garantia do fabricante + estendida) e `warranty_until date` (calculado a partir de `purchased_at` de 11.1, mas editável). Também `store_name text`, para saber onde foi comprado quando não há link.
-* **Interface:**
-  * Na linha do item comprado: um ícone de clipe quando há documento; no formulário, a seção **Nota e garantia**, com envio pela câmera do celular (`capture="environment"`), lista de arquivos e a garantia ("12 meses, até 15/03/2027").
-  * Atalho em `ListInsights`, depois da mudança: "N garantias vencem em 30 dias".
-  * Na página **Meu Lar** depois da mudança: "Documentos da casa", com tudo o que tem nota, filtro por ambiente e download em ZIP.
-* **Lembretes:** um worker diário (como `trialNotifications.ts`) envia e-mail 30 dias e 7 dias antes de a garantia vencer, com opção de desligar no perfil. Integrar às preferências e aos limites do ciclo de vida (Fase 7.4).
-* **Leitura automática (depois):** o Jev lê a foto da nota e preenche loja, data e valor. Definir o limite de consultas para controlar o custo.
-* **Limites de armazenamento:** definir a cota de documentos por conta conforme o custo do serviço.
-* **Segurança:** só membros do enxoval baixam; o tipo do arquivo é conferido pelo conteúdo, não pela extensão; os arquivos são apagados junto com a conta ou o enxoval (no job de exclusão).
-
-#### 11.5 Comparar lojas para o mesmo item
-**Por quê:** hoje cada item acompanha **um** link (`items.tracked_product_id`). Moonsift e Google Shopping mostram o mesmo produto em várias lojas. O casal costuma salvar dois ou três links antes de decidir.
-
-* **Banco de dados:** nova tabela `item_offers`: `id`, `item_id` (FK, cascade), `tracked_product_id` (FK para `tracked_products`, reaproveitando o worker de preço), `is_primary boolean`, `created_at` e `UNIQUE(item_id, tracked_product_id)`. Migrar o `tracked_product_id` atual de cada item para uma oferta `is_primary = true` e manter a coluna como espelho da oferta principal por uma versão, para não quebrar clientes antigos.
-* **Limites:** até 5 ofertas por item.
-* **Regra de preço:** o preço do item (`price_cents`) segue a oferta principal. A oferta mais barata em estoque (considerando o Pix quando `priceBasis = 'pix'`) ganha o selo "Mais barato" e pode virar a principal com um toque.
-* **Interface:**
-  * Na linha do item: "3 lojas · a partir de R$ 899", que abre a comparação.
-  * No formulário: a seção **Lojas**, com cada oferta mostrando loja (`storeLabel`), preço, Pix, estoque, última leitura e "Tornar principal".
-  * "Adicionar outra loja" usa o mesmo fluxo de leitura do link (`extractProduct`).
-  * O `PriceHistoryDialog` ganha uma linha por loja no gráfico.
-* **Atalhos e alertas:** o atalho "baixou de preço" e o alerta de preço-alvo passam a considerar **qualquer** oferta. O aviso diz em qual loja: "Air fryer: R$ 389 na Amazon (meta R$ 400)".
-* **Worker:** o `priceTrackerWorker` já lê por `tracked_products`; só muda a consulta dos alertas, que passa a juntar `item_offers`.
-* **Analytics:** `offer_added`, `offer_promoted` e `offer_cheapest_found` (economia em relação à principal).
-
-#### 11.6 Modo loja
-**Por quê:** na loja física (Leroy, Tok&Stok, Camicado, Havan) a pessoa abre o app no celular e quer ver só o que falta, o preço-alvo e as medidas, e riscar rápido. A lista completa, com filtros, cartões e atalhos, atrapalha nessa hora.
-
-* **Rota:** `/app/loja` (e `/app/loja/:ambienteId`) no `appRoute.ts`, com entrada pelo menu do enxoval e por um botão "Estou na loja" na lista (só no celular).
-* **Tela:**
-  * Só itens pendentes, agrupados por ambiente, com letra grande e alvo de toque de 56 px.
-  * Cada item mostra quantidade, variação (`selectedVariation`, por exemplo "220V"), preço-alvo ou faixa de referência do perfil de gasto (`itemBand`) e a observação (`description`), onde ficam as medidas.
-  * Busca no topo e filtro por ambiente em chips.
-  * Riscar abre uma versão compacta do `ItemCompletionDialog` (só "Comprei" + valor + parcelas) e o item some da tela com o `UndoToast`.
-  * "Vale a pena?": ao digitar o preço da etiqueta, a tela compara com o preço-alvo, com o menor preço em 60 dias e com a faixa do perfil, e diz "abaixo do que você planejou" ou "R$ 120 acima do menor preço online".
-* **Offline:** a tela tem de funcionar com sinal ruim. Guardar o último retrato do enxoval em IndexedDB (via service worker) e enfileirar as alterações para enviar quando a rede voltar, com aviso "3 alterações aguardando conexão". Conflitos: vale a última alteração, como já acontece hoje.
-* **Tela ligada:** usar a Wake Lock API para a tela não apagar enquanto o modo loja estiver aberto (onde o navegador suportar).
-* **Acesso:** a comparação "Vale a pena?" com o histórico de preço segue as regras do acompanhamento de preço.
-* **Analytics:** `store_mode_opened`, `store_mode_item_checked` e `store_mode_offline_sync` (quantas alterações estavam na fila).
-
-#### 11.7 Ordem sugerida e dependências
-
-| Ordem | Frente | Depende de | Complexidade |
-|:---:|---|---|:---:|
-| 1º | 11.3 Presentes e agradecimentos | — (prepara a Fase 4) | Baixa |
-| 2º | 11.1 Parcelas e fluxo mensal | `purchased_at` (criado aqui) | Média |
-| 3º | 11.2 Quem compra o quê | Membros e convites do enxoval | Baixa |
-| 4º | 11.5 Comparar lojas | Worker de preço (já existe) | Média |
-| 5º | 11.6 Modo loja | 11.1 para o valor/parcelas no risco rápido | Média-Alta (offline) |
-| 6º | 11.4 Comprovantes e garantias dos itens | Bucket de objetos, `purchased_at` (11.1), integração ao ciclo de vida (7.4) | Média-Alta |
+* **Bucket de documentos em produção:** criar o bucket privado (Cloudflare R2 ou S3), configurar `DOCUMENT_STORAGE=s3`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID` e `S3_SECRET_ACCESS_KEY` e validar envio, download pela URL assinada e exclusão. Sem bucket, os arquivos ficam no Postgres (serve para desenvolvimento e homologação, não para volume). Definir `DOCUMENT_QUOTA_MB` conforme o custo (padrão 500 MB por conta).
+* **Leitura automática da nota:** o Jev lê a foto da nota e preenche loja, data e valor; definir o limite de consultas para controlar o custo.
+* **Lembretes de garantia no ciclo de vida:** hoje respeitam a preferência do perfil, a pausa e a categoria "lembretes"; falta contá-los no limite de frequência do ciclo de vida (Fase 7.4) e medir o retorno ao app.
+* **Chá de Casa Nova (Fase 4):** ligar a reserva do convidado ao item (`gift_reservation_id`) para o "de quem foi o presente" vir preenchido.
+* **Modo loja sem conexão:** a casca do app e as telas só ficam guardadas depois de abrir o modo loja uma vez com internet (service worker só no build de produção). Validar em aparelhos reais (Android e iPhone), incluindo a Wake Lock.
 
 ---
 
@@ -295,6 +186,6 @@ Esta frente permite guardar as notas fiscais e garantias dos produtos comprados 
 | **7º** | **Fase 7 (restante):** Validação em produção, receita recorrente, SEO, dashboards, novos fluxos e webhooks de e-mail | Aquisição, Ativação e Retenção | Média-Alta |
 | **8º** | **Fase 8:** Inglês e espanhol no app inteiro + preço, impostos e conteúdo por região | Novos Mercados e Receita | Alta |
 | **9º** | **Fase 9 (restante):** Auditoria, linha do tempo e contas relacionadas no painel, Turnstile e e-mails descartáveis | Proteção e Confiança | Média |
-| **11º** | **Fase 11:** Parcelas e fluxo mensal, responsável por item, presentes e agradecimentos, comprovantes e garantias dos itens, várias lojas por item, modo loja | Retenção depois da mudança e Diferencial no Brasil | Média-Alta |
+| **11º** | **Fase 11 (restante):** Bucket de documentos em produção, leitura automática da nota, lembretes de garantia no ciclo de vida e validação do modo loja offline | Retenção depois da mudança | Baixa-Média |
 
 > **A ordem acima é de menor risco de produto, não de valor.** A validação em produção da Fase 7 (antes de comprar anúncios) e a Fase 9 devem ser **antecipadas**; a infraestrutura de idiomas da Fase 8 (nenhum texto novo fixo no código) também deve começar já, porque o custo de extração cresce a cada tela nova. Tabelas de região e preço da Fase 8 e o antifraude da Fase 9 são pré-requisitos da cobrança em outros países.
