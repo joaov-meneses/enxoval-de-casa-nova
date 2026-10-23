@@ -4,13 +4,16 @@
  *
  * Poses: "wave" (acenando, boas-vindas), "think" (com a pranchetinha e a trena, calculando),
  * "happy" (andando feliz e acenando, item riscado da lista) e "celebrate" (braços erguidos com
- * uma plantinha, cômodo ou casa concluídos).
+ * uma plantinha, item conquistado) e "rest" (sentado no arco, ambiente concluído).
+ * "keys": com as chaves na mão, convidando a liberar o acesso ao lar.
  */
 const POSES = {
   wave: { src: "/brand/nino.webp", fallback: "/brand/nino.png", width: 809, height: 952 },
   think: { src: "/brand/nino-plan.webp", fallback: "/brand/nino-plan.png", width: 749, height: 962 },
   happy: { src: "/brand/nino-happy.webp", fallback: "/brand/nino-happy.png", width: 820, height: 1077 },
   celebrate: { src: "/brand/nino-celebrate.webp", fallback: "/brand/nino-celebrate.png", width: 820, height: 964 },
+  rest: { src: "/brand/nino-rest.webp", fallback: "/brand/nino-rest.png", width: 820, height: 965 },
+  keys: { src: "/brand/nino-keys.webp", fallback: "/brand/nino-keys.png", width: 1156, height: 1360 },
 } as const;
 
 export function Nino({

@@ -32,6 +32,7 @@ Os logs estruturados do backend e o envio completo ao PostHog Logs estão em [do
 | `/login` e `/cadastro` | A mesma tela, com as abas "Entrar" e "Criar conta" (`/cadastro` abre na segunda). `/login?cadastro=1` vai para `/cadastro` e `/signup` vai para `/comecar` |
 | `/comecar` | Funil pós-cadastro: exige conta e nenhum enxoval ainda. Pergunta o nome e algumas perguntas curtas, monta o plano e cria o primeiro enxoval já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md) |
 | `/app` | Aplicativo conectado à conta |
+| `/app/:enxovalId`, `/app/:enxovalId/itens/:ambienteId`, `/app/:enxovalId/meu-lar` e `/app/:enxovalId/plano` | Enxoval e tela definidos na URL; links antigos continuam funcionando. Detalhes em [docs/rotas-do-app.md](docs/rotas-do-app.md) |
 | `/convite#token=…` | Aceite de convite para participar de um enxoval |
 | `/esqueci-senha` e `/redefinir-senha` | Recuperação de senha por e-mail |
 | `/privacidade` | Política de privacidade |
@@ -131,7 +132,7 @@ No modal de novo item, "Importar por link" lê o endereço de um produto de loja
 - **Desconto ou cashback** por item, no cadastro, na edição ou no diálogo "Descontos e cashback". O valor é abatido do preço e o servidor valida que não passe do preço do item. O desconto geral antigo do enxoval (`enxovais.discount_cents`) continua somando no resumo até ser removido no diálogo.
 - Busca sem distinção de acentos, filtros e ordenação por nome, alterações recentes ou "Minha ordem". Nesta última, sem busca nem filtros, as alças reordenam os itens do ambiente; ambientes também podem ser arrastados. As alças aceitam as setas do teclado e a ordem é persistida.
 - Lápis junto aos nomes para renomear o enxoval e os ambientes. A data de adição vem de `created_at` e permanece após editar.
-- Importação de itens por CSV ou XLSX, com modelos em `public/modelos/casamia-modelo-importacao.*` (gerados por `scripts/generate-import-templates.ts`), e exportação CSV do enxoval completo ou de um ambiente, em português, UTF-8 e separador `;`, com proteção contra células interpretadas como fórmulas. A exportação por ambiente inclui todos os itens, independentemente dos filtros ativos.
+- Importação de itens por CSV ou XLSX, com modelos em `public/modelos/casamia-modelo-importacao.*` (gerados por `scripts/generate-import-templates.ts`), e exportação CSV do enxoval completo ou de um ambiente, em português, UTF-8 e separador `;`, com proteção contra células interpretadas como fórmulas. A exportação por ambiente inclui todos os itens, independentemente dos filtros ativos. Na revisão da importação, o catálogo mestre (`POST /api/catalog/match`, sem Jev) sugere a grafia correta dos itens e o ambiente de cada um; um Ambiente vazio é preenchido quando o catálogo conhece o item.
 
 **Telas e dispositivos**
 - Landing page, login e cadastro adaptados para celular, tablet e computador.
@@ -160,7 +161,7 @@ Tipografia: **Fraunces** nos títulos e na assinatura, **Nunito** na interface (
 | Arquivo | O que é |
 |---|---|
 | `src/components/Brand.tsx` | Logo da interface: o Nino acenando ao lado de "Casa Mia" |
-| `src/components/Nino.tsx` | Mascote Nino com a arte final, em duas poses: acenando (`wave`) e com prancheta e trena (`think`) |
+| `src/components/Nino.tsx` | Mascote Nino: acenando (`wave`), com prancheta e trena (`think`), feliz (`happy`), comemorando (`celebrate`) e descansando no arco (`rest`). Estados e validação do Jev em [Nino — Fase 3](docs/nino-fase3.md) |
 | `public/brand/nino.{png,webp}` | Arte-base do Nino acenando, com fundo transparente. É a fonte do logo e dos ícones |
 | `public/brand/nino-plan.{png,webp}` | Nino com a prancheta e a trena (seção "Conheça o Nino") |
 | `public/brand/nino-logo.{png,webp}` | Versão leve do Nino acenando (224 px), usada no cabeçalho e no funil |
@@ -200,6 +201,8 @@ npm run test:price-tracking-db
 
 ## Build e execução em produção
 
+A configuração do Pix no Passe e da integração direta com o Emissor Público Nacional está em [Pagamentos e notas fiscais](docs/pagamentos-e-notas-fiscais.md). A transmissão fiscal permanece desligada até validar certificado ICP-Brasil, habilitação do CNPJ e política contábil. O backend registra obrigações mesmo desligada e preserva o acesso pago em caso de falha fiscal.
+
 ```sh
 npm run build
 npm start
@@ -219,6 +222,8 @@ O login expira após 48 horas sem atividade ou, no máximo, 7 dias desde a auten
 Novas contas concluem primeiro o onboarding. O plano completo fica salvo na conta antes do cadastro do cartão, sem iniciar o trial. Em seguida, a pessoa escolhe Mensal ou Passe em uma tela com os preços consultados na Stripe. O Mensal tem trial de 48 horas e renovação mensal; o Passe é pagamento único imediato por 12 meses, sem trial ou renovação automática. Após a confirmação do cartão ou pagamento na Stripe, o app abre diretamente o enxoval com todos os itens do onboarding. No Mensal, a Stripe concede 2 dias completos (48 horas) de acesso e faz a cobrança mensal automaticamente após o trial. O modal usa o preço da assinatura confirmada; no Passe, mostra o total efetivamente pago (incluindo descontos) e a validade. A escolha informada na URL nunca concede acesso nem determina o valor exibido. O trial só pode ser usado uma vez por conta; reativação é cobrada sem novo período gratuito. Checkouts abertos são reutilizados para evitar assinaturas duplicadas em duas abas.
 
 O aviso de início do trial aparece em um modal no primeiro acesso ao enxoval, sem faixa permanente. A confirmação é salva na conta por assinatura, evitando repetição ao recarregar ou trocar de dispositivo. O lembrete das últimas 24 horas também aparece uma única vez. O gerenciamento e o cancelamento ficam em **Meu perfil → Assinatura**, com confirmação antes de encerrar o acesso. O perfil é acessado pelo menu suspenso do desktop, pelo menu do celular ou pelo cartão de usuário na lateral.
+
+O carregamento inicial usa a estrutura do app; as verificações seguintes de acesso acontecem em segundo plano. Falhas temporárias mostram um aviso com nova tentativa, enquanto recusas do servidor e expiração continuam bloqueando o acesso. Detalhes e testes em [Carregamento e verificação de acesso](docs/carregamento-e-acesso.md).
 
 O servidor envia o aviso inicial e um lembrete quando restam 24 horas, pela rotina de notificações executada a cada minuto. Configure `RESEND_API_KEY`, `MAIL_FROM`, `APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY` e `STRIPE_WEBHOOK_SECRET`. Em produção, o início do checkout exige envio de e-mail configurado. Mantenha o serviço em execução para os lembretes serem enviados no horário. O webhook deve receber `customer.subscription.created`, `customer.subscription.updated` e `customer.subscription.deleted`; os eventos de checkout existentes continuam atendendo os Passes já comprados.
 

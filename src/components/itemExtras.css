@@ -1,0 +1,297 @@
+/* Fase 11: selos e seções novas da linha do item (parcelas, responsável, presente, documentos, garantia, lojas). */
+
+.workspace-app .item-row .item-installments-tag {
+  color: var(--cm-accent);
+}
+
+.item-assignee {
+  display: inline-flex;
+  align-items: center;
+}
+.item-assignee .item-assignee-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  font-weight: 750;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 80%, #fff);
+  background: color-mix(in oklab, var(--cm-accent) 10%, #fff);
+  color: var(--cm-accent);
+}
+
+.item-gift-tag,
+.item-doc-tag,
+.item-warranty-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.item-gift-tag {
+  background: color-mix(in oklab, var(--cm-primary) 9%, #fff);
+  border: 1px solid color-mix(in oklab, var(--cm-primary) 30%, #fff);
+  color: var(--cm-primary-dark);
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-doc-tag {
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 96%, var(--cm-text));
+  color: color-mix(in oklab, var(--cm-sand) 15%, var(--cm-text));
+}
+.item-warranty-tag {
+  background: #fdf1df;
+  border: 1px solid #efd2a6;
+  color: #7a4309;
+}
+.price-badge.item-thanks-badge {
+  background: color-mix(in oklab, var(--cm-primary) 14%, #fff);
+  color: var(--cm-primary-dark);
+  border-color: color-mix(in oklab, var(--cm-primary) 40%, #fff);
+}
+.price-badge.item-offers-badge {
+  background: color-mix(in oklab, var(--cm-accent) 9%, #fff);
+  color: var(--cm-accent);
+}
+
+.workspace-app .list-insight.is-mine > svg {
+  color: var(--cm-accent);
+}
+.workspace-app .list-insight.is-gift {
+  background: color-mix(in oklab, var(--cm-primary) 8%, #fff);
+  border-color: color-mix(in oklab, var(--cm-primary) 32%, #fff);
+  color: var(--cm-primary-dark);
+}
+
+/* Lojas e documentos dentro do formulário do item */
+.item-offers,
+.item-docs {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.item-offer-list,
+.item-doc-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.item-offer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 70%, #fff);
+  border-radius: 12px;
+  background: #fff;
+}
+.item-offer.is-primary {
+  border-color: color-mix(in oklab, var(--cm-success) 45%, #fff);
+  background: color-mix(in oklab, var(--cm-success) 5%, #fff);
+}
+.item-offer-store {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.item-offer-store strong {
+  font-size: 14px;
+}
+.item-offer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: color-mix(in oklab, var(--cm-success) 14%, #fff);
+  color: color-mix(in oklab, var(--cm-success) 95%, #000);
+}
+.item-offer-tag.is-cheapest {
+  background: #fbe7c9;
+  color: #8a4a0b;
+}
+.item-offer-price {
+  font-size: 15px;
+  font-weight: 750;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.item-offer-price small {
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.item-offer-meta {
+  font-size: 12px;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.item-offer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.item-offer-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--cm-primary-dark);
+}
+.item-offer-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+  background: transparent;
+  border: 1px solid transparent;
+}
+.item-offer-remove:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--cm-primary) 40%, #fff);
+  color: var(--cm-primary-dark);
+}
+.item-offer-add,
+.item-doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.item-offer-add input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.item-doc-actions > :first-child {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.item-doc-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "icon name remove" "icon meta remove";
+  align-items: center;
+  column-gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 70%, #fff);
+  border-radius: 12px;
+  background: #fff;
+}
+.item-doc-list li > svg {
+  grid-area: icon;
+  color: var(--cm-accent);
+}
+.item-doc-name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--cm-text);
+}
+.item-doc-list li > small {
+  grid-area: meta;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.item-doc-list li > .item-offer-remove {
+  grid-area: remove;
+}
+
+@media (max-width: 520px) {
+  .item-offer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .item-offer-price {
+    text-align: left;
+  }
+  .item-offer-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Agradecimento e diálogo de conclusão */
+.item-thanks-body {
+  display: grid;
+  gap: 14px;
+  padding: 4px 20px 16px;
+}
+.item-thanks-intro {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  outline: none;
+}
+.item-thanks-intro span,
+.item-thanks-field small {
+  font-size: 13px;
+  font-weight: 400;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.item-thanks-field {
+  display: grid;
+  gap: 6px;
+}
+.item-completion-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 420px) {
+  .item-completion-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Formulário do item em 12 colunas (product.css, a partir de 1360px): sem um span, cada campo novo ficaria com 1/12
+   da largura. Parcelas e garantia seguem a linha de Valores (4 por linha); a loja fica ao lado da garantia. */
+@media (min-width: 1360px) {
+  .workspace-app .item-inline-grid > .item-field-installments,
+  .workspace-app .item-inline-grid > .item-field-payment,
+  .workspace-app .item-inline-grid > .item-field-installment-value,
+  .workspace-app .item-inline-grid > .item-field-purchased,
+  .workspace-app .item-inline-grid > .item-field-first-installment,
+  .workspace-app .item-inline-grid > .item-field-warranty,
+  .workspace-app .item-inline-grid > .item-field-warranty-until { grid-column: span 3; }
+  .workspace-app .item-inline-grid > .item-field-gift-from,
+  .workspace-app .item-inline-grid > .item-field-thanked,
+  .workspace-app .item-inline-grid > .item-field-store { grid-column: span 6; }
+}
+
+/* "Estou na loja" fica só no celular; no desktop, o modo loja sai do menu do enxoval. */
+.store-mode-entry {
+  display: none;
+}
+@media (max-width: 767px) {
+  .store-mode-entry {
+    display: inline-flex;
+  }
+}
+.workspace-app.workspace-view-store .environment-tabs-scroll,
+.workspace-app.workspace-view-store .mobile-fab-add {
+  display: none;
+}
+
+/* O formulário compacto esconde títulos e dicas; as seções novas e as contas de parcela/garantia continuam à vista. */
+.workspace-app .item-inline-section.is-visible {
+  display: block;
+}
+.workspace-app .item-inline-hint.item-extra-note {
+  display: block;
+}

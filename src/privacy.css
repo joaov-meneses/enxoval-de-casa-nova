@@ -1,7 +1,7 @@
 /* Página /privacidade */
 .privacy-page {
   min-height: 100dvh;
-  background: var(--paper);
+  background: transparent;
   color: var(--ink);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;

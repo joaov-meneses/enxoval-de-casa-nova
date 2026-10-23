@@ -3,7 +3,7 @@ import { capture } from '../analytics';
 
 /** Mount inside SubscriptionAccess so blocked screens never count as workspace views. */
 export function WorkspaceAnalytics({ userId, enxovalId, view }: {
-  userId: string; enxovalId?: string; view: 'list' | 'overview' | 'plan';
+  userId: string; enxovalId?: string; view: 'list' | 'overview' | 'plan' | 'store';
 }) {
   const previous = useRef('');
   useEffect(() => {

@@ -142,7 +142,7 @@ try {
   await page.waitForTimeout(1500);
 
   // Passo 2: visão geral com os ambientes e o progresso de cada um.
-  await page.getByRole("button", { name: "Visão geral" }).click();
+  await page.getByRole("button", { name: "Meu Lar" }).click();
   await page.waitForTimeout(900);
   await salvar("passo-2-plano");
 

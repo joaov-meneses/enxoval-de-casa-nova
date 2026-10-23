@@ -1,4 +1,5 @@
 import { getLogger } from './logger.ts';
+import { checkoutReturnPath } from '../shared/appRoute.ts';
 // Pagamentos pela Stripe: assinatura mensal e Passe da Casa Nova (pagamento único, 12 meses sem renovação). O plano da
 // conta só muda aqui, pelos eventos assinados da Stripe (webhook), nunca por algo que o app envie. A assinatura vive em
 // users.plan; o Passe vive em users.pass_expires_at (ver effectivePlanSql). Sem as chaves, o app segue no plano gratuito.
@@ -13,6 +14,11 @@ import { appBaseUrl, canDeliverMail, isProductionServer } from './mailer.ts';
 import { asyncHandler, HttpError } from './security.ts';
 import { PAID_PLAN_OFFERS, PASS_MONTHS } from '../src/plans.ts';
 import type { AuthUser } from '../src/types.ts';
+import { sendPurchaseConversion } from './googleConversions.ts';
+import { enqueueFiscalEvent } from './fiscal/service.ts';
+import { recordRefundEvent, REFUND_EVENTS } from './billingOperations.ts';
+import { fiscalEnabled } from './fiscal/provider.ts';
+import { registerFiscalRoutes } from './fiscal/routes.ts';
 
 type PaidPlan = 'monthly' | 'pass';
 const PAID_PLANS: PaidPlan[] = ['monthly', 'pass'];
@@ -41,7 +47,7 @@ export function setStripeClientForTests(client: unknown) {
   stripeOverride = client as Stripe | null;
 }
 
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   if (stripeOverride) return stripeOverride;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
@@ -206,11 +212,16 @@ const CHECKOUT_EVENTS = new Set(['checkout.session.completed', 'checkout.session
 /** Processa um evento já verificado. Cada evento (id) é aplicado uma única vez. */
 export async function handleStripeEvent(event: Stripe.Event) {
   const isSubscription = SUBSCRIPTION_EVENTS.has(event.type);
-  if (!isSubscription && !CHECKOUT_EVENTS.has(event.type)) return;
+  const isInvoice = event.type === 'invoice.paid';
+  const isRefund = REFUND_EVENTS.has(event.type);
+  if (!isSubscription && !CHECKOUT_EVENTS.has(event.type) && !isInvoice && !isRefund) return;
   const monthlyToCancel = await withTransaction(async client => {
     const fresh = await client.query(
       'INSERT INTO stripe_events (id, type) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING', [event.id, event.type]);
     if (fresh.rowCount === 0) return null;
+    if (isRefund) { await recordRefundEvent(client, event); return null; }
+    await enqueueFiscalEvent(client, event);
+    if (isInvoice) return null;
     if (!isSubscription) return grantPass(client, event.data.object as Stripe.Checkout.Session);
     const result = await applySubscription(client, event.data.object as Stripe.Subscription, new Date(event.created * 1000));
     if (!result.applied && result.reason === 'user-not-found') {
@@ -219,6 +230,11 @@ export async function handleStripeEvent(event: Stripe.Event) {
     return null;
   });
   await cancelMonthly(monthlyToCancel);
+  if (CHECKOUT_EVENTS.has(event.type)) {
+    // Conversão para o Google Ads/GA4 com o valor pago; falha aqui nunca devolve erro à Stripe.
+    void sendPurchaseConversion(event.data.object as Stripe.Checkout.Session).catch(err =>
+      getLogger().warn({ event: 'ga4.purchase.failed', stripeEventId: event.id, err }, 'Não foi possível enviar a conversão ao GA4.'));
+  }
   await sendTrialNotifications();
 }
 
@@ -262,6 +278,7 @@ interface BillingDependencies {
 }
 
 export function registerBillingRoutes(router: Router, { requireUser, ensureDefaultEnxoval }: BillingDependencies) {
+  registerFiscalRoutes(router, requireUser);
   router.get('/billing/plans', asyncHandler(async (req, res) => {
     await requireUser(req);
     const offers = await Promise.all(PAID_PLAN_OFFERS.map(async offer => {
@@ -270,7 +287,8 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
       const valid = price.active && typeof price.unit_amount === 'number' &&
         (offer.id === 'pass' ? price.type === 'one_time' : price.recurring?.interval === 'month' && price.recurring.interval_count === 1);
       if (!valid) return null;
-      return { id: offer.id, name: offer.name, amount: price.unit_amount, currency: price.currency };
+      return { id: offer.id, name: offer.name, amount: price.unit_amount, currency: price.currency,
+        paymentMethods: offer.id === 'pass' && price.currency === 'brl' && process.env.STRIPE_PIX_ENABLED !== 'false' ? ['card', 'pix'] : ['card'] };
     }));
     res.json({ offers: offers.filter(Boolean) });
   }));
@@ -303,6 +321,9 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
     }
     res.json({
       trialNotice,
+      fiscalEnabled: fiscalEnabled(),
+      fiscalNeedsData: fiscalEnabled() && ownerId === user.id && !row.is_guest
+        ? (await getPool().query<{ pending: boolean }>("SELECT EXISTS (SELECT 1 FROM fiscal_invoices WHERE user_id = $1 AND status = 'needs_data') AS pending", [user.id])).rows[0].pending : false,
       monthlyPrice: row.billing_snapshot.monthlyPrice ?? null,
       passPayment: row.plan === 'pass' ? row.billing_snapshot.passPayment ?? null : null,
       passNotice: ownerId === user.id && !row.is_guest && row.plan === 'pass' && row.billing_snapshot.passPayment?.sessionId !== row.pass_notice_seen_session_id
@@ -363,11 +384,18 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
     const baseUrl = billingReturnUrl(req);
     if (!baseUrl) throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
 
+    const returnPath = checkoutReturnPath(req.body?.returnTo);
+    const checkoutConfiguration = `card:${fiscalEnabled() ? 'fiscal-v1' : 'standard'}:${returnPath}`;
     if (plan === 'monthly') {
-      const cached = await client.query<{url: string}>('SELECT url FROM billing_checkouts WHERE user_id = $1 AND expires_at > now()', [user.id]);
+      const cached = await client.query<{url: string}>('SELECT url FROM billing_checkouts WHERE user_id = $1 AND expires_at > now() AND configuration_key = $2', [user.id, checkoutConfiguration]);
       if (cached.rows[0]) return cached.rows[0].url;
     }
     const stripe = getStripe();
+    const price = await stripe.prices.retrieve(priceIdFor(plan));
+    if (!price.active || (plan === 'pass' ? price.type !== 'one_time' : price.recurring?.interval !== 'month' || price.recurring.interval_count !== 1)) {
+      throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
+    }
+    const pix = plan === 'pass' && price.currency === 'brl' && process.env.STRIPE_PIX_ENABLED !== 'false';
     let customerId = row.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({ email: row.email, metadata: { userId: user.id } });
@@ -384,9 +412,17 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
       line_items: [{ price: priceIdFor(plan), quantity: 1 }],
       allow_promotion_codes: true,
       locale: 'pt-BR',
+      // Stripe 23 / API 2026-09-30: payment_method_types foi substituído por allowed_payment_method_types.
+      allowed_payment_method_types: pix ? ['card', 'pix'] : ['card'],
+      ...(pix ? { payment_method_options: { pix: { expires_after_seconds: 3600 } } } : {}),
+      ...(fiscalEnabled() ? {
+        billing_address_collection: 'required' as const,
+        customer_update: { name: 'auto' as const, address: 'auto' as const },
+        custom_fields: [{ key: 'fiscal_document', label: { type: 'custom' as const, custom: 'CPF ou CNPJ (somente números)' },
+          type: 'numeric' as const, numeric: { minimum_length: 11, maximum_length: 14 }, optional: false }],
+      } : {}),
       metadata: { userId: user.id, plan },
       ...(plan === 'monthly' ? {
-        // Dynamic payment methods are configured in the Stripe Dashboard (API 2026-09-30+).
         payment_method_collection: 'always',
         subscription_data: {
           metadata: { userId: user.id },
@@ -394,12 +430,12 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
         },
         custom_text: { submit: { message: !row.trial_used ? 'Teste completo por 2 dias (48 horas). Após esse período, cobraremos automaticamente o valor mensal no cartão. Cancele no app antes do término para evitar a cobrança. O cancelamento encerra também o acesso dos convidados.' : 'A assinatura será cobrada agora. O teste gratuito só pode ser usado uma vez.' } }
       } : {}),
-      success_url: `${baseUrl}/app?assinatura=sucesso&plano=${plan}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/app?assinatura=cancelada`
+      success_url: `${baseUrl}${returnPath}?assinatura=sucesso&plano=${plan}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}${returnPath}?assinatura=cancelada`
     });
     if (!session.url) throw new HttpError(502, 'Não foi possível abrir o pagamento agora. Tente novamente.');
-    if (plan === 'monthly' && session.expires_at) await client.query(`INSERT INTO billing_checkouts (user_id, url, expires_at) VALUES ($1, $2, $3)
-      ON CONFLICT (user_id) DO UPDATE SET url = EXCLUDED.url, expires_at = EXCLUDED.expires_at`, [user.id, session.url, new Date(session.expires_at * 1000)]);
+    if (plan === 'monthly' && session.expires_at) await client.query(`INSERT INTO billing_checkouts (user_id, url, expires_at, configuration_key) VALUES ($1, $2, $3, $4)
+      ON CONFLICT (user_id) DO UPDATE SET url = EXCLUDED.url, expires_at = EXCLUDED.expires_at, configuration_key = EXCLUDED.configuration_key`, [user.id, session.url, new Date(session.expires_at * 1000), checkoutConfiguration]);
     return session.url;
     });
     res.json({ url });

@@ -2,7 +2,7 @@
 
 Inventario revisado em 2026-10-19: 71 registros de rotas da API. A cobertura vem do middleware global em server/index.ts, antes do webhook e dos parsers. Novas rotas herdam a mesma instrumentacao. Nao foi executada uma chamada de negocio em cada rota; os testes exercitam o middleware comum com rotas reais locais.
 
-Todas as rotas abaixo registram inicio, resultado ou falha, ID, URL, entrada, contexto, duracao, status e resposta da API.
+As rotas abaixo registram inicio, resultado ou falha, ID, URL, entrada, contexto, duracao, status e resposta da API. As chamadas rotineiras bem-sucedidas de `GET/HEAD /api/health` e `POST /api/auth/activity` ficam silenciosas; falhas, lentidao e interrupcoes continuam registradas. Carregamentos de paginas, modulos e arquivos estaticos e chamadas ao proxy `/ingest` seguem a mesma regra de silencio para sucesso, conforme [logs.md](logs.md).
 
 | Metodo | Rota | Arquivo |
 | --- | --- | --- |
@@ -69,6 +69,7 @@ Todas as rotas abaixo registram inicio, resultado ou falha, ID, URL, entrada, co
 | DELETE | `/api/profile/avatar` | `server/profile.ts` |
 | GET | `/api/profile/avatar` | `server/profile.ts` |
 | GET | `/api/catalog/search` | `server/catalog/routes.ts` |
+| POST | `/api/catalog/match` | `server/catalog/routes.ts` |
 | GET | `/api/admin/catalog/overview` | `server/catalog/routes.ts` |
 | GET | `/api/admin/catalog/items` | `server/catalog/routes.ts` |
 | PATCH | `/api/admin/catalog/items/:id` | `server/catalog/routes.ts` |

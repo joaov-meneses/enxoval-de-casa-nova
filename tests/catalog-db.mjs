@@ -179,8 +179,16 @@ try {
   assert.equal((await search("jogo de ca"))[0].name, "Jogo de cama", "prefixo do nome, mesmo com palavras vazias");
   assert.ok((await search("liquidificadr")).some((result) => result.name === "Liquidificador"), "tolera erro de digitação");
   assert.deepEqual(await search("a"), []);
+  const matched = await call("/catalog/match", "POST", { names: ["Geladeiras", "Liquidificadorr", "Air fryer Mondial preta", "Liquidificador com filtro", "Coisa desconhecida"] });
+  assert.equal(matched.status, 200, JSON.stringify(matched.data));
+  assert.deepEqual(
+    matched.data.results.map((result) => result && [result.match, result.name]),
+    [["exact", "Geladeira"], ["similar", "Liquidificador"], ["exact", "Air fryer"], ["contained", "Liquidificador"], null],
+    "importação: um nome por linha, na mesma ordem (marca e cor não mudam o item)",
+  );
+  assert.equal((await call("/catalog/match", "POST", { names: Array(501).fill("x") })).status, 400);
   assert.equal(received.length, 0, "a busca nunca consulta o Jev");
-  console.log("PASS: busca por prefixo, apelido e similaridade.");
+  console.log("PASS: busca por prefixo, apelido e similaridade; nomes da planilha em lote.");
 
   // 3. Itens do funil nascem ligados ao catálogo.
   const items = async () => Object.fromEntries((await call(`/items?enxovalId=${enxovalId}`)).data.map((item) => [item.name, item]));

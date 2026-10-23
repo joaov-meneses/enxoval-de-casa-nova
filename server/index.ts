@@ -12,6 +12,12 @@ import { registerBillingWebhook } from "./billing.ts";
 import { registerApiRoutes } from "./routes.ts";
 import { startPriceTrackerScheduler } from "./workers/priceTrackerWorker.ts";
 import { startCatalogScheduler } from "./workers/catalogWorker.ts";
+import { registerIngestProxy } from "./ingestProxy.ts";
+import { registerPreferenceRoutes } from "./lifecycle/routes.ts";
+import { startLifecycleWorker } from "./workers/lifecycleWorker.ts";
+import { stopProductAnalytics } from "./productAnalytics.ts";
+import { startFiscalInvoiceWorker } from "./workers/fiscalInvoices.ts";
+import { startWarrantyReminders } from './workers/warrantyReminders.ts';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -21,6 +27,8 @@ app.set("trust proxy", 1);
 app.use(createHttpLogging());
 // O webhook da Stripe confere a assinatura sobre o corpo cru, então vem antes do parser de JSON.
 registerBillingWebhook(app);
+// O proxy do PostHog repassa o corpo cru (às vezes comprimido), então também vem antes do parser de JSON.
+registerIngestProxy(app);
 app.use(express.json({ limit: "1mb" }));
 
 logger.info({ event: 'server.starting', port }, 'Iniciando servidor e aplicando migrações do banco.');
@@ -32,9 +40,13 @@ try {
   await Promise.allSettled([stopPosthogLogs(), stopErrorTracking()]);
   process.exit(1);
 }
+registerPreferenceRoutes(app);
 registerApiRoutes(app);
 startTrialNotifications();
+startLifecycleWorker();
 startUserIpRetention();
+startFiscalInvoiceWorker();
+startWarrantyReminders();
 
 if (isProduction) {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -85,7 +97,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     deadline.unref();
     httpServer.close(() => {
       clearTimeout(deadline);
-      void Promise.allSettled([stopPosthogLogs(), stopErrorTracking()]).finally(() => process.exit(0));
+      void Promise.allSettled([stopPosthogLogs(), stopErrorTracking(), stopProductAnalytics()]).finally(() => process.exit(0));
     });
   });
 }

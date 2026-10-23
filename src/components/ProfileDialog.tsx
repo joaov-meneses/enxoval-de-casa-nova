@@ -1,6 +1,7 @@
 import { Badge } from "@/src/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Button } from "@/src/components/ui/button";
+import { FiscalBillingSection } from './FiscalBillingSection';
 import { Label } from "@/src/components/ui/label";
 import { Input } from "@/src/components/ui/input";
 import { useEffect, useId, useState, type FormEvent } from "react";
@@ -11,8 +12,12 @@ import { Select } from "./Select";
 import {
   cancelSubscription,
   fetchBillingStatus,
+  fetchMarketingPreference,
+  fetchWarrantyReminders,
+  updateWarrantyReminders,
   fetchProfile,
   openBillingPortal,
+  updateMarketingPreference,
   removeProfileAvatar,
   requestPasswordReset,
   formatBillingAmount,
@@ -76,9 +81,18 @@ export function ProfileDialog({
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [marketing, setMarketing] = useState<boolean | null>(null);
+  const [warrantyReminders, setWarrantyReminders] = useState<boolean | null>(null);
   useEffect(() => {
     if (!open) return;
     let active = true;
+    // A preferência de e-mails carrega à parte: se falhar, o resto do perfil continua.
+    fetchMarketingPreference()
+      .then((result) => { if (active) setMarketing(result.subscribed); })
+      .catch(() => { if (active) setMarketing(null); });
+    fetchWarrantyReminders()
+      .then((result) => { if (active) setWarrantyReminders(result.enabled); })
+      .catch(() => { if (active) setWarrantyReminders(null); });
     setSection("profile");
     setLoading(true);
     setError("");
@@ -272,6 +286,47 @@ export function ProfileDialog({
                       </small>
                     )}
                   </section>
+                  {marketing !== null && !user.isGuest && (
+                    <section className="profile-security">
+                      <h3>E-mails do Casa Mia</h3>
+                      <label className="profile-optin">
+                        <input
+                          type="checkbox"
+                          checked={marketing}
+                          disabled={busy}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            void run(async () => {
+                              setMarketing((await updateMarketingPreference(next)).subscribed);
+                              setMessage(next ? "Pronto: você vai receber lembretes e dicas." : "Você não recebe mais lembretes e dicas.");
+                            });
+                          }}
+                        />
+                        <span>Lembretes da mudança e dicas para montar a casa, no máximo dois por semana.</span>
+                      </label>
+                      <small>Avisos da conta, da assinatura e de queda de preço continuam chegando.</small>
+                    </section>
+                  )}
+                  {warrantyReminders !== null && (
+                    <section className="profile-security">
+                      <h3>Garantias</h3>
+                      <label className="profile-optin">
+                        <input
+                          type="checkbox"
+                          checked={warrantyReminders}
+                          disabled={busy}
+                          onChange={(event) => {
+                            const next = event.target.checked;
+                            void run(async () => {
+                              setWarrantyReminders((await updateWarrantyReminders(next)).enabled);
+                              setMessage(next ? "Pronto: avisamos antes de cada garantia vencer." : "Você não recebe mais avisos de garantia.");
+                            });
+                          }}
+                        />
+                        <span>Avisar antes de a garantia vencer (30 e 7 dias antes), para os itens com garantia informada.</span>
+                      </label>
+                    </section>
+                  )}
                 </>
               )}
               {section === "home" &&
@@ -462,6 +517,7 @@ export function ProfileDialog({
                           </Button>
                         )}
                       </div>
+                      <FiscalBillingSection />
                     </>
                   )}
                 </section>

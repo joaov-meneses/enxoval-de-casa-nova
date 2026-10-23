@@ -1,6 +1,8 @@
 # Logs completos da aplicacao
 
-O backend usa Pino e pino-http. Toda requisicao que chega ao Express gera inicio e conclusao, falha ou interrupcao, inclusive autenticacao, administracao, webhook, arquivos e rotas inexistentes. O middleware vem antes dos parsers e o registro final registra novamente a requisicao depois do processamento.
+O backend usa Pino e pino-http. Requisicoes da API geram inicio e conclusao, falha ou interrupcao, inclusive autenticacao, administracao, webhook e rotas inexistentes. O middleware vem antes dos parsers e o registro final registra novamente a requisicao depois do processamento.
+
+Carregamentos bem-sucedidos de paginas, arquivos estaticos e modulos de desenvolvimento (incluindo os componentes de animacao) nao geram logs HTTP. O mesmo vale para o proxy `/ingest`, `GET/HEAD /api/health` e `POST /api/auth/activity`. Falhas, respostas HTTP 4xx/5xx, lentidao e interrupcoes continuam registradas, e o ID de correlacao continua disponivel mesmo nas requisicoes silenciosas.
 
 ## Dados registrados
 

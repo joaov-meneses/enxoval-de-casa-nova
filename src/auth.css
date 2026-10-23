@@ -22,21 +22,10 @@
   min-height: 100dvh;
   padding-top: 24px;
   overflow-x: clip;
-  background: var(--cm-bg);
+  background: transparent;
   color: var(--cm-text);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
-}
-/* Azulejo: arcos em fila, visíveis só ao redor da porta */
-.auth-shell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='56' viewBox='0 0 48 56'%3E%3Cpath d='M10 56V26a14 14 0 0 1 28 0v30' fill='none' stroke='%23ecdcc3' stroke-width='1.5'/%3E%3C/svg%3E");
-  -webkit-mask-image: radial-gradient(ellipse 62% 78% at 50% 62%, #000 0%, transparent 78%);
-  mask-image: radial-gradient(ellipse 62% 78% at 50% 62%, #000 0%, transparent 78%);
-  pointer-events: none;
 }
 .auth-shell ::selection {
   background: color-mix(in oklab, var(--cm-sand) 46%, var(--cm-bg));
@@ -648,4 +637,58 @@
     border-radius: 32px 32px 0 0;
   }
   .auth-door::before { display: none; }
+}
+
+/* Consentimento de e-mails de lembretes e dicas: opcional, desmarcado por padrão. */
+.auth-optin {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--cm-text, #2f2a26);
+  cursor: pointer;
+}
+
+.auth-optin input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--cm-action, #a34c30);
+  cursor: pointer;
+}
+
+.auth-optin strong {
+  display: block;
+  font-weight: 700;
+}
+
+/* Central de preferências de e-mail (/preferencias). */
+.preferences-options {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  text-align: left;
+}
+
+/* Dentro do formulário, vence as regras genéricas de label e input do cadastro. */
+.auth-form .auth-optin {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.auth-shell .auth-form .auth-optin input,
+.auth-form .auth-optin input {
+  display: block;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 4px;
 }

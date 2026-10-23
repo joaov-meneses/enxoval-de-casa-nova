@@ -4,6 +4,7 @@ import { asyncHandler, HttpError, rateLimit } from "./security.ts";
 import { processImage } from "./services/imageProcessing.ts";
 import { MAX_IMAGE_UPLOAD_BYTES } from "../src/imageUploadLimits.ts";
 import type { AuthUser } from "../src/types.ts";
+import { MARKETING_CONSENT_VERSION } from "./acquisition.ts";
 
 async function profileOf(userId: string) {
   const result = await getPool().query<{
@@ -27,6 +28,16 @@ async function profileOf(userId: string) {
       : null,
     createdAt: row.created_at.toISOString(),
   };
+}
+
+async function marketingOf(userId: string) {
+  const row = (
+    await getPool().query<{ marketing_consent_at: Date | null; marketing_unsubscribed_at: Date | null }>(
+      "SELECT marketing_consent_at, marketing_unsubscribed_at FROM users WHERE id = $1",
+      [userId],
+    )
+  ).rows[0];
+  return { subscribed: Boolean(row?.marketing_consent_at) && !row?.marketing_unsubscribed_at };
 }
 
 export function registerProfileRoutes(
@@ -55,6 +66,54 @@ export function registerProfileRoutes(
         [user.id, name],
       );
       res.json(await profileOf(user.id));
+    }),
+  );
+  // Aviso antes de a garantia de um item vencer (Fase 11.4): ligado por padrão, desliga no perfil.
+  router.get(
+    "/profile/warranty-reminders",
+    asyncHandler(async (req, res) => {
+      const user = await requireUser(req);
+      const row = (await getPool().query<{ warranty_reminders: boolean }>("SELECT warranty_reminders FROM users WHERE id = $1", [user.id])).rows[0];
+      res.json({ enabled: row?.warranty_reminders ?? true });
+    }),
+  );
+  router.put(
+    "/profile/warranty-reminders",
+    asyncHandler(async (req, res) => {
+      const user = await requireUser(req);
+      if (typeof req.body?.enabled !== "boolean") throw new HttpError(400, "Preferência inválida.");
+      await getPool().query("UPDATE users SET warranty_reminders = $2, updated_at = now() WHERE id = $1", [user.id, req.body.enabled]);
+      res.json({ enabled: req.body.enabled });
+    }),
+  );
+  // E-mails de lembretes e dicas: quem já tinha conta antes da caixa do cadastro liga ou desliga por aqui.
+  router.get(
+    "/profile/marketing",
+    asyncHandler(async (req, res) => {
+      const user = await requireUser(req);
+      res.json(await marketingOf(user.id));
+    }),
+  );
+  router.patch(
+    "/profile/marketing",
+    asyncHandler(async (req, res) => {
+      const user = await requireUser(req);
+      if (typeof req.body?.subscribed !== "boolean")
+        throw new HttpError(400, "Informe se você quer receber os e-mails.");
+      if (req.body.subscribed) {
+        await getPool().query(
+          `UPDATE users SET marketing_consent_at = now(), marketing_consent_source = 'perfil',
+             marketing_consent_version = $2, marketing_unsubscribed_at = NULL, marketing_paused_until = NULL
+           WHERE id = $1`,
+          [user.id, MARKETING_CONSENT_VERSION],
+        );
+      } else {
+        await getPool().query(
+          "UPDATE users SET marketing_unsubscribed_at = COALESCE(marketing_unsubscribed_at, now()) WHERE id = $1",
+          [user.id],
+        );
+      }
+      res.json(await marketingOf(user.id));
     }),
   );
   router.post(

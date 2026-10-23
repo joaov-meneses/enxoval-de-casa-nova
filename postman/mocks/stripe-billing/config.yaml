@@ -1,0 +1,9 @@
+version: 1
+name: Stripe Checkout — testes locais
+slug: stripe-billing-local
+protocol: http
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

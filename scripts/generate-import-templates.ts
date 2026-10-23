@@ -141,8 +141,8 @@ const instructions = [
   ["Item", "Nome do item. Até 36 caracteres.", "Sim"],
   [
     "Ambiente",
-    "Onde o item fica (Quarto, Cozinha...). Ambientes que ainda não existem são criados. Até 24 caracteres.",
-    "Sim",
+    "Onde o item fica (Quarto, Cozinha...). Ambientes que ainda não existem são criados. Até 24 caracteres. Em branco: o catálogo sugere o ambiente dos itens que conhece.",
+    "Sim, salvo itens que o catálogo conhece",
   ],
   [
     "Situação",
@@ -165,7 +165,7 @@ const instructions = [
   [""],
   ["Dicas"],
   [
-    "Item e Ambiente são obrigatórios e precisam estar preenchidos em todas as linhas. Se faltar algo, o arquivo é recusado e nada é importado.",
+    "Item é obrigatório em todas as linhas, e Ambiente também, a não ser que o catálogo conheça o item. Se faltar algo, o arquivo é recusado e nada é importado.",
   ],
   ['A primeira linha da aba "Itens" deve manter os títulos das colunas.'],
   [

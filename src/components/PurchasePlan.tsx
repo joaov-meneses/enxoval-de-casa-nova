@@ -46,16 +46,20 @@ import { citiesOfState, cityById, TRAIT_COPY } from "../onboarding/regions";
 import { STATES, stateInfo } from "../onboarding/plan";
 import { ITEM_STATUS_META, netPriceCents } from "../itemStatus";
 import { NinoAssistant } from "./NinoAssistant";
+import type { NinoCelebration } from "../nino";
 import { Select, type SelectOption } from "./Select";
+import { InstallmentsPlan } from "./InstallmentsPlan";
 
 export interface PlanningUpdates {
   moveDate?: string | null;
   spendingTier?: SpendingTier;
   state?: string | null;
   city?: string | null;
+  monthlyBudgetCents?: number | null;
 }
 
 interface PurchasePlanViewProps {
+  ninoCelebration?: NinoCelebration | null;
   enxoval: EnxovalSummary;
   items: EnxovalItem[];
   categories: EnxovalCategory[];
@@ -81,6 +85,7 @@ const dayMonth = new Intl.DateTimeFormat("pt-BR", {
 });
 
 const money = (cents: number) => wholeReais.format(cents / 100);
+const exactMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const range = (band: Band) =>
   band.maxCents === 0 ? "—" : `${money(band.minCents)} a ${money(band.maxCents)}`;
 
@@ -173,7 +178,7 @@ function PlanRow({
         <strong className="pp-row-name">{item.name}</strong>
         <span className="pp-row-meta">
           {done && <> · {ITEM_STATUS_META[item.status].label}</>}
-          {overdue && <b className="pp-late"> · Atrasado</b>}
+          {overdue && <b className="pp-late"> · Semana sugerida já passou</b>}
         </span>
         <span className="pp-row-reason">
           {manual ? (
@@ -268,11 +273,14 @@ function PeriodCard({
   canPickWeek,
   busyId,
   onPickWeek,
+  showBand,
 }: {
   step: number;
   summary: PeriodSummary<EnxovalItem>;
   moveDate: string | null;
   canPickWeek: boolean;
+  /** A faixa de referência só aparece depois de "Ver referência", para não ancorar o orçamento. */
+  showBand: boolean;
   busyId: string | null;
   onPickWeek: (id: string, week: number | null) => void;
 }) {
@@ -289,7 +297,7 @@ function PeriodCard({
     if (group) group.entries.push(entry);
     else groups.set(key, { name: entry.item.category, entries: [entry] });
   }
-  const verdict = summary.verdict;
+  const verdict = showBand ? summary.verdict : "empty";
   const VerdictIcon = VERDICT_ICON[verdict];
 
   return (
@@ -350,7 +358,7 @@ function PeriodCard({
                     <span className="pp-badge is-late">
                       <Clock3 size={13} aria-hidden="true" />{" "}
                       {summary.overdueCount}{" "}
-                      {summary.overdueCount === 1 ? "atrasado" : "atrasados"}
+                      para reagendar
                     </span>
                   </Badge>
                 )}
@@ -373,13 +381,15 @@ function PeriodCard({
         </h3>
 
         <CollapsibleContent id={bodyId} className="pp-period-body">
-          {verdict !== "empty" && (
+          {summary.verdict !== "empty" && (
             <div className="pp-figures">
               <dl>
-                <div>
-                  <dt>Faixa esperada</dt>
-                  <dd>{range(summary.band)}</dd>
-                </div>
+                {showBand && (
+                  <div>
+                    <dt>Faixa esperada</dt>
+                    <dd>{range(summary.band)}</dd>
+                  </div>
+                )}
                 <div>
                   <dt>Você planejou</dt>
                   <dd>
@@ -389,10 +399,10 @@ function PeriodCard({
                   </dd>
                 </div>
                 <div>
-                  <dt>Você gastou</dt>
+                  <dt>Já investimos</dt>
                   <dd>
                     {money(summary.spentCents)}
-                    {summary.reached && (
+                    {showBand && summary.reached && (
                       <small>
                         <Check size={11} aria-hidden="true" /> chegou à faixa
                       </small>
@@ -400,14 +410,16 @@ function PeriodCard({
                   </dd>
                 </div>
               </dl>
-              <Meter
-                band={summary.band}
-                planned={summary.plannedCents}
-                spent={summary.spentCents}
-              />
+              {showBand && (
+                <Meter
+                  band={summary.band}
+                  planned={summary.plannedCents}
+                  spent={summary.spentCents}
+                />
+              )}
               <p className="pp-figures-note">
-                {VERDICT_HELP[verdict]}
-                {summary.unpricedCount > 0 && verdict !== "no_prices" && (
+                {showBand && VERDICT_HELP[verdict]}
+                {showBand && summary.unpricedCount > 0 && verdict !== "no_prices" && (
                   <>
                     {" "}
                     {summary.unpricedCount}{" "}
@@ -452,6 +464,7 @@ function PeriodCard({
 }
 
 export function PurchasePlanView({
+  ninoCelebration,
   enxoval,
   items,
   categories,
@@ -462,6 +475,7 @@ export function PurchasePlanView({
 }: PurchasePlanViewProps) {
   const [error, setError] = useState("");
   const [tiersOpen, setTiersOpen] = useState(false);
+  const [bandOpen, setBandOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [addingName, setAddingName] = useState<string | null>(null);
@@ -608,7 +622,7 @@ export function PurchasePlanView({
               )}
             </div>
             {!hasMoveDate && (
-              <small>Sem a data, mostramos as semanas, mas não os dias nem os atrasos.</small>
+              <small>Sem a data, mostramos as semanas, mas não os dias de cada uma.</small>
             )}
           </div>
           <div className="pp-field">
@@ -662,7 +676,7 @@ export function PurchasePlanView({
             <span>
               <strong>{tierInfo.label}</strong>
               <small>
-                {tierInfo.tagline} · {range(totals[enxoval.spendingTier])}
+                {tierInfo.tagline}
               </small>
             </span>
             <ChevronDown size={18} aria-hidden="true" />
@@ -684,7 +698,7 @@ export function PurchasePlanView({
                   <RadioGroupItem id={`${baseId}-tier-${tier}`} value={tier} className="choice-control" />
                   <strong>{info.label}</strong>
                   <span>{info.tagline}</span>
-                  <small>{range(totals[tier])}</small>
+                  {enxoval.spendingTier === tier && <small>{range(totals[tier])}</small>}
                 </Label>
               );
             })}
@@ -694,12 +708,19 @@ export function PurchasePlanView({
       </section>
 
       <section className="pp-summary" aria-label="Resumo do planejamento">
+        {/* A faixa é referência, não meta: fica a um toque, para não ancorar o orçamento de quem quer gastar pouco. */}
         <div className="is-band">
           <span>
-            <Wallet size={14} aria-hidden="true" /> Faixa esperada
+            <Wallet size={14} aria-hidden="true" /> Faixa de referência
           </span>
-          <strong>{range(plan.totals.band)}</strong>
-          <small>Perfil {tierInfo.label}, para o enxoval todo</small>
+          {bandOpen ? (
+            <strong>{range(plan.totals.band)}</strong>
+          ) : (
+            <Button variant="brand" size="brand" type="button" className="pp-band-reveal" onClick={() => setBandOpen(true)}>
+              Ver referência
+            </Button>
+          )}
+          <small>Média do perfil {tierInfo.label} para o enxoval todo. Serve para orientar; quem decide o valor é você.</small>
         </div>
         <div className="is-planned">
           <span>Você planejou</span>
@@ -713,19 +734,29 @@ export function PurchasePlanView({
           </small>
         </div>
         <div className="is-spent">
-          <span>Você gastou</span>
-          <strong>{money(plan.totals.spentCents)}</strong>
+          <span>Já investimos</span>
+          {/* Centavos como em Meu Lar, para o mesmo número não aparecer arredondado em uma tela e exato na outra. */}
+          <strong>{exactMoney.format(plan.totals.spentCents / 100)}</strong>
           <small>
             {plan.totals.overdueCount > 0
-              ? `${plan.totals.overdueCount} ${plan.totals.overdueCount === 1 ? "item atrasado" : "itens atrasados"}`
+              ? `${plan.totals.overdueCount} ${plan.totals.overdueCount === 1 ? "item passou da semana sugerida" : "itens passaram da semana sugerida"}`
               : hasMoveDate
-                ? "Nada atrasado"
-                : "Informe a data para ver atrasos"}
+                ? "Tudo dentro das semanas sugeridas"
+                : "Informe a data para organizar as semanas"}
           </small>
         </div>
       </section>
 
+      <InstallmentsPlan
+        enxoval={enxoval}
+        items={items}
+        plan={plan}
+        canEdit={canEdit}
+        onSaveBudget={(cents) => onUpdateEnxoval({ monthlyBudgetCents: cents })}
+      />
+
       <NinoAssistant
+        celebration={ninoCelebration}
         enxovalId={enxoval.id}
         categories={categories}
         items={items}
@@ -739,7 +770,7 @@ export function PurchasePlanView({
       ) : (
         <>
           <div className="pp-section-head">
-            <h3>Etapas da compra</h3>
+            <h3>Etapas até a casa pronta</h3>
             <p>Toque em uma etapa para ver os itens e escolher a semana de cada um.</p>
           </div>
           {populated.map((summary, index) => (
@@ -751,6 +782,7 @@ export function PurchasePlanView({
             canPickWeek
             busyId={busyItemId}
             onPickWeek={(id, week) => void pickWeek(id, week)}
+            showBand={bandOpen}
           />
           ))}
         </>

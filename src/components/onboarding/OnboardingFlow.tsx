@@ -65,7 +65,7 @@ import {
   type IconComponent,
 } from "@/src/components/icons";
 import { Brand } from "../Brand";
-import { completeOnboarding, fetchBootstrap } from "../../api";
+import { ApiError, completeOnboarding, fetchBootstrap } from "../../api";
 import { track } from "../../onboarding/analytics";
 import { journeyFor, updateJourney } from "../../onboarding/journey";
 import { detectStateFromDevice } from "../../onboarding/location";
@@ -159,6 +159,11 @@ const ALL_STEPS = [
   "save",
 ] as const;
 type StepId = (typeof ALL_STEPS)[number];
+
+const QUESTION_STEPS: readonly StepId[] = [
+  "name", "moment", "date", "state", "housing", "people",
+  "rooms", "owned", "style", "budget", "worries", "usage",
+];
 
 const isStepId = (value: string): value is StepId =>
   (ALL_STEPS as readonly string[]).includes(value);
@@ -317,13 +322,16 @@ function OnboardingContent() {
   const [completed, setCompleted] = useState(saved?.completed ?? false);
   // O funil agora é a etapa pós-cadastro: exige conta criada (sem conta, cria em /login) e só
   // mostra as perguntas enquanto a conta ainda não tem nenhum enxoval (senão, já passou por aqui).
-  const [gate, setGate] = useState<"checking" | "open">("checking");
+  const [gate, setGate] = useState<"checking" | "open" | "error">("checking");
+  const [gateAttempt, setGateAttempt] = useState(0);
   useEffect(() => {
     let active = true;
+    setGate("checking");
     fetchBootstrap()
       .then((data) => {
         if (!active) return;
-        if (data.enxovais.length > 0 || data.user.onboardingCompleted || data.user.trialUsed) {
+        // E-mail ainda sem confirmação: o app mostra a tela de confirmação antes do funil.
+        if (data.user.emailVerified === false || data.enxovais.length > 0 || data.user.onboardingCompleted || data.user.trialUsed) {
           window.location.replace("/app");
           return;
         }
@@ -338,13 +346,18 @@ function OnboardingContent() {
         }));
         setGate("open");
       })
-      .catch(() => {
-        if (active) window.location.replace("/cadastro");
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 401) {
+          window.location.replace("/cadastro");
+          return;
+        }
+        setGate("error");
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [gateAttempt]);
 
   const plan = useMemo(() => generatePlan(answers), [answers]);
   const steps = visibleSteps(answers, plan);
@@ -391,7 +404,7 @@ function OnboardingContent() {
 
   // Persistência: o que a pessoa respondeu sobrevive a recarregar ou fechar.
   useEffect(() => {
-    if (step === "welcome" && !hasProgress && !answers.name) return;
+    if (step === "welcome") return;
     saveOnboarding({
       v: 2,
       answers,
@@ -499,8 +512,13 @@ function OnboardingContent() {
   };
 
   const hideProgress = step === "welcome" || step === "building";
-  const readyIndex = steps.indexOf("ready");
-  const progress = hideProgress ? 0 : Math.min(index / readyIndex, 1);
+  const questionCount = steps.filter((entry) => QUESTION_STEPS.includes(entry)).length;
+  const questionNumber = steps.slice(0, index + 1).filter((entry) => QUESTION_STEPS.includes(entry)).length;
+  const reviewing = index >= steps.indexOf("thanks");
+  const progress = hideProgress ? 0 : questionNumber / questionCount;
+  const progressLabel = reviewing
+    ? "Seu plano personalizado"
+    : `Pergunta ${questionNumber} de ${questionCount}`;
 
   const footer = ((): {
     label: string;
@@ -871,16 +889,32 @@ function OnboardingContent() {
     }
   })();
 
-  if (gate === "checking") {
+  if (gate !== "open") {
     return (
-      <div className="ob ob-gate" aria-busy="true">
-        <Brand />
-      </div>
+      <main className="ob ob-gate" aria-busy={gate === "checking"}>
+        <div className="ob-gate-content">
+          <Brand />
+          {gate === "error" ? (
+            <>
+              <h1 className="ob-title">Ops, tropeçamos aqui</h1>
+              <p className="ob-sub" role="alert">
+                Não conseguimos abrir seu plano agora. Confira sua conexão e
+                tente de novo para continuar de onde parou.
+              </p>
+              <Button variant="brand" size="brand" className="ob-cta" onClick={() => setGateAttempt((attempt) => attempt + 1)}>
+                Tentar de novo
+              </Button>
+            </>
+          ) : (
+            <p className="ob-sub" role="status">Preparando o plano do seu lar…</p>
+          )}
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="ob" data-step={step}>
+    <div className="ob" data-step={step} data-reviewing={reviewing}>
       <div className="ob-desktop-header">
         <a href="/" className="brand-link">
           <Brand />
@@ -904,25 +938,25 @@ function OnboardingContent() {
               <ArrowLeft size={20} />
             </Button>
           )}
-          <Progress value={Math.round(progress * 100)}
-            className="ob-progress"
-            aria-label="Progresso do seu plano"
-            data-hidden={hideProgress}
-          >
-            <motion.span
-              className="ob-progress-fill"
-              initial={false}
-              animate={{ width: `${progress * 100}%` }}
-              transition={
-                reduced
-                  ? { duration: 0 }
-                  : { type: "spring", stiffness: 140, damping: 24 }
-              }
-            />
-          </Progress>
-          <span className="ob-desktop-step">
-            {step === "welcome" ? "Vamos começar" : index < steps.indexOf("thanks") ? "Conhecendo seu lar" : "Seu plano personalizado"}
-          </span>
+          <div className="ob-progress-group" data-hidden={hideProgress} aria-hidden={hideProgress}>
+            <span className="ob-progress-label">{progressLabel}</span>
+            <Progress value={Math.round(progress * 100)}
+              className="ob-progress"
+              aria-label="Progresso das perguntas"
+              aria-valuetext={progressLabel}
+            >
+              <motion.span
+                className="ob-progress-fill"
+                initial={false}
+                animate={{ width: `${progress * 100}%` }}
+                transition={
+                  reduced
+                    ? { duration: 0 }
+                    : { type: "spring", stiffness: 140, damping: 24 }
+                }
+              />
+            </Progress>
+          </div>
         </header>
 
         <main className="ob-main" id="ob-main">
@@ -1040,7 +1074,7 @@ function WelcomeStep({ reduced }: { reduced: boolean }) {
           height={952}
           className="ob-mark"
           animate={reduced ? undefined : { y: [0, -7, 0] }}
-          transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 2.4, ease: "easeInOut" }}
         />
       </div>
 
@@ -1185,12 +1219,10 @@ function TimelineStep({
   };
   return (
     <div className="ob-center ob-timeline">
-      <span className="ob-eyebrow">
-        {weeks > 0 ? (weeks === 1 ? "SEMANA" : "SEMANAS") : "A MUDANÇA É"}
-      </span>
       <div className="ob-bignumber" aria-label={weeks > 0 ? plural(weeks, "semana", "semanas") : "Esta semana"}>
         {weeks > 0 ? <CountUp to={weeks} reduced={reduced} /> : <span className="ob-bignumber-text">Esta semana</span>}
       </div>
+      {weeks > 0 && <span className="ob-hint">{weeks === 1 ? "semana até a mudança" : "semanas até a mudança"}</span>}
       <span className="ob-pill">
         <i /> {PHASES.find((p) => p.id === (phase === "now" ? "final" : phase))?.label}
       </span>
@@ -1580,7 +1612,7 @@ function BuildingStep({
         height={952}
         className="ob-mark ob-mark-sm"
         animate={reduced ? undefined : { rotate: [0, -5, 5, 0] }}
-        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 1.6, repeat: 1, ease: "easeInOut" }}
       />
       <div className="ob-bignumber ob-bignumber-md" aria-hidden="true">
         {pct}%
@@ -1778,7 +1810,6 @@ function SavingsStep({
     : `${plural(sv.removedCount, "item", "itens")} que você não precisa comprar`;
   return (
     <>
-      <span className="ob-eyebrow ob-eyebrow-left">COMPARADO A UMA LISTA GENÉRICA</span>
       <h1 className="ob-title" tabIndex={-1} aria-label={title}>
         {none ? (
           title
@@ -2112,7 +2143,12 @@ function SaveStep({
   reduced: boolean;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState("");
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
   const payload = useMemo(() => toPayload(plan), [plan]);
   // Os mesmos valores que geraram o plano: o servidor exige todas as respostas obrigatórias.
   const profile = {
@@ -2127,6 +2163,8 @@ function SaveStep({
   // Salva o plano completo antes do cartão. O enxoval é criado após a confirmação da Stripe.
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setError("");
     track("signup_submit");
@@ -2147,6 +2185,7 @@ function SaveStep({
           : "Não foi possível salvar o plano agora. Tente novamente.",
       );
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
@@ -2180,15 +2219,16 @@ function SaveStep({
         ))}
       </ul>
 
-      <form className="ob-form" onSubmit={submit}>
+      <form className="ob-form" onSubmit={submit} aria-busy={submitting}>
         {error && (
-          <div className="ob-error" role="alert">
+          <div className="ob-error" role="alert" ref={errorRef} tabIndex={-1}>
             {error}
+            <p>Suas respostas continuam aqui. Tente salvar novamente.</p>
           </div>
         )}
         <Button variant="brand" size="brand" type="submit" className="ob-cta" disabled={submitting}>
           {submitting ? (
-            <LoaderCircle size={18} className="animate-spin" />
+            <><LoaderCircle size={18} className="animate-spin" aria-hidden="true" /> Salvando seu plano…</>
           ) : (
             "Criar meu plano"
           )}

@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const offers = [
-  { id: "monthly", name: "Mensal", amount: 2990, currency: "brl" },
-  { id: "pass", name: "Passe da Casa Nova", amount: 9900, currency: "brl" },
+  { id: "monthly", name: "Mensal", amount: 2990, currency: "brl", paymentMethods: ['card'] },
+  { id: "pass", name: "Passe da Casa Nova", amount: 9900, currency: "brl", paymentMethods: ['card', 'pix'] },
 ];
 
 async function openPaywall(page: Page, options: { trialUsed?: boolean; isOwner?: boolean; available?: boolean; offers?: typeof offers } = {}) {
@@ -20,6 +20,8 @@ async function openPaywall(page: Page, options: { trialUsed?: boolean; isOwner?:
     return route.fulfill({ json: {} });
   });
   await page.goto("/app");
+  const decline = page.getByRole('button', { name: 'Recusar', exact: true });
+  if (await decline.isVisible()) await decline.click();
   await expect(page.locator(".subscription-card")).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
 }
@@ -34,6 +36,9 @@ for (const [width, height] of [[320, 568], [360, 640], [375, 667], [390, 844], [
     await expect(page.getByText(/Se o acesso terminar/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Sair da conta" })).toBeVisible();
     await expect(page.locator(".subscription-plan-summary")).toContainText("Cobrança única agora");
+    await expect(page.locator('.subscription-plan-note')).toContainText('Pix ou cartão');
+    await expect(page.locator('.subscription-promise-art img')).toHaveAttribute('src', '/brand/nino-keys.png');
+    await expect.poll(() => page.locator('.subscription-promise-art img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
     await expect(page.locator(".subscription-plan-savings")).toHaveText("72% menos");
     await expect(page.locator(".subscription-plan-equivalent")).toContainText("R$ 8,25/mês");
     expect(await page.locator(".subscription-included").evaluate(element => element.parentElement?.previousElementSibling?.classList.contains("subscription-plan-options"))).toBe(true);

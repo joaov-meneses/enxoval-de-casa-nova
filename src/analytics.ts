@@ -3,7 +3,12 @@ import { startActionLogging } from './analytics/operations';
 import { exceptionProperties } from '../shared/errorTracking';
 import { allowedProperties, EVENT_PROPERTIES, safeRoute, scrubSdkProperties, type AnalyticsEvent, type AnalyticsProperties } from './analytics/events';
 import type { AuthUser } from './types';
-import { ATTRIBUTION_KEY, TRAFFIC_KEY, campaignAllowlist, pageMetadata, readAttribution, trafficType, webVitalsProperties } from './analytics/web';
+import { isAppPath } from './appRoute';
+import { ATTRIBUTION_KEY, TRAFFIC_KEY, campaignAllowlist, pageMetadata, readAttribution, safeOrigin, trafficType, webVitalsProperties } from './analytics/web';
+import { onConsentChange, readConsent, saveConsent, hasAnalyticsConsent, type ConsentChoice } from './analytics/consent';
+import { applyGoogleConsent, pushGoogleEvent, pushGooglePageview } from './analytics/google';
+import { readFirstTouch } from './analytics/firstTouch';
+import { channelGroup } from '../shared/acquisition';
 
 let enabled = false;
 let identifiedUser: string | null = null;
@@ -53,7 +58,9 @@ function safely(action: () => void) {
 }
 
 export function capture(event: AnalyticsEvent, properties: AnalyticsProperties = {}) {
-  safely(() => { posthog.capture(event, allowedProperties(event, properties)); });
+  const allowed = allowedProperties(event, properties);
+  safely(() => { posthog.capture(event, allowed); });
+  try { pushGoogleEvent(event, allowed); } catch { /* Best effort telemetry. */ }
 }
 
 export function trackLandingCta(action: 'start_trial' | 'open_app' | 'login' | 'view_pricing' | 'view_how_it_works' | 'view_nino' | 'view_gift_list', position: 'header' | 'navigation' | 'hero' | 'pricing' | 'footer_cta' | 'footer') {
@@ -85,14 +92,20 @@ export function captureOnce(key: string, event: AnalyticsEvent, properties: Anal
 export function identifyAnalytics(user: AuthUser) {
   safely(() => {
     if (identifiedUser && identifiedUser !== user.id) resetAnalytics();
-    posthog.identify(user.id, { plan: user.plan ?? 'free', is_guest: Boolean(user.isGuest) });
+    // Origem do primeiro toque, gravada uma vez só na pessoa ($set_once), para fatiar qualquer análise por canal.
+    const touch = readFirstTouch();
+    const initial = Object.fromEntries(Object.entries({
+      initial_channel_group: channelGroup(touch), initial_source: touch.source,
+      initial_medium: touch.medium, initial_campaign: touch.campaign,
+    }).filter(([, value]) => value !== undefined));
+    posthog.identify(user.id, { plan: user.plan ?? 'free', is_guest: Boolean(user.isGuest) }, initial);
     identifiedUser = user.id;
     recordAppSession();
   });
 }
 
 function recordAppSession() {
-  if (!identifiedUser || window.location.pathname !== '/app' || document.visibilityState === 'hidden') return;
+  if (!identifiedUser || !isAppPath(window.location.pathname) || document.visibilityState === 'hidden') return;
   safely(() => {
     const session = posthog.get_session_id();
     const key = `${identifiedUser}:${session}`;
@@ -108,7 +121,11 @@ function recordAppSession() {
 }
 
 export function resetAnalytics() {
-  safely(() => posthog.reset());
+  safely(() => {
+    posthog.reset();
+    // reset() devolve o SDK ao padrão (opt-out); quem consentiu continua sendo medido como anônimo.
+    if (hasAnalyticsConsent()) posthog.opt_in_capturing({ captureEventName: false });
+  });
   identifiedUser = null;
   openedSession = null;
   emitted.clear();
@@ -117,19 +134,29 @@ export function resetAnalytics() {
 }
 
 export const analyticsAvailable = () => enabled;
-export const analyticsOptedOut = () => enabled && posthog.has_opted_out_capturing();
+export const analyticsOptedOut = () => enabled && !hasAnalyticsConsent();
+/** Atalho da página de privacidade: grava no mesmo consentimento do aviso (recusar análise recusa marketing). */
 export function setAnalyticsOptOut(optOut: boolean) {
+  saveConsent({ analytics: !optOut, marketing: optOut ? false : Boolean(readConsent()?.marketing) });
+}
+
+/** PostHog só captura com consentimento de análise; antes disso não grava cookie nem armazenamento local. */
+function applyPosthogConsent(choice: ConsentChoice | null) {
   safely(() => {
-    if (optOut) {
-      posthog.opt_out_capturing();
-      attribution = null;
-      attributionSession = '';
-      try { sessionStorage.removeItem(ATTRIBUTION_KEY); } catch { /* Optional storage. */ }
-    } else {
-      posthog.opt_in_capturing();
-      lastPage = '';
-      trackPageview();
+    if (choice?.analytics) {
+      posthog.set_config({ persistence: 'localStorage+cookie' });
+      if (posthog.has_opted_out_capturing()) {
+        posthog.opt_in_capturing({ captureEventName: false });
+        lastPage = '';
+        trackPageview();
+      }
+      return;
     }
+    if (choice) posthog.opt_out_capturing();
+    posthog.set_config({ persistence: 'memory' });
+    attribution = null;
+    attributionSession = '';
+    try { sessionStorage.removeItem(ATTRIBUTION_KEY); } catch { /* Optional storage. */ }
   });
 }
 
@@ -146,6 +173,41 @@ export function trackPageview() {
   capture('$pageview', { route });
 }
 
+let lastGooglePage = '';
+function trackGooglePageview() {
+  const route = safeRoute(window.location.pathname);
+  if (route === lastGooglePage) return;
+  lastGooglePage = route;
+  try { pushGooglePageview(route, safeOrigin(window.location.origin)); } catch { /* Best effort telemetry. */ }
+}
+
+/** Tag Manager e Consent Mode. Independe do PostHog: cada ferramenta liga com a própria variável. */
+function startGoogle() {
+  applyGoogleConsent(readConsent());
+  const stopConsent = onConsentChange(choice => { applyGoogleConsent(choice); lastGooglePage = ''; trackGooglePageview(); });
+  trackGooglePageview();
+  const originalPush = window.history.pushState;
+  const originalReplace = window.history.replaceState;
+  const push: History['pushState'] = function (...args) { originalPush.apply(this, args); trackGooglePageview(); };
+  const replace: History['replaceState'] = function (...args) { originalReplace.apply(this, args); trackGooglePageview(); };
+  window.history.pushState = push;
+  window.history.replaceState = replace;
+  window.addEventListener('popstate', trackGooglePageview);
+  return () => {
+    stopConsent();
+    if (window.history.pushState === push) window.history.pushState = originalPush;
+    if (window.history.replaceState === replace) window.history.replaceState = originalReplace;
+    window.removeEventListener('popstate', trackGooglePageview);
+  };
+}
+
+export function startAnalytics() {
+  let stopGoogle = () => {};
+  try { stopGoogle = startGoogle(); } catch { /* Telemetry never blocks the app. */ }
+  const stopPosthog = startPosthog();
+  return () => { stopPosthog(); stopGoogle(); };
+}
+
 function trackPageleave() {
   if (!lastPage) return;
   const route = lastPage;
@@ -153,12 +215,20 @@ function trackPageleave() {
   safely(() => posthog.capture('$pageleave', { route }, { send_instantly: true, transport: 'sendBeacon' }));
 }
 
-export function startAnalytics() {
+function startPosthog() {
   const env = import.meta.env;
+  const consent = readConsent();
   if (!env.VITE_POSTHOG_KEY?.trim() || (env.DEV && env.VITE_POSTHOG_ENABLE_DEV !== 'true')) return () => {};
   try {
     posthog.init(env.VITE_POSTHOG_KEY.trim(), {
       api_host: env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+      // Com o proxy próprio (VITE_POSTHOG_HOST=/ingest), os links da interface do PostHog usam o host real.
+      ...(env.VITE_POSTHOG_UI_HOST ? { ui_host: env.VITE_POSTHOG_UI_HOST } : {}),
+      // Sem consentimento de análise: nada é capturado e nada é gravado no aparelho.
+      opt_out_capturing_by_default: true,
+      opt_out_persistence_by_default: true,
+      persistence: consent?.analytics ? 'localStorage+cookie' : 'memory',
+      ...(env.VITE_POSTHOG_COOKIELESS === 'on_reject' ? { cookieless_mode: 'on_reject' as const } : {}),
       person_profiles: 'identified_only', autocapture: false,
       capture_pageview: false, capture_pageleave: true,
       disable_session_recording: true, disable_surveys: true,
@@ -222,6 +292,8 @@ export function startAnalytics() {
     });
     enabled = true;
   } catch { return () => {}; }
+  applyPosthogConsent(consent);
+  const stopConsent = onConsentChange(applyPosthogConsent);
   const stopActionLogging = startActionLogging(captureOperational);
   trackPageview();
   if (new URLSearchParams(window.location.search).get('assinatura') === 'cancelada') capture('checkout_canceled');
@@ -243,6 +315,7 @@ export function startAnalytics() {
   window.addEventListener('focus', visible);
   document.addEventListener('visibilitychange', visible);
   return () => {
+    stopConsent();
     stopActionLogging();
     if (window.history.pushState === push) window.history.pushState = originalPush;
     if (window.history.replaceState === replace) window.history.replaceState = originalReplace;

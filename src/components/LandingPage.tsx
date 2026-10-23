@@ -22,6 +22,7 @@ import { Nino } from "./Nino";
 import { PAID_PLAN_OFFERS, PASS_MONTHS } from "../plans";
 import type { PaidPlanId } from "../api";
 import { trackLandingCta } from '../analytics';
+import { consentRequired, openConsentPreferences } from '../analytics/consent';
 import { PLAN_URL_VALUE } from '../planChoice';
 
 const FAQS = [
@@ -536,6 +537,11 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
           <a href="#planos" onClick={() => trackLandingCta('view_pricing', 'footer')}>Preços</a>
           <a href="/como-o-nino-escolhe">Como o Nino escolhe</a>
           <a href="/privacidade">Privacidade</a>
+          {consentRequired() && (
+            <a href="/privacidade" onClick={(event) => { event.preventDefault(); openConsentPreferences(); }}>
+              Preferências de privacidade
+            </a>
+          )}
         </nav>
         <span className="cm-footer-copy">
           © {new Date().getFullYear()} Casa Mia
