@@ -1,8 +1,8 @@
-// Teste de integração com PostgreSQL real: convite de pessoas para um enxoval (e-mail, aceite, permissões do convidado,
 // remoção e separação entre enxoval próprio e compartilhado). O e-mail vai para a caixa em memória (MAIL_DRIVER=memory).
 // Usa um schema descartável. Rodar: npm run test:invitations-db
 import assert from "node:assert/strict";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 
@@ -88,7 +88,7 @@ try {
     return { person, enxovalId: workspace.data.enxoval.id, id: account.data.user.id };
   };
 
-  const password = randomBytes(12).toString("base64url");
+  const password = strongPassword();
   const ana = await register("Ana", "ana@example.invalid", password, "Casa da Ana");
   const bia = await register("Bia", "bia@example.invalid", password, "Casa da Bia");
   const guestEmail = "convidado@example.invalid";

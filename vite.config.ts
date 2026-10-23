@@ -6,6 +6,12 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     build: { sourcemap: 'hidden' as const },
+    // Versão publicada (commit da Railway) nos eventos e exceções do navegador, para alertas por versão.
+    define: {
+      __APP_VERSION__: JSON.stringify(
+        process.env.APP_VERSION?.trim() || process.env.RAILWAY_GIT_COMMIT_SHA?.trim().slice(0, 7) || 'dev',
+      ),
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

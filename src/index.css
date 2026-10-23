@@ -4,12 +4,14 @@
 @import "./shadcn.css";
 @import "./product.css";
 @import "./onboarding.css";
+@import "./onboarding-polish.css";
 @import "./privacy.css";
 @import "./landing.css";
 @import "./auth.css";
 @import "./planning.css";
 @import "./feedback.css";
 @import "./catalog-admin.css";
+@import "./growth.css";
 @import "./workspace-interactions.css";
 
 /* O app não tem tema escuro: as classes dark: só valem dentro de .dark, nunca pela preferência do sistema. */

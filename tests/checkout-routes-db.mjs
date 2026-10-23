@@ -53,7 +53,7 @@ try {
     const data = await response.json();
     return { status: response.status, data };
   };
-  assert.equal((await call('/auth/register', { email: 'checkout-route@example.invalid', password: 'Local-test-password-123' })).status, 201);
+  assert.equal((await call('/auth/register', { email: 'checkout-route@example.invalid', password: 'Local-test-password-7' })).status, 201);
   for (const returnTo of ['/app/home/plano', '/app/home/plano', '/app/other/itens/office', 'https://evil.invalid/app']) {
     const result = await call('/billing/checkout', { plan: 'monthly', returnTo });
     assert.equal(result.status, 200, JSON.stringify(result.data));

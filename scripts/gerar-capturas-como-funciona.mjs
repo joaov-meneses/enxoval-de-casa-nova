@@ -58,7 +58,14 @@ function popular(enxovalId) {
 }
 
 limpar();
-const senha = randomBytes(12).toString("hex");
+// Segue a regra de senha nova (letra, número, caractere especial, sem números em sequência).
+const senhaAleatoria = () => {
+  for (;;) {
+    const candidata = `Casa#${randomBytes(12).toString("hex")}`;
+    if (/d/.test(candidata) && !/012|123|234|345|456|567|678|789|987|876|765|654|543|432|321|210/.test(candidata)) return candidata;
+  }
+};
+const senha = senhaAleatoria();
 const browser = await chromium.launch({ channel: "msedge" });
 const ctx = await browser.newContext({
   viewport: { width: 390, height: 844 },
@@ -132,7 +139,7 @@ try {
   const enxovalId = psql(`SELECT e.id FROM enxovais e JOIN users u ON u.id = e.owner_id WHERE u.email = '${EMAIL_ANA}'`);
   popular(enxovalId);
   const leo = await request.newContext();
-  const regLeo = await leo.post(`${BASE}/api/auth/register`, { data: { email: EMAIL_LEO, password: randomBytes(12).toString("hex") } });
+  const regLeo = await leo.post(`${BASE}/api/auth/register`, { data: { email: EMAIL_LEO, password: senhaAleatoria() } });
   if (regLeo.status() !== 201) throw new Error(`Cadastro do Léo falhou: ${regLeo.status()}`);
   await leo.dispose();
   psql(`UPDATE users SET name = 'Léo' WHERE email = '${EMAIL_LEO}'`);

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { strongPassword } from './strongPassword.mjs';
 import express from 'express';
 import pg from 'pg';
 import { getPool } from '../server/database.ts';
@@ -33,7 +34,7 @@ try {
     return { status: response.status, cookie: setCookie, data: response.status === 204 ? null : await response.json() };
   };
   const query = async (sql, params = []) => (await getPool().query(sql, params)).rows;
-  const password = randomBytes(24).toString('hex');
+  const password = strongPassword();
   const registered = await call('/auth/register', 'POST', { email: 'session@example.invalid', password });
   assert.equal(registered.status, 201);
   assert.match(registered.cookie, /Max-Age=604800/);

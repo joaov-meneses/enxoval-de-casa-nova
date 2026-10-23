@@ -1,8 +1,8 @@
-// Teste de integração com PostgreSQL real da Fase 11: parcelas, responsável, presentes, garantias, documentos (no
 // banco), várias lojas por item, teto mensal e lembretes de garantia. Usa um schema descartável.
 //   npm run test:enxoval-value-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import dotenv from "dotenv";
@@ -71,7 +71,7 @@ try {
     return { raw, call };
   };
   const signUp = async (person, name) => {
-    const result = await person.call("/auth/register", "POST", { name, email: `${name.toLowerCase()}-${randomUUID().slice(0, 6)}@example.invalid`, password: randomBytes(16).toString("base64url") });
+    const result = await person.call("/auth/register", "POST", { name, email: `${name.toLowerCase()}-${randomUUID().slice(0, 6)}@example.invalid`, password: strongPassword() });
     assert.equal(result.status, 201, JSON.stringify(result.data));
     await query("UPDATE users SET plan = 'monthly', name = $2 WHERE id = $1", [result.data.user.id, name]);
     return result.data.user.id;
@@ -272,8 +272,11 @@ try {
   assert.equal(mailOutbox[0].to, ownerRow.email, "quem desligou os avisos no perfil não recebe");
   summary = await sendWarrantyReminders();
   assert.equal(summary.emails, 0, "o mesmo aviso não sai duas vezes");
-  // Garantia renovada (outra data de fim) volta a ser avisada.
+  // Garantia renovada (outra data de fim) volta a ser avisada, respeitando o limite comum de 1 e-mail por dia.
   await query("UPDATE items SET warranty_until = warranty_until - 1 WHERE id = $1", [fridge.id]);
+  assert.equal((await sendWarrantyReminders()).emails, 0, "já recebeu e-mail hoje: o aviso espera a próxima rodada");
+  assert.equal((await query("SELECT COUNT(*)::int AS n FROM lifecycle_messages WHERE flow_key = 'warranty'"))[0].n, 1);
+  await query("UPDATE lifecycle_messages SET sent_at = sent_at - interval '2 days' WHERE flow_key = 'warranty'");
   assert.equal((await sendWarrantyReminders()).emails, 1);
   console.log("PASS: aviso de garantia 7 dias antes, sem repetir e respeitando a preferência do perfil.");
 

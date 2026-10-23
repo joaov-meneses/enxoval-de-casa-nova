@@ -1,7 +1,8 @@
 // Teste de integração do catálogo mestre (Fase 6) com PostgreSQL real e o SDK real do Jev falando com um servidor
 // HTTP falso. Usa um schema descartável. Rodar: npm run test:catalog-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import { createServer } from "node:http";
 import zlib from "node:zlib";
 import express from "express";
@@ -158,7 +159,7 @@ try {
   };
   const register = async (email) => {
     jar.delete("enxoval_session");
-    const result = await call("/auth/register", "POST", { email, password: randomBytes(16).toString("base64url") });
+    const result = await call("/auth/register", "POST", { email, password: strongPassword() });
     assert.equal(result.status, 201, JSON.stringify(result.data));
     // Conta paga: este teste cobre o catálogo, não as travas do plano gratuito (tests/freemium-db.mjs).
     await db.query("UPDATE users SET plan = 'monthly' WHERE id = $1", [result.data.user.id]);

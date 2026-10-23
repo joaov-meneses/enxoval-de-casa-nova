@@ -328,24 +328,42 @@
   }
 }
 
-/* Expand the summary smoothly and reveal its cards in a short sequence. */
+/* Expand the summary smoothly and reveal its cards in a short sequence. The box only opens and closes; the fade and
+   the rise belong to the cards themselves, as transitions, so both cards move the same way when opening and closing
+   (before, the box's own fade hid the first card's rise and only the second one seemed to move). */
 .workspace-app .stats-insights-reveal {
   display: grid;
   grid-template-rows: 0fr;
-  opacity: 0;
   visibility: hidden;
   margin-top: 0;
   transition:
     grid-template-rows 280ms ease,
-    opacity 180ms ease,
     margin-top 280ms ease,
     visibility 280ms;
 }
 .workspace-app .stats-insights-reveal[data-open="true"] {
   grid-template-rows: 1fr;
-  opacity: 1;
   visibility: visible;
   margin-top: 12px;
+}
+.workspace-app .stats-insights-reveal .stats-insight {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 160ms ease-in,
+    transform 200ms ease-in;
+}
+.workspace-app .stats-insights-reveal[data-open="true"] .stats-insight {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 260ms ease-out 60ms,
+    transform 300ms ease-out 60ms;
+}
+.workspace-app
+  .stats-insights-reveal[data-open="true"]
+  .stats-insight:nth-child(2) {
+  transition-delay: 120ms;
 }
 .workspace-app .stats-insights-reveal > .stats-insights-clip {
   min-height: 0;
@@ -353,24 +371,6 @@
   margin: 0;
   padding: 0;
   border: 0;
-}
-.workspace-app .stats-insights-reveal[data-open="true"] .stats-insight {
-  animation: stats-card-reveal 300ms ease-out both;
-}
-.workspace-app
-  .stats-insights-reveal[data-open="true"]
-  .stats-insight:nth-child(2) {
-  animation-delay: 65ms;
-}
-@keyframes stats-card-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* The same rising surface for Add, Import, Export and the editing forms. */
@@ -461,12 +461,15 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .workspace-app .item-row.is-completing,
-  .workspace-app .stats-insights-reveal[data-open="true"] .stats-insight,
   .casamia-dialog[data-state="open"] {
     animation: none;
   }
-  .workspace-app .stats-insights-reveal {
+  .workspace-app .stats-insights-reveal,
+  .workspace-app .stats-insights-reveal .stats-insight {
     transition: none;
+  }
+  .workspace-app .stats-insights-reveal .stats-insight {
+    transform: none;
   }
 }
 
@@ -1654,4 +1657,258 @@
   letter-spacing: 0;
   text-transform: none;
   color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+
+/* Chips de ambiente no celular: "conquistados/total" ao lado do nome, no tom do chip, sem a pílula de fundo. */
+.workspace-app .environment-chips .environment-select > small.environment-chip-count,
+.workspace-app .environment-chips-row > .environment-row.environment-all small.environment-chip-count {
+  padding: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
+}
+.workspace-app .environment-chips .environment-row.active small.environment-chip-count,
+.workspace-app .environment-chips-row > .environment-row.environment-all.active small.environment-chip-count {
+  background: none;
+  color: color-mix(in oklab, #fff 92%, var(--cm-action));
+}
+
+/* Cabeçalho da lista no celular: o título fica inteiro na primeira linha (sem partir a palavra) e as ações descem. */
+@media (max-width: 767px) {
+  .workspace-app .list-section-heading {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .workspace-app .list-section-heading > div:first-child {
+    flex: 1 1 100%;
+  }
+  .workspace-app .list-section-heading h2 {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  .workspace-app .list-heading-actions {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .workspace-app .list-heading-actions .store-mode-entry {
+    margin-left: auto;
+  }
+}
+/* Com a contagem, a largura fixa cortava o nome: o chip cresce com o conteúdo, a partir da largura base. */
+.workspace-app .environment-chips .sortable-entry,
+.workspace-app .environment-chips-row > .environment-row.environment-all {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: var(--environment-chip-width);
+}
+.workspace-app .environment-chips .environment-row {
+  width: auto;
+  min-width: var(--environment-chip-width);
+  max-width: 220px;
+}
+.workspace-app .environment-chips .environment-select > small.environment-chip-count,
+.workspace-app .environment-chips-row > .environment-row.environment-all small.environment-chip-count {
+  flex: none;
+}
+.workspace-app .environment-chips .environment-select > span,
+.workspace-app .environment-chips-row > .environment-row.environment-all .environment-select > span {
+  flex: 0 1 auto;
+}
+.workspace-app .environment-chips .environment-row .environment-select,
+.workspace-app .environment-chips-row > .environment-row.environment-all .environment-select {
+  gap: 6px;
+}
+
+/* "Ver na loja" e o ícone da observação andam juntos na linha de detalhes do item. */
+.item-meta .item-meta-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* No celular as ações da lista ficam logo acima da busca: um respiro antes dela. */
+.workspace-app .category-list-swipe > .list-heading-actions {
+  margin-bottom: 12px;
+}
+
+/* "Ver na loja - Leroy Merlin": o nome da loja não empurra a linha; nomes longos ganham reticências. */
+.item-meta .item-meta-tail .item-link-store {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Perfil no topo do menu: avatar, nome e uma seta, no mesmo cartão claro do seletor de enxoval. */
+.workspace-app .workspace-menu-content > .profile-entry-mobile,
+.workspace-menu-content > .profile-entry-mobile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 44%, #fff);
+  border-radius: 15px;
+  background: color-mix(in oklab, var(--cm-primary-dark) 5%, #fff);
+  color: var(--cm-text);
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.workspace-menu-content > .profile-entry-mobile:hover {
+  border-color: color-mix(in oklab, var(--cm-primary-dark) 35%, #fff);
+  background: color-mix(in oklab, var(--cm-primary-dark) 8%, #fff);
+}
+.workspace-menu-content > .profile-entry-mobile:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.profile-entry-mobile .profile-entry-avatar {
+  width: 44px;
+  height: 44px;
+  background: color-mix(in oklab, var(--cm-sand) 40%, #fff);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px color-mix(in oklab, var(--cm-primary-dark) 30%, #fff);
+  font-family: var(--font-serif);
+  font-size: 19px;
+}
+.profile-entry-mobile .profile-entry-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.profile-entry-mobile .profile-entry-text strong {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.profile-entry-mobile .profile-entry-text small {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: color-mix(in oklab, var(--cm-text) 60%, #fff);
+}
+.profile-entry-mobile .profile-entry-chevron {
+  flex: none;
+  color: var(--cm-primary-dark);
+}
+
+/* Atalho para o perfil ao lado do menu, no topo do celular. */
+.workspace-app .mobile-header-title-row .mobile-header-profile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  margin-right: -12px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+.workspace-app .mobile-header-profile .user-avatar {
+  width: 30px;
+  height: 30px;
+  background: color-mix(in oklab, var(--cm-sand) 40%, #fff);
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--cm-primary-dark) 30%, #fff);
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+.workspace-app .mobile-header-profile:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 1px;
+}
+
+/* Celular: "Estou na loja" é a ação principal, com uma linha que explica; importar e exportar ficam em "Planilhas". */
+.workspace-app .list-heading-actions.list-mobile-actions {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+}
+.workspace-app .list-mobile-actions .store-mode-cta {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, #fff);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--cm-text);
+  text-align: left;
+}
+.workspace-app .list-mobile-actions .store-mode-cta > svg {
+  flex: none;
+  color: var(--cm-primary-dark);
+}
+.workspace-app .list-mobile-actions .store-mode-cta > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+.workspace-app .list-mobile-actions .store-mode-cta strong {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.workspace-app .list-mobile-actions .store-mode-cta small {
+  font-size: 12px;
+  line-height: 1.3;
+  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
+}
+.workspace-app .list-mobile-actions .list-more-trigger {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 128px;
+  min-height: 56px;
+  padding: 0 18px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, #fff);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--cm-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.workspace-app .list-mobile-actions .list-more-trigger > svg {
+  color: var(--cm-primary-dark);
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .list-mobile-actions .store-mode-cta:hover,
+  .workspace-app .list-mobile-actions .list-more-trigger:hover {
+    border-color: color-mix(in oklab, var(--cm-primary-dark) 35%, #fff);
+  }
+}
+.workspace-app .list-mobile-actions .store-mode-cta:focus-visible,
+.workspace-app .list-mobile-actions .list-more-trigger:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.list-more-dialog .export-sheet-actions > button > svg {
+  flex: none;
+  color: var(--cm-primary-dark);
+}
+.list-more-dialog .export-sheet-actions > button strong {
+  font-size: 15px;
+}
+.list-more-dialog .export-sheet-actions > button {
+  min-height: 64px;
+}
+/* Com o avatar ao lado do menu sobra menos largura: o nome do enxoval fica numa linha só (com reticências),
+   senão um nome longo quebraria e o cabeçalho mudaria de altura. */
+.workspace-app .mobile-header-title-row .mobile-title-with-edit h1 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

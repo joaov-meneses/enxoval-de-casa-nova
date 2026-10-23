@@ -75,5 +75,69 @@ export async function migrateGrowth(pool: Pool) {
       reason text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+
+    -- Retorno do provedor (webhooks do Resend) e volta ao app pelo link do e-mail. O id do evento evita contar duas
+    -- vezes a mesma entrega quando o provedor reenvia o webhook.
+    ALTER TABLE lifecycle_events ADD COLUMN IF NOT EXISTS provider_event_id text;
+    CREATE UNIQUE INDEX IF NOT EXISTS lifecycle_events_provider_event_idx ON lifecycle_events(provider_event_id)
+      WHERE provider_event_id IS NOT NULL;
+    ALTER TABLE lifecycle_events DROP CONSTRAINT IF EXISTS lifecycle_events_type_valid;
+    ALTER TABLE lifecycle_events ADD CONSTRAINT lifecycle_events_type_valid
+      CHECK (type IN ('delivered', 'clicked', 'bounced', 'complained', 'unsubscribed', 'returned'));
+    CREATE INDEX IF NOT EXISTS lifecycle_messages_provider_idx ON lifecycle_messages(provider_message_id)
+      WHERE provider_message_id IS NOT NULL;
+
+    -- Dias em que a pessoa usou o app (um registro por dia). Mede retorno depois de cada e-mail e a retenção,
+    -- inclusive do grupo de controle, que não recebe link nenhum.
+    CREATE TABLE IF NOT EXISTS user_activity_days (
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      day date NOT NULL,
+      PRIMARY KEY (user_id, day)
+    );
+
+    -- L9: pesquisa de pós-mudança (nota de 0 a 10 e comentário opcional), uma resposta por pessoa e data de mudança.
+    CREATE TABLE IF NOT EXISTS survey_responses (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      survey text NOT NULL,
+      score smallint NOT NULL CHECK (score BETWEEN 0 AND 10),
+      comment text,
+      message_id uuid REFERENCES lifecycle_messages(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (user_id, survey)
+    );
+
+    -- Disparos pontuais da equipe para um segmento salvo (/admin). As mensagens ficam em lifecycle_messages com
+    -- flow_key 'campaign' e step = id da campanha, então valem o mesmo limite, a supressão e o retorno do provedor.
+    CREATE TABLE IF NOT EXISTS marketing_campaigns (
+      id uuid PRIMARY KEY,
+      name text NOT NULL,
+      segment text NOT NULL,
+      subject text NOT NULL,
+      body text NOT NULL,
+      cta_label text NOT NULL,
+      cta_path text NOT NULL,
+      status text NOT NULL DEFAULT 'sending',
+      audience_count integer NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      finished_at timestamptz,
+      CONSTRAINT marketing_campaigns_status_valid CHECK (status IN ('sending', 'sent', 'failed'))
+    );
+
+    -- Rotinas agendadas: última execução, último sucesso e última falha, para avisar quando uma rotina para de rodar.
+    CREATE TABLE IF NOT EXISTS job_runs (
+      job text PRIMARY KEY,
+      interval_ms integer NOT NULL,
+      app_version text,
+      registered_at timestamptz NOT NULL DEFAULT now(),
+      seen_at timestamptz NOT NULL DEFAULT now(),
+      last_started_at timestamptz,
+      last_succeeded_at timestamptz,
+      last_failed_at timestamptz,
+      last_error text,
+      last_duration_ms integer,
+      last_alerted_at timestamptz
+    );
   `);
 }

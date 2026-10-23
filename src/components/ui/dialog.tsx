@@ -54,15 +54,18 @@ function DialogContent({
   layoutClassName,
   overlayClassName,
   brandLayout = false,
+  container,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  /** Onde o portal monta; o padrão é o body. */
+  container?: HTMLElement | null;
   layoutClassName?: string;
   overlayClassName?: string;
   brandLayout?: boolean;
   showCloseButton?: boolean;
 }) {
   return (
-    <DialogPortal data-slot="dialog-portal">
+    <DialogPortal data-slot="dialog-portal" container={container}>
       <div className={layoutClassName}>
         <DialogOverlay className={overlayClassName} />
         <DialogPrimitive.Content

@@ -19,7 +19,9 @@ import {
 } from "../api";
 import { storeEnxovalId } from "../enxovais";
 import type { BootstrapData, InvitationPreview } from "../types";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordPolicyError } from "../../shared/passwordPolicy";
 import { Brand } from "./Brand";
+import { PasswordRules } from "./PasswordRules";
 
 // O token vem no fragmento (#token=...) do link do e-mail. É lido uma vez, no carregamento do módulo,
 // porque o fragmento é apagado da barra de endereço logo depois (ele não deve ficar no histórico).
@@ -99,6 +101,11 @@ export function InvitationPage() {
 
   function createAccount(event: FormEvent) {
     event.preventDefault();
+    const weak = passwordPolicyError(password);
+    if (weak) {
+      setError(weak);
+      return;
+    }
     if (password !== confirmation) {
       setError("As senhas não coincidem.");
       return;
@@ -140,11 +147,12 @@ export function InvitationPage() {
           id={id}
           type={visible ? "text" : "password"}
           autoComplete={autoComplete}
-          minLength={accountExists ? undefined : 8}
-          maxLength={128}
+          minLength={accountExists ? undefined : PASSWORD_MIN_LENGTH}
+          maxLength={PASSWORD_MAX_LENGTH}
           required
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          aria-describedby={accountExists ? undefined : "invite-password-rules"}
           disabled={busy}
         />
         <Button variant="brand" size="brand"
@@ -226,14 +234,15 @@ export function InvitationPage() {
                   />
                 </Label>
                 {passwordInput("invite-password", "Crie uma senha", "new-password")}
+                <PasswordRules password={password} id="invite-password-rules" />
                 <Label htmlFor="invite-confirmation">
                   Confirme a senha
                   <Input
                     id="invite-confirmation"
                     type={visible ? "text" : "password"}
                     autoComplete="new-password"
-                    minLength={8}
-                    maxLength={128}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
                     required
                     value={confirmation}
                     onChange={(event) => setConfirmation(event.target.value)}
@@ -242,8 +251,8 @@ export function InvitationPage() {
                   />
                 </Label>
                 <p className="account-password-hint">
-                  Use pelo menos 8 caracteres. Esta conta serve para usar os
-                  enxovais para os quais você for convidado.
+                  Esta conta serve para usar os enxovais para os quais você for
+                  convidado.
                 </p>
                 {error && (
                   <div className="form-error" role="alert">

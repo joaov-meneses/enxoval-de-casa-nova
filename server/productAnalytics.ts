@@ -2,6 +2,7 @@
 // nunca e-mail, nome ou texto livre. Mesmas variáveis e mesma regra de desenvolvimento do errorTracking.
 import { PostHog } from 'posthog-node';
 import { isProduction } from './logger.ts';
+import { appVersion } from './version.ts';
 
 let client: PostHog | null | undefined;
 
@@ -20,9 +21,17 @@ function getClient(env = process.env) {
   return client;
 }
 
-export function captureServerEvent(userId: string, event: 'lifecycle_email_sent', properties: Record<string, string | boolean>) {
+export type ServerEvent =
+  | 'lifecycle_email_sent' | 'lifecycle_email_delivered' | 'lifecycle_email_clicked' | 'lifecycle_email_bounced'
+  | 'lifecycle_email_complained' | 'lifecycle_email_returned' | 'price_alert_email_sent' | 'survey_answered'
+  | 'subscription_payment_succeeded';
+
+export function captureServerEvent(userId: string, event: ServerEvent, properties: Record<string, string | number | boolean>) {
   try {
-    getClient()?.capture({ distinctId: userId, event, properties: { ...properties, app_environment: isProduction ? 'production' : 'development' } });
+    getClient()?.capture({
+      distinctId: userId, event,
+      properties: { ...properties, app_environment: isProduction ? 'production' : 'development', app_version: appVersion() },
+    });
   } catch { /* Telemetria nunca interrompe o envio. */ }
 }
 

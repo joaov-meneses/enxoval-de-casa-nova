@@ -1,8 +1,8 @@
-// Teste de integração com PostgreSQL real: planejamento de compras (data da mudança, cidade, perfil de gasto,
 // semana de compra do item) e a migração que leva as respostas do funil para as colunas.
 // Usa um schema descartável. Rodar: npm run test:planning-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -92,7 +92,7 @@ try {
 
   const registered = await call("/auth/register", "POST", {
     email: "planejamento@example.invalid",
-    password: randomBytes(16).toString("base64url"),
+    password: strongPassword(),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
   // Conta paga: este teste cobre o planejamento, não as travas do plano gratuito (tests/freemium-db.mjs).
@@ -188,7 +188,7 @@ try {
   cookie = "";
   const guest = await call("/auth/register", "POST", {
     email: "convidado-planejamento@example.invalid",
-    password: randomBytes(16).toString("base64url"),
+    password: strongPassword(),
   });
   assert.equal(guest.status, 201);
   await query(

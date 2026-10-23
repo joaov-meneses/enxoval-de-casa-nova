@@ -3,6 +3,7 @@ import type { ErrorRequestHandler } from 'express';
 import { exceptionProperties } from '../shared/errorTracking.ts';
 import { isProduction, serializeError } from './logger.ts';
 import { requestId } from './posthogLogs.ts';
+import { appVersion } from './version.ts';
 
 export function createErrorTracking(env = process.env, production = isProduction) {
   const key = (env.POSTHOG_KEY || env.VITE_POSTHOG_KEY || '').trim();
@@ -11,8 +12,9 @@ export function createErrorTracking(env = process.env, production = isProduction
     host: env.POSTHOG_HOST || env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
     enableExceptionAutocapture: true,
     disableGeoip: true,
+    // A versão (commit publicado) em toda exceção permite alertar por versão: "quebrou no deploy X".
     before_send: event => event.event === '$exception'
-      ? { ...event, properties: exceptionProperties(event.properties) }
+      ? { ...event, properties: { ...exceptionProperties(event.properties), app_version: appVersion(env) } }
       : null,
   });
   // Transport failures must not become application failures or log event payloads.
@@ -41,6 +43,17 @@ export function errorTrackingHandler(sink: Pick<PostHog, 'captureException'> | n
     } catch { /* Telemetry never changes the response. */ }
     next(error);
   };
+}
+
+/** Falhas fora de uma requisição (rotinas agendadas), agrupadas pelo `kind` e pela rotina. */
+export function captureOperationalException(error: unknown, properties: Record<string, string>) {
+  try {
+    client?.captureException(error, undefined, {
+      ...properties,
+      $exception_fingerprint: `${properties.kind ?? 'operational'}:${properties.job ?? ''}`,
+      original_error: serializeError(error),
+    });
+  } catch { /* Telemetry never interrupts the job. */ }
 }
 
 export const captureServerError: ErrorRequestHandler = (error, req, res, next) => errorTrackingHandler(client)(error, req, res, next);

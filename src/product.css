@@ -4287,15 +4287,47 @@ button.reorder-handle:disabled {
     border-radius: 50%;
     box-shadow: 0 8px 20px #422d2447;
     transition: transform 0.15s;
+    /* Quica de leve, como uma bola, e descansa; usa `translate` para não brigar com o scale do toque. */
+    animation: fab-add-bounce 3.6s ease-in-out 1.2s infinite;
   }
   .mobile-fab-add:active {
     transform: scale(0.94);
+  }
+  .mobile-fab-add:hover,
+  .mobile-fab-add:focus-visible,
+  .mobile-fab-add:disabled {
+    animation: none;
   }
   .mobile-fab-add:disabled {
     opacity: 0.5;
   }
   .workspace-app:has(.item-row.expanded) .mobile-fab-add {
     display: none;
+  }
+}
+@keyframes fab-add-bounce {
+  0%,
+  30%,
+  100% {
+    translate: 0 0;
+    animation-timing-function: ease-out;
+  }
+  10% {
+    translate: 0 -8px;
+    animation-timing-function: ease-in;
+  }
+  20% {
+    translate: 0 0;
+    animation-timing-function: ease-out;
+  }
+  25% {
+    translate: 0 -3px;
+    animation-timing-function: ease-in;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-fab-add {
+    animation: none;
   }
 }
 

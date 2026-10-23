@@ -3,6 +3,7 @@
 // quando pedido: npm run catalog:refresh -- --urgency [--limit 600]
 import { getPool } from '../database.ts';
 import { logger } from '../logger.ts';
+import { registerJob, trackJob } from '../jobMonitor.ts';
 import { itemKey } from '../../src/catalog/normalize.ts';
 import type { RoomKey } from '../../src/onboarding/types.ts';
 import { roomOfCategory } from '../../src/planning/purchasePlan.ts';
@@ -233,8 +234,9 @@ export async function runCatalogRefresh(options: CatalogRefreshOptions = {}): Pr
 
 /** Agenda a rotina dentro do servidor. A primeira rodada sai alguns minutos depois de subir, fora do caminho do boot. */
 export function startCatalogScheduler() {
+  registerJob('catalog_refresh', CATALOG_REFRESH_INTERVAL_MS);
   const run = () =>
-    runCatalogRefresh()
+    trackJob('catalog_refresh', () => runCatalogRefresh(), summary => summary.skipped)
       .then(summary => logger.info({ event: 'catalog.refresh.completed', ...summary }, 'Rotina do catálogo concluída.'))
       .catch(err => logger.error({ event: 'catalog.refresh.failed', err }, 'Rotina do catálogo falhou.'));
   setTimeout(run, 5 * 60_000).unref();

@@ -336,6 +336,74 @@ export const fetchEmailPreferences = (token: string) =>
   request<EmailPreferences>(`/api/preferences?token=${encodeURIComponent(token)}`);
 export const updateEmailPreferences = (token: string, changes: { subscribed?: boolean; reminders?: boolean; tips?: boolean; pause?: boolean }) =>
   request<EmailPreferences>('/api/preferences', { method: 'POST', body: JSON.stringify({ token, ...changes }) });
+export interface SurveyAnswer { email: string; score: number | null; comment: string }
+export const fetchSurvey = (token: string) => request<SurveyAnswer>(`/api/survey?token=${encodeURIComponent(token)}`);
+export const answerSurvey = (token: string, answer: { score: number; comment?: string; messageId?: string | null }) =>
+  request<SurveyAnswer>('/api/survey', { method: 'POST', body: JSON.stringify({ token, ...answer }) });
+
+export interface AdminJob {
+  job: string;
+  interval_ms: number;
+  app_version: string | null;
+  last_started_at: string | null;
+  last_succeeded_at: string | null;
+  last_failed_at: string | null;
+  last_error: string | null;
+  last_duration_ms: number | null;
+  stale: boolean;
+}
+export interface AdminFlowReport {
+  flow: string;
+  sent: number;
+  holdout: number;
+  simulated: number;
+  failed: number;
+  delivered: number;
+  clicked: number;
+  returned: number;
+  bounced: number;
+  complained: number;
+  unsubscribed: number;
+  sentActive7d: number;
+  holdoutActive7d: number;
+  liftPoints: number | null;
+}
+export interface AdminCampaign {
+  id: string;
+  name: string;
+  segment: string;
+  subject: string;
+  status: 'sending' | 'sent' | 'failed';
+  audienceCount: number;
+  createdAt: string;
+  sent: number;
+  holdout: number;
+  simulated: number;
+  clicked: number;
+  returned: number;
+  unsubscribed: number;
+}
+export interface AdminOperations {
+  mode: 'off' | 'simulate' | 'send';
+  jobs: AdminJob[];
+  lifecycle: {
+    days: number;
+    flows: AdminFlowReport[];
+    survey: { responses: number; nps: number | null };
+    suppressions: { reason: string; count: number }[];
+  };
+  campaigns: AdminCampaign[];
+  segments: { key: string; label: string }[];
+}
+export interface CampaignDraft { name: string; segment: string; subject: string; body: string; ctaLabel: string; ctaPath: string }
+export const fetchAdminOperations = () => request<AdminOperations>('/api/admin/operations');
+export const estimateCampaign = (segment: string) =>
+  request<{ eligible: number; holdout: number; limited: number }>('/api/admin/campaigns/estimate', { method: 'POST', body: JSON.stringify({ segment }) });
+export const testCampaign = (draft: CampaignDraft, testEmail: string) =>
+  request<void>('/api/admin/campaigns/test', { method: 'POST', body: JSON.stringify({ ...draft, testEmail }) });
+export const sendAdminCampaign = (draft: CampaignDraft) =>
+  request<{ id: string; audience: number; sent: number; holdout: number; deferred: number; simulated: number; failed: number }>(
+    '/api/admin/campaigns', { method: 'POST', body: JSON.stringify(draft) });
 export const updateProfile = (name: string) => request<ProfileData>('/api/profile', { method: 'PATCH', body: JSON.stringify({ name }) });
 export const uploadProfileAvatar = (image: Blob) => request<ProfileData>('/api/profile/avatar', { method: 'POST', headers: { 'Content-Type': image.type || 'image/jpeg' }, body: image });
 export const removeProfileAvatar = () => request<ProfileData>('/api/profile/avatar', { method: 'DELETE' });

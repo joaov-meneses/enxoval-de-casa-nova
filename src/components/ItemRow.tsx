@@ -19,7 +19,6 @@ import {
   AlignLeft,
   Trash2,
   Clock3,
-  ChevronDown,
   LoaderCircle,
   Flame,
   TrendingDown,
@@ -59,8 +58,8 @@ import {
   ThanksDialog,
 } from "./ItemExtras";
 import { addItemOffer, extractProduct } from "../api";
-import { CopyableLinkInput } from "./CopyableLinkInput";
-import { priceChange, reachedTarget } from "../priceTracking";
+import { AddLinkInput } from "./AddLinkInput";
+import { knownStoreLabel, priceChange, reachedTarget } from "../priceTracking";
 import { PriceHistoryDialog } from "./PriceHistoryDialog";
 import {
   discountApplies,
@@ -73,6 +72,8 @@ import { MAX_ITEM_NAME_LENGTH } from "../data";
 import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
 import { QuantityStepper } from "./QuantityStepper";
 import { ItemCompletionDialog } from "./ItemCompletionDialog";
+import { Dialog } from "./Dialog";
+import "./itemCard.css";
 import { Select } from "./Select";
 import { weekOptions } from "../planning/weekOptions";
 import { weekLabel } from "../planning/purchasePlan";
@@ -164,13 +165,10 @@ export function ItemRow({
   onDelete,
   onCompletionChange,
 }: ItemRowProps) {
-  const [importStep, setImportStep] = useState<'idle' | 'ask' | 'loading' | 'choose' | 'done' | 'error'>('idle');
-  const [storeAdded, setStoreAdded] = useState(false);
+  const [importStep, setImportStep] = useState<'idle' | 'loading' | 'choose' | 'done'>('idle');
   const [productPreview, setProductPreview] = useState<ScrapedProductPreview | null>(null);
   const [importError, setImportError] = useState('');
   const importTicket = useRef(0);
-  const reviewedLink = useRef(item.link.trim());
-  const currentLink = useRef(item.link);
   const [expanded, setExpanded] = useState(false);
   const [completing, setCompleting] = useState(false);
   const wasChecked = useRef(item.checked);
@@ -192,7 +190,7 @@ export function ItemRow({
   const [priceText, setPriceText] = useState("");
   const [discountText, setDiscountText] = useState("");
   const [quantityText, setQuantityText] = useState("1");
-  const [linkText, setLinkText] = useState(item.link);
+  const [linkDraft, setLinkDraft] = useState("");
   const [description, setDescription] = useState(item.description);
   const [categoryId, setCategoryId] = useState(item.categoryId);
   const [status, setStatus] = useState<ItemStatus>(item.status);
@@ -221,7 +219,7 @@ export function ItemRow({
   const id = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!['ask', 'choose'].includes(importStep)) return;
+    if (importStep !== 'choose') return;
     const frame = requestAnimationFrame(() => {
       document.getElementById(`${id}-import`)?.scrollIntoView({ block: 'center', behavior: 'instant' });
     });
@@ -235,9 +233,7 @@ export function ItemRow({
     setDiscountText(
       item.discountCents > 0 ? money.format(item.discountCents / 100) : "",
     );
-    setLinkText(item.link);
-    currentLink.current = item.link;
-    reviewedLink.current = item.link.trim();
+    setLinkDraft("");
     importTicket.current++;
     setImportStep('idle'); setProductPreview(null); setImportError('');
     setDescription(item.description);
@@ -278,6 +274,10 @@ export function ItemRow({
   const formattedPrice =
     Number.isFinite(price) && price > 0 ? money.format(price / 100) : "";
   const link = safeLink(item.link);
+  // Nome curto da loja ao lado de "Ver na loja": a loja conhecida do link ou a que a pessoa escreveu.
+  const linkStore = link
+    ? (knownStoreLabel(new URL(link).hostname) ?? (item.storeName?.trim() || null))
+    : null;
   const tracking = item.priceTracking ?? null;
   const change = priceChange(tracking);
   const shared = members.length > 1;
@@ -307,21 +307,18 @@ export function ItemRow({
     setExpanded(false);
     toggleRef.current?.focus();
   }
-  const offerImport = () => {
-    const url = safeLink(linkText);
-    if (!url || reviewedLink.current === url || url === safeLink(item.link)) return false;
-    reviewedLink.current = url;
-    setImportStep('ask'); setProductPreview(null); setImportError('');
-    return true;
-  };
-  // Já tem um link salvo: o link novo pode virar outra loja em vez de trocar a principal. Links da mesma loja valem,
-  // porque cada endereço é um produto; só o mesmo endereço repetido é recusado pelo servidor.
-  const canAddStore = Boolean(onReplace) && Boolean(safeLink(item.link)) && (item.offers?.length ?? 0) < MAX_OFFERS;
-  const addAsOtherStore = async () => {
-    const url = safeLink(linkText);
-    if (!url || !onReplace) return;
+  // O link só vira loja no toque do "+". A primeira loja vira a principal e pode sugerir nome e preço; as outras
+  // entram para comparar o preço. Links da mesma loja valem, porque cada endereço é um produto; só o mesmo endereço
+  // repetido é recusado pelo servidor. No limite de lojas o campo some.
+  const offerCount = item.offers?.length ?? 0;
+  const canAddLink = Boolean(onReplace) && offerCount < MAX_OFFERS;
+  const addLink = async () => {
+    if (!onReplace || importStep === 'loading') return;
+    const url = safeLink(linkDraft);
+    if (!url) { setImportError('Cole o endereço completo do produto, começando com https://.'); return; }
+    const first = offerCount === 0;
     const ticket = ++importTicket.current;
-    setImportStep('loading'); setImportError('');
+    setImportStep('loading'); setImportError(''); setProductPreview(null);
     try {
       // A leitura deixa o preço pronto na hora; se a loja bloquear, a oferta espera a rotina de preços.
       const preview = await extractProduct(url).catch(() => null);
@@ -329,32 +326,21 @@ export function ItemRow({
       if (ticket !== importTicket.current) return;
       capture("offer_added", { offers: saved.offers?.length ?? 0 });
       onReplace(saved);
-      currentLink.current = saved.link;
-      setLinkText(saved.link);
-      setImportStep('done'); setProductPreview(null); setStoreAdded(true);
+      setLinkDraft("");
+      // Só pergunta quando a leitura traz algo novo: outro nome ou um preço.
+      const storeTitle = preview?.title?.replace(/\s+/g, ' ').trim() ?? '';
+      const brlPrice = Boolean(preview && !preview.partial && preview.priceCents !== null && preview.currency?.toUpperCase() === 'BRL');
+      if (first && preview && ((storeTitle && storeTitle !== name.trim()) || brlPrice)) { setProductPreview(preview); setImportStep('choose'); }
+      else setImportStep('done');
     } catch (err) {
       if (ticket !== importTicket.current) return;
       setImportError(err instanceof Error ? err.message : 'Não foi possível salvar a loja. Tente de novo.');
-      setImportStep('error');
-    }
-  };
-  const readProduct = async () => {
-    const url = safeLink(linkText);
-    const ticket = ++importTicket.current;
-    setImportStep('loading'); setImportError('');
-    try {
-      const preview = await extractProduct(url);
-      if (ticket !== importTicket.current || safeLink(currentLink.current) !== url) return;
-      setProductPreview(preview); setImportStep('choose');
-    } catch (err) {
-      if (ticket !== importTicket.current) return;
-      setImportError(err instanceof Error ? err.message : 'Não foi possível ler este produto. Você pode preencher os dados manualmente.');
-      setImportStep('error');
+      setImportStep('idle');
     }
   };
   const applyProduct = (useStoreName: boolean) => {
     if (!productPreview) return;
-    if (useStoreName && productPreview.title.trim()) setName(productPreview.title.replace(/\s+/g, ' ').trim().slice(0, MAX_ITEM_NAME_LENGTH));
+    if (useStoreName && productPreview.title?.trim()) setName(productPreview.title.replace(/\s+/g, ' ').trim().slice(0, MAX_ITEM_NAME_LENGTH));
     if (!productPreview.partial) {
       if (typeof productPreview.priceCents === 'number' && productPreview.priceCents >= 0 && productPreview.currency?.toUpperCase() === 'BRL') {
         setPriceText(money.format(productPreview.priceCents / 100));
@@ -369,7 +355,7 @@ export function ItemRow({
   };
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (offerImport() || ['ask', 'loading', 'choose'].includes(importStep)) return;
+    if (['loading', 'choose'].includes(importStep)) return;
     setBusy(true);
     setError("");
     const digits = priceText.replace(/\D/g, "");
@@ -425,18 +411,10 @@ export function ItemRow({
         priceCents: priceValue,
         quantity: quantityValue,
         discountCents: discountValue,
-        link: linkText.trim(),
         description: description.trim(),
         categoryId,
-        status,
-        // Trocar o link não mantém o acompanhamento da loja anterior.
-        ...(linkText.trim() !== item.link.trim() && tracking ? { trackedProductUrl: null } : {}),
-        ...(importStep === 'done' && productPreview && !productPreview.partial ? {
-          trackedProductUrl: productPreview.url,
-          initialPriceCents: productPreview.priceCents,
-          priceBasis: 'regular' as const,
-          selectedVariation: null,
-        } : {}),
+        // Situação só vai quando mudou: salvar a ficha não é uma nova mudança de situação (nem na análise de uso).
+        ...(status !== item.status ? { status } : {}),
         // A semana só vai no pedido quando a pessoa mexeu nela.
         ...(weekValue !== (item.buyWeek === null ? "auto" : String(item.buyWeek))
           ? { buyWeek: weekValue === "auto" ? null : Number(weekValue) }
@@ -450,6 +428,15 @@ export function ItemRow({
       });
       if (extras.assigneeId !== undefined && extras.assigneeId !== null)
         capture("item_assigned", { self: extras.assigneeId === currentUserId });
+      // Só quais campos mudaram, nunca os valores.
+      const edited = {
+        changed_name: name.trim() !== item.name,
+        changed_price: priceValue !== (item.priceCents ?? null) || discountValue !== (item.discountCents ?? 0),
+        changed_quantity: quantityValue !== item.quantity,
+        changed_notes: description.trim() !== (item.description ?? ""),
+        changed_room: categoryId !== item.categoryId,
+      };
+      if (Object.values(edited).some(Boolean)) capture("item_edited", edited);
       setExpanded(false);
       saved = true;
     } catch (err) {
@@ -495,12 +482,15 @@ export function ItemRow({
         </Button></Checkbox>
         </div>
         <div className="item-content">
+          {/* O botão do título cobre o card inteiro: tocar em qualquer parte abre a edição. */}
           <Button variant="brand" size="brand"
+            ref={toggleRef}
             type="button"
             className="item-title-button"
             onBlur={() => setPointerFocus(false)}
+            aria-label={`Abrir detalhes de ${item.name}`}
+            aria-haspopup="dialog"
             aria-expanded={expanded}
-            aria-controls={`${id}-details`}
             onClick={toggle}
             disabled={busy}
             title={item.name}
@@ -514,7 +504,7 @@ export function ItemRow({
             <span className={`item-status-tag status-${item.status}`}>
               {statusLabel(item.status)}
             </span>
-            <span className="item-meta-price">
+            <span className={`item-meta-price${formattedPrice ? "" : " is-empty"}`}>
               {formattedPrice || "Sem preço"}
             </span>
             {quantity > 1 && (
@@ -628,19 +618,25 @@ export function ItemRow({
                 <PackageX size={12} aria-hidden="true" /> Indisponível
               </span></Badge>
             )}
-            {link && (
-              <a
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <ExternalLink size={10} /> Ver na loja
-              </a>
-            )}
-            {item.description && (
-              <span title={item.description}>
-                <AlignLeft size={11} />
+            {/* Juntos: no celular, o ícone da observação não desce sozinho para outra linha. */}
+            {(link || item.description) && (
+              <span className="item-meta-tail">
+                {link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onPointerDown={(event) => event.stopPropagation()}
+                  >
+                    <ExternalLink size={10} /> Ver na loja
+                    {linkStore && <span className="item-link-store">- {linkStore}</span>}
+                  </a>
+                )}
+                {item.description && (
+                  <span title={item.description}>
+                    <AlignLeft size={11} />
+                  </span>
+                )}
               </span>
             )}
             {showUpdatedAt && updatedAtLabel && (
@@ -649,20 +645,42 @@ export function ItemRow({
               </span>
             )}
           </div>
+          {added && !showUpdatedAt && (
+            <span className="item-added">
+              <span className="item-added-prefix">Adicionado em </span>
+              {added}
+            </span>
+          )}
         </div>
         <span className="item-price">{formattedPrice || "Sem preço"}</span>
         <span className={`item-status status-${item.status}`}>
           {statusLabel(item.status)}
         </span>
-        {/* A alça de arrastar ocupa a coluna da direita, longe do quadrado de riscar. */}
-        {dragHandle && <div className="item-actions">{dragHandle}</div>}
+        {/* Lixeira e alça ficam na lateral direita, longe do círculo de riscar; apagar sempre pede confirmação. */}
+        <div className="item-actions">
+          <Button variant="brand" size="brand"
+            type="button"
+            className="item-delete"
+            aria-label={`Tirar ${item.name} da lista`}
+            title="Tirar da lista"
+            onClick={() => onDelete(item)}
+            disabled={busy}
+          >
+            <Trash2 size={17} aria-hidden="true" />
+          </Button>
+          {dragHandle}
+        </div>
       </div>
-      <div
-        id={`${id}-details`}
-        hidden={!expanded}
-        className="item-inline-panel"
+      <Dialog
+        title={item.name}
+        isOpen={expanded}
+        onClose={close}
+        busy={busy}
+        className="item-edit-dialog"
+        // Dentro da área de trabalho, o formulário herda os mesmos estilos de antes.
+        container={expanded ? toggleRef.current?.closest<HTMLElement>(".workspace-app") : undefined}
       >
-        {expanded && (
+        <div id={`${id}-details`} className="item-inline-panel" tabIndex={-1} data-dialog-autofocus>
           <form
             onSubmit={save}
             className="item-inline-form"
@@ -1056,34 +1074,29 @@ export function ItemRow({
               {onReplace && (
                 <ItemOffersSection item={item} disabled={busy} onReplace={onReplace} />
               )}
-              <h4 className="item-inline-section item-inline-wide">Detalhes</h4>
-              <div className="item-inline-wide item-field-link">
-                <Label htmlFor={`${id}-link`}>Link do produto</Label>
-                <CopyableLinkInput id={`${id}-link`} type="url" value={linkText} copyLabel="Copiar link do produto"
-                  onChange={event => { currentLink.current = event.target.value; setLinkText(event.target.value); importTicket.current++; setImportStep('idle'); setStoreAdded(false); setProductPreview(null); setImportError(''); }}
-                  onBlur={() => { offerImport(); }}
-                  onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); offerImport(); } }}
+              {canAddLink && <div className="item-inline-wide item-field-link">
+                <Label htmlFor={`${id}-link`}>{offerCount === 0 ? 'Link do produto' : 'Link de outra loja'}</Label>
+                <AddLinkInput id={`${id}-link`} type="url" inputMode="url" value={linkDraft}
+                  addLabel={offerCount === 0 ? 'Adicionar link do produto' : 'Adicionar outra loja'}
+                  busy={importStep === 'loading'} message={importError}
+                  onChange={event => { setLinkDraft(event.target.value); setImportError(''); if (importStep === 'done') setImportStep('idle'); }}
+                  onAdd={() => void addLink()}
                   placeholder="https://..." disabled={busy} />
-              </div>
+              </div>}
               {importStep !== 'idle' && <div id={`${id}-import`} className="item-link-import item-inline-wide" aria-busy={importStep === 'loading'}>
-                {importStep === 'ask' && <>
-                  <h5>Quer aproveitar os dados deste link?</h5>
-                  <p>{canAddStore ? 'Você pode trocar o link principal ou guardar este link como outra loja para comparar preços (até 3 lojas).' : 'Podemos buscar o nome e o preço na loja para ajudar a preencher este item. Você revisa tudo antes de salvar.'}</p>
-                  <div className="item-link-import-actions"><Button variant="brand" size="brand" type="button" className="button button-dark" onClick={() => void readProduct()}>{canAddStore ? 'Trocar link principal' : 'Buscar dados do produto'}</Button>{canAddStore && <Button variant="brand" size="brand" type="button" className="button button-dark" onClick={() => void addAsOtherStore()}>Adicionar como outra loja</Button>}<Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Preencher manualmente</Button></div>
-                </>}
-                {importStep === 'loading' && <><p className="item-link-import-loading" role="status"><LoaderCircle size={18} className="animate-spin" />Buscando informações na loja…</p><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => { importTicket.current++; setImportStep('idle'); }}>Continuar manualmente</Button></>}
+                {importStep === 'loading' && <p className="item-link-import-loading" role="status"><LoaderCircle size={18} className="animate-spin" />Buscando informações na loja…</p>}
                 {importStep === 'choose' && productPreview && <>
                   <h5>Como prefere chamar este item?</h5>
                   <div className="item-link-import-preview">
                     <div><strong>{productPreview.title || 'A loja não informou um nome'}</strong>{!productPreview.partial && productPreview.currency?.toUpperCase() === 'BRL' && productPreview.priceCents !== null && <span>{money.format(productPreview.priceCents / 100)}</span>}</div>
                   </div>
                   <p>{productPreview.partial ? 'A loja limitou a leitura. Encontramos apenas uma sugestão de nome pelo endereço; confira os outros dados manualmente.' : 'O preço encontrado será preenchido. Para o nome, escolha uma das opções abaixo. Seus dados só serão gravados ao salvar as alterações.'}</p>
-                  <div className="item-link-import-actions"><Button variant="brand" size="brand" type="button" className="button button-dark" disabled={!productPreview.title.trim()} onClick={() => applyProduct(true)}>Usar nome da loja</Button><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => applyProduct(false)}>Definir meu próprio nome</Button></div>
+                  <div className="item-link-import-actions"><Button variant="brand" size="brand" type="button" className="button button-dark" disabled={!productPreview.title?.trim()} onClick={() => applyProduct(true)}>Usar nome da loja</Button><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => applyProduct(false)}>Definir meu próprio nome</Button></div>
                   <Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => { setProductPreview(null); setImportStep('idle'); }}>Manter meus dados atuais</Button>
                 </>}
-                {importStep === 'done' && <p role="status">{storeAdded ? 'Loja adicionada. Compare os preços em Lojas e escolha a principal.' : productPreview?.partial ? 'Nome revisado. Confira os demais dados antes de salvar.' : 'Dados preenchidos. Revise as informações e salve quando estiver tudo certo.'}</p>}
-                {importStep === 'error' && <><p role="alert">{importError}</p><p>O link foi mantido. Você pode continuar preenchendo manualmente.</p><div className="item-link-import-actions"><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => void readProduct()}>Tentar buscar novamente</Button><Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => setImportStep('idle')}>Continuar manualmente</Button></div></>}
+                {importStep === 'done' && <p role="status">{!productPreview ? 'Loja adicionada. Compare os preços em Lojas e escolha a principal.' : productPreview.partial ? 'Nome revisado. Confira os demais dados antes de salvar.' : 'Dados preenchidos. Revise as informações e salve quando estiver tudo certo.'}</p>}
               </div>}
+              <h4 className="item-inline-section item-inline-wide">Detalhes</h4>
               <Label htmlFor={`${id}-description`} className="item-inline-wide item-field-notes">
                 Observações
                 <Textarea
@@ -1136,22 +1149,8 @@ export function ItemRow({
               </Button>
             </div>
           </form>
-        )}
-      </div>
-      <div className="item-footer">
-          <Button variant="brand" size="brand"
-            ref={toggleRef}
-            type="button"
-            onClick={toggle}
-            aria-label={`${expanded ? "Fechar" : "Abrir"} detalhes de ${item.name}`}
-            aria-expanded={expanded}
-            aria-controls={`${id}-details`}
-            className="item-expand"
-            disabled={busy}
-          >
-            <ChevronDown size={18} aria-hidden="true" />
-          </Button>
-      </div>
+        </div>
+      </Dialog>
       {tracking && (
         <PriceHistoryDialog
           item={item}

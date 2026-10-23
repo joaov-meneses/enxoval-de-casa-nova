@@ -35,6 +35,8 @@ railway run --service "Casa Mia" --environment production --no-local -- node scr
 
 O processo acima roda **localmente com a configuração de produção**. Não comprova conectividade a partir do contêiner nem o fluxo autenticado completo da versão publicada. A tentativa de verificar no contêiner por SSH foi impedida pela ausência de chave SSH registrada; nenhuma chave foi criada. Não foram encontradas chamadas concluídas nos registros de produção consultados. Assim, a presença da configuração e a disponibilidade do provedor com essa chave estão confirmadas; a consulta a partir do processo publicado continua sem evidência nesta sessão.
 
+**Validação pelo processo publicado (23/10/2026):** na versão em produção (`enxoval-de-casa-nova-production.up.railway.app`), com uma conta autenticada, **Planejamento → Ajuda do Nino → Pedir sugestão** para o ambiente Cozinha chamou `POST /api/ai/recommend`, que respondeu **200** com a sugestão "Facas de cozinha" (essencial). A rota só devolve sugestão quando o Jev responde (`recommendNext` não tem alternativa local; sem Jev configurado ela responde `available: false`), então a consulta a partir do processo publicado está comprovada. A verificação por SSH continua indisponível (sem chave SSH registrada na Railway).
+
 Para validar diretamente no ambiente onde o código está instalado, executar `npm run check:jev -- --expect-environment production`. O script não carrega `.env` automaticamente, faz uma única chamada sem cache ou retry e só emite metadados não secretos. Retorna código 1 em ambiente incorreto, chave ausente, erro HTTP/rede ou resposta inválida. A consulta operacional usa o SDK diretamente e não passa pelo orçamento diário do app; não é uma rotina periódica.
 
 ## Verificação reproduzível

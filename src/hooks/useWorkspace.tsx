@@ -1148,28 +1148,18 @@ export function useWorkspace() {
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === "owner";
   const visibleProgress = isHeaderMobile ? headerProgress : 0;
+  // O cabeçalho é sticky e ocupa espaço no fluxo: se a altura dele mudar com a rolagem, o conteúdo abaixo anda junto
+  // e a página "pula" sob o dedo. Por isso as medidas ficam fixas e a rolagem só esmaece a linha de apoio.
   const headerStyle = isHeaderMobile
-    ? {
-        paddingTop: `${10 - 3 * visibleProgress}px`,
-        paddingBottom: `${10 - 3 * visibleProgress}px`,
-      }
+    ? { paddingTop: "10px", paddingBottom: "10px" }
     : undefined;
   const eyebrowStyle: React.CSSProperties = {
-    maxHeight: `${16 * (1 - visibleProgress)}px`,
     opacity: 1 - visibleProgress,
     transform: `translateY(${-4 * visibleProgress}px)`,
     pointerEvents: visibleProgress > 0.9 ? "none" : "auto",
   };
-  const titleStyle = isHeaderMobile
-    ? {
-        fontSize: `${20 - 3 * visibleProgress}px`,
-      }
-    : undefined;
-  const categoryBarStyle = isHeaderMobile
-    ? {
-        marginTop: `${8 - 3 * visibleProgress}px`,
-      }
-    : undefined;
+  const titleStyle = isHeaderMobile ? { fontSize: "20px" } : undefined;
+  const categoryBarStyle = isHeaderMobile ? { marginTop: "8px" } : undefined;
 
   const startCategorySwipeAnimation = useCallback(
     (direction: CategorySwipeDirection) => {

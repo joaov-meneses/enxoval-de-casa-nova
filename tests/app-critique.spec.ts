@@ -153,8 +153,10 @@ for (const width of [390, 1440]) {
       await expect(card).toContainText("Próximo passo: Panela");
       await card.click();
       await expect(page.locator('[data-item-id="pan"] .item-title-button')).toHaveAttribute("aria-expanded", "true");
-      // A lixeira mora dentro do item aberto, com o nome da ação.
-      await expect(page.locator('[data-item-id="pan"]').getByRole("button", { name: "Tirar da lista" })).toBeVisible();
+      // A lixeira fica na lateral do card e também dentro da janela de edição.
+      await expect(page.getByRole("dialog").getByRole("button", { name: "Tirar da lista" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.locator('[data-item-id="pan"]').getByRole("button", { name: "Tirar Panela da lista" })).toBeVisible();
     });
 
     test("aviso de mudanças desde a última visita leva a Últimas alterações", async ({ page }) => {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getLogger } from './logger.ts';
 // E-mail transacional do Casa Mia (redefinição de senha e convite para um enxoval).
 // Provedor: Resend, pela API HTTP, quando RESEND_API_KEY e MAIL_FROM estão configurados.
@@ -56,24 +57,26 @@ export function canDeliverMail() {
   return mailDriver() !== "console" || !isProductionServer();
 }
 
-export async function sendMail(message: MailMessage) {
+/** Envia e devolve o id da mensagem no provedor (liga os webhooks de entrega e clique à mensagem enviada). */
+export async function sendMail(message: MailMessage): Promise<{ providerMessageId: string | null }> {
   const started = Date.now();
   const log = getLogger().child({ mail: message, driver: mailDriver() });
   log.info({ event: 'mail.started' }, 'Preparing transactional email.');
   try {
-    await deliverMail(message);
+    const providerMessageId = await deliverMail(message);
     log.info({ event: canDeliverMail() ? 'mail.completed' : 'mail.skipped', duration_ms: Date.now() - started }, 'Email delivery finished.');
+    return { providerMessageId };
   } catch (err) {
     log.error({ event: 'mail.failed', err, duration_ms: Date.now() - started }, 'Email delivery failed.');
     throw err;
   }
 }
 
-async function deliverMail(message: MailMessage) {
+async function deliverMail(message: MailMessage): Promise<string | null> {
   const driver = mailDriver();
   if (driver === "memory") {
     mailOutbox.push(message);
-    return;
+    return `memory-${randomUUID()}`;
   }
   if (driver === "resend") {
     const response = await fetch("https://api.resend.com/emails", {
@@ -96,9 +99,15 @@ async function deliverMail(message: MailMessage) {
     if (!response.ok) {
       throw new Error(`O provedor de e-mail respondeu ${response.status}. ${detail}`);
     }
-    return;
+    try {
+      const id = (JSON.parse(detail) as { id?: unknown }).id;
+      return typeof id === "string" ? id : null;
+    } catch {
+      return null;
+    }
   }
   getLogger().warn({ event: 'mail.simulated', mail: message, production: isProductionServer() }, 'Email provider is not configured.');
+  return null;
 }
 
 export function escapeHtml(value: string) {

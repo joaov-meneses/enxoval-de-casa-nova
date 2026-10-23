@@ -61,9 +61,9 @@ try {
     return fetch(`${base}/api/billing/webhook`, { method: 'POST', headers: { 'content-type': 'application/json', 'Stripe-Signature': stripe.webhooks.generateTestHeaderString({ payload, secret }) }, body: payload });
   }
   const owner = person(); const stranger = person();
-  const signup = await owner('/auth/register', 'POST', { email: 'fiscal@example.invalid', password: 'Senha-segura-123456789' });
+  const signup = await owner('/auth/register', 'POST', { email: 'fiscal@example.invalid', password: 'Senha-segura-2580' });
   assert.equal(signup.status, 201); const userId = signup.data.user.id;
-  assert.equal((await stranger('/auth/register', 'POST', { email: 'outro-fiscal@example.invalid', password: 'Senha-segura-123456789' })).status, 201);
+  assert.equal((await stranger('/auth/register', 'POST', { email: 'outro-fiscal@example.invalid', password: 'Senha-segura-2580' })).status, 201);
   assert.equal((await person()('/billing/fiscal')).status, 401);
   const offers = await owner('/billing/plans');
   assert.deepEqual(offers.data.offers.find(offer => offer.id === 'pass').paymentMethods, ['card', 'pix']);

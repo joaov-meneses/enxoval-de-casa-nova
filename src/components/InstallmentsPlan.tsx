@@ -117,7 +117,7 @@ export function InstallmentsPlan({
           <Input
             id={`${id}-budget`}
             inputMode="numeric"
-            placeholder="Sem teto"
+            placeholder="Sem teto mensal"
             value={budgetText}
             disabled={!canEdit || saving}
             onChange={(event) => {

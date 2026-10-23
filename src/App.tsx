@@ -46,6 +46,7 @@ import { NoAccessPage } from "./components/NoAccessPage";
 import { RequiredPasswordPage } from "./components/RequiredPasswordPage";
 import { ScrollIndicator } from "./components/ScrollIndicator";
 import { UndoToast } from "./components/UndoToast";
+import { UserAvatar } from "./components/UserAvatar";
 import { enxovalSelectOptions } from "./enxovais";
 import { activeItems,doneItems } from "./itemStatus";
 import { parseAppRoute } from "./appRoute";
@@ -693,6 +694,17 @@ export default function App() {
                     </p>
                   )}
                 </div>
+                <Button
+                  variant="brand"
+                  size="brand"
+                  type="button"
+                  className="mobile-header-profile"
+                  aria-label="Abrir meu perfil"
+                  title="Meu perfil"
+                  onClick={() => setIsProfileOpen(true)}
+                >
+                  <UserAvatar name={user.name} src={user.avatarUrl} />
+                </Button>
                 <Button
                   variant="brand"
                   size="brand"

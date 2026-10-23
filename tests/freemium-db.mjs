@@ -1,7 +1,7 @@
-// Integração PostgreSQL: trial sem limites, bloqueio de acesso herdado do titular e fundadores preservados.
 // Usa um schema descartável. Rodar: npm run test:freemium-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -63,7 +63,7 @@ try {
     };
   };
   const register = async (call, email) => {
-    const result = await call("/auth/register", "POST", { email, password: randomBytes(16).toString("base64url") });
+    const result = await call("/auth/register", "POST", { email, password: strongPassword() });
     assert.equal(result.status, 201, JSON.stringify(result.data));
     return result.data.user;
   };

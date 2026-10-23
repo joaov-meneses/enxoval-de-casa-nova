@@ -3,17 +3,19 @@
 import { logger } from '../logger.ts';
 import { runLifecycle } from '../lifecycle/engine.ts';
 import { lifecycleMode } from '../lifecycle/policy.ts';
+import { registerJob, trackJob } from '../jobMonitor.ts';
 
 export const LIFECYCLE_INTERVAL_MS = 15 * 60_000;
 
 export function startLifecycleWorker() {
   if (lifecycleMode() === 'off') return null;
+  registerJob('lifecycle', LIFECYCLE_INTERVAL_MS);
   let running = false;
   const run = async () => {
     if (running) return;
     running = true;
     try {
-      const summary = await runLifecycle();
+      const summary = await trackJob('lifecycle', () => runLifecycle(), result => result.skipped);
       if (!summary.skipped) logger.info({ event: 'lifecycle.worker.completed', ...summary }, 'Rodada do ciclo de vida concluída.');
     } catch (err) {
       logger.error({ event: 'lifecycle.worker.failed', err }, 'Falha na rotina de ciclo de vida.');

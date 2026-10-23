@@ -1,8 +1,8 @@
-// Teste de integração com PostgreSQL real: central de ajuda (problemas, sugestões e outros assuntos), validação,
 // captura de tela, limite de envios e leitura pelo painel administrativo. Usa um schema descartável.
 // Rodar: npm run test:feedback-db
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -28,7 +28,7 @@ let server;
 let created = false;
 
 const adminLogin = "gestao-teste";
-const adminPassword = randomBytes(18).toString("base64url");
+const adminPassword = strongPassword();
 
 // Um JPEG mínimo: só os primeiros bytes importam para a checagem de tipo.
 const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), randomBytes(60)]).toString("base64");
@@ -147,7 +147,7 @@ try {
 
   const registered = await call("/auth/register", "POST", {
     email: "ajuda@example.invalid",
-    password: randomBytes(16).toString("base64url"),
+    password: strongPassword(),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
   assert.equal((await query("SELECT count(*)::int AS n FROM feedback"))[0].n, 0);

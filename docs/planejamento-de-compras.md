@@ -58,7 +58,7 @@ No funil, o perfil sugerido é o mais confortável cujo total máximo cabe no or
 
 ## Catálogo por cidade
 
-O **estado** decide o clima geral (`quente`, `ameno`, `frio`). A **cidade** (opcional) acrescenta características locais (`regions.ts`): `umido`, `maresia`, `seco`, `chuvoso`. São generalizações do clima típico, não previsão do tempo. Hoje são 27 capitais e algumas grandes cidades; quem mora em outra escolhe "Outra cidade" e recebe o catálogo do estado.
+O **estado** decide o clima geral (`quente`, `ameno`, `frio`). A **cidade** (opcional) acrescenta características locais (`regions.ts`): `umido`, `maresia`, `seco`, `chuvoso`. São generalizações do clima típico, não previsão do tempo. Hoje são as 27 capitais e as maiores cidades de cada estado (capital primeiro na lista); quem mora em outra escolhe "Outra cidade" e recebe o catálogo do estado.
 
 No catálogo (`catalog.ts`), um item pode ter `where` (`ufs`, `cities` ou `trait`) e `note` (o porquê, que vai na descrição do item). Exemplos: sachê antimofo e desumidificador em cidade úmida (Salvador, Recife, Rio), umidificador na estação seca (São Paulo, Belo Horizonte, Brasília), spray anticorrosão no litoral, panela de barro na Bahia e no Espírito Santo, panela de pedra-sabão em Minas, kit tereré em MS e MT. A flag `U` marca o que é melhor já na primeira semana.
 

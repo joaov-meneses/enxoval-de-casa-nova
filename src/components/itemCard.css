@@ -1,0 +1,279 @@
+/* ───────── Card do item ─────────
+   Volta ao card antigo: círculo de riscar, nome, etiquetas neutras numa linha e a data embaixo.
+   As etiquetas derivam da cor do próprio card (--item-surface), então acompanham itens riscados e pendentes. */
+.workspace-app .item-row {
+  --tag-bg: color-mix(in oklab, var(--item-surface) 92%, var(--cm-text));
+  --tag-text: color-mix(in oklab, var(--cm-text) 74%, var(--item-surface));
+  /* Texto secundário (data, "Sem preço"): o mais claro que ainda passa 4,5:1 sobre o card. */
+  --tag-muted: color-mix(in oklab, var(--cm-text) 70%, var(--item-surface));
+  border: 1px solid color-mix(in oklab, var(--item-surface) 86%, var(--cm-text));
+  border-radius: 14px;
+  box-shadow: none;
+}
+/* Pendentes, riscados e inativos: mesma borda suave tirada da cor do card, sem sombra nem contorno quente. */
+.workspace-app .item-row:not(.checked):not(.inactive),
+.workspace-app .item-row.checked,
+.workspace-app .item-row.inactive {
+  border-color: color-mix(in oklab, var(--item-surface) 86%, var(--cm-text));
+  box-shadow: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .item-row:not(.checked):not(.inactive):hover,
+  .workspace-app .item-row.checked:hover,
+  .workspace-app .item-row.inactive:hover {
+    border-color: color-mix(in oklab, var(--item-surface) 72%, var(--cm-text));
+  }
+}
+.workspace-app .item-row .item-row-inner {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding: 14px 6px 14px 14px;
+}
+.workspace-app .item-row-inner:has(.item-title-button:focus-visible) {
+  border-radius: 14px;
+}
+
+/* Círculo de riscar: vazio com contorno areia; riscado, verde-oliva cheio com o check branco. */
+.workspace-app .item-row .item-row-controls {
+  align-self: center;
+}
+.workspace-app .item-row .item-row-controls .item-check {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, var(--cm-sand) 82%, var(--cm-text));
+  background: color-mix(in oklab, var(--item-surface) 40%, #fff);
+  color: transparent;
+  box-shadow: none;
+}
+.workspace-app .item-row .item-row-controls .item-check[data-state="checked"],
+.workspace-app .item-row.checked .item-row-controls .item-check {
+  border-color: color-mix(in oklab, var(--cm-success) 78%, #fff);
+  background: color-mix(in oklab, var(--cm-success) 66%, #fff);
+  color: #fff;
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .item-row:not(.checked) .item-row-controls .item-check:hover:not(:disabled) {
+    border-color: color-mix(in oklab, var(--cm-success) 60%, #fff);
+    color: color-mix(in oklab, var(--cm-success) 45%, #fff);
+  }
+}
+
+.workspace-app .item-row .item-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Etiquetas neutras e uniformes; a situação ganha só um ponto colorido. */
+.workspace-app .item-row .item-meta {
+  gap: 6px;
+  margin-top: 6px;
+  align-items: center;
+}
+.workspace-app .item-row .item-meta .item-category-tag,
+.workspace-app .item-row .item-meta .item-status-tag,
+.workspace-app .item-row .item-meta .item-quantity-tag,
+.workspace-app .item-row .item-meta .item-week-tag,
+.workspace-app .item-row .item-meta .item-discount-tag,
+.workspace-app .item-row .item-meta .item-gift-tag,
+.workspace-app .item-row .item-meta .item-doc-tag,
+.workspace-app .item-row .item-meta .item-warranty-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--tag-bg);
+  color: var(--tag-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.workspace-app .item-row .item-meta .item-week-tag svg,
+.workspace-app .item-row .item-meta .item-gift-tag svg,
+.workspace-app .item-row .item-meta .item-doc-tag svg,
+.workspace-app .item-row .item-meta .item-warranty-tag svg {
+  color: var(--tag-muted);
+}
+.workspace-app .item-row .item-meta .item-week-tag.is-late {
+  color: color-mix(in oklab, var(--cm-primary-dark) 82%, var(--cm-text));
+}
+.workspace-app .item-row .item-meta .item-status-tag::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--status-dot, var(--tag-muted));
+}
+.workspace-app .item-row .item-status-tag.status-researching { --status-dot: color-mix(in oklab, var(--cm-accent) 70%, #fff); }
+.workspace-app .item-row .item-status-tag.status-bought,
+.workspace-app .item-row .item-status-tag.status-received,
+.workspace-app .item-row .item-status-tag.status-owned { --status-dot: color-mix(in oklab, var(--cm-success) 80%, #fff); }
+
+/* Preço como texto, sem etiqueta: o valor é o dado, não um rótulo. */
+/* product.css força "display: inline !important" no celular; aqui o preço precisa centralizar com as etiquetas. */
+.workspace-app .item-row .item-meta .item-meta-price {
+  display: inline-flex !important;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-success) 82%, var(--cm-text));
+}
+.workspace-app .item-row .item-meta .item-meta-price.is-empty {
+  font-weight: 500;
+  color: var(--tag-muted);
+}
+
+.workspace-app .item-row .item-added {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tag-muted);
+}
+.workspace-app .item-row .item-added-prefix {
+  display: none;
+}
+@media (min-width: 768px) {
+  .workspace-app .item-row .item-added-prefix {
+    display: inline;
+  }
+}
+
+/* Preço e situação já estão nas etiquetas; as colunas à direita do desktop só repetiam a informação. */
+.workspace-app .item-row .item-row-inner > .item-price,
+.workspace-app .item-row .item-row-inner > .item-status {
+  display: none;
+}
+
+/* Lixeira na lateral: apaga sem abrir a edição (com confirmação). */
+.workspace-app .item-row .item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  align-self: center;
+}
+.workspace-app .item-row .item-actions .item-delete {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--tag-muted);
+}
+.workspace-app .item-row .item-actions .item-delete:hover:not(:disabled) {
+  background: var(--tag-bg);
+  color: var(--cm-primary-dark);
+}
+.workspace-app .item-row .item-actions .item-delete:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: -2px;
+}
+
+/* ───────── Edição do item em janela ─────────
+   Celular: sobe de baixo como folha; desktop: janela central mais larga, para a grade de campos caber. */
+.workspace-app .casamia-dialog.item-edit-dialog {
+  display: flex;
+  flex-direction: column;
+  animation: item-dialog-sheet-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.workspace-app .casamia-dialog.item-edit-dialog .dialog-heading {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+.workspace-app .casamia-dialog.item-edit-dialog > .item-inline-panel {
+  padding: 4px 16px 0;
+  background: none;
+  border: 0;
+  outline: none;
+}
+/* A janela dá 44px a todo botão; a caixinha de marcar mantém o próprio tamanho. */
+.workspace-app .item-edit-dialog button[role="checkbox"] {
+  min-height: 0;
+}
+.workspace-app .item-edit-dialog .item-inline-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 0 -16px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 41%, #fff);
+  backdrop-filter: none;
+}
+.workspace-app .item-edit-dialog .item-inline-actions .button {
+  flex: 1;
+  min-height: 44px;
+}
+@media (min-width: 768px) {
+  .workspace-app .casamia-dialog.item-edit-dialog {
+    width: min(760px, calc(100vw - 48px));
+    animation-name: item-dialog-pop-in;
+    animation-duration: 260ms;
+  }
+  .workspace-app .casamia-dialog.item-edit-dialog > .item-inline-panel {
+    padding: 8px 24px 0;
+  }
+  .workspace-app .item-edit-dialog .item-inline-actions {
+    margin: 0 -24px;
+    padding: 14px 24px;
+    justify-content: flex-end;
+  }
+  .workspace-app .item-edit-dialog .item-inline-actions .button {
+    flex: 0 0 auto;
+    min-width: 140px;
+  }
+}
+/* A grade de 12 colunas foi feita para o painel largo de antes; na janela, duas colunas em qualquer tela. */
+.workspace-app .casamia-dialog.item-edit-dialog .item-inline-panel .item-inline-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+.workspace-app .casamia-dialog.item-edit-dialog .item-inline-panel .item-inline-grid > * {
+  grid-column: auto;
+}
+.workspace-app .casamia-dialog.item-edit-dialog .item-inline-panel .item-inline-grid > .item-inline-wide {
+  grid-column: 1 / -1;
+}
+@keyframes item-dialog-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* No desktop a janela é centralizada por transform: a animação parte do mesmo centro. */
+@keyframes item-dialog-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 12px)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-app .casamia-dialog.item-edit-dialog {
+    animation: dialog-fade-in 0.15s ease-out;
+  }
+}

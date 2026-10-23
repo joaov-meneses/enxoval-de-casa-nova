@@ -1,7 +1,7 @@
 .casamia-dialog.item-completion-dialog { max-width: 520px; display: flex; flex-direction: column; overflow: hidden; }
 .item-completion-dialog > .dialog-heading { flex-shrink: 0; }
 .item-completion-dialog > .item-completion-body { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
-.item-completion-intro { margin: 0 0 18px; }
+.item-completion-intro { margin: 0 0 14px; }
 .item-completion-intro:focus { outline: none; }
 .item-completion-intro strong { display: block; font-size: 17px; color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text)); overflow-wrap: anywhere; line-height: 1.5; }
 .item-completion-intro span { display: block; font-size: 14px; color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text)); line-height: 1.6; margin-top: 6px; }
@@ -20,7 +20,7 @@
 .item-completion-option small { display: block; font-size: 12px; line-height: 1.5; color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text)); margin-top: 3px; }
 .casamia-dialog.item-completion-dialog > .item-completion-footer { flex-shrink: 0; display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid color-mix(in oklab, var(--cm-sand) 41%, #fff); background: color-mix(in oklab, var(--cm-bg) 28%, #fff); }
 .item-completion-footer .button { flex: 1; min-width: 0; min-height: 46px; padding: 11px 12px; font-size: 14px; }
-.item-completion-paid { display: grid; gap: 8px; margin-top: 16px; padding: 14px; border-radius: 13px; background: color-mix(in oklab, var(--cm-bg) 40%, #fff); border: 1px dashed color-mix(in oklab, var(--cm-sand) 60%, #fff); font-size: 14px; font-weight: 700; color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text)); }
+.item-completion-paid { display: grid; gap: 6px; margin-top: 10px; padding: 12px 14px; border-radius: 13px; background: color-mix(in oklab, var(--cm-bg) 40%, #fff); border: 1px dashed color-mix(in oklab, var(--cm-sand) 60%, #fff); font-size: 14px; font-weight: 700; color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text)); }
 .item-completion-paid small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; line-height: 1.5; color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text)); }
 .item-completion-paid input { font-size: 16px; }
 .item-completion-error { margin: 14px 0 0; padding: 12px; border-radius: 10px; background: color-mix(in oklab, var(--cm-primary) 13%, #fff); color: color-mix(in oklab, var(--cm-primary-dark) 92%, #000); font-size: 14px; line-height: 1.5; }
