@@ -62,11 +62,12 @@ async function workspace(page: Page, longEnvironment = false) {
     createdAt: "2026-10-18T12:00:00Z",
     updatedAt: "2026-10-18T12:00:00Z",
   };
-  const state = { fail: false, updates: 0, errors: [] as string[] };
+  const state = { fail: false, updates: 0, bootstraps: 0, errors: [] as string[] };
   page.on("pageerror", (error) => state.errors.push(error.message));
   await page.route("**/api/**", (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path === "/api/bootstrap")
+    if (path === "/api/bootstrap") {
+      state.bootstraps++;
       return route.fulfill({
         json: {
           user,
@@ -86,6 +87,7 @@ async function workspace(page: Page, longEnvironment = false) {
           ],
         },
       });
+    }
     if (path === "/api/categories/order")
       return route.fulfill({ json: categories });
     if (path === "/api/billing/status")
@@ -134,6 +136,56 @@ async function workspace(page: Page, longEnvironment = false) {
     .click();
   return state;
 }
+
+test("mobile scroll keeps header height and refresh only follows an uninterrupted pull from the top", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 640 });
+  const state = await workspace(page);
+  const header = page.locator(".mobile-workspace-header");
+  const height = await header.evaluate(node => node.getBoundingClientRect().height);
+  const bootstraps = state.bootstraps;
+  const gesture = async (phase: string, positions: number[], inDialog = false) => page.evaluate(({ phase, positions, inDialog }) => {
+    const target = document.querySelector(inDialog ? ".item-inline-panel" : "#workspace-main")!;
+    const touches = positions.map((clientY, identifier) => new Touch({ identifier, target, clientX: 200, clientY }));
+    const changedTouches = touches.length ? touches : [new Touch({ identifier: 0, target, clientX: 200, clientY: 360 })];
+    const event = new TouchEvent(phase, { bubbles: true, cancelable: true, touches, targetTouches: touches, changedTouches });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  }, { phase, positions, inDialog });
+
+  await page.evaluate(() => window.scrollTo(0, 100));
+  await expect.poll(() => header.evaluate(node => node.getBoundingClientRect().height)).toBe(height);
+  await gesture("touchstart", [200]);
+  expect(await gesture("touchmove", [360])).toBe(false);
+  await gesture("touchend", []);
+  expect(state.bootstraps).toBe(bootstraps);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await gesture("touchstart", [200]);
+  await gesture("touchmove", [360, 370]);
+  await gesture("touchend", []);
+  expect(state.bootstraps).toBe(bootstraps);
+
+  await gesture("touchstart", [200]);
+  expect(await gesture("touchmove", [360])).toBe(true);
+  await gesture("touchcancel", []);
+  await gesture("touchend", []);
+  expect(state.bootstraps).toBe(bootstraps);
+
+  await gesture("touchstart", [200]);
+  await gesture("touchmove", [360]);
+  await gesture("touchend", []);
+  await expect.poll(() => state.bootstraps).toBe(bootstraps + 1);
+  await expect(page.locator(".pull-refresh-indicator")).toHaveAttribute("data-refreshing", "false");
+
+  await page.locator('.item-row .item-title-button').first().click();
+  await page.getByRole("dialog").waitFor();
+  await gesture("touchstart", [200], true);
+  // A janela pode bloquear a rolagem pelo próprio scroll-lock; não deve iniciar atualização do workspace.
+  await gesture("touchmove", [360], true);
+  await gesture("touchend", [], true);
+  expect(state.bootstraps).toBe(bootstraps + 1);
+  expect(state.errors).toEqual([]);
+});
 
 for (const width of [
   320, 360, 375, 390, 414, 430, 540, 767, 768, 1023, 1024, 1440, 1920,

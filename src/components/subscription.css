@@ -263,15 +263,17 @@
 .subscription-included [data-slot="collapsible-trigger"]:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--cm-action) 30%, transparent); border-radius: 12px; }
 
 /* Passe da Casa Nova: o plano recomendado tem selo, borda em degradê e um brilho que o atravessa. */
-.subscription-plan-option.subscription-plan-pass { isolation: isolate; border-color: transparent; background:
+.subscription-plan-option.subscription-plan-pass { isolation: isolate; border-width: 2px; }
+.subscription-plan-option.subscription-plan-pass.is-selected { border-color: transparent; background:
   linear-gradient(color-mix(in oklab, var(--cm-primary) 5%, var(--cm-bg)), color-mix(in oklab, var(--cm-primary) 5%, var(--cm-bg))) padding-box,
   linear-gradient(135deg, var(--cm-action), color-mix(in oklab, var(--cm-sand) 70%, #fff) 55%, var(--cm-action)) border-box;
   border-width: 2px; box-shadow: 0 8px 22px color-mix(in oklab, var(--cm-action) 16%, transparent); }
-.subscription-plan-option.subscription-plan-pass::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 14px; background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / .55) 50%, transparent 65%) no-repeat; background-size: 250% 100%; background-position: 160% 0; animation: subscription-pass-shine 4.2s ease-in-out 1s infinite; pointer-events: none; }
+.subscription-plan-option.subscription-plan-pass.is-selected::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 14px; background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / .55) 50%, transparent 65%) no-repeat; background-size: 250% 100%; background-position: 160% 0; animation: subscription-pass-shine 4.2s ease-in-out 1s infinite; pointer-events: none; }
 .subscription-plan-option.subscription-plan-pass.is-selected { box-shadow: 0 10px 26px color-mix(in oklab, var(--cm-action) 24%, transparent); }
 .subscription-plan-option.subscription-pass-pulse { animation: subscription-pass-glow 2.6s ease-in-out infinite; }
 .subscription-plan-badge { position: absolute; top: 0; right: 0; display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px 4px 8px; border-bottom-left-radius: 10px; border-top-right-radius: 14px; background: var(--cm-action); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .2px; text-transform: uppercase; line-height: 1.3; }
 .subscription-plan-pass .subscription-plan-savings { z-index: 1; }
+.subscription-plan-pass .subscription-plan-content { padding-top: 16px; }
 .subscription-plan-pass .subscription-plan-content strong { padding-right: 0; }
 .subscription-plan-pass .choice-control { z-index: 2; }
 @keyframes subscription-pass-shine {
