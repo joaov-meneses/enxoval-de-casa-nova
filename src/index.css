@@ -13,6 +13,7 @@
 @import "./catalog-admin.css";
 @import "./growth.css";
 @import "./workspace-interactions.css";
+@import "./focus.css";
 
 /* O app não tem tema escuro: as classes dark: só valem dentro de .dark, nunca pela preferência do sistema. */
 @custom-variant dark (&:is(.dark *));

@@ -1,3 +1,5 @@
+import { currentWeek, type PurchasePlan } from '../planning/purchasePlan';
+import { priceReferenceOpportunity } from '../planning/priceOpportunity';
 import { RoomIcon } from "./RoomIcon";
 import { Card } from "@/src/components/ui/card";
 import { Progress } from "./ui/progress";
@@ -239,9 +241,13 @@ export function WorkspaceOverview({
   onImported,
   onAddCategory,
   onShowUnpriced,
+  purchasePlan, moveDate = null, onPlanning,
   view,
   scope,
 }: {
+  purchasePlan?: PurchasePlan<EnxovalItem> | null;
+  moveDate?: string | null;
+  onPlanning?: () => void;
   items: EnxovalItem[];
   categories: EnxovalCategory[];
   name: string;
@@ -259,6 +265,8 @@ export function WorkspaceOverview({
   scope?: { name: string; items: EnxovalItem[] };
 }) {
   // Descontos e cashback são do enxoval inteiro: não entram na conta de um ambiente.
+  const dueCount = moveDate && purchasePlan ? [...purchasePlan.byId.values()].filter(entry => entry.pending && entry.placement.week <= currentWeek(moveDate)).length : 0;
+  const opportunityCount = items.filter(item => priceReferenceOpportunity(item)).length;
   const statsItems = scope ? scope.items : items;
   const statsDiscountCents = scope ? 0 : discountCents;
   const statsActive = activeItems(statsItems);
@@ -362,6 +370,13 @@ export function WorkspaceOverview({
         );
   return (
     <>
+      {view === "overview" && onPlanning && items.length > 0 && <section className="pp-card purchase-next-actions">
+        <h3>Suas próximas compras</h3>
+        <p>{moveDate ? `${dueCount} ${dueCount === 1 ? 'item precisa' : 'itens precisam'} da sua atenção nesta semana.` : 'Defina a data da mudança para ver suas próximas compras.'}</p>
+        {opportunityCount > 0 && <p>{opportunityCount} {opportunityCount === 1 ? 'item com preço abaixo da referência recente.' : 'itens com preços abaixo da referência recente.'}</p>}
+        {!!purchasePlan?.budgetConflicts.length && <p>Há compras acima do seu orçamento mensal para revisar.</p>}
+        <Button variant="brand" size="brand" className="button button-outline" onClick={onPlanning}>Ver planejamento</Button>
+      </section>}
       {/* Na lista, o título do ambiente já orienta: a frase de boas-vindas fica só em Meu Lar. */}
       {view === "overview" && (
         <div className="workspace-welcome">

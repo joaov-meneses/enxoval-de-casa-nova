@@ -116,6 +116,7 @@ export default function App() {
     error,
     ninoCelebration,
     updatePlanning,
+    applyUrgencyScores,
     updateItem,
     addItem,
     enxovalDiscountCents,
@@ -139,6 +140,9 @@ export default function App() {
       categories={categories}
       name={activeEnxoval!.name}
       enxovalId={activeEnxoval!.id}
+      purchasePlan={workspace.purchasePlan}
+      moveDate={activeEnxoval.moveDate}
+      onPlanning={() => setWorkspaceView("plan")}
       onImported={handleRefresh}
       onAddCategory={openCreateCategory}
       discountCents={enxovalDiscountCents}
@@ -770,6 +774,7 @@ export default function App() {
                     categories={categories}
                     canEdit={isOwner}
                     onUpdateEnxoval={updatePlanning}
+                    onUrgencyScores={applyUrgencyScores}
                     onUpdateItem={(id, updates) => updateItem(id, updates)}
                     onAddItem={(name, categoryId, categoryName) =>
                       addItem(name, categoryId, categoryName)

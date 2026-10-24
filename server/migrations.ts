@@ -1,3 +1,4 @@
+import { migratePlanning } from './planningSchema.ts';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { DEFAULT_ENXOVAL_TEMPLATE_NAME, DEFAULT_TEMPLATE_CATEGORIES, DEFAULT_TEMPLATE_ITEMS } from '../src/data.ts';
@@ -6,6 +7,7 @@ import { migrateGrowth } from './growthSchema.ts';
 import { migrateFiscal } from './fiscal/schema.ts';
 import { migrateEnxovalValue } from './enxovalValueSchema.ts';
 import { getPool } from './database.ts';
+import { migrateCatalogPricing } from './catalog/pricingSchema.ts';
 
 interface UserRow {
   id: string;
@@ -657,6 +659,8 @@ export async function migrateDatabase() {
   `);
 
   await seedDefaultTemplate(pool);
+  await migrateCatalogPricing(pool);
+  await migratePlanning(pool);
   await seedCatalog(pool);
   await migrateGrowth(pool);
   await migrateFiscal(pool);

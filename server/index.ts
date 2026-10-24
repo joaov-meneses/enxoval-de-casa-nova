@@ -13,6 +13,7 @@ import { registerBillingWebhook } from "./billing.ts";
 import { registerApiRoutes } from "./routes.ts";
 import { startPriceTrackerScheduler } from "./workers/priceTrackerWorker.ts";
 import { startCatalogScheduler } from "./workers/catalogWorker.ts";
+import { startCatalogMarketScheduler } from './workers/catalogMarketWorker.ts';
 import { registerIngestProxy } from "./ingestProxy.ts";
 import { registerPreferenceRoutes } from "./lifecycle/routes.ts";
 import { startLifecycleWorker } from "./workers/lifecycleWorker.ts";
@@ -119,8 +120,11 @@ if (process.env.PRICE_TRACKER === "on" || (isProduction && process.env.PRICE_TRA
   startPriceTrackerScheduler();
 }
 
-// Rotina do catálogo (vínculos, faixas de preço, itens vindos das listas) a cada 6 horas. Não chama o Jev.
+// Rotina do catálogo a cada 6 horas; o Jev valida nomes antes de agregá-los nos preços nacionais.
 // CATALOG_WORKER=on liga e CATALOG_WORKER=off desliga em qualquer ambiente.
 if (process.env.CATALOG_WORKER === "on" || (isProduction && process.env.CATALOG_WORKER !== "off")) {
   startCatalogScheduler();
 }
+
+// Opt-in: ligar somente no ambiente que é dono da franquia SerpAPI (normalmente produção).
+if (process.env.CATALOG_MARKET_PRICES === 'on') startCatalogMarketScheduler();

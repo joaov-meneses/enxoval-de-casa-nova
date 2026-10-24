@@ -1,3 +1,5 @@
+import type { PurchasePlan } from '../planning/purchasePlan';
+import { purchaseDateLabel } from './PurchaseTiming';
 import { Label } from "@/src/components/ui/label";
 import { Button } from "@/src/components/ui/button";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -49,7 +51,11 @@ export function NinoAssistant({
   items,
   onAddItem,
   celebration,
+  plan, moveDate = null, onUrgencyScores,
 }: {
+  plan?: PurchasePlan<EnxovalItem>;
+  moveDate?: string | null;
+  onUrgencyScores?: (scores: { id: string; name: string; categoryId: string; urgency: number; confidence: number }[]) => void;
   enxovalId: string;
   categories: EnxovalCategory[];
   items: EnxovalItem[];
@@ -108,7 +114,7 @@ export function NinoAssistant({
   const ranked = shownPending
     .map((item) => ({ item, score: scoreOf(item) }))
     .filter((entry): entry is { item: EnxovalItem; score: Score } => entry.score !== null)
-    .sort((a, b) => b.score.urgency - a.score.urgency)
+    .sort((a, b) => (plan?.byId.get(a.item.id)?.placement.week ?? 104) - (plan?.byId.get(b.item.id)?.placement.week ?? 104) || b.score.urgency - a.score.urgency)
     .slice(0, TOP_URGENT);
 
   const preferredMoodId = focusCategoryId || celebration?.categoryId || selectedId;
@@ -186,6 +192,10 @@ export function NinoAssistant({
         }
         return merged;
       });
+      onUrgencyScores?.(result.scores.flatMap(score => {
+        const item = byId.get(score.id);
+        return item ? [{ ...score, name: item.name, categoryId: item.categoryId }] : [];
+      }));
       setLastRun({ inferred: result.inferred, cached: result.cached, unscored: result.unscored });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível consultar o Nino.");
@@ -324,11 +334,12 @@ export function NinoAssistant({
                       {shownCategory.name}
                       {score.confidence < UNCERTAIN && " · estimativa incerta"}
                     </span>
+                    {plan?.byId.get(item.id) && <span className="pp-hint">{plan.byId.get(item.id)!.placement.reason}</span>}
                   </div>
                   <span
                     className={`pp-nino-urgency is-${Math.min(URGENCY_LEVELS, Math.max(1, Math.round(score.urgency)))}`}
                   >
-                    {urgencyLabel(score.urgency)}
+                    {plan?.byId.get(item.id) ? purchaseDateLabel(plan.byId.get(item.id)!.placement.week, moveDate) : urgencyLabel(score.urgency)}
                   </span>
                 </li>
               ))}

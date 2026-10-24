@@ -1,7 +1,8 @@
 // Rotina do catálogo mestre. Roda sozinha a cada 6 horas dentro do servidor (ver `startCatalogScheduler`) ou sob
-// demanda: npm run catalog:refresh. Nenhum passo padrão chama o Jev; o pré-cálculo das urgências (que chama) só roda
-// quando pedido: npm run catalog:refresh -- --urgency [--limit 600]
+// demanda: npm run catalog:refresh. Nomes de preços diferentes são validados pelo Jev, com cache no banco.
+// O pré-cálculo adicional das urgências só roda quando pedido: npm run catalog:refresh -- --urgency [--limit 600].
 import { getPool } from '../database.ts';
+import { refreshNationalPriceStats } from '../catalog/pricing.ts';
 import { logger } from '../logger.ts';
 import { registerJob, trackJob } from '../jobMonitor.ts';
 import { itemKey } from '../../src/catalog/normalize.ts';
@@ -23,7 +24,7 @@ export const CATALOG_REFRESH_INTERVAL_MS = 6 * 60 * 60_000;
 // Número fixo que identifica esta rotina no lock do PostgreSQL (evita duas execuções ao mesmo tempo em vários servidores).
 const ADVISORY_LOCK_KEY = 726_351_906;
 
-/** Amostra mínima (enxovais diferentes) para publicar uma faixa de preço ou promover um item cadastrado pelas pessoas. */
+/** Amostra mínima de enxovais para promover um nome novo; preços usam priceMinCustomers(). */
 export function minSamples() {
   const value = Number(process.env.CATALOG_MIN_SAMPLES);
   return Number.isInteger(value) && value >= 1 ? value : 5;
@@ -46,63 +47,11 @@ export interface CatalogRefreshSummary {
 }
 
 /**
- * Faixas de preço por item e região (UF), só com agregados: um valor por enxoval (a mediana dos preços dele), fora os
- * extremos (regra do IQR), e só com `minSamples()` enxovais distintos. Itens com quantidade maior que 1 ficam de fora,
- * porque o preço pode ser do conjunto. Na falta do preço digitado, vale o preço lido da loja acompanhada.
+ * Faixa nacional: ofertas comparáveis recentes, ou preços de pelo menos dois clientes distintos.
+ * O Jev só valida nomes; a média e os percentis são calculados a partir dos valores observados.
  */
 export async function refreshPriceStats() {
-  const client = await getPool().connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('DELETE FROM catalog_price_stats');
-    const result = await client.query(
-      `WITH per_enxoval AS (
-         SELECT i.catalog_item_id AS item_id, COALESCE(e.state, '') AS uf, i.enxoval_id,
-                percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(i.price_cents, tp.current_price_cents)) AS price
-         FROM items i
-         INNER JOIN enxovais e ON e.id = i.enxoval_id
-         LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
-         WHERE i.catalog_item_id IS NOT NULL
-           AND i.quantity = 1
-           AND COALESCE(i.price_cents, tp.current_price_cents) > 0
-         GROUP BY 1, 2, 3
-       ),
-       scoped AS (
-         SELECT item_id, '' AS region, price FROM per_enxoval
-         UNION ALL
-         SELECT item_id, uf, price FROM per_enxoval WHERE uf <> ''
-       ),
-       fences AS (
-         SELECT item_id, region,
-                percentile_cont(0.25) WITHIN GROUP (ORDER BY price) AS q1,
-                percentile_cont(0.75) WITHIN GROUP (ORDER BY price) AS q3
-         FROM scoped GROUP BY 1, 2
-       ),
-       kept AS (
-         SELECT s.item_id, s.region, s.price
-         FROM scoped s INNER JOIN fences f USING (item_id, region)
-         WHERE s.price BETWEEN f.q1 - 1.5 * (f.q3 - f.q1) AND f.q3 + 1.5 * (f.q3 - f.q1)
-       )
-       INSERT INTO catalog_price_stats (item_id, region, p10, p50, p90, samples)
-       SELECT item_id, region,
-              round(percentile_cont(0.1) WITHIN GROUP (ORDER BY price))::int,
-              round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price))::int,
-              round(percentile_cont(0.9) WITHIN GROUP (ORDER BY price))::int,
-              COUNT(*)::int
-       FROM kept
-       GROUP BY 1, 2
-       HAVING COUNT(*) >= $1`,
-      [minSamples()]
-    );
-    await client.query('COMMIT');
-    invalidateCatalogIndex();
-    return result.rowCount ?? 0;
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  return refreshNationalPriceStats();
 }
 
 /** Liga ao catálogo os itens que ainda não têm par (itens antigos, ou que o catálogo passou a conhecer). Sem Jev. */

@@ -68,6 +68,7 @@ jobs:
       - run: npm run test:freemium-db
       - run: npm run test:trust-db
       - run: npm run test:catalog
+      - run: npm run test:catalog-pricing
       - run: npm run test:catalog-db
       # Só este passo usa o Redis: nos outros, uma resposta do Jev vinda do cache atrapalharia a contagem de chamadas.
       - run: npm run test:shared-cache

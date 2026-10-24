@@ -1,7 +1,7 @@
 // "Parcelas por mês" no Planejamento (Fase 11.1): quanto da renda de cada mês já está comprometido com parcelas,
 // mais a previsão dos itens pendentes pela semana de compra, contra o teto mensal que o casal escolher.
 import type React from "react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { CreditCard, TriangleAlert } from "@/src/components/icons";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -63,6 +63,7 @@ export function InstallmentsPlan({
   const [budgetText, setBudgetText] = useState(budget ? money.format(budget / 100) : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => setBudgetText(budget ? money.format(budget / 100) : ""), [budget]);
   const id = useId();
   const max = Math.max(1, budget ?? 0, ...flow.months.map((month) => month.committedCents + month.forecastCents));
   const overCount = budget === null ? 0 : flow.months.filter((month) => month.committedCents + month.forecastCents > budget).length;
@@ -82,15 +83,21 @@ export function InstallmentsPlan({
     }
   }
 
+  async function clearBudget() {
+    setSaving(true); setError("");
+    try { await onSaveBudget(null); setBudgetText(""); }
+    catch (err) { setError(err instanceof Error ? err.message : "Não foi possível remover o orçamento."); }
+    finally { setSaving(false); }
+  }
+
   return (
     <section className="pp-card flow-card" aria-labelledby={`${id}-title`}>
       <div className="flow-head">
         <h3 id={`${id}-title`}>
-          <CreditCard size={16} aria-hidden="true" /> Parcelas por mês
+          <CreditCard size={16} aria-hidden="true" /> Orçamento e compras por mês
         </h3>
         <p className="pp-hint">
-          Quanto de cada mês já está comprometido com parcelas, mais a previsão dos itens que faltam pela semana de compra.
-          "Já investimos" continua sendo o valor total das compras.
+          Compras à vista e parcelas já assumidas, mais a previsão dos itens que faltam. O orçamento ajuda a distribuir as compras opcionais.
         </p>
       </div>
 
@@ -112,7 +119,7 @@ export function InstallmentsPlan({
       </dl>
 
       <div className="flow-budget">
-        <Label htmlFor={`${id}-budget`}>Teto mensal para parcelas</Label>
+        <Label htmlFor={`${id}-budget`}>Quanto você pode destinar à casa por mês?</Label>
         <div className="flow-budget-row">
           <Input
             id={`${id}-budget`}
@@ -133,7 +140,7 @@ export function InstallmentsPlan({
             }}
           />
           {canEdit && budget !== null && (
-            <Button variant="brand" size="brand" type="button" className="pp-link" disabled={saving} onClick={() => { setBudgetText(""); void onSaveBudget(null).catch(() => undefined); }}>
+            <Button variant="brand" size="brand" type="button" className="pp-link" disabled={saving} onClick={() => void clearBudget()}>
               Tirar teto
             </Button>
           )}
@@ -143,7 +150,7 @@ export function InstallmentsPlan({
             ? "Só quem criou o enxoval define o teto."
             : overCount > 0
               ? `${overCount} ${overCount === 1 ? "mês passa" : "meses passam"} do teto.`
-              : "Os meses que passarem do teto ficam marcados no gráfico."}
+              : enxoval.moveDate ? "O planejamento respeita este valor ao distribuir os opcionais. Itens sem preço usam estimativas." : "Informe a data da mudança para distribuir as compras pelo orçamento mensal."}
         </small>
         {error && <p className="pp-error" role="alert">{error}</p>}
       </div>

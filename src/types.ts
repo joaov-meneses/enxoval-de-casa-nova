@@ -1,3 +1,4 @@
+import type { SchedulingInput } from './planning/scheduling';
 import type { ItemStatus } from './itemStatus';
 import type { PriceCategory, SpendingTier } from './planning/spending';
 import type { CatalogItemMeta, ItemPriority, ItemTiming } from './planning/purchasePlan';
@@ -9,8 +10,8 @@ export interface CatalogSearchResult {
   id: string;
   name: string;
   room: RoomKey | null;
-  /** Faixa comum de preço, em centavos, quando há amostra suficiente (p10, mediana e p90). */
-  priceRange: { p10: number; p50: number; p90: number; samples: number; region: string } | null;
+  /** Faixa nacional estimada, com fonte, média e tamanho da amostra quando disponíveis. */
+  priceRange: CatalogItemMeta['priceRange'];
 }
 
 /**
@@ -78,7 +79,7 @@ export interface EnxovalSummary {
   city: string | null;
   /** Perfil de gasto: define as faixas de referência de cada item e de cada período de compra. */
   spendingTier: SpendingTier;
-  /** Teto mensal que o casal quer respeitar nas parcelas (opcional, só o dono edita). */
+  /** Orçamento mensal para compras à vista e parcelas (opcional, só o dono edita). */
   monthlyBudgetCents?: number | null;
 }
 
@@ -251,7 +252,7 @@ export interface ItemDocument {
   url: string;
 }
 
-export interface EnxovalItem {
+export interface EnxovalItem extends SchedulingInput {
   id: string;
   name: string;
   categoryId: string;

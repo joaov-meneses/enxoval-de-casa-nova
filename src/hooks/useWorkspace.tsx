@@ -948,6 +948,7 @@ export function useWorkspace() {
         ? buildPurchasePlan(items, {
             tier: activeEnxoval.spendingTier,
             moveDate: activeEnxoval.moveDate,
+            monthlyBudgetCents: activeEnxoval.monthlyBudgetCents,
           })
         : null,
     [items, activeEnxoval],
@@ -1417,6 +1418,9 @@ export function useWorkspace() {
       payload.categoryId = updates.categoryId;
     if (typeof updates.buyWeek === "number" || updates.buyWeek === null)
       payload.buyWeek = updates.buyWeek;
+    for (const key of ['leadTimeWeeks', 'researchWeeks', 'hasTemporarySolution', 'dependsOnItemId'] as const) {
+      if (updates[key] !== undefined) (payload as Record<string, unknown>)[key] = updates[key];
+    }
     if (updates.targetPriceCents !== undefined)
       payload.targetPriceCents = updates.targetPriceCents;
     if (typeof updates.priceAlertEnabled === "boolean")
@@ -1475,6 +1479,14 @@ export function useWorkspace() {
   };
 
   /** Data da mudança, lugar e perfil de gasto (só o dono): o servidor valida e devolve o enxoval atualizado. */
+  const applyUrgencyScores = (scores: { id: string; name: string; categoryId: string; urgency: number; confidence: number }[]) => {
+    const byId = new Map(scores.map(score => [score.id, score]));
+    setItems(current => current.map(item => {
+      const score = byId.get(item.id);
+      return score && score.name === item.name && score.categoryId === item.categoryId
+        ? { ...item, aiUrgency: score.urgency, aiUrgencyConfidence: score.confidence } : item;
+    }));
+  };
   const updatePlanning = async (updates: PlanningUpdates) => {
     if (!activeEnxoval) return;
     const updatedEnxoval = await updateEnxovalRequest(
@@ -2378,6 +2390,7 @@ export function useWorkspace() {
       categories={categories}
       dragHandle={dragHandle}
       buyPlan={buyPlans.get(item.id)}
+      planningItems={items}
       // Dentro de um ambiente a etiqueta só repetiria o título da lista.
       categoryName={
         activeCategory && !isSearching && !isShowingLatestChanges
@@ -2488,7 +2501,9 @@ export function useWorkspace() {
     categoryBarStyle,
     error,
     ninoCelebration,
+    purchasePlan,
     updatePlanning,
+    applyUrgencyScores,
     updateItem,
     addItem,
     enxovalDiscountCents,

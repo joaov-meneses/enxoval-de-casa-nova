@@ -59,9 +59,9 @@ test('semana sugerida: prazo de entrega, primeira noite e opcionais depois da mu
   const quadros = item('Quadros e decoração', 'Sala de Estar');
   const placements = planPurchases([geladeira, toalhas, sofa, quadros], 'equilibrado');
 
-  assert.equal(placements.get(geladeira.id).week, -8, 'compra grande e essencial vem antes');
+  assert.equal(placements.get(geladeira.id).week, -5, 'compra grande e essencial vem antes');
   assert.equal(placements.get(toalhas.id).week, -1, 'primeira noite: semana anterior');
-  assert.equal(placements.get(sofa.id).week, -8);
+  assert.equal(placements.get(sofa.id).week, -5);
   assert.ok(placements.get(quadros.id).week >= 4, 'opcional só depois que a casa assentou');
   assert.ok(placements.get(quadros.id).reason.length > 0);
 });

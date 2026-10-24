@@ -1,6 +1,7 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 
-async function planning(page: Page) {
+async function planning(page: Page, priceSource?: 'customers' | 'serpapi') {
+  await page.addInitScript(() => localStorage.setItem('casamia:consent', JSON.stringify({ analytics: false, marketing: false, version: '2026-10', decidedAt: new Date().toISOString() })));
   const home = {
     id: "home",
     name: "Nossa casa nova",
@@ -52,6 +53,10 @@ async function planning(page: Page) {
     priceCategory: null,
     priority: null,
     timing: null,
+    catalog: priceSource ? {
+      priceCategory: 2 as const, priority: null, timing: null, leadTimeWeeks: 0,
+      priceRange: { p10: 10000, p50: 12500, p90: 15000, meanCents: 12500, samples: 2, region: '', source: priceSource }
+    } : undefined,
     updatedAt: "2026-10-19T12:00:00Z",
   }));
   await page.route("**/api/**", (route) => {
@@ -98,6 +103,28 @@ async function planning(page: Page) {
     .getByRole("button", { name: /Planejamento/ })
     .click();
   await expect(page.locator(".pp")).toBeVisible();
+}
+
+for (const source of ['customers', 'serpapi'] as const) {
+  test(`national price estimate identifies ${source} and a small sample`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await planning(page, source);
+    const period = page.locator('.pp-period').first();
+    await period.locator('.pp-period-toggle').click();
+    const room = period.locator('.pp-room-group').first();
+    const roomTrigger = room.locator(':scope > [data-slot=collapsible-trigger]');
+    if (await roomTrigger.getAttribute('aria-expanded') === 'false') await roomTrigger.click();
+    const estimate = room.locator('.pp-price-estimate').first();
+    await expect(estimate).toBeVisible();
+    await expect(estimate).toContainText('Estimativa nacional');
+    await expect(estimate).toHaveAttribute('title', new RegExp(source === 'serpapi' ? '2 lojas pesquisadas' : '2 clientes'));
+    await expect(estimate).toHaveAttribute('title', /amostra inicial/);
+    await expect(estimate.locator('.pp-price-range > span').first()).toHaveText(/^R\$\s*100$/);
+    await expect(estimate.locator('.pp-price-range > span').last()).toHaveText(/^R\$\s*150$/);
+    await estimate.evaluate(node => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await estimate.screenshot({ path: `tmp/validation/national-price-${source}.png` });
+  });
 }
 
 async function checkHeightAnimation(

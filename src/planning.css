@@ -1560,3 +1560,42 @@
 .pp-band-reveal:hover {
   color: var(--cm-action-hover);
 }
+/* Scheduling uses the same cards, fields and dialog controls as nearby planning sections. */
+.purchase-timing-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-width: 0; }
+.purchase-timing-fields .pp-field { min-width: 0; }
+.purchase-timing-fields input { width: 100%; min-width: 0; min-height: 44px; }
+.purchase-timing-wide { grid-column: 1 / -1; }
+.purchase-timing-check { display: flex; gap: 10px; align-items: center; min-height: 44px; line-height: 1.45; }
+.purchase-timing-check [role="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; max-height: 20px; }
+.casamia-dialog.purchase-timing-dialog { display: flex; flex-direction: column; width: 100%; height: min(760px, calc(100dvh - 16px)); overflow: clip; }
+.casamia-dialog.purchase-timing-dialog > form { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: clip; padding: 0; }
+.purchase-timing-dialog .dialog-heading { flex-shrink: 0; }
+.purchase-timing-body { padding: 18px 20px; overflow-y: auto; display: grid; gap: 16px; min-height: 0; }
+.purchase-timing-body .pp-hint, .purchase-timing-fields .pp-hint { margin: 0; line-height: 1.5; }
+.purchase-timing-date { margin: 0; color: var(--cm-primary-dark); font-weight: 800; }
+.purchase-timing-footer { padding: 12px 20px; display: flex; gap: 10px; border-top: 1px solid var(--cm-sand); flex-shrink: 0; }
+.purchase-timing-footer .button { flex: 1; min-height: 44px; white-space: normal; }
+.purchase-timing-open { min-height: 44px; white-space: normal; text-align: left; justify-content: flex-start; }
+.purchase-price-opportunity { display: grid; gap: 4px; margin: 8px 0; line-height: 1.45; font-size: 12px; }
+.purchase-price-opportunity strong { color: var(--cm-success); }
+.purchase-price-opportunity span { color: var(--cm-text); font-weight: 400; }
+.purchase-budget-alert h3 { display: flex; gap: 8px; align-items: flex-start; }
+.purchase-budget-alert ul { padding: 0; margin: 12px 0; list-style: none; display: grid; gap: 12px; }
+.purchase-budget-alert li { display: grid; gap: 4px; font-size: 14px; overflow-wrap: anywhere; }
+.purchase-budget-alert li strong { color: var(--cm-primary-dark); }
+.purchase-next-actions { margin-block: 16px; display: grid; gap: 10px; }
+.purchase-next-actions p { margin: 0; font-size: 14px; line-height: 1.5; }
+.pp-row-week { min-width: 0; }
+.pp-nino-ranking > li { align-items: flex-start; flex-wrap: wrap; }
+.pp-nino-ranking > li > div { min-width: 0; flex: 1 1 180px; }
+.pp-nino-ranking .pp-nino-urgency { white-space: normal; max-width: 100%; }
+@media (max-width: 480px) {
+  .purchase-timing-fields { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .purchase-timing-body { padding: 14px; }
+  .purchase-timing-footer { padding: 12px 14px; }
+  .purchase-timing-footer .button { font-size: 13px; padding-inline: 8px; }
+  .purchase-timing-fields input { font-size: 16px; }
+}
+@media (min-width: 768px) {
+  .casamia-dialog.purchase-timing-dialog { width: min(600px, calc(100vw - 48px)); }
+}

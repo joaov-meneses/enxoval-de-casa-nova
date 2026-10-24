@@ -562,6 +562,10 @@ export function updateItem(
       | "discountCents"
       | "categoryId"
       | "buyWeek"
+      | "leadTimeWeeks"
+      | "researchWeeks"
+      | "hasTemporarySolution"
+      | "dependsOnItemId"
     >
   > &
     ItemTrackingInput &
