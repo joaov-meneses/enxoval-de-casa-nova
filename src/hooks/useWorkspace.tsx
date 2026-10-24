@@ -725,6 +725,8 @@ export function useWorkspace() {
         ? makeTitle("Meu Lar")
         : workspaceView === "plan"
           ? makeTitle("Planejamento")
+          : workspaceView === "housewarming"
+            ? makeTitle("Chá de Casa Nova")
           : workspaceView === "store"
             ? makeTitle("Modo loja")
             : routeCategory

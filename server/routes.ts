@@ -31,6 +31,7 @@ import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, e
 import { registerBillingRoutes, recoverBillingAccess } from './billing.ts';
 import { registerProfileRoutes } from './profile.ts';
 import { offerHistories, registerItemOfferRoutes, syncPrimaryOffer } from './itemOffers.ts';
+import { registerPublicHousewarmingRoutes, registerHousewarmingRoutes } from './housewarming.ts';
 import { registerItemDocumentRoutes } from './itemDocuments.ts';
 import { parseItemExtras } from './itemExtras.ts';
 import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
@@ -1383,6 +1384,7 @@ export function registerApiRoutes(app: Express) {
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(protectMutationOrigin);
   router.use(enforceBans);
+  registerPublicHousewarmingRoutes(router);
   router.use(asyncHandler(async (req, _res, next) => {
     if (/^\/(auth(?:\/|$)|profile(?:\/|$)|onboarding\/complete$|billing(?:\/|$)|admin(?:\/|$)|bootstrap$|health$|invitations(?:\/|$)|feedback(?:\/|$)|lifecycle\/returned$)/.test(req.path)) return next();
     // Older onboarding screens post the draft here. The handler saves it without granting access.
@@ -1400,6 +1402,7 @@ export function registerApiRoutes(app: Express) {
   registerCatalogRoutes(router, { requireUser: requireCurrentUser });
   registerItemOfferRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember, fetchItemRow });
   registerItemDocumentRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember, fetchItemRow });
+  registerHousewarmingRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember });
 
   // Foto de quem participa do enxoval (para o avatar do responsável pelo item). Só para quem está no mesmo enxoval.
   router.get('/enxovais/:id/members/:userId/avatar', asyncHandler(async (req, res) => {

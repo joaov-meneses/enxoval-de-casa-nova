@@ -2,19 +2,18 @@
 
 > **Objetivo:** Reunir as próximas entregas técnicas e de produto do **Casa Mia**.
 >
-> **Este documento lista só o que falta fazer.** Revisado em **23/10/2026**, considerando o código atual, inclusive alterações locais. A numeração das fases foi preservada para manter as referências entre documentos. Configurações de produção devem ser confirmadas no ambiente antes de serem consideradas pendências.
+> **Este documento lista só o que falta fazer.** Revisado em **24/10/2026**, considerando o código atual, inclusive alterações locais. A numeração das fases foi preservada para manter as referências entre documentos. Configurações de produção devem ser confirmadas no ambiente antes de serem consideradas pendências.
 
 ---
 
 ## 1. O que ainda falta
 
 1. **Pagamentos (produção):** concluir cadastro Stripe, configurar chaves/preços/webhook live e URL de produção, ativar Pix live e validar compra até a liberação de acesso no processo publicado; para a NFS-e (código pronto), obter certificado A1, confirmar habilitação e política contábil e homologar no Emissor Nacional antes de ativar a transmissão (Fases 2 e 5; ver [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md)).
-2. **Chá de Casa Nova:** sem rotas públicas, tabela ou Pix (Fase 4).
-3. **Produção:** Dockerfile, confirmação de backups, domínio e DNS; e-mails de boas-vindas/presente/resumo, ativação da emissão fiscal e depósito de marca (Fase 5).
-4. **Analytics (configuração nas contas):** o código está pronto; falta configurar Google (Tag Manager, GA4, Ads, Search Console), PostHog (funis, painéis e alertas por versão) e o webhook do Resend com os dados reais, e ligar os e-mails em produção (Fase 7).
-5. **Idiomas e preço por região:** app só em português e reais (Fase 8).
-6. **Segurança e banimento (restante):** auditoria das ações da equipe, linha do tempo de segurança, contas relacionadas, Turnstile/Cloudflare e lista de e-mails descartáveis (Fase 9).
-7. **Lista "Meu enxoval" (restante):** bucket de documentos em produção, leitura automática da nota, volta ao app pelos lembretes de garantia e validação do modo loja offline em aparelhos reais (Fase 11).
+2. **Produção:** Dockerfile, confirmação de backups, domínio e DNS; e-mails de boas-vindas/presente/resumo, ativação da emissão fiscal e depósito de marca (Fase 5).
+3. **Analytics (configuração nas contas):** o código está pronto; falta configurar Google (Tag Manager, GA4, Ads, Search Console), PostHog (funis, painéis e alertas por versão) e o webhook do Resend com os dados reais, e ligar os e-mails em produção (Fase 7).
+4. **Idiomas e preço por região:** app só em português e reais (Fase 8).
+5. **Segurança e banimento (restante):** auditoria das ações da equipe, linha do tempo de segurança, contas relacionadas, Turnstile/Cloudflare e lista de e-mails descartáveis (Fase 9).
+6. **Validação em celulares físicos:** executar o roteiro do modo loja offline e da Wake Lock em Android e iPhone reais. O fluxo já foi testado em Chromium e WebKit com perfis móveis; isso não substitui aparelhos físicos (ver [`lista-meu-enxoval-fase11.md`](./lista-meu-enxoval-fase11.md)).
 
 ---
 
@@ -22,8 +21,7 @@
 
 ```mermaid
 flowchart LR
-    Fase2["Fase 2: Pix em Produção"] --> Fase4["Fase 4: Chá de Casa Nova (Viral)"]
-    Fase4 --> Fase5["Fase 5: Infraestrutura Railway & Go-to-Market"]
+    Fase2["Fase 2: Pix em Produção"] --> Fase5["Fase 5: Infraestrutura Railway & Go-to-Market"]
     Fase5 --> Fase7["Fase 7: Operação de Analytics & Novos Fluxos"]
     Fase5 --> Fase8["Fase 8: Idiomas EN/ES & Preço por Região"]
     Fase5 --> Fase9["Fase 9: Segurança, IP & Banimento"]
@@ -39,35 +37,6 @@ flowchart LR
 * Concluir o cadastro Stripe e habilitar cobranças reais. Os ambientes `staging` e `production` na Railway ainda usam chave de teste e URL de staging.
 * Configurar chave, preços, URL e webhook próprios de produção; ativar Pix na configuração live.
 * Publicar o código e validar uma compra real autorizada no Passe em BRL, incluindo confirmação assinada no webhook, liberação única de acesso e tratamento de expiração. Seguir o procedimento de [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md).
-
----
-
-### FASE 4: Página Pública de Chá de Casa Nova (Viral Loop)
-
-A funcionalidade que transforma convidados em novos clientes da plataforma.
-
-#### 4.1 Estrutura de Banco de Dados
-* Nova tabela `housewarming_lists`:
-  * `id`: uuid
-  * `user_id`: uuid
-  * `slug`: text unique (ex.: `lar-da-ana-e-leo`)
-  * `title`: text (*"Chá de Casa Nova da Ana e do Léo"*)
-  * `message`: text (*"Estamos montando nosso cantinho e ficaremos muito felizes com a sua presença e carinho!"*)
-  * `event_date`: timestamp
-  * `pix_key`: text (chave Pix do casal)
-  * `pix_key_type`: text (`cpf`, `email`, `phone`, `random`)
-  * `is_public`: boolean
-
-#### 4.2 Interface Pública do Chá (`/cha/:slug`)
-* Página de visualização pública, leve e responsiva (sem necessidade de cadastro do convidado).
-* **Ações do Convidado:**
-  1. **"Vou presentear com este item":** o convidado informa seu nome e e-mail; o item é marcado como "Reservado/Presenteado" na lista em tempo real.
-  2. **"Presentear via Pix":** gera o QR Code e código copia-e-cola direto com a chave Pix cadastrada pelos moradores.
-  3. **Deixar Recado de Boas-Vindas:** campo de texto onde o convidado deixa uma mensagem de afeto.
-* **Experiência do Anfitrião:**
-  * O morador recebe notificação no app: *"Maria reservou o Jogo de Pratos para a sua Cozinha e deixou um recado!"*.
-* **Rodapé Viral:**
-  * Em destaque no final da página: *"Lista organizada com amor no Casa Mia. Monte o seu enxoval também! [Começar Grátis]"*.
 
 ---
 
@@ -141,15 +110,11 @@ A funcionalidade que transforma convidados em novos clientes da plataforma.
 
 ---
 
-### FASE 11: Mais Valor na Lista "Meu enxoval" (restante)
+### Validação operacional: celulares físicos
 
-> Como funciona e como configurar: [`lista-meu-enxoval-fase11.md`](./lista-meu-enxoval-fase11.md).
+As implementações de documentos, OCR local de notas, retorno pelos lembretes de garantia e cache completo do modo loja estão concluídas. O armazenamento pode continuar no PostgreSQL; um bucket S3/R2 é uma opção de escala, não um requisito desta fase.
 
-* **Bucket de documentos em produção:** criar o bucket privado (Cloudflare R2 ou S3), configurar `DOCUMENT_STORAGE=s3`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID` e `S3_SECRET_ACCESS_KEY` e validar envio, download pela URL assinada e exclusão. Sem bucket, os arquivos ficam no Postgres (serve para desenvolvimento e homologação, não para volume). Definir `DOCUMENT_QUOTA_MB` conforme o custo (padrão 500 MB por conta).
-* **Leitura automática da nota:** o Jev lê a foto da nota e preenche loja, data e valor; definir o limite de consultas para controlar o custo.
-* **Lembretes de garantia:** já entram no limite de frequência e recebem entrega e clique pelo webhook; falta o link do e-mail levar `lm` para medir a volta ao app.
-* **Chá de Casa Nova (Fase 4):** ligar a reserva do convidado ao item (`gift_reservation_id`) para o "de quem foi o presente" vir preenchido.
-* **Modo loja sem conexão:** a casca do app e as telas só ficam guardadas depois de abrir o modo loja uma vez com internet (service worker só no build de produção). Validar em aparelhos reais (Android e iPhone), incluindo a Wake Lock.
+Falta executar em Android e iPhone físicos o roteiro de perda de sinal, reabertura, sincronização e comportamento da tela ligada. Não havia aparelhos físicos acessíveis para esta validação. Evidências e roteiro ficam em [`lista-meu-enxoval-fase11.md`](./lista-meu-enxoval-fase11.md).
 
 ---
 
@@ -158,11 +123,10 @@ A funcionalidade que transforma convidados em novos clientes da plataforma.
 | Ordem | Entregável | Impacto Principal | Complexidade |
 |:---:|---|---|:---:|
 | **2º** | **Fase 2 (restante):** Cadastro Stripe, configuração live e validação do Pix em produção | Monetização e Negócio | Baixa-Média |
-| **4º** | **Fase 4:** Página pública de Chá de Casa Nova com Pix e Reservas | Crescimento Viral | Média |
 | **5º** | **Fase 5 (restante):** Dockerfile, validação de infraestrutura e DNS, novos e-mails e ativação fiscal | Escala e Estabilidade | Média |
 | **7º** | **Fase 7 (configuração):** Google, PostHog e Resend com dados reais; ligar os e-mails em produção | Aquisição, Ativação e Retenção | Baixa |
 | **8º** | **Fase 8:** Inglês e espanhol no app inteiro + preço, impostos e conteúdo por região | Novos Mercados e Receita | Alta |
 | **9º** | **Fase 9 (restante):** Auditoria, linha do tempo e contas relacionadas no painel, Turnstile e e-mails descartáveis | Proteção e Confiança | Média |
-| **11º** | **Fase 11 (restante):** Bucket de documentos em produção, leitura automática da nota, volta ao app pelos lembretes de garantia e validação do modo loja offline | Retenção depois da mudança | Baixa-Média |
+| **11º** | **Validação física:** Modo loja offline e Wake Lock em Android/iPhone reais | Confiabilidade na loja | Baixa |
 
 > **A ordem acima é de menor risco de produto, não de valor.** A validação em produção da Fase 7 (antes de comprar anúncios) e a Fase 9 devem ser **antecipadas**; a infraestrutura de idiomas da Fase 8 (nenhum texto novo fixo no código) também deve começar já, porque o custo de extração cresce a cada tela nova. Tabelas de região e preço da Fase 8 e o antifraude da Fase 9 são pré-requisitos da cobrança em outros países.

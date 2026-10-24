@@ -1,0 +1,9 @@
+version: 1
+name: Jev price name comparison
+slug: jev-pricing
+protocol: http
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

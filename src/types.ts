@@ -239,6 +239,16 @@ export interface ItemOffer {
 
 export type ItemDocumentKind = 'invoice' | 'warranty' | 'manual' | 'other';
 
+export interface ReceiptPreview {
+  storeName: string | null;
+  purchasedAt: string | null;
+  /** Total da nota, que pode conter outros produtos; só vira preço do item com confirmação explícita. */
+  totalCents: number | null;
+  confidence: number;
+  multipleItems: boolean;
+  method: 'local_ocr';
+}
+
 /** Nota fiscal, certificado de garantia ou manual guardado no item. */
 export interface ItemDocument {
   id: string;

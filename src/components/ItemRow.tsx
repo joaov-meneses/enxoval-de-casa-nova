@@ -1121,7 +1121,11 @@ export const ItemRow = memo(function ItemRow({
                       disabled={busy}
                     />
                   </Label>
-                  {onReplace && <ItemDocumentsSection item={item} disabled={busy} onReplace={onReplace} />}
+                  {onReplace && <ItemDocumentsSection item={item} disabled={busy} onReplace={onReplace} onReceiptApply={fields => {
+                    if (fields.storeName) setStoreName(fields.storeName);
+                    if (fields.purchasedAt && status === 'bought') setPurchasedAt(fields.purchasedAt);
+                    if (fields.priceCents !== undefined) setPriceText(money.format(fields.priceCents / 100));
+                  }} />}
                 </>
               )}
               {onReplace && (

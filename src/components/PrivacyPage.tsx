@@ -58,6 +58,18 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           só abre o aplicativo com a mensagem; não guardamos telefones.
         </li>
         <li>
+          <strong>Chá de Casa Nova:</strong> quando você publica um convite, quem
+          tiver o link pode ver título, mensagem, data, itens escolhidos e a chave
+          Pix cadastrada. A chave Pix pode ser um dado pessoal; você pode usar uma
+          chave aleatória e tirar a página do ar a qualquer momento. Convidados
+          informam nome, e-mail e recado ao reservar um presente; recados avulsos
+          pedem apenas nome e mensagem. Esses dados ficam visíveis só aos moradores,
+          servem para organizar os presentes e saem junto com o item, o enxoval ou
+          a conta, conforme o vínculo. Não inscrevemos convidados em campanhas.
+          O Pix vai direto à conta indicada; o Casa Mia não recebe o dinheiro nem
+          confirma a transferência.
+        </li>
+        <li>
           <strong>Notas fiscais, garantias e manuais:</strong> as fotos e os PDFs
           que você enviar para os itens. Ficam num armazenamento privado, só quem
           participa do enxoval consegue baixar (por links que expiram em 5

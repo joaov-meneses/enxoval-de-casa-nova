@@ -5,7 +5,8 @@ coverage/
 test-results/
 playwright-report/
 tmp/
-.tmp/nfse-research/
+.tmp/
+.temp/
 .DS_Store
 *.log
 .env*

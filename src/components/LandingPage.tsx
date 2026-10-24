@@ -40,7 +40,7 @@ const FAQS = [
   ],
   [
     "O que é o Chá de Casa Nova?",
-    "É uma página pública só da sua lista, que chega em breve aos planos pagos. Com ela, seus convidados vão poder reservar um item ou mandar um Pix direto para você, sem precisar de cadastro, e deixar um recado de carinho.",
+    "É uma página pública da sua lista, disponível nos planos pagos. Você escolhe os itens e compartilha o convite. Seus convidados podem reservar um presente, mandar um Pix direto para você e deixar um recado de carinho, sem precisar de cadastro.",
   ],
   [
     "Funciona no celular e no computador?",
@@ -68,7 +68,7 @@ const PAID_FEATURES = [
   "Cômodos e itens ilimitados",
   "Lista a dois, com quem mora com você",
   "Sugestões do Nino para cada cômodo",
-  "Página do Chá de Casa Nova (em breve)",
+  "Página do Chá de Casa Nova",
   "Importar e exportar em Excel e CSV",
 ];
 

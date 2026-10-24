@@ -295,3 +295,13 @@
 .workspace-app .item-inline-hint.item-extra-note {
   display: block;
 }
+.item-doc-list li:has(.receipt-read-button) { grid-template-areas: "icon name remove" "icon meta remove" "read read read"; }
+.receipt-read-button { grid-area: read; justify-self: start; color: var(--cm-primary-dark); font-weight: 700; margin-top: 4px; min-height: 44px; }
+.receipt-review { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--cm-sand); border-radius: 12px; background: var(--cm-bg); }
+.receipt-review p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--cm-text); }
+.receipt-review > label { display: grid; gap: 6px; min-width: 0; }
+.receipt-review input { min-width: 0; width: 100%; font-size: 16px; }
+.receipt-review > .receipt-use-amount { display: flex; gap: 10px; align-items: center; min-height: 44px; line-height: 1.5; }
+.receipt-use-amount [role="checkbox"] { flex: 0 0 20px; min-height: 20px; width: 20px; height: 20px; }
+.receipt-review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.receipt-review-actions .button { flex: 1 1 150px; white-space: normal; min-height: 44px; }

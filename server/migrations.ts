@@ -6,6 +6,7 @@ import { seedCatalog } from './catalog/store.ts';
 import { migrateGrowth } from './growthSchema.ts';
 import { migrateFiscal } from './fiscal/schema.ts';
 import { migrateEnxovalValue } from './enxovalValueSchema.ts';
+import { migrateHousewarming } from './housewarmingSchema.ts';
 import { getPool } from './database.ts';
 import { migrateCatalogPricing } from './catalog/pricingSchema.ts';
 
@@ -665,6 +666,7 @@ export async function migrateDatabase() {
   await migrateGrowth(pool);
   await migrateFiscal(pool);
   await migrateEnxovalValue(pool);
+  await migrateHousewarming(pool);
 
   const usersResult = await pool.query<UserRow>(`
     SELECT DISTINCT u.id, u.name

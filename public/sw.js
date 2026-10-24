@@ -1,16 +1,23 @@
 // Service worker do Casa Mia: só para o modo loja abrir com sinal ruim (Fase 11.6). Guarda a casca do app (/app) e os
 // arquivos com hash do build; nunca guarda respostas da API, que dependem de quem está conectado.
-const CACHE = "casamia-shell-v1";
+const CACHE = "casamia-shell-__STORE_BUILD__";
 const SHELL = "/app";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.add(new Request(SHELL, { cache: "reload" }))).catch(() => undefined));
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    const manifest = await fetch('/store-offline-assets.json', { cache: 'no-store' }).then(response => {
+      if (!response.ok) throw new Error('Offline asset manifest unavailable');
+      return response.json();
+    });
+    await cache.addAll([new Request(SHELL, { cache: 'reload' }), ...manifest.assets.map(asset => new Request(asset, { cache: 'reload' }))]);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith('casamia-shell-') && key !== CACHE).map((key) => caches.delete(key)))).then(() => self.clients.claim()),
   );
 });
 
@@ -28,11 +35,11 @@ self.addEventListener("fetch", (event) => {
         .then((response) => {
           if (response.ok) {
             const copy = response.clone();
-            void caches.open(CACHE).then((cache) => cache.put(SHELL, copy));
+            event.waitUntil(caches.open(CACHE).then((cache) => cache.put(SHELL, copy)));
           }
           return response;
         })
-        .catch(() => caches.match(SHELL).then((cached) => cached || Response.error())),
+        .catch(() => caches.open(CACHE).then(cache => cache.match(SHELL)).then((cached) => cached || Response.error())),
     );
     return;
   }
@@ -40,13 +47,13 @@ self.addEventListener("fetch", (event) => {
   // Arquivos do build têm hash no nome: o que está guardado nunca muda.
   if (url.pathname.startsWith("/assets/")) {
     event.respondWith(
-      caches.match(request).then(
+      caches.open(CACHE).then(cache => cache.match(request)).then(
         (cached) =>
           cached ||
           fetch(request).then((response) => {
             if (response.ok) {
               const copy = response.clone();
-              void caches.open(CACHE).then((cache) => cache.put(request, copy));
+              event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)));
             }
             return response;
           }),

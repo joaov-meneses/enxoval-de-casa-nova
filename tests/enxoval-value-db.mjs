@@ -6,6 +6,7 @@ import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import dotenv from "dotenv";
+import { receiptFixture } from './fixtures/receipt-image.mjs';
 
 dotenv.config({ path: ".env.local", quiet: true });
 dotenv.config({ quiet: true });
@@ -37,6 +38,7 @@ try {
   const { sendWarrantyReminders } = await import("../server/workers/warrantyReminders.ts");
   const { todayInBrazil } = await import("../server/itemExtras.ts");
   const { addMonths } = await import("../src/planning/installments.ts");
+  const { recordReturn } = await import('../server/lifecycle/tracking.ts');
   await migrateDatabase();
   // Migração idempotente: rodar de novo não pode quebrar nem duplicar ofertas.
   await migrateDatabase();
@@ -252,6 +254,33 @@ try {
   assert.equal(deleted.status, 200);
   assert.equal(deleted.data.documentCount, 0);
   assert.equal((await query("SELECT COUNT(*)::int AS n FROM item_document_blobs"))[0].n, 0);
+  // OCR reads the stored photo for authorized members and caches a review; it never changes the item itself.
+  const receiptImage = await receiptFixture();
+  response = await upload(owner, fridge.id, receiptImage, 'image/png', 'nota-teste.png', 'invoice');
+  assert.equal(response.status, 201);
+  const receiptDocument = (await response.json()).document;
+  assert.equal((await stranger.call(`/documents/${receiptDocument.id}/read-receipt`, 'POST')).status, 404);
+  const beforeRead = (await query('SELECT price_cents, store_name, purchased_at FROM items WHERE id = $1', [fridge.id]))[0];
+  const read = await owner.call(`/documents/${receiptDocument.id}/read-receipt`, 'POST');
+  assert.equal(read.status, 200, JSON.stringify(read.data));
+  assert.equal(read.data.preview.totalCents, 12345);
+  assert.equal(read.data.preview.storeName, 'CASA TESTE LTDA');
+  assert.equal(read.data.cached, false);
+  assert.equal(read.data.preview.multipleItems, true);
+  const cachedRead = await partner.call(`/documents/${receiptDocument.id}/read-receipt`, 'POST');
+  assert.equal(cachedRead.status, 200);
+  assert.equal(cachedRead.data.cached, true);
+  assert.deepEqual((await query('SELECT price_cents, store_name, purchased_at FROM items WHERE id = $1', [fridge.id]))[0], beforeRead);
+  assert.equal((await query('SELECT attempts FROM document_read_usage WHERE user_id = $1', [ownerId]))[0].attempts, 1);
+  process.env.RECEIPT_READ_DAILY_LIMIT = '1';
+  response = await upload(owner, fridge.id, receiptImage, 'image/png', 'outra-nota.png', 'invoice');
+  const limitedDocument = (await response.json()).document;
+  assert.equal((await owner.call(`/documents/${limitedDocument.id}/read-receipt`, 'POST')).status, 429);
+  assert.equal((await owner.call(`/documents/${receiptDocument.id}/read-receipt`, 'POST')).status, 200, 'cached preview does not spend the limit');
+  await owner.call(`/documents/${limitedDocument.id}`, 'DELETE');
+  delete process.env.RECEIPT_READ_DAILY_LIMIT;
+  await owner.call(`/documents/${receiptDocument.id}`, 'DELETE');
+  console.log('PASS: OCR real, cache, access control and explicit review before saving.');
   // Apagar o item leva os arquivos junto.
   response = await upload(owner, glasses.id, pdf, "application/pdf", "garantia.pdf", "warranty");
   assert.equal(response.status, 201);
@@ -270,6 +299,13 @@ try {
   assert.match(mailOutbox[0].subject, /Geladeira vence em 7 dias/);
   const [ownerRow] = await query("SELECT email FROM users WHERE id = $1", [ownerId]);
   assert.equal(mailOutbox[0].to, ownerRow.email, "quem desligou os avisos no perfil não recebe");
+  const messageId = new URL(mailOutbox[0].text.match(/https?:\/\/[^\s]+\/app\?[^\s]+/)[0]).searchParams.get('lm');
+  const [message] = await query("SELECT id, user_id FROM lifecycle_messages WHERE flow_key = 'warranty'");
+  assert.equal(message.id, messageId);
+  assert.equal(await recordReturn(partnerId, messageId), false);
+  assert.equal(await recordReturn(ownerId, messageId), true);
+  assert.equal(await recordReturn(ownerId, messageId), true);
+  assert.equal((await query("SELECT count(*)::int AS n FROM lifecycle_events WHERE message_id = $1 AND type = 'returned'", [messageId]))[0].n, 1);
   summary = await sendWarrantyReminders();
   assert.equal(summary.emails, 0, "o mesmo aviso não sai duas vezes");
   // Garantia renovada (outra data de fim) volta a ser avisada, respeitando o limite comum de 1 e-mail por dia.
@@ -281,6 +317,32 @@ try {
   console.log("PASS: aviso de garantia 7 dias antes, sem repetir e respeitando a preferência do perfil.");
 
   console.log("PASS: Fase 11 com PostgreSQL real.");
+  if (process.env.DOCUMENTS_S3_SIM_URL) {
+    const endpoint = process.env.DOCUMENTS_S3_SIM_URL;
+    Object.assign(process.env, { DOCUMENT_STORAGE: 's3', S3_ENDPOINT: endpoint, S3_BUCKET: 'test-documents', S3_REGION: 'auto', S3_ACCESS_KEY_ID: 'simulation-access', S3_SECRET_ACCESS_KEY: 'simulation-secret' });
+    const { processStorageDeletions } = await import('../server/objectStorage.ts');
+    response = await upload(owner, fridge.id, pdf, 'application/pdf', 's3-test.pdf', 'invoice');
+    assert.equal(response.status, 201, await response.clone().text());
+    const doc = (await response.json()).document;
+    const download = await owner.raw(`/documents/${doc.id}/file`);
+    assert.equal(download.status, 302);
+    assert.equal(download.headers.get('cache-control'), 'private, no-store');
+    const signed = download.headers.get('location');
+    assert.ok(new URL(signed).searchParams.get('X-Amz-Signature'));
+    assert.deepEqual(Buffer.from(await (await fetch(signed)).arrayBuffer()), pdf);
+    assert.equal((await stranger.raw(`/documents/${doc.id}/file`)).status, 404);
+    await owner.call(`/documents/${doc.id}`, 'DELETE');
+    assert.equal((await processStorageDeletions(getPool())).deleted, 1);
+    await fetch(`${endpoint}/test/state`, { method: 'POST', body: JSON.stringify({ mode: 'unavailable' }) });
+    const count = (await query('SELECT count(*)::int AS n FROM item_documents'))[0].n;
+    response = await upload(owner, fridge.id, pdf, 'application/pdf', 'storage-down.pdf', 'invoice');
+    assert.equal(response.status, 500);
+    assert.equal((await query('SELECT count(*)::int AS n FROM item_documents'))[0].n, count);
+    await fetch(`${endpoint}/test/state`, { method: 'POST', body: JSON.stringify({ mode: 'success' }) });
+    const metrics = await (await fetch(`${endpoint}/test/state`)).json();
+    assert.ok(metrics.put >= 1 && metrics.get >= 1 && metrics.delete >= 1);
+    console.log('PASS: real application HTTP against S3 simulation: upload, signed download, deletion and unavailable storage.');
+  }
 } finally {
   if (server) await new Promise((resolve) => server.close(resolve));
   try {

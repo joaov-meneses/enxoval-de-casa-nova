@@ -16,6 +16,7 @@ DropdownMenuTrigger,
 import { WorkspaceAnalytics } from "./components/WorkspaceAnalytics";
 import { WorkspaceDialogs } from "./components/WorkspaceDialogs";
 import { WorkspaceLoading } from "./components/WorkspaceLoading";
+import { HousewarmingNotice } from './components/HousewarmingNotice';
 
 import {
 CalendarClock,
@@ -23,6 +24,7 @@ Check,
 ChevronDown,
 DoorOpen,
 Home,
+Gift,
 LayoutDashboard,
 ListChecks,
 ListPlus,
@@ -58,6 +60,7 @@ const ListRoute = lazy(() => import("./routes/ListRoute"));
 const PlanRoute = lazy(() => import("./routes/PlanRoute"));
 const StoreRoute = lazy(() => import("./routes/StoreRoute"));
 const OfflineStore = lazy(() => import("./routes/OfflineStore"));
+const HousewarmingRoute = lazy(() => import('./routes/HousewarmingRoute'));
 
 export default function App() {
   const workspace = useWorkspace();
@@ -340,6 +343,11 @@ export default function App() {
                       {rescheduleCount} a reagendar
                     </span>
                   )}
+                </Button>
+                <Button variant="brand" size="brand" className={workspaceView === 'housewarming' ? 'active' : ''}
+                  aria-current={workspaceView === 'housewarming' ? 'page' : undefined}
+                  onClick={() => setWorkspaceView('housewarming')} disabled={!hasEnxoval}>
+                  <Gift size={18} /> Chá de Casa Nova
                 </Button>
               </nav>
               {/* Todos os enxovais à vista: trocar é um clique e criar um novo não depende de achar o menu do título. */}
@@ -746,6 +754,7 @@ export default function App() {
             </motion.header>
 
             <main id="workspace-main" className="workspace-main">
+              {hasEnxoval && workspaceView !== 'housewarming' && <HousewarmingNotice key={activeEnxoval!.id} enxovalId={activeEnxoval!.id} onOpen={() => setWorkspaceView('housewarming')} />}
               {error && (
                 <div className="form-error workspace-error" role="alert">
                   {error}
@@ -797,6 +806,8 @@ export default function App() {
                     showToast={showToast}
                   />
                 )}
+                {hasEnxoval && workspaceView === 'housewarming' && <HousewarmingRoute key={activeEnxoval!.id}
+                  enxoval={activeEnxoval!} items={items} canEdit={isOwner} onSavedItem={replaceItem} onRefresh={() => void handleRefresh()} />}
                 {hasEnxoval && workspaceView === "overview" && overview}
                 {hasEnxoval && workspaceView === "list" && (
                   <ListRoute workspace={workspace} overview={overview} />
@@ -867,6 +878,11 @@ export default function App() {
               >
                 <CalendarClock size={19} />
                 Planejamento
+              </Button>
+              <Button variant="brand" size="brand" className={workspaceView === 'housewarming' ? 'active' : ''}
+                aria-current={workspaceView === 'housewarming' ? 'page' : undefined}
+                onClick={() => { setWorkspaceView('housewarming'); window.scrollTo({ top: 0 }); }} disabled={!hasEnxoval}>
+                <Gift size={19} /> Chá de Casa Nova
               </Button>
             </nav>
             <Button

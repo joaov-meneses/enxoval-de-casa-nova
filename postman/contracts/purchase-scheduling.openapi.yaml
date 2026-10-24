@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: Casa Mia - Purchase scheduling additions
+  version: 1.0.0
+  description: Additive fields on the existing item PATCH and workspace PATCH. No paid external service is required by scheduling. Existing fields and permissions are preserved.
+servers:
+  - url: http://localhost:3000/api
+security:
+  - session: []
+paths:
+  /items/{id}:
+    patch:
+      operationId: updatePurchaseTiming
+      description: Workspace members can update timing. The dependency must belong to the same workspace and cannot form a cycle, including concurrent edits. A manual buyWeek prevails over automatic placement. Omitted fields remain unchanged; null restores estimated delivery/research or removes a dependency.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Timing'
+            example: { leadTimeWeeks: 4, researchWeeks: 1, hasTemporarySolution: false, dependsOnItemId: null, buyWeek: null }
+      responses:
+        '200':
+          description: Saved item, including the timing fields. Also returned by the existing bootstrap read, with defaults null/null/false/null on legacy items.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Timing'
+                  - type: object
+                    required: [id, name]
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+        '400': { description: Invalid range/type, self-dependency, dependency from another workspace or dependency cycle. Transaction is rolled back. }
+        '401': { description: Authentication required. }
+        '404': { description: Item absent or user is not a member. }
+  /enxovais/{id}:
+    patch:
+      operationId: updatePurchaseBudget
+      description: Existing owner-only monthlyBudgetCents now also guides optional purchase placement. Includes cash purchases and installments. Essentials and manual dates are preserved and conflicts are displayed. Without a move date no calendar budget redistribution occurs.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                monthlyBudgetCents: { type: integer, minimum: 1, maximum: 1000000000, nullable: true }
+            example: { monthlyBudgetCents: 100000 }
+      responses:
+        '200': { description: Updated workspace. }
+        '400': { description: Invalid amount. }
+        '401': { description: Authentication required. }
+        '403': { description: Only the workspace owner can change the budget. }
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: enxoval_session
+  schemas:
+    Timing:
+      type: object
+      properties:
+        buyWeek: { type: integer, minimum: -52, maximum: 104, nullable: true }
+        leadTimeWeeks: { type: integer, minimum: 0, maximum: 52, nullable: true }
+        researchWeeks: { type: integer, minimum: 0, maximum: 12, nullable: true }
+        hasTemporarySolution: { type: boolean }
+        dependsOnItemId: { type: string, format: uuid, nullable: true }

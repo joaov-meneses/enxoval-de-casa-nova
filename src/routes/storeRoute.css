@@ -211,3 +211,4 @@
   text-align: center;
   color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
 }
+.store-offline-readiness { margin: 10px 0; font-size: 13px; line-height: 1.5; color: var(--cm-success); }

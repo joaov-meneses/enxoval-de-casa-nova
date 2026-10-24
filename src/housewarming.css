@@ -1,0 +1,96 @@
+.housewarming-manager, .housewarming-public { color: var(--cm-text); }
+.housewarming-heading { margin: 8px 0 24px; }
+.housewarming-heading h2, .housewarming-manager h3, .housewarming-public h1, .housewarming-public h2, .housewarming-public h3 { font-family: var(--font-serif, 'Fraunces', Georgia, serif); }
+.housewarming-heading h2 { display: flex; align-items: center; gap: 12px; font-size: clamp(26px, 4vw, 36px); margin: 8px 0; }
+.housewarming-heading p, .housewarming-manager p, .housewarming-public p { line-height: 1.65; }
+.housewarming-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.housewarming-panel { padding: clamp(18px, 3vw, 28px); border: 1px solid color-mix(in srgb, var(--cm-sand) 65%, white); border-radius: 16px; background: white; min-width: 0; }
+.housewarming-panel h3 { font-size: 22px; display: flex; align-items: center; gap: 8px; margin: 0 0 14px; }
+.housewarming-side { display: grid; gap: 24px; min-width: 0; }
+.housewarming-form fieldset { border: 0; padding: 0; min-width: 0; }
+.housewarming-form label, .housewarming-panel > label, .housewarming-pix label { display: grid; gap: 7px; font-weight: 700; margin: 0 0 18px; }
+.housewarming-form label > span:not(:first-child), .housewarming-form small, .housewarming-panel small { font-weight: 400; }
+.housewarming-form small, .housewarming-panel small, .housewarming-pix small { color: color-mix(in srgb, var(--cm-text) 80%, var(--cm-bg)); line-height: 1.6; overflow-wrap: anywhere; }
+.housewarming-form h3:not(:first-child) { margin-top: 28px; }
+.housewarming-form p { margin-bottom: 14px; }
+.housewarming-form select { min-height: 44px; border: 1px solid var(--input); border-radius: 7px; padding: 8px 12px; background: white; font: inherit; width: 100%; }
+.housewarming-form input:not([type=checkbox]), .housewarming-panel input, .housewarming-form textarea { min-height: 44px; }
+.housewarming-form .housewarming-check { display: flex; align-items: center; gap: 12px; min-height: 44px; margin-bottom: 6px; cursor: pointer; }
+.housewarming-check input { accent-color: var(--cm-action); width: 20px; height: 20px; flex: 0 0 auto; }
+.housewarming-check span { display: grid; }
+.housewarming-item-picker { max-height: 350px; overflow-y: auto; overscroll-behavior: contain; border-block: 1px solid var(--input); padding: 10px 4px; }
+.housewarming-section-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.housewarming-form .housewarming-section-title { margin-top: 26px; }
+.housewarming-form .housewarming-section-title h3 { margin: 0; }
+.housewarming-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.housewarming-actions button, .housewarming-actions a, .housewarming-filters button { min-height: 44px; }
+.housewarming-actions button, .housewarming-gift-card button { white-space: normal; height: auto; }
+.housewarming-feedback:empty { display: none; }
+.housewarming-feedback, .housewarming-success { padding: 14px 18px; background: color-mix(in srgb, var(--cm-success) 13%, white); border-radius: 10px; margin-bottom: 20px; }
+.housewarming-inbox { list-style: none; padding: 0; margin: 18px 0 0; }
+.housewarming-inbox li { border-top: 1px solid var(--input); padding: 18px 0; overflow-wrap: anywhere; }
+.housewarming-inbox p { margin: 0 0 6px; }
+.housewarming-inbox blockquote { margin: 12px 0; padding-left: 14px; border-left: 3px solid var(--cm-sand); white-space: pre-wrap; }
+.housewarming-badge { display: inline-block; font-size: 12px; background: color-mix(in srgb, var(--cm-success) 15%, white); border-radius: 5px; padding: 3px 8px; margin-left: 8px; }
+.housewarming-notice { display: flex; align-items: center; width: 100%; padding: 14px 18px; gap: 14px; margin: 0 0 20px; border: 1px solid var(--cm-sand); background: color-mix(in srgb, var(--cm-success) 9%, white); border-radius: 12px; text-align: left; }
+.housewarming-notice > span:first-of-type { display: grid; gap: 3px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.housewarming-notice > span:last-child { font-size: 13px; text-decoration: underline; }
+.housewarming-public { background: var(--cm-bg); min-height: 100vh; }
+.housewarming-public-header, .housewarming-public main, .housewarming-public-footer { width: min(1120px, calc(100% - 48px)); margin-inline: auto; }
+.housewarming-public-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 24px; }
+.housewarming-public-header .brand-symbol { width: 44px; height: auto; }
+.housewarming-home-link { min-height: 44px; display: flex; align-items: center; font-size: 14px; text-decoration: underline; }
+.housewarming-hero { display: grid; grid-template-columns: minmax(0, 1fr) 240px; align-items: center; gap: 48px; padding: 65px 0 70px; border-bottom: 1px solid var(--cm-sand); }
+.housewarming-hero h1 { font-size: clamp(34px, 5vw, 60px); line-height: 1.12; letter-spacing: -.025em; margin: 14px 0 24px; overflow-wrap: anywhere; }
+.housewarming-invitation-message { font-size: 19px; max-width: 650px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.housewarming-date { display: flex; align-items: center; gap: 10px; margin-top: 22px; font-weight: 700; }
+.housewarming-nino { display: grid; place-items: center; gap: 18px; text-align: center; color: var(--cm-action); font-weight: 700; }
+.housewarming-nino img { width: 160px; height: auto; }
+.housewarming-gifts { padding-block: 55px; scroll-margin-top: 24px; }
+.housewarming-gifts h2, .housewarming-message-cta h2 { font-size: clamp(26px, 3.5vw, 38px); line-height: 1.2; margin: 10px 0 16px; }
+.housewarming-filters { display: flex; gap: 10px; flex-wrap: wrap; margin: 26px 0; }
+.housewarming-gift-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; list-style: none; padding: 0; margin-top: 28px; }
+.housewarming-gift-card { display: flex; flex-direction: column; align-items: start; background: white; border: 1px solid color-mix(in srgb, var(--cm-sand) 60%, white); border-radius: 16px; padding: 24px; gap: 12px; min-width: 0; }
+.housewarming-gift-symbol { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: color-mix(in srgb, var(--cm-action) 9%, white); color: var(--cm-action); margin-bottom: 7px; }
+.housewarming-gift-card h3 { font-size: 23px; overflow-wrap: anywhere; margin: 0; }
+.housewarming-availability { font-size: 13px; margin-bottom: 8px; }
+.housewarming-gift-card button { margin-top: auto; width: 100%; min-height: 44px; line-height: 1.4; padding-block: 10px; }
+.housewarming-gift-card:not(.is-available) { background: color-mix(in srgb, var(--cm-bg) 50%, white); }
+.housewarming-message-cta { text-align: center; max-width: 580px; margin: 0 auto; padding: 28px 0 60px; }
+.housewarming-message-cta > svg { margin-inline: auto; color: var(--cm-action); }
+.housewarming-message-cta button { min-height: 44px; margin-top: 18px; }
+.housewarming-public-footer { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding-block: 32px; border-top: 1px solid var(--cm-sand); }
+.housewarming-public-footer p { margin: 0; flex: 1; }
+.housewarming-public-footer .brand-symbol { width: 44px; height: auto; }
+.housewarming-public-footer > a:last-child { font-size: 13px; text-decoration: underline; min-height: 44px; display: inline-flex; align-items: center; }
+.housewarming-unavailable { text-align: center; padding-block: 80px; }
+.housewarming-unavailable > svg { margin-inline: auto; color: var(--cm-action); }
+.housewarming-unavailable h1 { font-size: 32px; margin-block: 24px; }
+.housewarming-unavailable p { margin-bottom: 16px; }
+.housewarming-dialog { max-width: min(520px, calc(100vw - 24px)); }
+.housewarming-pix { display: grid; gap: 14px; }
+.housewarming-pix img { max-width: 100%; margin-inline: auto; border: 1px solid var(--input); }
+.housewarming-pix textarea { font-family: monospace; font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .housewarming-layout { grid-template-columns: minmax(0, 1fr); }
+  .housewarming-hero { grid-template-columns: minmax(0, 1fr) 160px; gap: 24px; }
+  .housewarming-gift-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .housewarming-notice > span:last-child { display: none; }
+}
+@media (max-width: 600px) {
+  .housewarming-public-header, .housewarming-public main, .housewarming-public-footer { width: calc(100% - 32px); }
+  .housewarming-public-header { padding-block: 16px; }
+  .housewarming-public-header .brand-word { font-size: 23px; }
+  .housewarming-home-link { max-width: 110px; text-align: right; }
+  .housewarming-hero { grid-template-columns: minmax(0, 1fr); padding-block: 34px; gap: 26px; }
+  .housewarming-nino { display: flex; justify-content: center; text-align: left; font-size: 14px; }
+  .housewarming-nino img { width: 60px; }
+  .housewarming-invitation-message { font-size: 17px; }
+  .housewarming-gift-grid { grid-template-columns: minmax(0, 1fr); }
+  .housewarming-gift-card { padding: 22px; }
+  .housewarming-public-footer { gap: 16px; }
+  .housewarming-public-footer p { flex-basis: calc(100% - 70px); font-size: 14px; }
+  .housewarming-gifts { padding-block: 32px; }
+  .housewarming-manager .housewarming-actions { align-items: stretch; }
+  .housewarming-manager .housewarming-actions > * { flex: 1 1 auto; }
+}

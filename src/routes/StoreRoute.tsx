@@ -139,6 +139,8 @@ export default function StoreRoute({
   const [completing, setCompleting] = useState<EnxovalItem | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [offlineReady, setOfflineReady] = useState(offlineOnly);
+  const [offlineCheckDone, setOfflineCheckDone] = useState(false);
   const flushing = useRef(false);
 
   useEffect(() => {
@@ -150,7 +152,14 @@ export default function StoreRoute({
   // Retrato do enxoval no aparelho, para abrir o modo loja mesmo sem conexão.
   useEffect(() => {
     if (offlineOnly) return;
-    void saveStoreSnapshot({ enxovalId: enxoval.id, enxoval, items, categories });
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const shell = !import.meta.env.PROD ? Promise.resolve(false) : 'serviceWorker' in navigator
+      ? Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 20_000); })]) : Promise.resolve(false);
+    void Promise.all([saveStoreSnapshot({ enxovalId: enxoval.id, enxoval, items, categories }), shell]).then(([snapshot, prepared]) => {
+      if (alive) { setOfflineReady(snapshot && prepared); setOfflineCheckDone(true); }
+    });
+    return () => { alive = false; if (timer) clearTimeout(timer); };
   }, [enxoval, items, categories, offlineOnly]);
 
   const refreshQueue = async () => setQueue(await pendingChanges(enxoval.id));
@@ -194,20 +203,31 @@ export default function StoreRoute({
   // Tela ligada enquanto o modo loja está aberto (onde o navegador permite).
   useEffect(() => {
     let lock: { release: () => Promise<void> } | null = null;
+    let stopped = false;
+    let requesting = false;
     const wakeLock = (navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> } }).wakeLock;
     const request = async () => {
-      if (!wakeLock || document.visibilityState !== "visible") return;
+      if (stopped || requesting || lock || !wakeLock || document.visibilityState !== "visible") return;
+      requesting = true;
       try {
-        lock = await wakeLock.request("screen");
+        const acquired = await wakeLock.request("screen");
+        if (stopped || document.visibilityState !== 'visible') await acquired.release();
+        else lock = acquired;
       } catch {
         lock = null;
+      } finally {
+        requesting = false;
       }
     };
     void request();
-    const onVisible = () => void request();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void request();
+      else { const held = lock; lock = null; void held?.release().catch(() => undefined); }
+    };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
+      stopped = true;
       void lock?.release().catch(() => undefined);
     };
   }, []);
@@ -236,7 +256,9 @@ export default function StoreRoute({
         setOnline(false);
       }
     }
-    if (!(await queueChange({ enxovalId: enxoval.id, itemId: item.id, updates })))
+    const queuedUpdates = updates.status === 'bought' && !updates.purchasedAt
+      ? { ...updates, purchasedAt: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) } : updates;
+    if (!(await queueChange({ enxovalId: enxoval.id, itemId: item.id, updates: queuedUpdates })))
       throw new Error("Sem conexão e sem espaço no aparelho para guardar a alteração. Tente de novo quando o sinal voltar.");
     await refreshQueue();
     return "queued" as const;
@@ -280,6 +302,11 @@ export default function StoreRoute({
         </p>
       )}
 
+      {import.meta.env.PROD && online && <p className="store-offline-readiness" role="status">
+        {offlineReady ? 'Disponível para abrir sem conexão neste aparelho.' : offlineCheckDone
+          ? 'A abertura offline não ficou disponível. Mantenha esta tela aberta ao usar sem sinal.'
+          : 'Preparando para abrir sem conexão. Mantenha esta tela aberta por alguns instantes.'}
+      </p>}
       <div className="store-search">
         <Search size={20} aria-hidden="true" />
         <Input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar item" aria-label="Buscar item no modo loja" />

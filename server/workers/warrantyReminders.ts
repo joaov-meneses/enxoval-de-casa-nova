@@ -1,6 +1,7 @@
 // Fase 11.4: avisa 30 e 7 dias antes de a garantia de um item vencer, e esvazia a fila de arquivos a apagar do bucket.
 // A tabela warranty_reminders evita repetir o mesmo aviso, inclusive com mais de uma instância do servidor.
 import { getPool, withTransaction } from '../database.ts';
+import { randomUUID } from 'node:crypto';
 import { logger } from '../logger.ts';
 import { canDeliverMail, sendMail, warrantyEmail } from '../mailer.ts';
 import { categoryEnabled } from '../lifecycle/policy.ts';
@@ -71,8 +72,10 @@ export async function sendWarrantyReminders(now = new Date()) {
           if (claimed.rowCount) fresh.push(item);
         }
         if (fresh.length === 0) return;
-        const delivery = await sendMail(warrantyEmail({ to: email, name, items: fresh }));
-        await recordExternalSend(allowed.get(email) ?? null, 'warranty', delivery.providerMessageId);
+        const userId = allowed.get(email) ?? null;
+        const messageId = userId ? randomUUID() : undefined;
+        const delivery = await sendMail(warrantyEmail({ to: email, name, items: fresh, messageId }));
+        await recordExternalSend(userId, 'warranty', delivery.providerMessageId, undefined, { messageId, queryable: client });
         summary.items += fresh.length;
         summary.emails += 1;
       });

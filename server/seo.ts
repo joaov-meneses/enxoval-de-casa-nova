@@ -37,7 +37,7 @@ export const PUBLIC_PAGES: PublicPage[] = [
 /** Prefixos que nunca devem aparecer em buscadores: conta, gestão e links que chegam por e-mail. */
 const PRIVATE_PREFIXES = [
   '/app', '/admin', '/login', '/cadastro', '/convite', '/preferencias', '/pesquisa', '/esqueci-senha', '/redefinir-senha',
-  '/verificar-email', '/api',
+  '/verificar-email', '/api', '/cha',
 ];
 
 export function isPrivatePath(pathname: string) {

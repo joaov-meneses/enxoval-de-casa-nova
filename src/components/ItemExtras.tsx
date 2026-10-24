@@ -29,6 +29,9 @@ import type { EnxovalItem, EnxovalMember, ItemDocument, ItemDocumentKind } from 
 import { Dialog } from "./Dialog";
 import { Select } from "./Select";
 import { UserAvatar } from "./UserAvatar";
+import { ReceiptReview, type ReceiptFields } from './ReceiptReview';
+import { readItemReceipt } from '../api';
+import type { ReceiptPreview } from '../types';
 import "./itemExtras.css";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -269,13 +272,17 @@ export function ItemDocumentsSection({
   item,
   disabled,
   onReplace,
+  onReceiptApply,
 }: {
   item: EnxovalItem;
   disabled?: boolean;
   onReplace: (item: EnxovalItem) => void;
+  onReceiptApply?: (fields: ReceiptFields) => void;
 }) {
   const [documents, setDocuments] = useState<ItemDocument[] | null>(item.documentCount ? null : []);
   const [kind, setKind] = useState<ItemDocumentKind>("invoice");
+  const [receipt, setReceipt] = useState<ReceiptPreview | null>(null);
+  const [receiptNotice, setReceiptNotice] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -334,6 +341,13 @@ export function ItemDocumentsSection({
     }
   }
 
+  async function readReceipt(document: ItemDocument) {
+    setBusy(`read:${document.id}`); setError(''); setReceipt(null); setReceiptNotice('');
+    try { setReceipt((await readItemReceipt(document.id)).preview); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível ler a nota. Preencha os dados manualmente.'); }
+    finally { setBusy(null); }
+  }
+
   const count = documents?.length ?? item.documentCount ?? 0;
   return (
     <div className="item-docs item-inline-wide" aria-busy={busy === "upload" || documents === null}>
@@ -352,6 +366,12 @@ export function ItemDocumentsSection({
               <small>
                 {DOCUMENT_KIND_LABEL[document.kind]} · {fileSize(document.sizeBytes)}
               </small>
+              {onReceiptApply && document.kind === 'invoice' && document.contentType.startsWith('image/') && (
+                <Button variant="brand" size="brand" type="button" className="receipt-read-button" disabled={disabled || busy !== null}
+                  onClick={() => void readReceipt(document)} aria-label={`Ler nota ${document.fileName}`}>
+                  {busy === `read:${document.id}` ? 'Lendo nota…' : 'Ler nota'}
+                </Button>
+              )}
               <Button
                 variant="brand"
                 size="brand"
@@ -368,6 +388,10 @@ export function ItemDocumentsSection({
           ))}
         </ul>
       ) : null}
+      {receipt && onReceiptApply && <ReceiptReview key={JSON.stringify(receipt)} preview={receipt} onCancel={() => setReceipt(null)} onApply={fields => {
+        onReceiptApply(fields); setReceipt(null); setReceiptNotice('Dados preenchidos. Confira os campos e toque em Salvar alterações para confirmar.');
+      }} />}
+      {receiptNotice && <p className="item-inline-hint" role="status">{receiptNotice}</p>}
       {count < MAX_DOCUMENTS && (
         <div className="item-doc-actions">
           <Label htmlFor={`${id}-kind`} className="sr-only">Tipo do documento</Label>

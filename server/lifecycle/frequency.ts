@@ -2,7 +2,7 @@
 // lembrete de garantia e as campanhas da equipe. Quem já recebeu e-mail hoje (ou dois na semana) espera a próxima
 // rodada; o envio fica registrado em lifecycle_messages para contar no limite e aparecer no painel de cada fluxo.
 import { randomUUID } from 'node:crypto';
-import { getPool } from '../database.ts';
+import { getPool, type Queryable } from '../database.ts';
 import { frequencyAllows, TEMPLATE_VERSION, type MessageKind } from './policy.ts';
 
 /** Contas ligadas aos endereços (minúsculos), com os envios dos últimos 7 dias. */
@@ -33,13 +33,13 @@ export async function frequencyGate(emails: string[], now = Date.now()) {
 }
 
 /** Registra um e-mail enviado fora do motor, para contar no limite e receber o retorno do provedor. */
-export async function recordExternalSend(userId: string | null, kind: MessageKind, providerMessageId: string | null, step = randomUUID()) {
+export async function recordExternalSend(userId: string | null, kind: MessageKind, providerMessageId: string | null, step = randomUUID(), options: { messageId?: string; queryable?: Queryable } = {}) {
   if (!userId) return null;
-  const result = await getPool().query<{ id: string }>(`
+  const result = await (options.queryable ?? getPool()).query<{ id: string }>(`
     INSERT INTO lifecycle_messages (id, user_id, flow_key, step, template_version, status, sent_at, provider_message_id)
     VALUES ($1, $2, $3, $4, $5, 'sent', now(), $6)
     ON CONFLICT DO NOTHING
     RETURNING id
-  `, [randomUUID(), userId, kind, step, TEMPLATE_VERSION, providerMessageId]);
+  `, [options.messageId ?? randomUUID(), userId, kind, step, TEMPLATE_VERSION, providerMessageId]);
   return result.rows[0]?.id ?? null;
 }
