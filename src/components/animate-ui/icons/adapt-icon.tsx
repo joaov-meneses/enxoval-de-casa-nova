@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { memo, type ComponentType } from "react";
 import {
   useAnimateIconContext,
   type IconProps as AnimateIconProps,
@@ -48,5 +48,6 @@ export function adaptIcon(
     );
   }
   AnimatedIcon.displayName = `Animated(${name})`;
-  return AnimatedIcon;
+  // Memorizado: o ícone (cheio de elementos de animação) não redesenha quando o pai redesenha com as mesmas props.
+  return memo(AnimatedIcon) as unknown as IconComponent;
 }

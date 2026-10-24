@@ -1,7 +1,7 @@
 import { Button } from "@/src/components/ui/button";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Reorder, useDragControls } from "motion/react";
-import { GripVertical } from "@/src/components/icons";
+import { StaticListIcon } from "./StaticListIcon";
 
 interface Entry {
   id: string;
@@ -143,7 +143,11 @@ function SortableEntry<T extends Entry>({
 }) {
   const controls = useDragControls();
   const [dragging, setDragging] = useState(false);
-  const handle = (
+  // A alça tem identidade estável (as funções do pai mudam a cada render e são lidas pela ref), para a linha
+  // memorizada que a recebe não redesenhar à toa.
+  const onMoveRef = useRef(onMove);
+  onMoveRef.current = onMove;
+  const handle = useMemo(() => (
     <Button variant="brand" size="brand"
       type="button"
       className="reorder-handle"
@@ -166,13 +170,13 @@ function SortableEntry<T extends Entry>({
         if (event.key === previous || event.key === next) {
           event.preventDefault();
           event.stopPropagation();
-          onMove(event.key === previous ? -1 : 1);
+          onMoveRef.current(event.key === previous ? -1 : 1);
         }
       }}
     >
-      <GripVertical size={17} aria-hidden="true" animate={false} animateOnHover={false} animateOnTap={false} />
+      <StaticListIcon name="grip-vertical" size={17} />
     </Button>
-  );
+  ), [axis, controls, disabled, hintId, item.name]);
   return (
     <Reorder.Item
       as="div"

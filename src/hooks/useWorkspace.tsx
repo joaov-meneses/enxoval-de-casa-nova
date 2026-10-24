@@ -87,6 +87,7 @@ ItemTrackingInput,
 } from "../types";
 import { measureTextWidth } from "../utils/textWidth";
 import { useItemCompletionOrder } from "./useItemCompletionOrder";
+import { useStableCallback } from "./useStableCallback";
 
 type ItemSortMode = "manual" | "name" | "updated" | "week";
 
@@ -181,6 +182,15 @@ function formatUpdatedAt(value: string) {
 }
 
 const SIDEBAR_MIN_WIDTH = 280;
+// Estilos fixos do cabeçalho do celular: objetos estáveis, para não invalidar quem os recebe a cada render.
+const MOBILE_HEADER_STYLE: React.CSSProperties = { paddingTop: "10px", paddingBottom: "10px" };
+const MOBILE_TITLE_STYLE: React.CSSProperties = { fontSize: "20px" };
+const MOBILE_CATEGORY_BAR_STYLE: React.CSSProperties = { marginTop: "8px" };
+/** A linha "Compartilhado com" esmaece com a rolagem pela variável --header-progress (ver o efeito de rolagem). */
+const EYEBROW_STYLE: React.CSSProperties = {
+  opacity: "calc(1 - var(--header-progress, 0))" as unknown as number,
+  transform: "translateY(calc(var(--header-progress, 0) * -4px))",
+};
 const SIDEBAR_ROW_CHROME = 228;
 
 export function useWorkspace() {
@@ -283,12 +293,13 @@ export function useWorkspace() {
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [headerProgress, setHeaderProgress] = useState(0);
-  const [isHeaderMobile, setIsHeaderMobile] = useState(false);
+  // O indicador de "puxar para atualizar" é desenhado por CSS (variável --pull), sem renderizar o app a cada movimento.
+  const pullIndicatorRef = useRef<HTMLDivElement>(null);
+  const mobileHeaderRef = useRef<HTMLElement>(null);
+  const [isHeaderMobile, setIsHeaderMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches,
+  );
   const [error, setError] = useState("");
-  const pullStartYRef = useRef<number | null>(null);
-  const pullLastDistanceRef = useRef(0);
   useEffect(() => {
     setJustAddedItemId(null);
   }, [activeCategoryId, itemSortMode, activeEnxoval?.id]);
@@ -738,30 +749,45 @@ export function useWorkspace() {
     user,
   ]);
 
+  // Celular ou não: só muda ao cruzar o limite de largura, não a cada redimensionamento.
   useEffect(() => {
-    let animationFrame = 0;
+    const query = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsHeaderMobile(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
-    const updateHeaderSize = () => {
+  // A rolagem esmaece a linha de apoio do cabeçalho por uma variável CSS (--header-progress, de 0 a 1). Antes era
+  // estado do React: cada quadro de rolagem redesenhava o workspace inteiro, com todos os itens.
+  useEffect(() => {
+    if (!isHeaderMobile) {
+      mobileHeaderRef.current?.style.removeProperty("--header-progress");
+      if (mobileHeaderRef.current) delete mobileHeaderRef.current.dataset.headerScrolled;
+      return;
+    }
+    let animationFrame = 0;
+    let last = -1;
+    const update = () => {
       cancelAnimationFrame(animationFrame);
       animationFrame = requestAnimationFrame(() => {
-        const isMobile = window.innerWidth < 640;
-        setIsHeaderMobile(isMobile);
-        setHeaderProgress(
-          isMobile ? Math.min(Math.max(window.scrollY / 140, 0), 1) : 0,
-        );
+        const root = mobileHeaderRef.current;
+        if (!root) return;
+        const progress = Math.min(Math.max(window.scrollY / 140, 0), 1);
+        if (progress === last) return;
+        last = progress;
+        root.style.setProperty("--header-progress", progress.toFixed(3));
+        if (progress > 0.9) root.dataset.headerScrolled = "true";
+        else delete root.dataset.headerScrolled;
       });
     };
-
-    updateHeaderSize();
-    window.addEventListener("scroll", updateHeaderSize, { passive: true });
-    window.addEventListener("resize", updateHeaderSize);
-
+    update();
+    window.addEventListener("scroll", update, { passive: true });
     return () => {
       cancelAnimationFrame(animationFrame);
-      window.removeEventListener("scroll", updateHeaderSize);
-      window.removeEventListener("resize", updateHeaderSize);
+      window.removeEventListener("scroll", update);
     };
-  }, []);
+  }, [isHeaderMobile]);
 
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
@@ -797,94 +823,100 @@ export function useWorkspace() {
     }
   }, [activeCategoryId, selectedEnxovalId, isRefreshing]);
 
+  // "Puxar para atualizar" no celular. O movimento do dedo só é escutado de forma bloqueante (passive: false) enquanto
+  // a pessoa puxa a partir do topo; no resto do tempo o navegador rola sem esperar o JavaScript. O indicador anda
+  // pela variável CSS --pull, sem redesenhar o app a cada movimento.
+  const handleRefreshRef = useRef(handleRefresh);
+  handleRefreshRef.current = handleRefresh;
+  const isRefreshingRef = useRef(isRefreshing);
+  isRefreshingRef.current = isRefreshing;
   useEffect(() => {
-    if (!user || !isHeaderMobile || isWorkspaceMenuOpen) {
-      pullStartYRef.current = null;
-      pullLastDistanceRef.current = 0;
-      setPullDistance(0);
-      return;
-    }
+    if (!user || !isHeaderMobile || isWorkspaceMenuOpen) return;
 
     const pullThreshold = 72;
     let resetTimer: number | undefined;
+    let startY: number | null = null;
+    let distance = 0;
 
+    const paint = (value: number) => {
+      pullIndicatorRef.current?.style.setProperty("--pull", String(value));
+    };
     const isInteractiveTarget = (target: EventTarget | null) =>
       target instanceof Element &&
       Boolean(
         target.closest('button, input, textarea, select, a, [role="button"]'),
       );
 
-    const resetPull = () => {
-      pullStartYRef.current = null;
-      pullLastDistanceRef.current = 0;
-      setPullDistance(0);
+    const stopTracking = () => {
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", cancelPull);
+      startY = null;
+    };
+    const cancelPull = () => {
+      stopTracking();
+      distance = 0;
+      paint(0);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (startY === null) return;
+      if (event.touches.length !== 1) {
+        cancelPull();
+        return;
+      }
+      const delta = event.touches[0].clientY - startY;
+      if (delta <= 0 || window.scrollY > 0) {
+        cancelPull();
+        return;
+      }
+      distance = Math.min(Math.round(delta * 0.55), 96);
+      paint(distance);
+      if (distance > 4 && event.cancelable) event.preventDefault();
+    };
+
+    const handleTouchEnd = () => {
+      const shouldRefresh = distance >= pullThreshold;
+      stopTracking();
+      distance = 0;
+      if (!shouldRefresh) {
+        paint(0);
+        return;
+      }
+      paint(pullThreshold);
+      void handleRefreshRef.current().finally(() => {
+        resetTimer = window.setTimeout(() => paint(0), 180);
+      });
     };
 
     const handleTouchStart = (event: TouchEvent) => {
       if (
-        isRefreshing ||
+        isRefreshingRef.current ||
         window.scrollY > 0 ||
         event.touches.length !== 1 ||
-        isInteractiveTarget(event.target)
+        isInteractiveTarget(event.target) ||
+        (event.target instanceof Element &&
+          Boolean(event.target.closest('[role="dialog"], [role="menu"], [contenteditable="true"]')))
       ) {
-        resetPull();
         return;
       }
-
-      pullStartYRef.current = event.touches[0].clientY;
-      pullLastDistanceRef.current = 0;
-    };
-
-    const handleTouchMove = (event: TouchEvent) => {
-      const startY = pullStartYRef.current;
-      if (startY === null || event.touches.length !== 1) return;
-
-      const delta = event.touches[0].clientY - startY;
-      if (delta <= 0 || window.scrollY > 0) {
-        resetPull();
-        return;
-      }
-
-      const distance = Math.min(Math.round(delta * 0.55), 96);
-      pullLastDistanceRef.current = distance;
-      setPullDistance(distance);
-
-      if (distance > 4 && event.cancelable) {
-        event.preventDefault();
-      }
-    };
-
-    const handleTouchEnd = () => {
-      if (pullStartYRef.current === null) return;
-
-      const shouldRefresh = pullLastDistanceRef.current >= pullThreshold;
-      pullStartYRef.current = null;
-      pullLastDistanceRef.current = 0;
-
-      if (!shouldRefresh) {
-        setPullDistance(0);
-        return;
-      }
-
-      setPullDistance(pullThreshold);
-      void handleRefresh().finally(() => {
-        resetTimer = window.setTimeout(() => setPullDistance(0), 180);
-      });
+      if (resetTimer) window.clearTimeout(resetTimer);
+      stopTracking();
+      startY = event.touches[0].clientY;
+      distance = 0;
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+      window.addEventListener("touchend", handleTouchEnd);
+      window.addEventListener("touchcancel", cancelPull);
     };
 
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("touchend", handleTouchEnd);
-    window.addEventListener("touchcancel", resetPull);
-
     return () => {
       if (resetTimer) window.clearTimeout(resetTimer);
       window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
-      window.removeEventListener("touchcancel", resetPull);
+      stopTracking();
+      paint(0);
     };
-  }, [handleRefresh, isWorkspaceMenuOpen, isHeaderMobile, isRefreshing, user]);
+  }, [isWorkspaceMenuOpen, isHeaderMobile, user]);
 
   // Sem ambiente selecionado (activeCategoryId vazio) a lista mostra todos os itens.
   const activeCategory = categories.find(
@@ -1147,19 +1179,12 @@ export function useWorkspace() {
   const receivedValueText = formatCurrency(receivedValueCents);
   const hasEnxoval = enxovais.length > 0 && Boolean(activeEnxoval);
   const isOwner = activeEnxoval?.role === "owner";
-  const visibleProgress = isHeaderMobile ? headerProgress : 0;
   // O cabeçalho é sticky e ocupa espaço no fluxo: se a altura dele mudar com a rolagem, o conteúdo abaixo anda junto
-  // e a página "pula" sob o dedo. Por isso as medidas ficam fixas e a rolagem só esmaece a linha de apoio.
-  const headerStyle = isHeaderMobile
-    ? { paddingTop: "10px", paddingBottom: "10px" }
-    : undefined;
-  const eyebrowStyle: React.CSSProperties = {
-    opacity: 1 - visibleProgress,
-    transform: `translateY(${-4 * visibleProgress}px)`,
-    pointerEvents: visibleProgress > 0.9 ? "none" : "auto",
-  };
-  const titleStyle = isHeaderMobile ? { fontSize: "20px" } : undefined;
-  const categoryBarStyle = isHeaderMobile ? { marginTop: "8px" } : undefined;
+  // e a página "pula" sob o dedo. Por isso as medidas ficam fixas e a rolagem só esmaece a linha de apoio (CSS).
+  const headerStyle = isHeaderMobile ? MOBILE_HEADER_STYLE : undefined;
+  const eyebrowStyle = EYEBROW_STYLE;
+  const titleStyle = isHeaderMobile ? MOBILE_TITLE_STYLE : undefined;
+  const categoryBarStyle = isHeaderMobile ? MOBILE_CATEGORY_BAR_STYLE : undefined;
 
   const startCategorySwipeAnimation = useCallback(
     (direction: CategorySwipeDirection) => {
@@ -2317,51 +2342,59 @@ export function useWorkspace() {
     if (title && title.getAttribute("aria-expanded") !== "true") title.click();
     title?.focus({ preventScroll: true });
   };
-  const renderItem = (item: EnxovalItem, dragHandle?: React.ReactNode) => {
-    const planned = purchasePlan?.byId.get(item.id);
-    return (
-      <ItemRow
-        key={item.id}
-        item={item}
-        completionExiting={
-          completionOrder.completions.get(item.id)?.phase === "exiting"
-        }
-        categories={categories}
-        dragHandle={dragHandle}
-        buyPlan={
-          planned
-            ? {
-                week: planned.placement.week,
-                manual: planned.placement.source === "manual",
-                reason: planned.placement.reason,
-                moveDate: activeEnxoval?.moveDate ?? null,
-                overdue: planned.overdue,
-              }
-            : undefined
-        }
-        // Dentro de um ambiente a etiqueta só repetiria o título da lista.
-        categoryName={
-          activeCategory && !isSearching && !isShowingLatestChanges
-            ? undefined
-            : (categoryById.get(item.categoryId)?.name ?? item.category)
-        }
-        showUpdatedAt={isShowingLatestChanges}
-        updatedAtLabel={formatUpdatedAt(item.updatedAt)}
-        onUpdate={updateItem}
-        onReplace={replaceItem}
-        members={members}
-        currentUserId={user?.id}
-        knownGiftNames={knownGiftNames}
-        onDelete={openDeleteItem}
-        onCompletionChange={({ id, name, previous, done }) =>
-          showToast(
-            done ? `Riscado da lista: ${name}.` : `${name} voltou para a fila.`,
-            () => updateItem(id, { status: previous }),
-          )
-        }
-      />
-    );
-  };
+  // Callbacks e dados das linhas com identidade estável: a linha de item é memorizada e só redesenha quando os
+  // dados dela mudam (antes, qualquer render do workspace refazia todas as linhas).
+  const updateItemStable = useStableCallback(updateItem);
+  const replaceItemStable = useStableCallback(replaceItem);
+  const openDeleteItemStable = useStableCallback(openDeleteItem);
+  const onItemCompletionChange = useStableCallback(
+    ({ id, name, previous, done }: { id: string; name: string; previous: ItemStatus; done: boolean }) =>
+      showToast(
+        done ? `Riscado da lista: ${name}.` : `${name} voltou para a fila.`,
+        () => updateItem(id, { status: previous }),
+      ),
+  );
+  const buyPlans = useMemo(() => {
+    const plans = new Map<string, NonNullable<React.ComponentProps<typeof ItemRow>["buyPlan"]>>();
+    if (!purchasePlan) return plans;
+    for (const [id, planned] of purchasePlan.byId) {
+      plans.set(id, {
+        week: planned.placement.week,
+        manual: planned.placement.source === "manual",
+        reason: planned.placement.reason,
+        moveDate: activeEnxoval?.moveDate ?? null,
+        overdue: planned.overdue,
+      });
+    }
+    return plans;
+  }, [purchasePlan, activeEnxoval?.moveDate]);
+  const renderItem = (item: EnxovalItem, dragHandle?: React.ReactNode) => (
+    <ItemRow
+      key={item.id}
+      item={item}
+      completionExiting={
+        completionOrder.completions.get(item.id)?.phase === "exiting"
+      }
+      categories={categories}
+      dragHandle={dragHandle}
+      buyPlan={buyPlans.get(item.id)}
+      // Dentro de um ambiente a etiqueta só repetiria o título da lista.
+      categoryName={
+        activeCategory && !isSearching && !isShowingLatestChanges
+          ? undefined
+          : (categoryById.get(item.categoryId)?.name ?? item.category)
+      }
+      showUpdatedAt={isShowingLatestChanges}
+      updatedAtLabel={formatUpdatedAt(item.updatedAt)}
+      onUpdate={updateItemStable}
+      onReplace={replaceItemStable}
+      members={members}
+      currentUserId={user?.id}
+      knownGiftNames={knownGiftNames}
+      onDelete={openDeleteItemStable}
+      onCompletionChange={onItemCompletionChange}
+    />
+  );
   // Nomes de quem já deu presente neste enxoval: o campo "De quem foi o presente?" sugere os mesmos.
   const knownGiftNames = useMemo(
     () =>
@@ -2444,7 +2477,8 @@ export function useWorkspace() {
     openDiscounts,
     openDeleteEnxoval,
     setIsProfileOpen,
-    pullDistance,
+    pullIndicatorRef,
+    mobileHeaderRef,
     isRefreshing,
     headerStyle,
     titleStyle,

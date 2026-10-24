@@ -104,7 +104,8 @@ export default function App() {
     openDiscounts,
     openDeleteEnxoval,
     setIsProfileOpen,
-    pullDistance,
+    pullIndicatorRef,
+    mobileHeaderRef,
     isRefreshing,
     headerStyle,
     titleStyle,
@@ -644,27 +645,19 @@ export default function App() {
                 <Brand />
               </a>
             </div>
+            {/* Posição, opacidade e giro vêm da variável --pull (escrita pelo gesto, sem renderizar o app). */}
             <div
+              ref={pullIndicatorRef}
               aria-hidden="true"
-              className="pointer-events-none fixed left-1/2 top-3 z-50 sm:hidden transition-opacity duration-150"
-              style={{
-                opacity: pullDistance > 0 || isRefreshing ? 1 : 0,
-                transform: `translate(-50%, ${Math.max(0, pullDistance - 34)}px)`,
-              }}
+              className="pull-refresh-indicator pointer-events-none fixed left-1/2 top-3 z-50 sm:hidden"
+              data-refreshing={isRefreshing}
             >
               <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-brand-wood shadow-md ring-1 ring-stone-200">
-                <RefreshCw
-                  size={17}
-                  className={isRefreshing ? "animate-spin" : ""}
-                  style={
-                    isRefreshing
-                      ? undefined
-                      : { transform: `rotate(${pullDistance * 3}deg)` }
-                  }
-                />
+                <RefreshCw size={17} className={isRefreshing ? "animate-spin" : "pull-refresh-icon"} />
               </div>
             </div>
             <motion.header
+              ref={mobileHeaderRef}
               layoutRoot
               className="mobile-workspace-header mobile-header-clean sticky top-0 z-20"
               style={headerStyle}
@@ -875,7 +868,7 @@ export default function App() {
               variant="brand"
               size="brand"
               type="button"
-              className="mobile-fab-add"
+              className={`mobile-fab-add${toast ? " has-undo-toast" : ""}`}
               aria-label="Adicionar item ou ambiente"
               aria-haspopup="dialog"
               onClick={() => setIsAddChoiceOpen(true)}
