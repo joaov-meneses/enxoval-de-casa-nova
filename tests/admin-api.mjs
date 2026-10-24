@@ -200,6 +200,10 @@ try {
       spendingTier: "equilibrado",
       worries: ["budget"],
       usage: ["buy", "share"],
+      worriesNone: false,
+      worriesOther: "",
+      usageNone: false,
+      usageOther: "",
       source: "instagram",
     });
     assert.ok(!JSON.stringify(registered.data).includes("onboarding_profile"));
