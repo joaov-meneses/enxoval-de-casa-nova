@@ -1,6 +1,10 @@
 import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import { Dialog } from "../components/Dialog";
 import { ExportMenu } from "../components/ExportMenu";
 import {
+Download,
+FileSpreadsheet,
 ListChecks,
 Pencil,
 Plus,
@@ -8,6 +12,7 @@ Search,
 ShoppingBag,
 SlidersHorizontal,
 Sparkles,
+Upload,
 X,
 } from "../components/icons";
 import { ImportItemsButton } from "../components/ImportItemsDialog";
@@ -121,6 +126,146 @@ export default function ListRoute({
     renderItem,
     weekGroups,
   } = workspace;
+  // No celular as ações ficam logo acima da busca, junto da lista que elas usam.
+  const actionsAboveSearch = useIsCompact();
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+  const openStoreMode = () => {
+    setWorkspaceView("store");
+    window.scrollTo({ top: 0 });
+  };
+  // A importação e a exportação abrem a partir da folha "Planilhas", que já fechou: o foco volta ao botão.
+  const returnToMore = (open: boolean) => {
+    if (!open) requestAnimationFrame(() => moreTriggerRef.current?.focus({ preventScroll: true }));
+  };
+  // Celular: uma ação principal com explicação; importar e exportar, com nomes por extenso, em "Planilhas".
+  const mobileActions = (
+    <div className="list-heading-actions list-mobile-actions">
+      <Button
+        variant="brand"
+        size="brand"
+        type="button"
+        className="store-mode-cta"
+        onClick={openStoreMode}
+      >
+        <ShoppingBag size={20} aria-hidden="true" />
+        <span>
+          <strong>Estou na loja</strong>
+          <small>Só o que falta comprar</small>
+        </span>
+      </Button>
+      <Button
+        ref={moreTriggerRef}
+        variant="brand"
+        size="brand"
+        type="button"
+        className="list-more-trigger"
+        aria-haspopup="dialog"
+        onClick={() => setIsMoreOpen(true)}
+      >
+        <FileSpreadsheet size={18} aria-hidden="true" /> Planilhas
+      </Button>
+      <Dialog
+        title="Planilhas"
+        isOpen={isMoreOpen}
+        onClose={() => setIsMoreOpen(false)}
+        className="list-more-dialog"
+      >
+        <div className="export-sheet-actions">
+          <Button
+            variant="brand"
+            size="brand"
+            type="button"
+            onClick={() => {
+              setIsMoreOpen(false);
+              setIsImportOpen(true);
+            }}
+          >
+            <Upload size={18} aria-hidden="true" />
+            <span>
+              <strong>Trazer itens de uma planilha</strong>
+              <small>Importe sua lista em CSV ou Excel</small>
+            </span>
+          </Button>
+          <Button
+            variant="brand"
+            size="brand"
+            type="button"
+            onClick={() => {
+              setIsMoreOpen(false);
+              setIsExportOpen(true);
+            }}
+          >
+            <Download size={18} aria-hidden="true" />
+            <span>
+              <strong>Baixar minha lista</strong>
+              <small>Salve uma planilha em CSV ou Excel</small>
+            </span>
+          </Button>
+        </div>
+      </Dialog>
+      <ImportItemsButton
+        enxovalId={activeEnxoval!.id}
+        items={items}
+        categories={categories}
+        onImported={handleRefresh}
+        hideTrigger
+        open={isImportOpen}
+        onOpenChange={(open) => {
+          setIsImportOpen(open);
+          returnToMore(open);
+        }}
+      />
+      <ExportMenu
+        categories={categories}
+        items={items}
+        enxovalName={activeEnxoval!.name}
+        activeCategoryId={activeCategory?.id}
+        hideTrigger
+        open={isExportOpen}
+        onOpenChange={(open) => {
+          setIsExportOpen(open);
+          returnToMore(open);
+        }}
+      />
+    </div>
+  );
+  const headingActions = (
+    <div className="list-heading-actions">
+      <ImportItemsButton
+        enxovalId={activeEnxoval!.id}
+        items={items}
+        categories={categories}
+        onImported={handleRefresh}
+      />
+      <ExportMenu
+        categories={categories}
+        items={items}
+        enxovalName={activeEnxoval!.name}
+        activeCategoryId={activeCategory?.id}
+      />
+      {/* Só no celular: na loja física, a lista enxuta do modo loja. */}
+      <Button
+        variant="brand"
+        size="brand"
+        type="button"
+        className="button button-outline button-small store-mode-entry"
+        onClick={openStoreMode}
+      >
+        <ShoppingBag size={17} /> Estou na loja
+      </Button>
+      <Button
+        variant="brand"
+        size="brand"
+        className="button button-dark button-small desktop-add-item"
+        onClick={() => setIsAddModalOpen(true)}
+      >
+        <Plus size={17} /> Adicionar item
+      </Button>
+    </div>
+  );
   return (
     <>
       {overview}
@@ -155,41 +300,7 @@ export default function ListRoute({
               </Button>
             )}
           </div>
-          <div className="list-heading-actions">
-            <ImportItemsButton
-              enxovalId={activeEnxoval!.id}
-              items={items}
-              categories={categories}
-              onImported={handleRefresh}
-            />
-            <ExportMenu
-              categories={categories}
-              items={items}
-              enxovalName={activeEnxoval!.name}
-              activeCategoryId={activeCategory?.id}
-            />
-            {/* Só no celular: na loja física, a lista enxuta do modo loja. */}
-            <Button
-              variant="brand"
-              size="brand"
-              type="button"
-              className="button button-outline button-small store-mode-entry"
-              onClick={() => {
-                setWorkspaceView("store");
-                window.scrollTo({ top: 0 });
-              }}
-            >
-              <ShoppingBag size={17} /> Estou na loja
-            </Button>
-            <Button
-              variant="brand"
-              size="brand"
-              className="button button-dark button-small desktop-add-item"
-              onClick={() => setIsAddModalOpen(true)}
-            >
-              <Plus size={17} /> Adicionar item
-            </Button>
-          </div>
+          {!actionsAboveSearch && headingActions}
         </div>
         <div
           onPointerDown={handleCategoryListPointerDown}
@@ -236,6 +347,7 @@ export default function ListRoute({
                 onAdd={(name) => addItem(name, activeCategory.id)}
               />
             )}
+            {actionsAboveSearch && mobileActions}
             {/* A busca fica junto da lista que ela filtra, logo acima do progresso do ambiente. */}
             <div className="list-search mb-4 flex items-center gap-2">
               <div className="relative min-w-0 flex-1">
@@ -283,7 +395,7 @@ export default function ListRoute({
               </Button>
             </div>
             <div
-              className={`list-progress-row mb-4 flex items-center justify-between gap-3 text-sm text-stone-500 font-medium px-1${!isSearching && !isShowingLatestChanges && !hasItemFilters ? " is-redundant" : ""}`}
+              className={`list-progress-row mb-4 flex items-center justify-between gap-3 text-sm text-stone-600 font-medium px-1${!isSearching && !isShowingLatestChanges && !hasItemFilters ? " is-redundant" : ""}`}
             >
               <span className="min-w-0 truncate">{listTitle}</span>
               <span className="shrink-0">{listCounterText}</span>
@@ -349,4 +461,18 @@ export default function ListRoute({
       </>
     </>
   );
+}
+
+/** Mesmo corte do CSS do celular (767px). */
+function useIsCompact() {
+  const [compact, setCompact] = useState(
+    () => window.matchMedia("(max-width: 767px)").matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setCompact(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return compact;
 }

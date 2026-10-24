@@ -34,7 +34,7 @@ import { roomOfCategory } from '../src/planning/purchasePlan.ts';
 import { URGENCY_LEVELS } from '../src/planning/purchaseUrgency.ts';
 import type { AuthUser, EnxovalCategory, EnxovalItem } from '../src/types.ts';
 
-const HOUSINGS = ['apartamento', 'casa', 'studio'];
+const HOUSINGS = ['apartamento', 'casa', 'studio', 'kitnet'];
 const MIN_NAME_LENGTH = 3;
 
 export interface AiDependencies {

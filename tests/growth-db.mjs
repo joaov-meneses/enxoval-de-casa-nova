@@ -1,8 +1,9 @@
 // Teste de integração com PostgreSQL real (Fase 7): origem e consentimentos gravados no cadastro, motor de ciclo de
 // vida (envio, grupo de controle, nunca repetir), central de preferências, descadastro com um clique e opção no
-// perfil. Usa um schema descartável. Rodar: npm run test:growth-db
+// perfil; resumo de atrasos, webhooks do Resend, volta ao app, pesquisa, campanhas e monitor de rotinas.
+// Usa um schema descartável. Rodar: npm run test:growth-db
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -11,6 +12,7 @@ import { registerApiRoutes } from "../server/routes.ts";
 import { registerPreferenceRoutes } from "../server/lifecycle/routes.ts";
 import { runLifecycle } from "../server/lifecycle/engine.ts";
 import { inHoldout } from "../server/lifecycle/policy.ts";
+import { handleResendEvent, registerResendWebhook } from "../server/lifecycle/tracking.ts";
 
 if (!process.env.DATABASE_URL) throw new Error("Configure DATABASE_URL para o teste PostgreSQL.");
 const originalUrl = new URL(process.env.DATABASE_URL);
@@ -33,7 +35,9 @@ try {
   await migrateDatabase();
   await migrateDatabase(); // idempotente
 
+  process.env.RESEND_WEBHOOK_SECRET = `whsec_${Buffer.from("segredo-webhook").toString("base64")}`;
   const app = express();
+  registerResendWebhook(app);
   app.use(express.json({ limit: "1mb" }));
   registerPreferenceRoutes(app);
   registerApiRoutes(app);
@@ -63,7 +67,7 @@ try {
   // 1. Cadastro com origem, consentimento de anúncios e de e-mails.
   const ana = client();
   const registered = await ana("/auth/register", "POST", {
-    email: "ana@example.invalid", password: "segredo123", emailMarketing: true,
+    email: "ana@example.invalid", password: "segredo-7", emailMarketing: true,
     acquisition: {
       adConsent: true, gaClientId: "1234567890.1700000000",
       touch: { source: "Google", medium: "cpc", campaign: "enxoval-casal-sp-2026q4", gclid: "Cj0KCQ-abc_123", referrerHost: "google.com", landingPath: "/", firstSeenAt: new Date(Date.now() - 3 * 86_400_000).toISOString(), nome: "Ana" },
@@ -83,7 +87,7 @@ try {
 
   const bia = client();
   const second = await bia("/auth/register", "POST", {
-    email: "bia@example.invalid", password: "segredo123",
+    email: "bia@example.invalid", password: "segredo-7",
     acquisition: { adConsent: false, gaClientId: "1.2", touch: { gclid: "Cj0KCQ-abc_999", referrerHost: "l.instagram.com" } },
   });
   assert.equal(second.status, 201);
@@ -93,7 +97,7 @@ try {
   assert.equal(row.ga_client_id, null);
   assert.equal(row.acq_channel_group, "organic_social");
   assert.equal(row.marketing_consent_at, null, "caixa de e-mails desmarcada por padrão");
-  const legacy = await client()("/auth/register", "POST", { email: "sem-origem@example.invalid", password: "segredo123" });
+  const legacy = await client()("/auth/register", "POST", { email: "sem-origem@example.invalid", password: "segredo-7" });
   assert.equal(legacy.status, 201, "cadastro sem o corpo novo continua funcionando");
   assert.equal((await query("SELECT acq_channel_group FROM users WHERE id = $1", [legacy.data.user.id])).rows[0].acq_channel_group, "direct");
   console.log("PASS: origem e consentimentos gravados no cadastro.");
@@ -162,6 +166,111 @@ try {
   assert.deepEqual((await bia("/profile/marketing", "PATCH", { subscribed: false })).data, { subscribed: false });
   assert.equal((await bia("/profile/marketing", "PATCH", {})).status, 400);
   console.log("PASS: opção de e-mails no perfil.");
+
+  // 5. L4 resumo de atrasos com o planejamento real, id do provedor, webhooks, volta ao app e supressão.
+  const carla = client();
+  const carlaReg = await carla("/auth/register", "POST", { email: "carla@example.invalid", password: "segredo-7", emailMarketing: true });
+  assert.equal(carlaReg.status, 201);
+  const carlaId = carlaReg.data.user.id;
+  assert.equal((await query("SELECT count(*)::int AS n FROM user_activity_days WHERE user_id = $1", [carlaId])).rows[0].n, 1,
+    "o login conta como dia de uso");
+  const enxovalId = randomUUID();
+  const kitchenId = randomUUID();
+  const moveDate = new Date(now.getTime() + 14 * 86_400_000).toISOString().slice(0, 10);
+  await query("INSERT INTO enxovais (id, name, owner_id, move_date, created_at) VALUES ($1, 'Casa', $2, $3, $4)",
+    [enxovalId, carlaId, moveDate, new Date(now.getTime() - 30 * 86_400_000)]);
+  await query("INSERT INTO categories (id, user_id, name, enxoval_id) VALUES ($1, $2, 'Cozinha', $3)", [kitchenId, carlaId, enxovalId]);
+  for (const name of ["Geladeira", "Fogão"]) {
+    await query("INSERT INTO items (id, user_id, category_id, name, enxoval_id, status) VALUES ($1, $2, $3, $4, $5, 'researching')",
+      [randomUUID(), carlaId, kitchenId, name, enxovalId]);
+  }
+  const carlaSends = [];
+  const carlaRun = await runLifecycle({ mode: "send", now, send: async (message) => { carlaSends.push(message); return { providerMessageId: "re_carla_1" }; } });
+  const carlaMessage = (await query("SELECT * FROM lifecycle_messages WHERE user_id = $1", [carlaId])).rows[0];
+  assert.equal(carlaMessage.flow_key, "overdue", "a geladeira passou da semana sugerida (cerca de 8 semanas antes)");
+  assert.equal(carlaMessage.step, "wk:2026-10-19");
+  const carlaHoldout = inHoldout(carlaId, "overdue");
+  if (carlaHoldout) {
+    assert.equal(carlaRun.holdout, 1);
+  } else {
+    assert.equal(carlaMessage.provider_message_id, "re_carla_1");
+    const mail = carlaSends.find((message) => message.to === "carla@example.invalid");
+    assert.match(mail.subject, /^(1 item passou|\d+ itens passaram) da semana de compra$/);
+    assert.match(mail.text, /Atrasados:\n- (Geladeira|Fogão)/);
+    assert.match(mail.text, new RegExp(`lm=${carlaMessage.id}`));
+
+    let result = await handleResendEvent({ type: "email.delivered", created_at: now.toISOString(), data: { email_id: "re_carla_1", to: ["carla@example.invalid"] } }, "evt_1");
+    assert.equal(result.recorded, true);
+    result = await handleResendEvent({ type: "email.delivered", data: { email_id: "re_carla_1" } }, "evt_1");
+    assert.equal(result.recorded, false, "o mesmo evento reenviado não conta duas vezes");
+    await handleResendEvent({ type: "email.clicked", data: { email_id: "re_carla_1" } }, "evt_2");
+    const returned = await carla("/lifecycle/returned", "POST", { messageId: carlaMessage.id });
+    assert.deepEqual(returned.data, { recorded: true });
+    assert.deepEqual((await ana("/lifecycle/returned", "POST", { messageId: carlaMessage.id })).data, { recorded: false },
+      "só a dona da mensagem conta a volta");
+    const types = (await query("SELECT type FROM lifecycle_events WHERE message_id = $1 ORDER BY type", [carlaMessage.id])).rows.map((r) => r.type);
+    assert.deepEqual(types, ["clicked", "delivered", "returned"]);
+    const { frequencyGate } = await import("../server/lifecycle/frequency.ts");
+    const gate = await frequencyGate(["Carla@example.invalid", "bia@example.invalid"]);
+    assert.deepEqual(gate.deferred, ["Carla@example.invalid"], "quem recebeu hoje espera; o alerta de preço segue a mesma regra");
+    assert.equal(gate.allowed.get("bia@example.invalid"), biaId);
+  }
+  // Webhook pela rota HTTP: assinatura obrigatória; rejeição definitiva suprime o endereço.
+  const body = JSON.stringify({ type: "email.bounced", data: { email_id: "re_outro", to: ["carla@example.invalid"], bounce: { type: "Permanent" } } });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = `v1,${createHmac("sha256", Buffer.from("segredo-webhook")).update(`evt_3.${timestamp}.${body}`).digest("base64")}`;
+  const unsigned = await fetch(`${base}/api/webhooks/resend`, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+  assert.equal(unsigned.status, 400);
+  const signed = await fetch(`${base}/api/webhooks/resend`, {
+    method: "POST", body,
+    headers: { "Content-Type": "application/json", "svix-id": "evt_3", "svix-timestamp": timestamp, "svix-signature": signature },
+  });
+  assert.equal(signed.status, 200);
+  assert.equal((await query("SELECT reason FROM email_suppressions WHERE email = 'carla@example.invalid'")).rows[0]?.reason, "bounce");
+  console.log(`PASS: resumo de atrasos (${carlaHoldout ? "grupo de controle" : "envio, webhooks e volta ao app"}) e supressão por rejeição.`);
+
+  // 6. Pesquisa de pós-mudança pelo token, sem login.
+  const survey = await anon(`/survey?token=${token}`);
+  assert.deepEqual(survey.data, { email: "a**@example.invalid", score: null, comment: "" });
+  assert.equal((await anon("/survey", "POST", { token, score: 11 })).status, 400);
+  assert.equal((await anon("/survey", "POST", { token, score: 9, comment: "Ótimo" })).data.score, 9);
+  assert.equal((await anon("/survey", "POST", { token, score: 10 })).data.score, 10, "responder de novo atualiza");
+  assert.equal((await query("SELECT count(*)::int AS n FROM survey_responses WHERE user_id = $1", [anaId])).rows[0].n, 1);
+  console.log("PASS: pesquisa de pós-mudança.");
+
+  // 7. Campanha por segmento: estimativa, simulação, envio com grupo de controle e limite; painel e rotinas.
+  process.env.LIFECYCLE_MODE = "send";
+  const { estimateAudience, sendCampaign } = await import("../server/lifecycle/campaigns.ts");
+  const { lifecycleReport, listCampaigns } = await import("../server/lifecycle/report.ts");
+  const estimate = await estimateAudience("all");
+  assert.equal(estimate.eligible, 1, "Ana entra; Carla foi suprimida e Bia não consentiu");
+  const campaignSends = [];
+  const campaign = await sendCampaign(
+    { name: "Teste", segment: "all", subject: "Novidade", body: "Oi", ctaLabel: "Ver", ctaPath: "/app" },
+    { send: async (message) => { campaignSends.push(message); return { providerMessageId: "re_campaign" }; } },
+  );
+  assert.equal(campaign.audience, 1);
+  assert.equal(campaign.sent + campaign.holdout + campaign.deferred, 1);
+  const campaigns = await listCampaigns();
+  assert.equal(campaigns[0].name, "Teste");
+  assert.equal(campaigns[0].status, "sent");
+  if (campaign.sent) assert.match(campaignSends[0].html, /utm_campaign=lifecycle-campaign/);
+  const report = await lifecycleReport();
+  assert.ok(report.flows.some((flow) => flow.flow === "overdue"));
+  assert.equal(report.survey.responses, 1);
+  assert.equal(report.survey.nps, 100);
+  delete process.env.LIFECYCLE_MODE;
+  const { listJobs, registerJob, trackJob } = await import("../server/jobMonitor.ts");
+  registerJob("teste_ok", 60_000);
+  registerJob("teste_falha", 60_000);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal(await trackJob("teste_ok", async () => 7), 7);
+  await assert.rejects(trackJob("teste_falha", async () => { throw new Error("quebrou"); }), /quebrou/);
+  const jobs = Object.fromEntries((await listJobs()).map((job) => [job.job, job]));
+  assert.ok(jobs.teste_ok.last_succeeded_at);
+  assert.equal(jobs.teste_falha.last_error, "quebrou");
+  assert.equal(jobs.teste_ok.stale, false);
+  console.log("PASS: campanha por segmento, painel de ciclo de vida e monitor de rotinas.");
 } finally {
   if (server) await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   await getPool().end();

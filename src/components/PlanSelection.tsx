@@ -5,7 +5,7 @@ import { Disclosure, DisclosureTrigger } from "@/src/components/ui/disclosure";
 import { useEffect, useState } from 'react';
 import { fetchBillingOffers, formatBillingAmount, type BillingOffer, type PaidPlanId } from '../api';
 import { PASS_MONTHS } from '../plans';
-import { ArrowRight, Bell, Check, CircleHelp, CreditCard, LockKeyhole } from "@/src/components/icons";
+import { ArrowRight, Bell, Check, ChevronDown, CircleHelp, CreditCard, ListChecks, LockKeyhole, Sparkles } from "@/src/components/icons";
 import { Dialog } from './Dialog';
 import { capture } from '../analytics';
 import { readPlanChoice } from '../planChoice';
@@ -45,6 +45,7 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
       <legend className="sr-only">Escolha seu plano</legend>
       {orderedOffers.map(offer => <Label key={offer.id} htmlFor={`subscription-plan-${offer.id}`} className={`subscription-plan-option subscription-plan-${offer.id}${selected === offer.id ? ' is-selected' : ''}${offer.id === 'pass' && selected === 'pass' && !busy && !disabled ? ' subscription-pass-pulse' : ''}`}>
         <RadioGroupItem id={`subscription-plan-${offer.id}`} value={offer.id} className="choice-control" />
+        {offer.id === 'pass' && <span className="subscription-plan-badge"><Sparkles size={12} aria-hidden="true" />Recomendado</span>}
         <span className="subscription-plan-content"><strong>{offer.name}</strong>
           <span className="subscription-plan-price-row">
             <span className="subscription-plan-price">{formatBillingAmount(offer)}{offer.id === 'monthly' && <small>/mês</small>}</span>
@@ -58,7 +59,11 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
     {error ? <><p role="alert">{error}</p><Button variant="brand" size="brand" className="button button-outline" onClick={() => setAttempt(value => value + 1)}>Carregar planos novamente</Button></> : !offers.length ? <p role="status">Carregando planos…</p> : <>
       <div className="subscription-plan-help">
       <Disclosure className="subscription-included">
-        <DisclosureTrigger aria-label="Recursos incluídos nos dois planos">O que está incluído</DisclosureTrigger>
+        <DisclosureTrigger aria-label="Recursos incluídos nos dois planos">
+          <ListChecks size={16} aria-hidden="true" />
+          <span>O que está incluído</span>
+          <ChevronDown size={15} aria-hidden="true" className="subscription-included-chevron" />
+        </DisclosureTrigger>
         <ul>
           {['Ambientes e itens sem limite', 'Controle de gastos, links e prioridades', 'Convide quem organiza a casa com você', 'Importação e exportação da sua lista'].map(text => <li key={text}><Check size={15} aria-hidden="true" />{text}</li>)}
         </ul>

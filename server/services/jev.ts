@@ -14,7 +14,7 @@ import { foldText } from '../../src/catalog/normalize.ts';
 import { sharedGet, sharedIncrement, sharedSet } from '../cache/shared.ts';
 import { CATALOG, matchesWhere } from '../../src/onboarding/catalog.ts';
 import { NORDESTE, traitsOfCity } from '../../src/onboarding/regions.ts';
-import { stateInfo } from '../../src/onboarding/plan.ts';
+import { isCompactHousing, stateInfo } from '../../src/onboarding/plan.ts';
 import type { RoomKey } from '../../src/onboarding/types.ts';
 import { URGENCY_RUBRIC_VERSION, URGENCY_SCALE } from '../../src/planning/purchaseUrgency.ts';
 
@@ -182,7 +182,7 @@ const normalize = foldText;
 /* --------------------------------------------------------------------- perfil */
 
 export interface JevProfile {
-  /** apartamento, casa ou studio. */
+  /** apartamento, casa, studio ou kitnet (a kitnet segue as regras do studio). */
   housing: string;
   /** casal, solo, amigos ou troca. */
   moment: string;
@@ -352,8 +352,8 @@ export function candidatesFor(room: RoomKey, existingNames: string[], profile: J
     if (
       (has('K') && profile.housing !== 'casa') ||
       (has('A') && profile.housing === 'casa') ||
-      (has('X') && profile.housing === 'studio') ||
-      (has('O') && profile.housing !== 'studio') ||
+      (has('X') && isCompactHousing(profile.housing)) ||
+      (has('O') && !isCompactHousing(profile.housing)) ||
       (has('N') && !NORDESTE.has(uf)) ||
       (has('R') && uf !== 'RS') ||
       (has('C') && profile.moment !== 'casal') ||
@@ -524,7 +524,9 @@ export const BUCKET_SITUATIONS: readonly BucketSituation[] = ['casal', 'solo', '
  * é combinado em código com o prazo de entrega do catálogo.
  */
 export function profileBucket(profile: Pick<JevProfile, 'housing' | 'moment' | 'uf'>) {
-  const housing = (BUCKET_HOUSINGS as readonly string[]).includes(profile.housing) ? profile.housing : 'apartamento';
+  // A kitnet tem as mesmas necessidades do studio: as duas usam a mesma faixa (e a mesma nota do Jev).
+  const compact = profile.housing === 'kitnet' ? 'studio' : profile.housing;
+  const housing = (BUCKET_HOUSINGS as readonly string[]).includes(compact) ? compact : 'apartamento';
   const situation: BucketSituation = profile.moment === 'casal' ? 'casal' : profile.moment === 'solo' ? 'solo' : 'outros';
   return `${housing}|${stateInfo(profile.uf).climate}|${situation}`;
 }

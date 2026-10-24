@@ -264,8 +264,8 @@ for (const width of [375, 768, 1100, 1440, 1920]) {
       test(`campos de ${id} alinhados e sem sobreposição`, async ({ page }) => {
         const state = await mockApp(page);
         await openList(page);
-        await page.locator(`[data-item-id="${id}"] .item-expand`).click();
-        const grid = page.locator(`[data-item-id="${id}"] .item-inline-grid`);
+        await page.locator(`[data-item-id="${id}"] .item-title-button`).click();
+        const grid = page.locator(".item-edit-dialog .item-inline-grid");
         await expect(grid).toBeVisible();
         const report = await grid.evaluate((node) => {
           const boxes = [...node.children]
@@ -291,7 +291,7 @@ for (const width of [375, 768, 1100, 1440, 1920]) {
         expect(report.outside, "fora da grade").toEqual([]);
         expect(report.clipped, "conteúdo cortado").toEqual([]);
         expect(report.page, "rolagem horizontal").toBeLessThanOrEqual(0);
-        await page.locator(`[data-item-id="${id}"]`).screenshot({ path: `test-results/form-item-${id}-${width}.png` });
+        await page.locator(".item-edit-dialog").screenshot({ path: `test-results/form-item-${id}-${width}.png` });
         expect(state.errors).toEqual([]);
       });
     }
@@ -334,8 +334,8 @@ test.describe("Meu enxoval (todos) e ambientes mostram os mesmos campos", () => 
       await mockApp(page);
       const fieldsAt = async (url: string) => {
         await page.goto(url);
-        await page.locator(`[data-item-id="${id}"] .item-expand`).click();
-        const grid = page.locator(`[data-item-id="${id}"] .item-inline-grid`);
+        await page.locator(`[data-item-id="${id}"] .item-title-button`).click();
+        const grid = page.locator(".item-edit-dialog .item-inline-grid");
         await expect(grid).toBeVisible();
         return grid.evaluate((node) =>
           [...node.querySelectorAll("label, h4, button[role=combobox]")]
@@ -358,20 +358,22 @@ test.describe("Itens riscados e não riscados têm o mesmo formulário", () => {
     await mockApp(page);
     await openList(page);
     const fields = async (id: string) => {
-      await page.locator(`[data-item-id="${id}"] .item-expand`).click();
-      const grid = page.locator(`[data-item-id="${id}"] .item-inline-grid`);
+      await page.locator(`[data-item-id="${id}"] .item-title-button`).click();
+      const grid = page.locator(".item-edit-dialog .item-inline-grid");
       await expect(grid).toBeVisible();
       const labels = await grid.evaluate((node) =>
         [...node.querySelectorAll("label, h4")]
           .map((el) => (el.getAttribute("aria-label") ?? el.firstChild?.textContent ?? "").replace(/\s+/g, " ").replace(/\d+\/\d+$/, "").trim().slice(0, 28))
           .filter(Boolean),
       );
-      await page.locator(`[data-item-id="${id}"] .item-expand`).click();
+      await page.keyboard.press("Escape");
+      await expect(grid).toBeHidden();
       return labels;
     };
     const gift = /^(Presente|De quem foi|Recado que veio|Já agradeci)/;
     const bought = (await fields("fridge")).filter((label) => !gift.test(label));
-    const dependent = /^(Valor da parcela|Primeira parcela|Acompanhar|Me avise|Avisar)/;
+    // O campo de link some quando o item chega ao limite de lojas.
+    const dependent = /^(Valor da parcela|Primeira parcela|Acompanhar|Me avise|Avisar|Link do produto|Link de outra loja)/;
     const common = bought.filter((label) => !dependent.test(label));
     expect(await fields("airfryer")).toEqual(expect.arrayContaining(common));
     const received = await fields("glasses");
@@ -385,34 +387,35 @@ test.describe("Itens riscados e não riscados têm o mesmo formulário", () => {
 test.describe("Lojas pelo campo de link", () => {
   test.use({ viewport: { width: 1440, height: 1100 } });
 
-  test("outro link vira outra loja, sem campo próprio e sem sobrescrever a principal", async ({ page }) => {
+  test("o link só vira outra loja no toque do +, sem botão de copiar nem trocar a principal", async ({ page }) => {
     const state = await mockApp(page);
     await openList(page);
-    await page.locator('[data-item-id="sofa"] .item-expand').click();
+    await page.locator('[data-item-id="sofa"] .item-title-button').click();
     const form = page.getByRole("form", { name: "Editar Sofá retrátil na lista" });
-    await expect(form.getByPlaceholder("Cole o link de outra loja")).toHaveCount(0);
-    await expect(form.getByRole("button", { name: /Adicionar (outra )?loja/ })).toHaveCount(0);
-    const link = form.getByPlaceholder("https://...");
+    await expect(form.getByRole("button", { name: /^Copiar link/ })).toHaveCount(0);
+    const link = form.getByLabel("Link de outra loja", { exact: true });
+    const add = form.getByRole("button", { name: "Adicionar outra loja", exact: true });
+    await expect(link).toHaveValue("");
+    await expect(add).toBeDisabled();
     // Mesma loja, produto diferente: é outra oferta.
     await link.fill("https://www.loja-a.example.com/sofa-2");
     await link.blur();
-    await form.getByRole("button", { name: "Adicionar como outra loja" }).click();
-    await expect(form.getByText("Loja adicionada.")).toBeVisible();
+    expect(state.offerPosts).toEqual([]);
+    await add.click();
+    await expect(form.getByText("Loja adicionada.", { exact: false })).toBeVisible();
     expect(state.offerPosts).toEqual([{ url: "https://www.loja-a.example.com/sofa-2" }]);
     await expect(form.locator(".item-offer")).toHaveCount(2);
-    await expect(link).toHaveValue("https://www.loja-a.example.com/sofa-1");
+    await expect(link).toHaveValue("");
     expect(state.errors).toEqual([]);
   });
 
-  test("com 3 lojas o link novo só troca a principal", async ({ page }) => {
+  test("com 3 lojas, o limite, o campo de link some", async ({ page }) => {
     await mockApp(page);
     await openList(page);
-    await page.locator('[data-item-id="airfryer"] .item-expand').click();
+    await page.locator('[data-item-id="airfryer"] .item-title-button').click();
     const form = page.getByRole("form", { name: "Editar Air fryer na lista" });
-    const link = form.getByPlaceholder("https://...");
-    await link.fill("https://www.loja-z.example.com/air-fryer");
-    await link.blur();
-    await expect(form.getByRole("button", { name: "Buscar dados do produto" })).toBeVisible();
-    await expect(form.getByRole("button", { name: "Adicionar como outra loja" })).toHaveCount(0);
+    await expect(form.locator(".item-offer")).toHaveCount(3);
+    await expect(form.getByPlaceholder("https://...")).toHaveCount(0);
+    await expect(form.getByText("Este item já tem 3 lojas, o limite.", { exact: false })).toBeVisible();
   });
 });

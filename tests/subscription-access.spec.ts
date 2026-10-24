@@ -82,6 +82,8 @@ test('navegação e revalidação lenta preservam o app e uma consulta em trâns
   await expect(page.locator('.workspace-loading')).toHaveCount(0);
   await expect(page.locator('[data-item-id="pan"] .item-title-button')).toHaveAttribute('aria-expanded', 'true');
   await expect.poll(() => api.statusCalls.length).toBe(initialCalls + 1);
+  // A edição abre numa janela: fecha antes de usar a barra lateral.
+  await page.keyboard.press('Escape');
   await page.locator('.workspace-sidebar').getByRole('button', { name: 'Planejamento', exact: true }).click();
   await expect(page.locator('.workspace-app')).toBeVisible();
   await expect(page.locator('.workspace-loading')).toHaveCount(0);

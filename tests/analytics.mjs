@@ -67,7 +67,34 @@ test('Nino unavailable, unrelated APIs and admin traffic produce no product even
   recordApiSuccess(s, '/api/catalog/search?q=private', 'GET', {}, {});
   assert.deepEqual(s.calls, []);
   recordApiSuccess(s, '/api/ai/recommend', 'POST', {}, { available: true });
-  assert.deepEqual(s.calls, [['nino_used', { feature: 'recommend' }]]);
+  assert.deepEqual(s.calls, [['nino_used', { feature: 'recommend', outcome: 'none' }]]);
+});
+
+test('Nino outcomes use fixed vocabularies, never names from the answer', () => {
+  const s = sink();
+  recordApiSuccess(s, '/api/ai/assess-item', 'POST', { name: 'Private' }, { available: true, source: 'catalog', catalogItem: { name: 'Private' }, environment: null, redundancy: { overlapsWith: 'Private' } });
+  recordApiSuccess(s, '/api/ai/assess-item', 'POST', {}, { available: true, source: 'jev', catalogItem: null, environment: { name: 'Private' }, redundancy: null });
+  recordApiSuccess(s, '/api/ai/recommend', 'POST', {}, { available: true, recommendation: { name: 'Private' } });
+  recordApiSuccess(s, '/api/ai/recommend', 'POST', {}, { available: true, recommendation: null, reason: 'complete' });
+  recordApiSuccess(s, '/api/ai/prioritize', 'POST', {}, { available: true, scores: [{ urgency: 3 }] });
+  assert.deepEqual(s.calls, [
+    ['nino_used', { feature: 'assess_item', outcome: 'redundancy', source: 'catalog' }],
+    ['nino_used', { feature: 'assess_item', outcome: 'environment', source: 'jev' }],
+    ['nino_used', { feature: 'recommend', outcome: 'recommended' }],
+    ['nino_used', { feature: 'recommend', outcome: 'complete' }],
+    ['nino_used', { feature: 'prioritize', outcome: 'scored' }],
+  ]);
+  assert.equal(JSON.stringify(s.calls).includes('Private'), false);
+});
+
+test('deleting an item, room or enxoval emits a bare event', () => {
+  const s = sink();
+  recordApiSuccess(s, '/api/items/i1', 'DELETE', {}, undefined);
+  recordApiSuccess(s, '/api/categories/c1?enxovalId=e1', 'DELETE', {}, undefined);
+  recordApiSuccess(s, '/api/enxovais/e1', 'DELETE', {}, undefined);
+  recordApiSuccess(s, '/api/enxovais/e1/members/u2', 'DELETE', {}, undefined);
+  assert.deepEqual(s.calls, [['item_deleted', {}], ['environment_deleted', {}], ['workspace_deleted', {}]]);
+  assert.deepEqual(allowedProperties('item_edited', { changed_name: true, changed_price: false, name: 'Private' }), { changed_name: true, changed_price: false });
 });
 
 test('subscription conversion requires confirmed paid access and deduplicates the checkout', () => {

@@ -14,7 +14,7 @@ import { appBaseUrl, canDeliverMail, isProductionServer } from './mailer.ts';
 import { asyncHandler, HttpError } from './security.ts';
 import { PAID_PLAN_OFFERS, PASS_MONTHS } from '../src/plans.ts';
 import type { AuthUser } from '../src/types.ts';
-import { sendPurchaseConversion } from './googleConversions.ts';
+import { sendInvoiceConversion, sendPurchaseConversion } from './googleConversions.ts';
 import { enqueueFiscalEvent } from './fiscal/service.ts';
 import { recordRefundEvent, REFUND_EVENTS } from './billingOperations.ts';
 import { fiscalEnabled } from './fiscal/provider.ts';
@@ -234,6 +234,11 @@ export async function handleStripeEvent(event: Stripe.Event) {
     // Conversão para o Google Ads/GA4 com o valor pago; falha aqui nunca devolve erro à Stripe.
     void sendPurchaseConversion(event.data.object as Stripe.Checkout.Session).catch(err =>
       getLogger().warn({ event: 'ga4.purchase.failed', stripeEventId: event.id, err }, 'Não foi possível enviar a conversão ao GA4.'));
+  }
+  if (isInvoice) {
+    // Primeira cobrança e renovações da assinatura (receita recorrente); falha aqui nunca devolve erro à Stripe.
+    void sendInvoiceConversion(event.data.object as Stripe.Invoice).catch(err =>
+      getLogger().warn({ event: 'ga4.invoice.failed', stripeEventId: event.id, err }, 'Não foi possível enviar a cobrança recorrente ao GA4.'));
   }
   await sendTrialNotifications();
 }

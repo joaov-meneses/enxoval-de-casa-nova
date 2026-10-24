@@ -11,7 +11,7 @@ import {
   X,
   ListChecks,
   MessageCircleHeart,
-  UserRound,
+  ChevronRight,
   ShoppingBag,
 } from "@/src/components/icons";
 import type {
@@ -86,6 +86,16 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           </Button>
         </div>
         <div className="workspace-menu-content">
+          {/* O perfil abre o menu: quem é a pessoa vem antes do que ela organiza. */}
+          <Button variant="brand" size="brand" type="button" className="profile-entry-mobile" aria-label="Meu perfil"
+            onClick={() => run(props.onProfile)}>
+            <UserAvatar name={props.user.name} src={props.user.avatarUrl} className="profile-entry-avatar" />
+            <span className="profile-entry-text">
+              <strong>Meu perfil</strong>
+              <small>{props.user.name}</small>
+            </span>
+            <ChevronRight size={18} className="profile-entry-chevron" aria-hidden="true" />
+          </Button>
           <section
             className="workspace-menu-switcher"
             aria-label="Seus enxovais"
@@ -252,9 +262,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               </Button>
             </div>
           )}
-          <div className="workspace-menu-subscription">
-            <Button variant="brand" size="brand" className="button button-outline button-small profile-entry-mobile" type="button" onClick={() => run(props.onProfile)}><UserRound size={18} /> Meu perfil</Button>
-          </div>
           <div className="workspace-menu-help">
             <Button variant="brand" size="brand" type="button" onClick={() => run(props.onHelp)}>
               <span className="workspace-menu-help-icon" aria-hidden="true">

@@ -5,7 +5,8 @@ import { emptyAnswers, generatePlan, toPayload } from "../src/onboarding/plan.ts
 import { mailOutbox } from "../server/mailer.ts";
 import { sendTrialNotifications } from "../server/workers/trialNotifications.ts";
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import Stripe from "stripe";
@@ -119,7 +120,7 @@ try {
     };
   };
   const register = async (call, email) => {
-    const result = await call("/auth/register", "POST", { email, password: randomBytes(16).toString("base64url") });
+    const result = await call("/auth/register", "POST", { email, password: strongPassword() });
     assert.equal(result.status, 201, JSON.stringify(result.data));
     return result.data.user;
   };

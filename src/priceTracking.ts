@@ -14,8 +14,13 @@ const STORE_LABELS: [RegExp, string][] = [
 ];
 
 export function storeLabel(domain: string) {
+  return knownStoreLabel(domain) ?? domain.toLowerCase().replace(/^www\./, "");
+}
+
+/** Nome da loja quando ela é conhecida; `null` para endereços que não reconhecemos. */
+export function knownStoreLabel(domain: string) {
   const host = domain.toLowerCase().replace(/^www\./, "");
-  return STORE_LABELS.find(([pattern]) => pattern.test(host))?.[1] ?? host;
+  return STORE_LABELS.find(([pattern]) => pattern.test(host))?.[1] ?? null;
 }
 
 export interface PriceChange {

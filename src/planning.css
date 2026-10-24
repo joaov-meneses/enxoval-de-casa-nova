@@ -1086,6 +1086,8 @@
   background: color-mix(in oklab, var(--cm-accent) 6%, #fff);
 }
 .pp-how [data-slot="collapsible-trigger"] {
+  width: 100%;
+  text-align: left;
   gap: 12px;
   padding: 12px 14px;
   min-height: 56px;
@@ -1403,12 +1405,19 @@
   border: 1px solid color-mix(in oklab, var(--cm-sand) 46%, #fff);
   border-radius: 10px;
   background: color-mix(in oklab, var(--cm-bg) 20%, #fff);
-  padding: 0 12px;
+  --pp-room-pad: 12px;
+  padding: 0 var(--pp-room-pad);
 }
+/* A faixa inteira abre o ambiente: o gatilho cobre o cartão de ponta a ponta, inclusive o recuo. */
 .pp-room-group > [data-slot="collapsible-trigger"] {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: calc(100% + 2 * var(--pp-room-pad));
+  margin: 0 calc(-1 * var(--pp-room-pad));
+  padding: 0 var(--pp-room-pad);
+  border-radius: 10px;
+  text-align: left;
   min-height: 48px;
   cursor: pointer;
   list-style: none;
@@ -1417,8 +1426,7 @@
 .pp-room-group > [data-slot="collapsible-trigger"]::-webkit-details-marker { display: none; }
 .pp-room-group > [data-slot="collapsible-trigger"]:focus-visible {
   outline: 2px solid var(--cm-primary);
-  outline-offset: 3px;
-  border-radius: 6px;
+  outline-offset: 2px;
 }
 .pp-room-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
 .pp-room-count { font-size: 12px; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); }
@@ -1441,7 +1449,7 @@
 .pp-price-range > span { white-space: nowrap; }
 .pp-price-to { font-weight: 400; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); }
 @media (max-width: 720px) {
-  .pp-room-group { padding: 0 10px; }
+  .pp-room-group { --pp-room-pad: 10px; }
   .pp-row {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "main" "price" "week";
@@ -1490,7 +1498,7 @@
   .pp-figures dt { font-size: 12px; }
   .pp-figures dd { margin: 0; font-size: 12px; overflow-wrap: normal; }
   .pp-room-groups { gap: 8px; }
-  .pp-room-group { padding: 0 8px; }
+  .pp-room-group { --pp-room-pad: 8px; }
   .pp-room-group > [data-slot="collapsible-trigger"] { gap: 6px; }
   .pp-room-name { font-size: 13px; }
   .pp-room-count { font-size: 12px; }

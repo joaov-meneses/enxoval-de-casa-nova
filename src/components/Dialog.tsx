@@ -11,6 +11,8 @@ interface DialogProps {
   tone?: "default" | "danger";
   busy?: boolean;
   className?: string;
+  /** Monta a janela dentro deste elemento (para herdar os estilos da área de trabalho, por exemplo). */
+  container?: HTMLElement | null;
 }
 
 export function Dialog({
@@ -21,6 +23,7 @@ export function Dialog({
   tone = "default",
   busy = false,
   className = "",
+  container,
 }: DialogProps) {
   const wasOpen = useRef(false);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -42,6 +45,7 @@ export function Dialog({
       }}
     >
       <DialogContent
+        container={container}
         brandLayout
         layoutClassName="dialog-layer"
         overlayClassName="dialog-backdrop"
@@ -70,7 +74,7 @@ export function Dialog({
           )).find(input => input.getClientRects().length > 0);
           if (field) {
             event.preventDefault();
-            field.focus();
+            field.focus({ preventScroll: true });
           }
         }}
       >

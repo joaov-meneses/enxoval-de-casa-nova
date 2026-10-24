@@ -18,6 +18,10 @@ import {
 } from "./security.ts";
 import { BAN_REASONS, BAN_TARGETS, clearBanCache, type BanTarget } from "./trust.ts";
 import type { AdminBan, AdminUser } from "../src/types.ts";
+import { listJobs } from "./jobMonitor.ts";
+import { estimateAudience, isSegment, parseCampaign, SEGMENTS, sendCampaign, sendCampaignTest } from "./lifecycle/campaigns.ts";
+import { lifecycleMode } from "./lifecycle/policy.ts";
+import { lifecycleReport, listCampaigns } from "./lifecycle/report.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Motivos que a equipe escolhe; os demais são do bloqueio automático. */
@@ -325,6 +329,48 @@ export function registerAdminRoutes(router: Router) {
       if (!result.rowCount) throw new HttpError(404, "Bloqueio não encontrado ou já revogado.");
       clearBanCache();
       res.status(204).end();
+    }),
+  );
+
+  // Operação: rotinas agendadas, painel de ciclo de vida (com grupo de controle) e campanhas por segmento.
+  router.get(
+    "/admin/operations",
+    asyncHandler(async (req, res) => {
+      await requireAdmin(req);
+      const [jobs, lifecycle, campaigns] = await Promise.all([listJobs(), lifecycleReport(), listCampaigns()]);
+      res.json({
+        mode: lifecycleMode(),
+        jobs,
+        lifecycle,
+        campaigns,
+        segments: Object.entries(SEGMENTS).map(([key, segment]) => ({ key, label: segment.label })),
+      });
+    }),
+  );
+
+  router.post(
+    "/admin/campaigns/estimate",
+    asyncHandler(async (req, res) => {
+      await requireAdmin(req);
+      if (!isSegment(req.body?.segment)) throw new HttpError(400, "Escolha um segmento.");
+      res.json(await estimateAudience(req.body.segment));
+    }),
+  );
+
+  router.post(
+    "/admin/campaigns/test",
+    asyncHandler(async (req, res) => {
+      await requireAdmin(req);
+      await sendCampaignTest(parseCampaign(req.body), typeof req.body?.testEmail === "string" ? req.body.testEmail.trim() : "");
+      res.status(204).end();
+    }),
+  );
+
+  router.post(
+    "/admin/campaigns",
+    asyncHandler(async (req, res) => {
+      await requireAdmin(req);
+      res.status(201).json(await sendCampaign(parseCampaign(req.body)));
     }),
   );
 }

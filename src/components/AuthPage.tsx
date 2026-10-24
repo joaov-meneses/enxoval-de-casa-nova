@@ -14,6 +14,8 @@ import {
 } from "@/src/components/icons";
 import { login, register } from "../api";
 import { isAppPath } from "../appRoute";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordPolicyError } from "../../shared/passwordPolicy";
+import { PasswordRules } from "./PasswordRules";
 import type { BootstrapData } from "../types";
 import { Brand } from "./Brand";
 import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
@@ -262,6 +264,11 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const weak = passwordPolicyError(password);
+    if (weak) {
+      setError(weak);
+      return;
+    }
     if (password !== confirmation) {
       setError("As senhas não coincidem.");
       return;
@@ -319,17 +326,16 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 setPassword(e.target.value);
                 setError("");
               }}
-              placeholder="6 ou mais caracteres"
+              placeholder={`${PASSWORD_MIN_LENGTH} ou mais caracteres`}
               autoComplete="new-password"
               aria-describedby="register-password-hint"
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               required
             />
             <PasswordToggle visible={visible} onToggle={() => setVisible(!visible)} />
           </span>
-          <p className="auth-hint" id="register-password-hint">
-            Use 6 caracteres ou mais.
-          </p>
+          <PasswordRules password={password} id="register-password-hint" />
         </div>
         <div className="auth-field">
           <Label htmlFor="register-password-confirmation">Confirme a senha</Label>

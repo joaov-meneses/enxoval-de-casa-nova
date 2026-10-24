@@ -13,6 +13,7 @@ import { computeSavings } from '../src/priceTracking.ts';
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, rateLimit, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { recordReturn } from './lifecycle/tracking.ts';
 import { registerFeedbackRoutes } from './feedback.ts';
 import { registerAiRoutes } from './ai.ts';
 import { urgencyKey } from './services/jev.ts';
@@ -33,6 +34,7 @@ import { offerHistories, registerItemOfferRoutes, syncPrimaryOffer } from './ite
 import { registerItemDocumentRoutes } from './itemDocuments.ts';
 import { parseItemExtras } from './itemExtras.ts';
 import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
+import { passwordPolicyError } from '../shared/passwordPolicy.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -194,6 +196,14 @@ function requireText(value: unknown, fieldName: string) {
   }
 
   return value.trim();
+}
+
+/** Só para senha nova: o login segue aceitando senhas cadastradas antes da regra. */
+function requireNewPassword(value: unknown, fieldName: string) {
+  const password = requireText(value, fieldName);
+  const problem = passwordPolicyError(password);
+  if (problem) throw new HttpError(400, problem);
+  return password;
 }
 
 function requireEnvironmentName(value: unknown) {
@@ -709,10 +719,18 @@ const isTiming = (value: unknown): value is ItemTiming => value === 'first_night
 const MAX_PLAN_CATEGORIES = 15;
 const MAX_PLAN_ITEMS = 400;
 
-/** Plano gerado pelo funil de onboarding: ambientes e itens, com limites para não virar um vetor de abuso. */
-export function parseOnboardingPlan(value: unknown, allowEmptyItems = false): EnxovalPlan | null {
+/**
+ * Plano gerado pelo funil de onboarding: ambientes e itens, com limites para não virar um vetor de abuso.
+ * `allowNoRooms`: a pessoa escolheu "nenhum ambiente agora"; o plano chega vazio e o enxoval nasce sem ambientes.
+ */
+export function parseOnboardingPlan(value: unknown, allowEmptyItems = false, allowNoRooms = false): EnxovalPlan | null {
   if (value === undefined || value === null) return null;
   const categories = (value as { categories?: unknown })?.categories;
+  if (allowNoRooms) {
+    // Sem ambientes escolhidos, o plano só pode vir vazio: nada de ambientes que a pessoa não pediu.
+    if (!Array.isArray(categories) || categories.length > 0) throw new HttpError(400, 'Plano inválido.');
+    return { categories: [] };
+  }
   if (!Array.isArray(categories) || categories.length === 0 || categories.length > MAX_PLAN_CATEGORIES) {
     throw new HttpError(400, 'Plano inválido.');
   }
@@ -862,6 +880,15 @@ async function createSession(res: Response, userId: string, queryable: Queryable
     ...cookieOptions(),
     maxAge: SESSION_TTL_MS
   });
+  await recordActivityDay(queryable, userId);
+}
+
+/** Um registro por dia de uso: mede retorno depois de cada e-mail (inclusive do grupo de controle) e a retenção. */
+async function recordActivityDay(queryable: Queryable, userId: string) {
+  await queryable.query(`
+    INSERT INTO user_activity_days (user_id, day) VALUES ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date)
+    ON CONFLICT DO NOTHING
+  `, [userId]);
 }
 
 async function recordUserIpEvent(queryable: Queryable, userId: string, context: ClientContext, event: 'signup' | 'login' | 'invitation_signup') {
@@ -1308,7 +1335,7 @@ export function registerApiRoutes(app: Express) {
   router.use(protectMutationOrigin);
   router.use(enforceBans);
   router.use(asyncHandler(async (req, _res, next) => {
-    if (/^\/(auth(?:\/|$)|profile(?:\/|$)|onboarding\/complete$|billing(?:\/|$)|admin(?:\/|$)|bootstrap$|health$|invitations(?:\/|$)|feedback(?:\/|$))/.test(req.path)) return next();
+    if (/^\/(auth(?:\/|$)|profile(?:\/|$)|onboarding\/complete$|billing(?:\/|$)|admin(?:\/|$)|bootstrap$|health$|invitations(?:\/|$)|feedback(?:\/|$)|lifecycle\/returned$)/.test(req.path)) return next();
     // Older onboarding screens post the draft here. The handler saves it without granting access.
     if (req.method === 'POST' && req.path === '/enxovais' && req.body?.plan !== undefined) return next();
     const user = await requireCurrentUser(req);
@@ -1357,7 +1384,7 @@ export function registerApiRoutes(app: Express) {
     if (user.isGuest) throw new HttpError(403, 'Contas de convidados usam o enxoval do titular.');
     const name = normalizeEnxovalName(requireText(req.body?.name, 'Nome do enxoval'));
     const profile = parseOnboardingProfile(req.body?.profile);
-    const plan = parseOnboardingPlan(req.body?.plan, profile.style === 'none');
+    const plan = parseOnboardingPlan(req.body?.plan, profile.style === 'none', profile.rooms.length === 0);
     if (!plan) throw new HttpError(400, 'Conclua o planejamento antes de continuar.');
     const userName = parseUserName(req.body?.userName);
     await saveOnboardingDraft(user.id, name, plan, profile, userName);
@@ -1376,14 +1403,12 @@ export function registerApiRoutes(app: Express) {
 
   router.post('/auth/register', asyncHandler(async (req, res) => {
     const email = normalizeEmail(req.body?.email);
-    const password = requireText(req.body?.password, 'Senha');
     const name = typeof req.body?.name === 'string' && req.body.name.trim()
       ? req.body.name.trim()
       : email.split('@')[0];
 
     if (!email || !email.includes('@')) throw new HttpError(400, 'E-mail inválido.');
-    if (password.length > 128) throw new HttpError(400, 'A senha pode ter no máximo 128 caracteres.');
-    if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
+    const password = requireNewPassword(req.body?.password, 'Senha');
 
     const context = ensureDevice(req, res);
     await assertNotBlocked(getPool(), { ip: context.ip, deviceId: context.deviceId });
@@ -1449,9 +1474,8 @@ export function registerApiRoutes(app: Express) {
 
   router.post('/auth/change-password', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req, true, true);
-    const password = requireText(req.body?.password, 'Nova senha');
+    const password = requireNewPassword(req.body?.password, 'Nova senha');
     const confirmation = requireText(req.body?.confirmation, 'Confirmação da senha');
-    if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
     if (password !== confirmation) throw new HttpError(400, 'As senhas não coincidem.');
     const updatedUser = await withTransaction(async client => {
       const result = await client.query<DbUserRow>(
@@ -1495,9 +1519,8 @@ export function registerApiRoutes(app: Express) {
 
   router.post('/auth/reset-password', loginRateLimit(10), asyncHandler(async (req, res) => {
     const token = typeof req.body?.token === 'string' ? req.body.token : '';
-    const password = requireText(req.body?.password, 'Nova senha');
+    const password = requireNewPassword(req.body?.password, 'Nova senha');
     const confirmation = requireText(req.body?.confirmation, 'Confirmação da senha');
-    if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
     if (password !== confirmation) throw new HttpError(400, 'As senhas não coincidem.');
     if (token.length < 20 || token.length > 200) throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo link de redefinição.');
 
@@ -1555,14 +1578,22 @@ export function registerApiRoutes(app: Express) {
   }));
 
   router.post('/auth/activity', asyncHandler(async (req, res) => {
-    await requireCurrentUser(req, true, true);
+    const user = await requireCurrentUser(req, true, true);
     const tokenHash = hashSessionToken(getCookie(req, SESSION_COOKIE));
     const updated = await getPool().query(`UPDATE sessions SET last_activity_at = now()
       WHERE token_hash = $1 AND expires_at > now()
         AND created_at > now() - interval '7 days'
         AND last_activity_at > now() - interval '48 hours'`, [tokenHash]);
     if (!updated.rowCount) throw new HttpError(401, 'Sua sessão expirou. Faça login novamente.');
+    await recordActivityDay(getPool(), user.id);
     res.status(204).end();
+  }));
+
+  // Volta ao app pelo link de um e-mail (parâmetro `lm`): mede o retorno por fluxo de ciclo de vida. Fica fora do
+  // bloqueio de assinatura: quem volta por um e-mail pode estar justamente sem plano ativo.
+  router.post('/lifecycle/returned', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req, true, true);
+    res.json({ recorded: await recordReturn(user.id, req.body?.messageId) });
   }));
 
   router.post('/auth/logout', asyncHandler(async (req, res) => {
@@ -1588,7 +1619,7 @@ export function registerApiRoutes(app: Express) {
     // O enxoval do funil /comecar chega com o plano gerado e as respostas; sem plano, segue o
     // fluxo normal de "criar novo enxoval" (com ou sem o template padrão).
     const profile = req.body?.plan != null ? parseOnboardingProfile(req.body?.profile) : null;
-    const plan = parseOnboardingPlan(req.body?.plan, profile?.style === 'none');
+    const plan = parseOnboardingPlan(req.body?.plan, profile?.style === 'none', profile?.rooms.length === 0);
     const useDefaultTemplate = req.body?.useDefaultTemplate !== false;
     // O cadastro não pede o nome; o funil pergunta e ele chega aqui, junto do plano.
     const userName = plan ? parseUserName(req.body?.userName) : null;
@@ -1880,8 +1911,7 @@ export function registerApiRoutes(app: Express) {
         await recordDevice(client, userId, context);
       } else {
         // Primeiro acesso: cria uma conta de convidado, que não tem enxoval próprio.
-        const password = requireText(req.body?.password, 'Senha');
-        if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
+        const password = requireNewPassword(req.body?.password, 'Senha');
         if (password !== req.body?.confirmation) throw new HttpError(400, 'As senhas não coincidem.');
         const name = typeof req.body?.name === 'string' && req.body.name.trim()
           ? req.body.name.trim().slice(0, 100)

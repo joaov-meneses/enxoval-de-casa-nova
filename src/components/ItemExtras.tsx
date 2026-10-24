@@ -184,7 +184,7 @@ export function ItemOffersSection({
       <h4 className="item-inline-section item-inline-wide is-visible" id={`${id}-title`}>Lojas</h4>
       <div className="item-offers item-inline-wide" aria-labelledby={`${id}-title`}>
         {offers.length === 0 ? (
-          <p className="item-inline-hint">Cole o link do produto em "Link do produto" para guardar a loja. Com um link salvo, outro link pode virar mais uma loja (até {MAX_OFFERS}) para comparar o preço.</p>
+          <p className="item-inline-hint">Cole o link do produto logo abaixo e toque em + para guardar a loja. Dá para comparar o preço em até {MAX_OFFERS} lojas.</p>
         ) : (
           <ul className="item-offer-list">
             {offers.map((offer) => {
@@ -253,6 +253,9 @@ export function ItemOffersSection({
               );
             })}
           </ul>
+        )}
+        {offers.length >= MAX_OFFERS && (
+          <p className="item-inline-hint item-extra-note">Este item já tem {MAX_OFFERS} lojas, o limite. Remova uma para adicionar outra.</p>
         )}
         {error && <p className="form-error" role="alert">{error}</p>}
       </div>

@@ -3,6 +3,9 @@
 import { getPool } from '../database.ts';
 import { logger } from '../logger.ts';
 import { canDeliverMail, priceOpportunityEmail, sendMail, type PriceOpportunity } from '../mailer.ts';
+import { frequencyGate, recordExternalSend } from '../lifecycle/frequency.ts';
+import { registerJob, trackJob } from '../jobMonitor.ts';
+import { captureServerEvent } from '../productAnalytics.ts';
 import { domainOf, ScrapeError, scrapeProduct, type ScrapedProductPreview } from '../services/productScraper.ts';
 import { storeLabel } from '../../src/priceTracking.ts';
 import { recordScrape, recordScrapeFailure, type ScrapeOutcome } from '../trackedProducts.ts';
@@ -199,10 +202,18 @@ export async function runPriceTracker(options: PriceTrackerOptions = {}): Promis
       }
 
       if (outbox.size > 0 && canDeliverMail()) {
+        // Mesmo limite dos e-mails de ciclo de vida: quem já recebeu e-mail hoje recebe o alerta na próxima rodada
+        // (o preço não é marcado como avisado, então o alerta continua pendente).
+        const { allowed, deferred } = await frequencyGate([...outbox.keys()]);
+        if (deferred.length) logger.info({ event: 'prices.alert.deferred', count: deferred.length }, 'Price alerts deferred by the frequency limit.');
         for (const [email, { name, items }] of outbox) {
+          if (!allowed.has(email)) continue;
           try {
-            await sendMail(priceOpportunityEmail({ to: email, name, opportunities: items }));
+            const delivery = await sendMail(priceOpportunityEmail({ to: email, name, opportunities: items }));
             summary.alertsSent += 1;
+            const userId = allowed.get(email) ?? null;
+            await recordExternalSend(userId, 'price_drop', delivery.providerMessageId);
+            if (userId) captureServerEvent(userId, 'price_alert_email_sent', { items_count: items.length });
             // Só marca o preço como avisado depois do envio: se o e-mail falhar, a próxima rodada tenta de novo.
             for (const item of items) {
               await getPool().query('UPDATE items SET last_alert_price_cents = $2 WHERE id = $1', [item.itemId, item.alertedPriceCents]);
@@ -227,8 +238,9 @@ export async function runPriceTracker(options: PriceTrackerOptions = {}): Promis
  * Devolve uma função que cancela o agendamento.
  */
 export function startPriceTrackerScheduler() {
+  registerJob('price_tracker', PRICE_CHECK_INTERVAL_MS);
   const run = () => {
-    runPriceTracker()
+    trackJob('price_tracker', () => runPriceTracker(), summary => summary.skipped)
       .then(summary => {
         logger.info({ event: 'prices.refresh.completed', ...summary }, 'Rotina de preços concluída.');
       })

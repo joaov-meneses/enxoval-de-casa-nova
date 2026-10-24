@@ -23,23 +23,28 @@ try {
     const fab=page.getByRole('button',{name:'Adicionar item ou ambiente',exact:true});
     const first=page.locator('[data-item-id=item-0]');const second=page.locator('[data-item-id=item-1]');
     assert.equal(await fab.isVisible(),true);
+    // A edição abre numa janela por cima da lista; só um item fica aberto por vez.
+    const editor=page.getByRole('dialog');
     await first.getByRole('button',{name:'Abrir detalhes de Cama',exact:true}).click();
+    await editor.getByRole('form').waitFor();
     assert.equal(await fab.isVisible(),false,'abrir um item oculta o botão flutuante');
-    assert.equal(await first.locator('img, input[type=file]').count(),0,'imagem antiga e envio não aparecem na edição');
-    assert.equal(await first.getByText(/Enviar imagem|Trocar imagem|Link da imagem/).count(),0);
+    assert.equal(await editor.locator('img, input[type=file]:not([hidden])').count(),0,'imagem antiga e envio não aparecem na edição');
+    assert.equal(await editor.getByText(/Enviar imagem|Trocar imagem|Link da imagem/).count(),0);
+    await editor.getByRole('button',{name:'Cancelar',exact:true}).click();
+    await editor.waitFor({state:'detached'});
+    assert.equal(await fab.isVisible(),true,'volta ao cancelar');
     await second.getByRole('button',{name:'Abrir detalhes de Cesto',exact:true}).click();
-    await first.getByRole('button',{name:'Cancelar',exact:true}).click();
-    assert.equal(await fab.isVisible(),false,'continua oculto se ainda há outro item aberto');
-    await second.getByRole('button',{name:'Cancelar',exact:true}).click();
-    assert.equal(await fab.isVisible(),true,'volta ao fechar o último item');
+    await page.keyboard.press('Escape');
+    await editor.waitFor({state:'detached'});
+    assert.equal(await fab.isVisible(),true,'volta ao fechar com Esc');
     await first.getByRole('button',{name:'Abrir detalhes de Cama',exact:true}).click();
-    await first.getByLabel('Nome do item').fill('Cama nova');
-    await first.getByRole('button',{name:'Salvar alterações',exact:true}).click();
-    await first.getByRole('form').waitFor({state:'detached'});
+    await editor.getByLabel('Nome do item').fill('Cama nova');
+    await editor.getByRole('button',{name:'Salvar alterações',exact:true}).click();
+    await editor.waitFor({state:'detached'});
     assert.equal(await fab.isVisible(),true,'volta após salvar');
     assert.equal(items[0].name,'Cama nova');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-    console.log(`PASS: floating add button hides during editing and returns after closing/canceling/saving at ${width}px.`);
+    console.log(`PASS: floating add button hides while the edit dialog is open and returns after canceling/Esc/saving at ${width}px.`);
     await page.close();
   }
 } finally {await browser.close();}

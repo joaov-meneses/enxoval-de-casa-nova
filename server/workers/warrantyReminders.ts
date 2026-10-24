@@ -4,7 +4,9 @@ import { getPool, withTransaction } from '../database.ts';
 import { logger } from '../logger.ts';
 import { canDeliverMail, sendMail, warrantyEmail } from '../mailer.ts';
 import { categoryEnabled } from '../lifecycle/policy.ts';
+import { frequencyGate, recordExternalSend } from '../lifecycle/frequency.ts';
 import { processStorageDeletions } from '../objectStorage.ts';
+import { registerJob, trackJob } from '../jobMonitor.ts';
 
 export const REMINDER_DAYS = [30, 7] as const;
 
@@ -53,7 +55,10 @@ export async function sendWarrantyReminders(now = new Date()) {
     }
   }
 
+  // Mesmo limite dos e-mails de ciclo de vida: quem já recebeu e-mail hoje recebe o aviso na próxima rodada (de hora em hora).
+  const { allowed } = await frequencyGate([...outbox.keys()], now.getTime());
   for (const [email, { name, items }] of outbox) {
+    if (!allowed.has(email)) continue;
     try {
       await withTransaction(async client => {
         const fresh = [];
@@ -66,7 +71,8 @@ export async function sendWarrantyReminders(now = new Date()) {
           if (claimed.rowCount) fresh.push(item);
         }
         if (fresh.length === 0) return;
-        await sendMail(warrantyEmail({ to: email, name, items: fresh }));
+        const delivery = await sendMail(warrantyEmail({ to: email, name, items: fresh }));
+        await recordExternalSend(allowed.get(email) ?? null, 'warranty', delivery.providerMessageId);
         summary.items += fresh.length;
         summary.emails += 1;
       });
@@ -78,13 +84,16 @@ export async function sendWarrantyReminders(now = new Date()) {
 }
 
 export function startWarrantyReminders() {
+  registerJob('warranty_reminders', 60 * 60_000);
   let running = false;
   const run = async () => {
     if (running) return;
     running = true;
     try {
-      const summary = await sendWarrantyReminders();
-      const deletions = await processStorageDeletions(getPool());
+      const { summary, deletions } = await trackJob('warranty_reminders', async () => ({
+        summary: await sendWarrantyReminders(),
+        deletions: await processStorageDeletions(getPool()),
+      }));
       if (summary.emails || deletions.deleted || deletions.failed) {
         logger.info({ event: 'warranty.worker.completed', summary, deletions }, 'Warranty reminders and storage cleanup completed.');
       }

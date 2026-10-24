@@ -245,7 +245,10 @@ test('uma cidade que não pertence ao estado é ignorada', () => {
   assert.ok(!errada.includes('Umidificador de ar'));
   assert.equal(cityMatchesState('salvador', 'BA'), true);
   assert.equal(cityMatchesState('salvador', 'SP'), false);
-  assert.deepEqual(citiesOfState('BA').map((city) => city.name), ['Salvador']);
+  const baianas = citiesOfState('BA').map((city) => city.name);
+  assert.equal(baianas[0], 'Salvador', 'a capital vem primeiro');
+  assert.ok(baianas.includes('Feira de Santana'));
+  assert.ok(citiesOfState('BA').every((city) => city.uf === 'BA'));
 });
 
 test('a nota regional vai na descrição e o plano carrega os dados do planejamento', () => {

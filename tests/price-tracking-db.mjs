@@ -1,8 +1,8 @@
-// Teste de integração com PostgreSQL real: itens ligados a links de lojas, histórico de preços, rotina de
 // acompanhamento (com avisos por e-mail) e resumo de economia. Usa um schema descartável.
 // Rodar: npm run test:price-tracking-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 
@@ -69,7 +69,7 @@ try {
   const call = makeClient();
   const register = await call("/auth/register", "POST", {
     email: "precos@example.invalid",
-    password: randomBytes(16).toString("base64url"),
+    password: strongPassword(),
   });
   assert.equal(register.status, 201, JSON.stringify(register.data));
   // O acompanhamento pressupõe acesso ativo; o bloqueio por assinatura tem testes próprios.
@@ -161,11 +161,18 @@ try {
   assert.equal(repeat.alertsSent, 0, "o mesmo preço não é avisado duas vezes");
   assert.equal((await query("SELECT count(*)::int AS n FROM product_price_snapshots"))[0].n, 2, "preço igual (e recente) não repete o ponto");
 
-  // novo recorde de baixa: avisa de novo
+  // novo recorde de baixa no mesmo dia: o limite comum de e-mails (1 por dia) adia o aviso, que continua pendente
   nextPrice = { priceCents: 26000, pixPriceCents: 24000 };
   const record = await runPriceTracker({ force: true, sleep: noSleep, scrape });
-  assert.equal(record.alertsSent, 1);
+  assert.equal(record.alertsSent, 0, "segundo e-mail no mesmo dia espera a próxima rodada");
   assert.equal((await query("SELECT count(*)::int AS n FROM product_price_snapshots"))[0].n, 3);
+  assert.equal((await query("SELECT count(*)::int AS n FROM lifecycle_messages WHERE flow_key = 'price_drop' AND status = 'sent'"))[0].n, 1,
+    "o alerta enviado conta no limite de frequência");
+  // um dia depois, o aviso adiado sai
+  await query("UPDATE lifecycle_messages SET sent_at = sent_at - interval '2 days' WHERE flow_key = 'price_drop'");
+  const later = await runPriceTracker({ force: true, sleep: noSleep, scrape });
+  assert.equal(later.alertsSent, 1);
+  assert.match(mailOutbox.at(-1).text, /R\$\s26\d,00|R\$\s24\d,00/);
 
   // sem --force, produto lido há pouco não é relido
   const idle = await runPriceTracker({ sleep: noSleep, scrape });
@@ -228,7 +235,7 @@ try {
 
   // --- outra pessoa não vê o histórico nem o resumo
   const stranger = makeClient();
-  const strangerAccount = await stranger("/auth/register", "POST", { email: "outra@example.invalid", password: randomBytes(16).toString("base64url") });
+  const strangerAccount = await stranger("/auth/register", "POST", { email: "outra@example.invalid", password: strongPassword() });
   assert.equal(strangerAccount.status, 201, JSON.stringify(strangerAccount.data));
   await query("UPDATE users SET plan = 'monthly', subscription_status = 'active' WHERE id = $1", [strangerAccount.data.user.id]);
   assert.equal((await stranger(`/items/${item.id}/price-history`)).status, 404);

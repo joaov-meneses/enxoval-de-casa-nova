@@ -12,7 +12,9 @@ import {
   TriangleAlert,
 } from "@/src/components/icons";
 import { checkPasswordResetToken, resetPassword } from "../api";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordPolicyError } from "../../shared/passwordPolicy";
 import { Brand } from "./Brand";
+import { PasswordRules } from "./PasswordRules";
 
 // O token vem no fragmento (#token=...) do link do e-mail. É lido uma vez, no carregamento do módulo,
 // porque o fragmento é apagado da barra de endereço logo depois (ele não deve ficar no histórico).
@@ -51,6 +53,11 @@ export function ResetPasswordPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const weak = passwordPolicyError(password);
+    if (weak) {
+      setError(weak);
+      return;
+    }
     if (password !== confirmation) {
       setError("As senhas não coincidem.");
       return;
@@ -124,13 +131,14 @@ export function ResetPasswordPage() {
                     id="reset-password"
                     type={visible ? "text" : "password"}
                     autoComplete="new-password"
-                    minLength={8}
-                    maxLength={128}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
                     required
                     autoFocus
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Pelo menos 8 caracteres"
+                    placeholder={`Pelo menos ${PASSWORD_MIN_LENGTH} caracteres`}
+                    aria-describedby="reset-password-rules"
                     disabled={busy}
                   />
                   <Button variant="brand" size="brand"
@@ -142,14 +150,15 @@ export function ResetPasswordPage() {
                   </Button>
                 </span>
               </Label>
+              <PasswordRules password={password} id="reset-password-rules" />
               <Label htmlFor="reset-confirmation">
                 Confirme a nova senha
                 <Input
                   id="reset-confirmation"
                   type={visible ? "text" : "password"}
                   autoComplete="new-password"
-                  minLength={8}
-                  maxLength={128}
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={PASSWORD_MAX_LENGTH}
                   required
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}

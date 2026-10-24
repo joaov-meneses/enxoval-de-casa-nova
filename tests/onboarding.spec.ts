@@ -479,7 +479,7 @@ test.describe("funil /comecar", () => {
     await toSave(page);
 
     await page.getByLabel("Seu e-mail").fill("jeo@exemplo.com");
-    await page.getByLabel("Crie uma senha").fill("senha-segura");
+    await page.getByLabel("Crie uma senha").fill("senha-segura-9");
     await page.getByRole("button", { name: /Criar conta e salvar plano/ }).click();
     await expect(page).toHaveURL(/\/app$/);
 
@@ -515,7 +515,7 @@ test.describe("funil /comecar", () => {
     await reachReady(page);
     await toSave(page);
     await page.getByLabel("Seu e-mail").fill("jeo@exemplo.com");
-    await page.getByLabel("Crie uma senha").fill("senha-segura");
+    await page.getByLabel("Crie uma senha").fill("senha-segura-9");
     await page.getByRole("button", { name: /Criar conta e salvar plano/ }).click();
     await expect(page.getByRole("alert")).toHaveText("Já existe uma conta com esse e-mail.");
     await expect(page).toHaveURL(/\/comecar$/);

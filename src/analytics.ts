@@ -27,6 +27,7 @@ function trafficProperties() {
   return {
     app_environment: import.meta.env.MODE === 'test' ? 'test' : import.meta.env.DEV ? 'development' : 'production',
     traffic_type: trafficType(import.meta.env, flag, window.location.hostname),
+    app_version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev',
   };
 }
 
@@ -104,6 +105,11 @@ export function identifyAnalytics(user: AuthUser) {
   });
 }
 
+/** Propriedades da pessoa ($set), já filtradas pelo esquema do evento que as originou. */
+export function setPersonProperties(properties: AnalyticsProperties) {
+  safely(() => { if (Object.keys(properties).length) posthog.setPersonProperties(properties); });
+}
+
 function recordAppSession() {
   if (!identifiedUser || !isAppPath(window.location.pathname) || document.visibilityState === 'hidden') return;
   safely(() => {
@@ -161,16 +167,18 @@ function applyPosthogConsent(choice: ConsentChoice | null) {
 }
 
 export function trackPageview() {
+  // $pageview first: the session's entry page and origin come from its first event.
+  const route = safeRoute(window.location.pathname);
+  if (route !== lastPage) {
+    trackPageleave();
+    lastPage = route;
+    capture('$pageview', { route });
+  }
   const location = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (location !== lastOperationalPage) {
     lastOperationalPage = location;
     captureOperational('application.navigation', { path: window.location.pathname, search: window.location.search, hash: window.location.hash });
   }
-  const route = safeRoute(window.location.pathname);
-  if (route === lastPage) return;
-  trackPageleave();
-  lastPage = route;
-  capture('$pageview', { route });
 }
 
 let lastGooglePage = '';
@@ -245,7 +253,12 @@ function startPosthog() {
       save_referrer: false, save_campaign_params: false,
       respect_dnt: true, ip: false,
       before_send: event => {
-        if (event?.event.startsWith('application.')) return { ...event, properties: { ...event.properties, ...trafficProperties() } };
+        // Operational events keep the real URL in `url`; the SDK page fields get the sanitized route and origin,
+        // so a session that starts with one of them still has an entry page and channel in Web Analytics.
+        if (event?.event.startsWith('application.')) return { ...event, properties: {
+          ...event.properties, ...pageMetadata(window.location.origin, window.location.pathname),
+          ...campaignProperties(), ...trafficProperties(),
+        } };
         if (/^\/admin(?:\/|$)/.test(window.location.pathname) && event?.event !== '$exception') return null;
         if (event?.event === '$exception') {
           if (env.VITE_POSTHOG_ERROR_TRACKING === 'false') return null;
@@ -259,7 +272,7 @@ function startPosthog() {
               distinct_id: event.properties.distinct_id,
               $device_id: event.properties.$device_id,
               $user_id: event.properties.$user_id,
-              ...trafficProperties(),
+              ...campaignProperties(), ...trafficProperties(),
             },
           } as typeof event;
         }
@@ -276,7 +289,7 @@ function startPosthog() {
             $session_id: event.properties.$session_id, $window_id: event.properties.$window_id,
             $device_type: event.properties.$device_type, $browser: event.properties.$browser,
             $os: event.properties.$os, $lib: event.properties.$lib, $lib_version: event.properties.$lib_version,
-            ...pageMetadata(window.location.origin, path), ...trafficProperties(),
+            ...pageMetadata(window.location.origin, path), ...campaignProperties(), ...trafficProperties(),
             ...metrics,
           } } as typeof event;
         }

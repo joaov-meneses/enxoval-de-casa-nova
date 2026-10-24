@@ -4,9 +4,13 @@
 import { randomUUID } from 'node:crypto';
 import express, { type Express, type Request } from 'express';
 import { getPool } from '../database.ts';
+import { captureServerEvent } from '../productAnalytics.ts';
 import { asyncHandler, HttpError, protectMutationOrigin, rateLimit } from '../security.ts';
 
 const PAUSE_DAYS = 30;
+/** Pesquisa de pós-mudança (L9). Uma resposta por pessoa; responder de novo atualiza a nota. */
+const SURVEY = 'post_move';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface PreferenceRow {
   id: string;
@@ -88,6 +92,35 @@ export function registerPreferenceRoutes(app: Express) {
       `, [row.id, JSON.stringify(prefs), body.subscribed === true, body.pause === true ? 'pause' : body.pause === false ? 'resume' : '', PAUSE_DAYS]);
     }
     res.json(preferencesView(await findByToken(readToken(req))));
+  }));
+
+  // Pesquisa de pós-mudança: o e-mail traz o token de preferências e a nota já escolhida; a página confirma.
+  app.get('/api/survey', limit, asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const row = await findByToken(readToken(req));
+    const answer = (await getPool().query<{ score: number; comment: string | null }>(
+      'SELECT score, comment FROM survey_responses WHERE user_id = $1 AND survey = $2', [row.id, SURVEY])).rows[0];
+    res.json({ email: maskEmail(row.email), score: answer?.score ?? null, comment: answer?.comment ?? '' });
+  }));
+
+  app.post('/api/survey', limit, protectMutationOrigin, asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const row = await findByToken(readToken(req));
+    const score = Number(req.body?.score);
+    if (!Number.isInteger(score) || score < 0 || score > 10) throw new HttpError(400, 'Escolha uma nota de 0 a 10.');
+    const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim().slice(0, 1000) : '';
+    const rawMessage = typeof req.body?.messageId === 'string' && UUID.test(req.body.messageId) ? req.body.messageId : null;
+    const messageId = rawMessage
+      ? (await getPool().query<{ id: string }>('SELECT id FROM lifecycle_messages WHERE id = $1 AND user_id = $2', [rawMessage, row.id])).rows[0]?.id ?? null
+      : null;
+    await getPool().query(`
+      INSERT INTO survey_responses (id, user_id, survey, score, comment, message_id) VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (user_id, survey) DO UPDATE SET score = EXCLUDED.score, comment = EXCLUDED.comment,
+        message_id = COALESCE(EXCLUDED.message_id, survey_responses.message_id), updated_at = now()
+    `, [randomUUID(), row.id, SURVEY, score, comment || null, messageId]);
+    // A nota vai ao PostHog; o comentário (texto livre) fica só no banco.
+    captureServerEvent(row.id, 'survey_answered', { survey: SURVEY, score });
+    res.json({ email: maskEmail(row.email), score, comment });
   }));
 
   // Descadastro com um clique (cabeçalho List-Unsubscribe-Post). Responde 200 mesmo para token desconhecido,

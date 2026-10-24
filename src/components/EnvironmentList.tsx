@@ -75,7 +75,9 @@ export function EnvironmentList({
           >
             {!horizontal && <RoomIcon name={category.name} />}
             <span>{category.name}</span>
-            {!horizontal && <RoomProgress items={items.filter((item) => item.categoryId === category.id)} />}
+            {horizontal
+              ? <ChipCount {...countOf(items.filter((item) => item.categoryId === category.id))} />
+              : <RoomProgress items={items.filter((item) => item.categoryId === category.id)} />}
           </Button>
           {horizontal && handle}
           {!horizontal && (
@@ -105,6 +107,7 @@ export function EnvironmentList({
           aria-current={allOption.active ? "true" : undefined}
         >
           <span>Todos</span>
+          <ChipCount done={allOption.done} total={allOption.total} />
         </Button>
       </div>
       {list}
@@ -112,10 +115,23 @@ export function EnvironmentList({
   );
 }
 
+function countOf(items: EnxovalItem[]) {
+  return { done: items.filter((item) => isDoneStatus(item.status)).length, total: items.length };
+}
+
+/** Nos chips do celular, só o "conquistados/total" ao lado do nome, sem barra. */
+function ChipCount({ done, total }: { done: number; total: number }) {
+  return (
+    <small className="environment-chip-count">
+      <span aria-hidden="true">{done}/{total}</span>
+      <span className="sr-only">, {done} de {total} conquistados</span>
+    </small>
+  );
+}
+
 /** Conquistados de quantos, com uma barra fina: na lista de ambientes, o que importa é quanto falta. */
 function RoomProgress({ items }: { items: EnxovalItem[] }) {
-  const done = items.filter((item) => isDoneStatus(item.status)).length;
-  const total = items.length;
+  const { done, total } = countOf(items);
   return (
     <small className="environment-progress">
       <span className="environment-count" aria-hidden="true">

@@ -1,6 +1,6 @@
-// Integração com PostgreSQL em schema descartável: remoção das imagens dos itens.
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -58,7 +58,7 @@ try {
     return { send, json };
   };
   const register = async (who, email) => {
-    who.password = randomBytes(16).toString("base64url");
+    who.password = strongPassword();
     const result = await who.json("/auth/register", "POST", { email, password: who.password });
     assert.equal(result.status, 201, JSON.stringify(result.data));
     return result.data.user;

@@ -1,6 +1,7 @@
 // Real PostgreSQL integration test. Uses a new disposable schema, never existing accounts.
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -141,7 +142,7 @@ try {
     200,
   );
   assert.equal((await admin.call("/admin/session")).status, 200);
-  const originalPassword = randomBytes(16).toString("base64url");
+  const originalPassword = strongPassword();
   const email = "cliente@example.invalid";
   const signup = await registerPaidAccount(customer, "Cliente Teste", email, originalPassword);
   assert.equal(signup.status, 201);
@@ -154,7 +155,7 @@ try {
       funnel,
       "Funil Teste",
       "funil@example.invalid",
-      randomBytes(16).toString("base64url"),
+      strongPassword(),
     );
     assert.equal(funnelAccount.status, 201);
     assert.equal(funnelAccount.data.enxovais.length, 0, "o cadastro não cria enxoval nenhum");
@@ -209,7 +210,7 @@ try {
       rejecter,
       "Rejeitado",
       "rejeitado@example.invalid",
-      randomBytes(16).toString("base64url"),
+      strongPassword(),
     );
     assert.equal(rejecterAccount.status, 201);
     const count = async () =>
@@ -459,7 +460,7 @@ try {
       .status,
     403,
   );
-  const newPassword = randomBytes(18).toString("base64url");
+  const newPassword = strongPassword();
   assert.equal(
     (
       await customer.call("/auth/change-password", "POST", {

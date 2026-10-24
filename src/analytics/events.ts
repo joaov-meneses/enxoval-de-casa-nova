@@ -2,19 +2,33 @@ import { appRouteTemplate } from '../appRoute';
 
 export type AnalyticsProperties = Record<string, string | number | boolean>;
 
+/**
+ * Respostas do funil concluído, em categorias e faixas (ver src/onboarding/metrics.ts). Ficam aqui, e não lá, para
+ * o esquema não puxar o gerador do plano para todas as páginas.
+ */
+export const ONBOARDING_METRIC_KEYS = [
+  'moment', 'housing', 'people_bucket', 'rooms_count', 'items_count', 'no_rooms', 'owned', 'style', 'budget',
+  'spending_tier', 'has_move_date', 'weeks_to_move_bucket', 'uf', 'has_city', 'worries_count', 'worries_none',
+  'worries_none_reason', 'usage_count', 'usage_none', 'usage_none_reason',
+  'worry_start', 'worry_waste', 'worry_forget', 'worry_budget', 'worry_time',
+  'usage_buy', 'usage_spend', 'usage_links', 'usage_share',
+] as const;
+
 // Explicit schema: never forward forms, API payloads, names, links or free text.
 export const EVENT_PROPERTIES = {
   onboarding_start: ['resumed'], step_view: ['step', 'index'],
   step_complete: ['step', 'index'], onboarding_back: ['step'],
-  plan_ready: ['items', 'rooms'], onboarding_submit: [], onboarding_complete: [],
+  plan_ready: ['items', 'rooms'], onboarding_submit: [], onboarding_complete: ONBOARDING_METRIC_KEYS, commitment_signed: [],
   signup_submit: [], signup_success: [], login_success: [], logout: [],
   app_opened: [], workspace_viewed: ['view'], workspace_created: ['template'],
   environment_created: [], item_created: ['source', 'status'],
   item_status_changed: ['status'], item_purchase_recorded: [],
+  item_edited: ['changed_name', 'changed_price', 'changed_quantity', 'changed_notes', 'changed_room'],
+  item_deleted: [], environment_deleted: [], workspace_deleted: [],
   purchase_scheduled: [], planning_updated: [],
   product_imported: ['has_price'], price_history_viewed: [],
   invitation_sent: [], invitation_accepted: [],
-  nino_used: ['feature'], items_imported: ['count', 'failed', 'stopped', 'catalog_applied'],
+  nino_used: ['feature', 'outcome', 'source'], items_imported: ['count', 'failed', 'stopped', 'catalog_applied'],
   items_exported: ['format', 'count'], plans_viewed: ['source', 'reason'],
   checkout_started: ['plan'], checkout_failed: ['plan'], checkout_canceled: [],
   subscription_activated: ['plan', 'trial'], subscription_canceled: [],
@@ -44,7 +58,7 @@ export function allowedProperties(event: AnalyticsEvent, properties: AnalyticsPr
   }));
 }
 
-export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/preferencias', '/como-o-nino-escolhe', '/esqueci-senha', '/redefinir-senha', '/verificar-email'];
+export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/preferencias', '/pesquisa', '/como-o-nino-escolhe', '/esqueci-senha', '/redefinir-senha', '/verificar-email'];
 
 export function safeRoute(pathname: string) {
   if (PUBLIC_ROUTES.includes(pathname)) return pathname;

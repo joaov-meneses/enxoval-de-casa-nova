@@ -113,7 +113,7 @@ try {
   // --- Cadastro: aparelho registrado e e-mail pendente ---
   const ana = agent("198.51.100.10");
   const anaEmail = "ana@example.invalid";
-  const registered = await ana.call("/auth/register", "POST", { email: anaEmail, password: "senha-segura" });
+  const registered = await ana.call("/auth/register", "POST", { email: anaEmail, password: "senha-segura-9" });
   assert.equal(registered.status, 201);
   assert.equal(registered.data.user.emailVerified, false);
   const anaDevice = ana.jar.get("casamia_device");
@@ -168,7 +168,7 @@ try {
     const failed = await attacker.call("/auth/login", "POST", { email: anaEmail, password: "errada" });
     assert.equal(failed.status, 401);
   }
-  const blockedLogin = await attacker.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura" });
+  const blockedLogin = await attacker.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura-9" });
   assert.equal(blockedLogin.status, 429);
   assert.equal(blockedLogin.data.code, "AUTH_TEMPORARILY_BLOCKED");
   const [autoBan] = await query("SELECT target_type, target_value, scope, created_by, reason_code, expires_at > now() AS active FROM bans");
@@ -181,7 +181,7 @@ try {
     active: true,
   });
   // Ana, em outra rede, entra normalmente; e quem já está dentro na rede bloqueada continua usando o app.
-  assert.equal((await agent("198.51.100.12").call("/auth/login", "POST", { email: anaEmail, password: "senha-segura" })).status, 200);
+  assert.equal((await agent("198.51.100.12").call("/auth/login", "POST", { email: anaEmail, password: "senha-segura-9" })).status, 200);
   ana.ip = "198.51.100.66";
   assert.equal((await ana.call("/profile")).status, 200);
   ana.ip = "198.51.100.10";
@@ -189,11 +189,11 @@ try {
   // --- Bloqueio automático por rajada de cadastros ---
   const farm = agent("198.51.100.77");
   for (let index = 0; index < AUTO_BLOCK.signups; index++) {
-    const signup = await farm.call("/auth/register", "POST", { email: `robo${index}@example.invalid`, password: "senha-segura" });
+    const signup = await farm.call("/auth/register", "POST", { email: `robo${index}@example.invalid`, password: "senha-segura-9" });
     assert.equal(signup.status, 201);
   }
   await sleep(200);
-  const burst = await farm.call("/auth/register", "POST", { email: "robo-extra@example.invalid", password: "senha-segura" });
+  const burst = await farm.call("/auth/register", "POST", { email: "robo-extra@example.invalid", password: "senha-segura-9" });
   assert.equal(burst.status, 429);
   assert.equal(burst.data.code, "AUTH_TEMPORARILY_BLOCKED");
 
@@ -221,13 +221,13 @@ try {
   const userBan = await admin.call("/admin/bans", "POST", { targetType: "user", targetValue: anaRow.id, reasonCode: "fraud", notes: "Teste", durationHours: null });
   assert.equal(userBan.status, 201);
   assert.equal((await ana.call("/profile")).status, 401);
-  const bannedLogin = await ana.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura" });
+  const bannedLogin = await ana.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura-9" });
   assert.equal(bannedLogin.status, 403);
   assert.equal(bannedLogin.data.code, "ACCOUNT_BLOCKED");
   assert.equal((await admin.call("/admin/users")).data.users.find((user) => user.email === anaEmail).activeBan.reasonCode, "fraud");
   assert.equal((await admin.call(`/admin/bans/${userBan.data.id}/revoke`, "POST")).status, 204);
   assert.equal((await admin.call(`/admin/bans/${userBan.data.id}/revoke`, "POST")).status, 404);
-  assert.equal((await ana.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura" })).status, 200);
+  assert.equal((await ana.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura-9" })).status, 200);
 
   // IP bloqueado pela equipe: a API inteira recusa, inclusive quem já estava dentro.
   const ipBan = await admin.call("/admin/bans", "POST", { targetType: "ip", targetValue: "198.51.100.10", reasonCode: "abuse", durationHours: 24 });
@@ -243,16 +243,16 @@ try {
   assert.equal(rangeBan.status, 201);
   const [range] = await query("SELECT target_value FROM bans WHERE id = $1", [rangeBan.data.id]);
   assert.equal(range.target_value, "203.0.113.0/24");
-  assert.equal((await agent("203.0.113.200").call("/auth/login", "POST", { email: anaEmail, password: "senha-segura" })).status, 403);
+  assert.equal((await agent("203.0.113.200").call("/auth/login", "POST", { email: anaEmail, password: "senha-segura-9" })).status, 403);
 
   // Aparelho bloqueado: as sessões dele caem e ele não entra nem de outro IP.
   const deviceBan = await admin.call("/admin/bans", "POST", { targetType: "device", targetValue: anaDevice, reasonCode: "abuse", durationHours: null });
   assert.equal(deviceBan.status, 201);
   assert.equal((await query("SELECT 1 FROM sessions WHERE device_id = $1", [anaDevice])).length, 0);
   ana.ip = "198.51.100.13";
-  assert.equal((await ana.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura" })).status, 403);
+  assert.equal((await ana.call("/auth/login", "POST", { email: anaEmail, password: "senha-segura-9" })).status, 403);
   // Outro aparelho da mesma pessoa continua entrando.
-  assert.equal((await agent("198.51.100.13").call("/auth/login", "POST", { email: anaEmail, password: "senha-segura" })).status, 200);
+  assert.equal((await agent("198.51.100.13").call("/auth/login", "POST", { email: anaEmail, password: "senha-segura-9" })).status, 200);
 
   const bans = (await admin.call("/admin/bans")).data.bans;
   // Em vigor: os dois automáticos, a faixa e o aparelho (conta e IP foram revogados).

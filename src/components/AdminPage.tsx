@@ -41,6 +41,7 @@ import { Brand } from "./Brand";
 import { Dialog } from "./Dialog";
 import { AdminCatalog } from "./AdminCatalog";
 import { AdminFeedbackList } from "./AdminFeedback";
+import { AdminOperations } from "./AdminOperations";
 import { AdminBanDialog, AdminBanList, BAN_REASON_LABEL, describeDevice } from "./AdminBans";
 
 const date = (value: string | null) =>
@@ -572,6 +573,7 @@ export function AdminPage() {
         <AdminBanList refreshKey={bansKey} onChanged={bansChanged} onError={(err) => setError(handleError(err))} />
         <AdminCatalog onError={(err) => setError(handleError(err))} />
         <AdminFeedbackList onError={(err) => setError(handleError(err))} />
+        <AdminOperations onError={(err) => setError(handleError(err))} />
       </main>
       <Dialog
         isOpen={Boolean(action)}

@@ -68,20 +68,37 @@ const money = (cents: number | null) =>
         currency: "BRL",
       }).format(cents / 100);
 
-export function ImportItemsButton(props: ImportItemsButtonProps) {
-  const [open, setOpen] = useState(false);
+export function ImportItemsButton({
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
+  ...props
+}: ImportItemsButtonProps & {
+  /** Controlado por fora (celular): a janela abre a partir de "Planilhas", sem o botão próprio. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+}) {
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   return (
     <>
-      <Button variant="brand" size="brand"
-        type="button"
-        className="button button-outline button-small export-menu-trigger"
-        aria-label="Importar"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-      >
-        <Upload size={17} aria-hidden="true" />
-        <span>Importar</span>
-      </Button>
+      {!hideTrigger && (
+        <Button variant="brand" size="brand"
+          type="button"
+          className="button button-outline button-small export-menu-trigger"
+          aria-label="Importar"
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+        >
+          <Upload size={17} aria-hidden="true" />
+          <span>Importar</span>
+        </Button>
+      )}
       {/* Remonta ao fechar: cada importação começa do zero. */}
       {open && <ImportItemsDialog {...props} onClose={() => setOpen(false)} />}
     </>
