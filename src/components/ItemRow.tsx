@@ -5,6 +5,7 @@ import { Label } from "@/src/components/ui/label";
 import { Input } from "@/src/components/ui/input";
 import { Textarea } from "@/src/components/ui/textarea";
 import {
+  memo,
   useEffect,
   useLayoutEffect,
   useId,
@@ -14,17 +15,13 @@ import {
   type ReactNode,
 } from "react";
 import {
-  Check,
   ExternalLink,
-  AlignLeft,
   Trash2,
-  Clock3,
   LoaderCircle,
   Flame,
   TrendingDown,
   TrendingUp,
   PackageX,
-  CalendarClock,
   BadgePercent,
   Gift,
   Receipt,
@@ -79,6 +76,7 @@ import { weekOptions } from "../planning/weekOptions";
 import { weekLabel } from "../planning/purchasePlan";
 import { ScribbledItemName } from "./ScribbledItemName";
 import { ItemChalkStroke } from "./ItemChalkStroke";
+import { StaticListIcon } from "./StaticListIcon";
 
 /** Semana de compra do item no planejamento (sugerida pelo algoritmo ou escolhida pela pessoa). */
 export interface ItemBuyPlan {
@@ -141,6 +139,8 @@ const INSTALLMENT_OPTIONS = Array.from({ length: MAX_INSTALLMENTS }, (_, index) 
   value: String(index + 1),
   label: index === 0 ? "À vista" : `${index + 1}x`,
 }));
+/** Quantas linhas estão abertas agora (normalmente uma). */
+let expandedItems = 0;
 const centsOf = (text: string) => Number(text.replace(/\D/g, "")) || 0;
 const moneyText = (cents: number | null | undefined) => (cents && cents > 0 ? money.format(cents / 100) : "");
 const brDate = (iso: string) => iso.split("-").reverse().join("/");
@@ -148,7 +148,31 @@ const brDate = (iso: string) => iso.split("-").reverse().join("/");
 function weekTagLabel(week: number) {
   return week === 0 ? "Na semana da mudança" : `${weekLabel(week)} da mudança`;
 }
-export function ItemRow({
+
+function sameRowProps(previous: ItemRowProps, next: ItemRowProps) {
+  const keys = Object.keys(previous) as (keyof ItemRowProps)[];
+  if (keys.length !== Object.keys(next).length) return false;
+  return keys.every((key) => {
+    if (Object.is(previous[key], next[key])) return true;
+    // O plano e as sugestões são recalculados ao salvar qualquer item. Compara os valores para preservar as
+    // outras linhas; callbacks e os dados do item continuam sendo comparados pela identidade.
+    if (key === "buyPlan") {
+      const a = previous.buyPlan, b = next.buyPlan;
+      return !!a && !!b && a.week === b.week && a.manual === b.manual && a.reason === b.reason
+        && a.moveDate === b.moveDate && a.overdue === b.overdue;
+    }
+    if (key === "knownGiftNames") {
+      const a = previous.knownGiftNames, b = next.knownGiftNames;
+      return !!a && !!b && a.length === b.length && a.every((name, index) => name === b[index]);
+    }
+    return false;
+  });
+}
+/**
+ * Linha de item. Memorizada: só redesenha quando os dados dela mudam (o workspace passa callbacks estáveis e o plano
+ * de compra de cada item já pronto), em vez de refazer todas as linhas a cada render do app.
+ */
+export const ItemRow = memo(function ItemRow({
   item,
   completionExiting = false,
   categories,
@@ -300,6 +324,17 @@ export function ItemRow({
     item.createdAt && Number.isFinite(Date.parse(item.createdAt))
       ? new Date(item.createdAt).toLocaleDateString("pt-BR")
       : null;
+  // Só o botão flutuante precisa mudar de estilo. Marcar body/workspace invalidaria os estilos de toda a lista.
+  useEffect(() => {
+    if (!expanded) return;
+    expandedItems += 1;
+    const fab = toggleRef.current?.closest(".workspace-app")?.querySelector<HTMLElement>(".mobile-fab-add");
+    if (fab) fab.dataset.itemExpanded = "true";
+    return () => {
+      expandedItems = Math.max(0, expandedItems - 1);
+      if (!expandedItems && fab) delete fab.dataset.itemExpanded;
+    };
+  }, [expanded]);
   function toggle() {
     if (!busy) setExpanded((value) => !value);
   }
@@ -478,7 +513,7 @@ export function ItemRow({
               .catch(() => undefined);
           }}
         >
-          <Check size={15} strokeWidth={2.5} />
+          <StaticListIcon name="check" size={15} strokeWidth={2.5} />
         </Button></Checkbox>
         </div>
         <div className="item-content">
@@ -553,7 +588,7 @@ export function ItemRow({
                 className={`item-week-tag${buyPlan.overdue ? " is-late" : ""}${buyPlan.manual ? " is-manual" : ""}`}
                 title={buyPlan.reason}
               >
-                <CalendarClock size={12} aria-hidden="true" />
+                <StaticListIcon name="calendar-clock" size={12} />
                 {buyPlan.overdue ? "Semana sugerida já passou" : weekTagLabel(buyPlan.week)}
               </span>
             )}
@@ -634,14 +669,14 @@ export function ItemRow({
                 )}
                 {item.description && (
                   <span title={item.description}>
-                    <AlignLeft size={11} />
+                    <StaticListIcon name="align-left" size={11} />
                   </span>
                 )}
               </span>
             )}
             {showUpdatedAt && updatedAtLabel && (
               <span className="inline-flex items-center gap-1">
-                <Clock3 size={10} /> {updatedAtLabel}
+                <StaticListIcon name="clock-3" size={10} /> {updatedAtLabel}
               </span>
             )}
           </div>
@@ -666,7 +701,7 @@ export function ItemRow({
             onClick={() => onDelete(item)}
             disabled={busy}
           >
-            <Trash2 size={17} aria-hidden="true" />
+            <StaticListIcon name="trash-2" size={17} />
           </Button>
           {dragHandle}
         </div>
@@ -1182,4 +1217,4 @@ export function ItemRow({
       }} />}
     </div>
   );
-}
+}, sameRowProps);

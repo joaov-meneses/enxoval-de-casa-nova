@@ -129,9 +129,6 @@
 html {
   scroll-padding-top: 104px;
 }
-html:has(.cm-page) {
-  scrollbar-color: color-mix(in oklab, var(--cm-sand) 84%, var(--cm-text)) var(--cm-bg);
-}
 .cm-header {
   position: sticky;
   top: 0;

@@ -69,6 +69,11 @@ body {
   color: var(--color-brand-coffee, #2f2a26);
 }
 
+/* Barra de rolagem da página no tom do linho: sem isso o Windows desenha um trilho branco na lateral. */
+html {
+  scrollbar-color: color-mix(in oklab, var(--cm-sand) 84%, var(--cm-text)) var(--cm-bg);
+}
+
 /* Azulejos do cadastro, compartilhados por todas as rotas. A camada fixa
    mantém a escala e o degradê em páginas longas, sem interceptar cliques. */
 body {

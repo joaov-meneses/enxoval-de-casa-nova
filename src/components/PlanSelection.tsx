@@ -49,9 +49,8 @@ export function PlanSelection({ trialUsed, busy, disabled, onChoose }: {
         <span className="subscription-plan-content"><strong>{offer.name}</strong>
           <span className="subscription-plan-price-row">
             <span className="subscription-plan-price">{formatBillingAmount(offer)}{offer.id === 'monthly' && <small>/mês</small>}</span>
-            {offer.id === 'pass' && savings > 0 && <span className="subscription-plan-savings">{savings}% menos</span>}
           </span>
-          <span className="subscription-plan-term">{offer.id === 'monthly' ? trialUsed ? 'Renovação mensal' : '2 dias grátis' : <><span>{PASS_MONTHS} meses de acesso</span><span>Pagamento único</span></>}</span>
+          <span className="subscription-plan-term">{offer.id === 'monthly' ? <>{!trialUsed && <span>2 dias grátis</span>}<span>Renovação automática mensal</span><span>Cancele quando quiser</span></> : <><span>{PASS_MONTHS} meses de acesso</span><span>Pagamento único</span></>}</span>
           {offer.id === 'pass' && <span className="subscription-plan-equivalent"><span>Equivale a</span><span>{formatBillingAmount({ amount: offer.amount / PASS_MONTHS, currency: offer.currency })}/mês</span></span>}
         </span>
       </Label>)}

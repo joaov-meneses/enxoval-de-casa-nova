@@ -1883,8 +1883,8 @@ input[type="search"]:focus-visible {
   .mobile-header-clean {
     display: block;
     padding: 16px 22px 14px;
-    background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
-    box-shadow: 0 1px 0 color-mix(in oklab, var(--cm-sand) 38%, #fff);
+    background: var(--cm-bg);
+    box-shadow: none;
   }
   .mobile-header-title-row {
     display: flex;
@@ -3878,7 +3878,8 @@ button.reorder-handle:disabled {
     padding: 8px 14px;
   }
   .workspace-app .mobile-header-clean {
-    padding-inline: 14px;
+    --mobile-header-inset: 14px;
+    padding-inline: var(--mobile-header-inset);
   }
   .workspace-app .mobile-header-eyebrow {
     margin: 0 0 2px;
@@ -4301,7 +4302,8 @@ button.reorder-handle:disabled {
   .mobile-fab-add:disabled {
     opacity: 0.5;
   }
-  .workspace-app:has(.item-row.expanded) .mobile-fab-add {
+  /* Estado no próprio botão: não invalida os estilos de todos os itens ao abrir a edição. */
+  .mobile-fab-add[data-item-expanded] {
     display: none;
   }
 }
@@ -5900,7 +5902,7 @@ button.price-badge:hover {
 /* Ajustes de escala para celulares de 320 a 359px. */
 @media (max-width: 359px) {
   .workspace-app .workspace-main { padding-inline: 10px; }
-  .workspace-app .mobile-header-clean { padding-inline: 10px; }
+  .workspace-app .mobile-header-clean { --mobile-header-inset: 10px; padding-inline: var(--mobile-header-inset); }
   .workspace-app .workspace-welcome h2 { font-size: 18px; line-height: 1.3; }
   .workspace-app .stats-compact { padding: 10px; }
   .stats-compact-main { gap: 6px; flex-wrap: wrap; }
@@ -6159,7 +6161,7 @@ button.price-badge:hover {
     bottom: calc(76px + env(safe-area-inset-bottom));
   }
   /* O aviso ocupa a faixa do botão de adicionar: o botão some enquanto ele está à vista. */
-  .workspace-app:has(.undo-toast) .mobile-fab-add {
+  .mobile-fab-add.has-undo-toast {
     display: none;
   }
 }
