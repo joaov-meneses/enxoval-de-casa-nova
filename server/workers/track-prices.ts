@@ -1,3 +1,4 @@
+import { logger, stopPosthogLogs } from '../logger.ts';
 // Executa uma rodada do acompanhamento de preços e termina. Uso: npm run track-prices [-- --force]
 import { getPool } from '../database.ts';
 import { runPriceTracker } from './priceTrackerWorker.ts';
@@ -5,10 +6,11 @@ import { runPriceTracker } from './priceTrackerWorker.ts';
 try {
   const summary = await runPriceTracker({
     force: process.argv.includes('--force'),
-    log: message => console.log(message),
   });
-  if (summary.skipped) console.log('Outra rodada já está em andamento. Nada a fazer.');
-  else console.log(`Concluído: ${summary.checked} lidos, ${summary.updated} atualizados, ${summary.failed} com falha, ${summary.alertsSent} e-mails enviados.`);
+  logger.info({ event: 'prices.refresh.completed', ...summary }, 'Worker run completed.');
+} catch (err) {
+  logger.error({ event: 'prices.refresh.failed', err }, 'Worker run failed.');
+  process.exitCode = 1;
 } finally {
-  await getPool().end();
+  await Promise.allSettled([getPool().end(), stopPosthogLogs()]);
 }

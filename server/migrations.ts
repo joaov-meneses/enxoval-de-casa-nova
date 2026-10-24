@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { DEFAULT_ENXOVAL_TEMPLATE_NAME, DEFAULT_TEMPLATE_CATEGORIES, DEFAULT_TEMPLATE_ITEMS } from '../src/data.ts';
 import { seedCatalog } from './catalog/store.ts';
+import { migrateGrowth } from './growthSchema.ts';
+import { migrateFiscal } from './fiscal/schema.ts';
+import { migrateEnxovalValue } from './enxovalValueSchema.ts';
 import { getPool } from './database.ts';
 
 interface UserRow {
@@ -109,6 +112,25 @@ export async function migrateDatabase() {
       expires_at timestamptz NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS user_ip_events (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip inet NOT NULL,
+      event text NOT NULL CHECK (event IN ('signup', 'login', 'invitation_signup')),
+      occurred_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS user_ip_events_ip_time_idx ON user_ip_events(ip, occurred_at DESC);
+    CREATE INDEX IF NOT EXISTS user_ip_events_user_time_idx ON user_ip_events(user_id, occurred_at DESC);
+    CREATE INDEX IF NOT EXISTS user_ip_events_time_idx ON user_ip_events(occurred_at);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data bytea;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_version text;
+
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_activity_at timestamptz;
+    UPDATE sessions SET last_activity_at = created_at WHERE last_activity_at IS NULL;
+    ALTER TABLE sessions ALTER COLUMN last_activity_at SET DEFAULT now();
+    ALTER TABLE sessions ALTER COLUMN last_activity_at SET NOT NULL;
+    UPDATE sessions SET expires_at = created_at + interval '7 days'
+      WHERE expires_at > created_at + interval '7 days';
 
     CREATE TABLE IF NOT EXISTS enxovais (
       id uuid PRIMARY KEY,
@@ -205,6 +227,23 @@ export async function migrateDatabase() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_started_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_used boolean NOT NULL DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS billing_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS pass_notice_seen_session_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_intro_seen_subscription_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_ending_seen_subscription_id text;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at timestamptz;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_draft jsonb;
+    CREATE TABLE IF NOT EXISTS billing_checkouts (
+      user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      url text NOT NULL, expires_at timestamptz NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS billing_mail (
+      subscription_id text NOT NULL, kind text NOT NULL, sent_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (subscription_id, kind)
+    );
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_renews_at timestamptz;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_cancel_at_period_end boolean NOT NULL DEFAULT false;
     -- Passe da Casa Nova (pagamento único): acesso até esta data. users.plan não guarda 'pass'; o plano em vigor sai de effectivePlanSql.
@@ -258,8 +297,15 @@ export async function migrateDatabase() {
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_cents integer;
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_price_cents_non_negative;
     ALTER TABLE items ADD CONSTRAINT items_price_cents_non_negative CHECK (price_cents IS NULL OR price_cents >= 0);
-    ALTER TABLE items ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'needed';
-    UPDATE items SET status = 'bought' WHERE checked AND status = 'needed';
+    ALTER TABLE items ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'researching';
+    ALTER TABLE items ALTER COLUMN status SET DEFAULT 'researching';
+    UPDATE items SET status = CASE WHEN checked THEN 'bought' ELSE 'researching' END
+      WHERE status = 'needed';
+    UPDATE items SET status = 'researching', checked = false
+      WHERE status IN ('not_needed', 'discarded');
+    UPDATE items SET status = 'bought' WHERE checked AND status = 'researching';
+    UPDATE items SET checked = (status IN ('bought', 'received', 'owned'))
+      WHERE checked IS DISTINCT FROM (status IN ('bought', 'received', 'owned'));
     ALTER TABLE items ADD COLUMN IF NOT EXISTS discount_cents integer NOT NULL DEFAULT 0;
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_discount_cents_non_negative;
     ALTER TABLE items ADD CONSTRAINT items_discount_cents_non_negative CHECK (discount_cents >= 0);
@@ -279,7 +325,7 @@ export async function migrateDatabase() {
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_quantity_valid;
     ALTER TABLE items ADD CONSTRAINT items_quantity_valid CHECK (quantity >= 1 AND quantity <= 999);
     ALTER TABLE items DROP CONSTRAINT IF EXISTS items_status_valid;
-    ALTER TABLE items ADD CONSTRAINT items_status_valid CHECK (status IN ('needed', 'researching', 'bought', 'received', 'owned', 'not_needed', 'discarded'));
+    ALTER TABLE items ADD CONSTRAINT items_status_valid CHECK (status IN ('researching', 'bought', 'received', 'owned'));
 
     -- Planejamento de compras: data da mudança, localização e perfil de gasto passam a ser do enxoval.
     DO $$
@@ -369,7 +415,6 @@ export async function migrateDatabase() {
       canonical_url text,
       domain text NOT NULL,
       title text NOT NULL,
-      image_url text,
       current_price_cents integer,
       pix_price_cents integer,
       lowest_price_cents integer,
@@ -409,7 +454,6 @@ export async function migrateDatabase() {
     ALTER TABLE items ADD COLUMN IF NOT EXISTS tracked_product_id uuid REFERENCES tracked_products(id) ON DELETE SET NULL;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS target_price_cents integer;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS selected_variation text;
-    ALTER TABLE items ADD COLUMN IF NOT EXISTS image_url text;
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_alert_enabled boolean NOT NULL DEFAULT true;
     -- Qual preço da loja o item acompanha (normal ou no Pix) e o último preço avisado por e-mail (evita repetir o aviso).
     ALTER TABLE items ADD COLUMN IF NOT EXISTS price_basis text NOT NULL DEFAULT 'regular';
@@ -423,23 +467,10 @@ export async function migrateDatabase() {
     );
     CREATE INDEX IF NOT EXISTS items_tracked_product_id_idx ON items(tracked_product_id);
 
-    -- Imagens dos itens (enviadas ou importadas por link): já reduzidas e convertidas para WebP pelo servidor.
-    -- O item guarda só o endereço interno (/api/item-images/<id>). A mesma imagem não se repete dentro do enxoval.
-    CREATE TABLE IF NOT EXISTS item_images (
-      id uuid PRIMARY KEY,
-      enxoval_id uuid NOT NULL REFERENCES enxovais(id) ON DELETE CASCADE,
-      created_by uuid REFERENCES users(id) ON DELETE SET NULL,
-      content_type text NOT NULL DEFAULT 'image/webp',
-      data bytea NOT NULL,
-      width integer NOT NULL,
-      height integer NOT NULL,
-      byte_size integer NOT NULL,
-      sha256 text NOT NULL,
-      created_at timestamptz NOT NULL DEFAULT now(),
-      CONSTRAINT item_images_type_valid CHECK (content_type = 'image/webp'),
-      CONSTRAINT item_images_size_valid CHECK (byte_size > 0 AND byte_size <= 1048576)
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS item_images_enxoval_sha_unique ON item_images(enxoval_id, sha256);
+    -- Recurso de imagens dos itens removido: apaga arquivos e endereços já armazenados.
+    DROP TABLE IF EXISTS item_images;
+    ALTER TABLE items DROP COLUMN IF EXISTS image_url;
+    ALTER TABLE tracked_products DROP COLUMN IF EXISTS image_url;
 
     -- Nome de enxoval começa com letra maiúscula ("apartamento" vira "Apartamento"); o app já grava assim e isto
     -- corrige os nomes antigos. Só toca nos que ainda começam com minúscula.
@@ -551,6 +582,64 @@ export async function migrateDatabase() {
 
     ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_user_name_unique;
 
+    -- Fase 9: aparelho, verificação de e-mail e bloqueios.
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'email_verified_at'
+      ) THEN
+        -- Uma única vez: contas que já existiam (e já usavam o e-mail para recuperar a senha) contam como verificadas.
+        ALTER TABLE users ADD COLUMN email_verified_at timestamptz;
+        UPDATE users SET email_verified_at = created_at;
+      END IF;
+    END $$;
+    CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash text NOT NULL UNIQUE,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS email_verification_tokens_user_idx ON email_verification_tokens(user_id, created_at DESC);
+
+    ALTER TABLE user_ip_events ADD COLUMN IF NOT EXISTS device_id uuid;
+    ALTER TABLE user_ip_events ADD COLUMN IF NOT EXISTS user_agent text;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_id uuid;
+    CREATE INDEX IF NOT EXISTS sessions_device_id_idx ON sessions(device_id) WHERE device_id IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS user_devices (
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      device_id uuid NOT NULL,
+      first_seen_at timestamptz NOT NULL DEFAULT now(),
+      last_seen_at timestamptz NOT NULL DEFAULT now(),
+      ua_browser text,
+      ua_os text,
+      ua_device text,
+      PRIMARY KEY (user_id, device_id)
+    );
+    CREATE INDEX IF NOT EXISTS user_devices_device_idx ON user_devices(device_id);
+
+    CREATE TABLE IF NOT EXISTS bans (
+      id uuid PRIMARY KEY,
+      target_type text NOT NULL CHECK (target_type IN ('user', 'ip', 'cidr', 'device')),
+      target_value text NOT NULL,
+      scope text NOT NULL DEFAULT 'block_all' CHECK (scope IN ('block_all', 'block_auth')),
+      reason_code text NOT NULL,
+      notes text,
+      created_by text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz,
+      revoked_at timestamptz,
+      revoked_by text
+    );
+    CREATE INDEX IF NOT EXISTS bans_active_target_idx ON bans(target_type, target_value) WHERE revoked_at IS NULL;
+
+    CREATE TABLE IF NOT EXISTS auth_failures (
+      ip inet NOT NULL,
+      occurred_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS auth_failures_ip_time_idx ON auth_failures(ip, occurred_at DESC);
+
     CREATE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions(token_hash);
     CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
     CREATE INDEX IF NOT EXISTS enxovais_owner_id_idx ON enxovais(owner_id);
@@ -569,6 +658,9 @@ export async function migrateDatabase() {
 
   await seedDefaultTemplate(pool);
   await seedCatalog(pool);
+  await migrateGrowth(pool);
+  await migrateFiscal(pool);
+  await migrateEnxovalValue(pool);
 
   const usersResult = await pool.query<UserRow>(`
     SELECT DISTINCT u.id, u.name

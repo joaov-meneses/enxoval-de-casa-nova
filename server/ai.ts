@@ -28,13 +28,13 @@ import {
 } from './catalog/store.ts';
 import { categoryForRoom } from '../src/catalog/rooms.ts';
 import { MAX_ITEM_NAME_LENGTH } from '../src/data.ts';
-import { isDoneStatus, isInactiveStatus } from '../src/itemStatus.ts';
+import { isDoneStatus } from '../src/itemStatus.ts';
 import { weeksUntil } from '../src/onboarding/plan.ts';
 import { roomOfCategory } from '../src/planning/purchasePlan.ts';
 import { URGENCY_LEVELS } from '../src/planning/purchaseUrgency.ts';
 import type { AuthUser, EnxovalCategory, EnxovalItem } from '../src/types.ts';
 
-const HOUSINGS = ['apartamento', 'casa', 'studio'];
+const HOUSINGS = ['apartamento', 'casa', 'studio', 'kitnet'];
 const MIN_NAME_LENGTH = 3;
 
 export interface AiDependencies {
@@ -69,7 +69,11 @@ async function loadProfile(queryable: Queryable, enxovalId: string): Promise<Jev
     uf: row?.state ?? (typeof onboarding.state === 'string' ? onboarding.state : null),
     city: row?.city ?? null,
     spendingTier: row?.spending_tier ?? 'equilibrado',
-    weeksToMove: row?.move_date ? weeksUntil(row.move_date) : null
+    weeksToMove: row?.move_date ? weeksUntil(row.move_date) : null,
+    worries: Array.isArray(onboarding.worries) ? onboarding.worries.filter((value): value is string => typeof value === 'string' && ['start', 'waste', 'forget', 'budget', 'time'].includes(value)) : [],
+    usage: Array.isArray(onboarding.usage) ? onboarding.usage.filter((value): value is string => typeof value === 'string' && ['buy', 'spend', 'links', 'share'].includes(value)) : [],
+    owned: typeof onboarding.owned === 'string' && ['nada', 'algumas', 'boa'].includes(onboarding.owned) ? onboarding.owned : undefined,
+    style: typeof onboarding.style === 'string' && ['full', 'min', 'none'].includes(onboarding.style) ? onboarding.style : undefined
   };
 }
 
@@ -111,7 +115,7 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
       getCatalogIndex()
     ]);
     const classify = req.body?.classify === true;
-    const active = items.filter(item => !isInactiveStatus(item.status));
+    const active = items;
 
     // 1º o catálogo: item conhecido tem cômodo e grupo de função gravados, e a resposta sai do banco, sem Jev.
     const known = matchName(catalog, name).item;
@@ -189,7 +193,7 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
       res.json({ available: true, recommendation: null, reason: 'unknown_room' });
       return;
     }
-    const active = items.filter(item => !isInactiveStatus(item.status));
+    const active = items;
     // Quem já tem o item em outro ambiente não precisa dele de novo: o filtro olha a lista inteira.
     const candidates = candidatesFor(room, active.map(item => item.name), profile);
     const recommendation = await recommendNext({
@@ -228,7 +232,7 @@ export function registerAiRoutes(router: Router, deps: AiDependencies) {
     }
 
     const pending = items.filter(item =>
-      item.categoryId === category.id && !isDoneStatus(item.status) && !isInactiveStatus(item.status));
+      item.categoryId === category.id && !isDoneStatus(item.status));
     const scores = new Map<string, { urgency: number; confidence: number }>();
     for (const item of pending) {
       if (typeof item.aiUrgency === 'number') scores.set(item.id, { urgency: item.aiUrgency, confidence: item.aiUrgencyConfidence ?? 0 });

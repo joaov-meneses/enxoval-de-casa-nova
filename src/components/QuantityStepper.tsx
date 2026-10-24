@@ -1,4 +1,6 @@
-import { Minus, Plus } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
+import { Minus, Plus } from "@/src/components/icons";
 import { MAX_ITEM_QUANTITY, normalizeQuantity } from "../itemQuantity";
 
 interface QuantityStepperProps {
@@ -25,7 +27,7 @@ export function QuantityStepper({
   return (
     <div className="quantity-stepper">
       <div className="quantity-stepper-buttons">
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           aria-label="Diminuir quantidade"
           title="Diminuir quantidade"
@@ -33,8 +35,8 @@ export function QuantityStepper({
           disabled={disabled || current <= 1}
         >
           <Minus size={18} aria-hidden="true" />
-        </button>
-        <button
+        </Button>
+        <Button variant="brand" size="brand"
           type="button"
           aria-label="Aumentar quantidade"
           title="Aumentar quantidade"
@@ -42,9 +44,9 @@ export function QuantityStepper({
           disabled={disabled || current >= MAX_ITEM_QUANTITY}
         >
           <Plus size={18} aria-hidden="true" />
-        </button>
+        </Button>
       </div>
-      <input
+      <Input
         id={id}
         aria-label="Quantidade"
         inputMode="numeric"

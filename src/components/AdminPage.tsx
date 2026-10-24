@@ -1,3 +1,7 @@
+import { Badge } from "@/src/components/ui/badge";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
 import {
   useCallback,
   useEffect,
@@ -21,13 +25,14 @@ import {
   UserCheck,
   UserRoundX,
   Users,
-} from "lucide-react";
+} from "@/src/components/icons";
 import {
   adminLogin,
   adminLogout,
   adminSession,
   ApiError,
   fetchAdminUsers,
+  markUserEmailVerified,
   resetUserPassword,
   setUserActive,
 } from "../api";
@@ -36,6 +41,8 @@ import { Brand } from "./Brand";
 import { Dialog } from "./Dialog";
 import { AdminCatalog } from "./AdminCatalog";
 import { AdminFeedbackList } from "./AdminFeedback";
+import { AdminOperations } from "./AdminOperations";
+import { AdminBanDialog, AdminBanList, BAN_REASON_LABEL, describeDevice } from "./AdminBans";
 
 const date = (value: string | null) =>
   value
@@ -67,6 +74,9 @@ export function AdminPage() {
     expiresAt: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [banUser, setBanUser] = useState<AdminUser | null>(null);
+  const [bansKey, setBansKey] = useState(0);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const temporaryRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (temporary) temporaryRef.current?.focus();
@@ -162,6 +172,24 @@ export function AdminPage() {
       setRefreshing(false);
     }
   }
+  async function confirmEmail(user: AdminUser) {
+    setVerifyingId(user.id);
+    setError("");
+    try {
+      const { emailVerifiedAt } = await markUserEmailVerified(user.id);
+      setUsers((current) =>
+        current.map((entry) => (entry.id === user.id ? { ...entry, emailVerifiedAt } : entry)),
+      );
+    } catch (err) {
+      setError(handleError(err));
+    } finally {
+      setVerifyingId(null);
+    }
+  }
+  function bansChanged() {
+    setBansKey((key) => key + 1);
+    void refresh();
+  }
   function openAction(user: AdminUser, kind: Action["kind"]) {
     setDialogError("");
     setTemporary(null);
@@ -241,9 +269,9 @@ export function AdminPage() {
             acesso.
           </p>
           <form className="auth-form" onSubmit={signIn} aria-busy={busy}>
-            <label htmlFor="admin-login">
+            <Label htmlFor="admin-login">
               Login administrativo
-              <input
+              <Input
                 id="admin-login"
                 value={login}
                 onChange={(event) => setLogin(event.target.value)}
@@ -253,11 +281,11 @@ export function AdminPage() {
                 disabled={busy}
                 placeholder="Seu login de gestão"
               />
-            </label>
-            <label htmlFor="admin-password">
+            </Label>
+            <Label htmlFor="admin-password">
               Senha administrativa
               <span className="password-field">
-                <input
+                <Input
                   id="admin-password"
                   type={visible ? "text" : "password"}
                   value={password}
@@ -267,21 +295,21 @@ export function AdminPage() {
                   maxLength={512}
                   disabled={busy}
                 />
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
                   onClick={() => setVisible(!visible)}
                 >
                   {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                </Button>
               </span>
-            </label>
+            </Label>
             {error && (
               <div className="form-error" role="alert">
                 {error}
               </div>
             )}
-            <button
+            <Button variant="brand" size="brand"
               className="button button-dark"
               disabled={busy}
               type="submit"
@@ -293,7 +321,7 @@ export function AdminPage() {
                   Entrar na gestão <ArrowRight size={18} />
                 </>
               )}
-            </button>
+            </Button>
           </form>
           <a className="account-signout" href="/login">
             <ArrowLeft size={16} /> Voltar ao login do aplicativo
@@ -315,7 +343,7 @@ export function AdminPage() {
         (filter === "active" && user.isActive) ||
         (filter === "inactive" && !user.isActive) ||
         (filter === "reset" && user.mustChangePassword)) &&
-      `${user.name} ${user.email}`
+      `${user.name} ${user.email} ${(user.ipAddresses ?? []).join(" ")} ${(user.devices ?? []).map((device) => device.deviceId).join(" ")}`
         .toLocaleLowerCase("pt-BR")
         .includes(normalized),
   );
@@ -329,13 +357,13 @@ export function AdminPage() {
           <span className="admin-session-label">
             <ShieldCheck size={16} /> {session}
           </span>
-          <button
+          <Button variant="brand" size="brand"
             className="button button-outline"
             onClick={() => void signOut()}
             disabled={busy}
           >
             <LogOut size={16} /> Sair
-          </button>
+          </Button>
         </div>
       </header>
       <main className="admin-main">
@@ -345,14 +373,14 @@ export function AdminPage() {
             <h1>Cuidado com cada acesso.</h1>
             <p>Encontre uma conta, acompanhe seu status e ajude a recomeçar.</p>
           </div>
-          <button
+          <Button variant="brand" size="brand"
             className="button button-outline"
             onClick={() => void refresh()}
             disabled={refreshing || busy}
           >
             <RefreshCw size={17} className={refreshing ? "animate-spin" : ""} />{" "}
             Atualizar
-          </button>
+          </Button>
         </section>
         <div className="admin-summary">
           <div>
@@ -381,16 +409,16 @@ export function AdminPage() {
         >
           <div className="admin-users-heading">
             <h2 id="users-title">Usuários</h2>
-            <label className="admin-search">
+            <Label className="admin-search">
               <Search size={18} aria-hidden="true" />
-              <input
+              <Input
                 aria-label="Buscar usuários"
                 type="search"
-                placeholder="Busque por nome ou e-mail"
+                placeholder="Busque por nome, e-mail, IP ou aparelho"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-            </label>
+            </Label>
           </div>
           <div
             className="admin-filters"
@@ -405,7 +433,7 @@ export function AdminPage() {
                 ["reset", "Troca pendente"],
               ] as const
             ).map(([value, label]) => (
-              <button
+              <Button variant="brand" size="brand"
                 key={value}
                 aria-pressed={filter === value}
                 className={filter === value ? "active" : ""}
@@ -413,7 +441,7 @@ export function AdminPage() {
               >
                 {label}
                 <span>{counts[value]}</span>
-              </button>
+              </Button>
             ))}
           </div>
           {error && (
@@ -438,19 +466,27 @@ export function AdminPage() {
                   </div>
                 </div>
                 <div className="admin-user-status">
-                  <span
+                  <Badge asChild variant="outline"><span
                     className={`admin-badge ${user.isActive ? "active" : "inactive"}`}
                   >
                     {user.isActive ? "Ativo" : "Inativo"}
-                  </span>
+                  </span></Badge>
                   {user.mustChangePassword && (
-                    <span className="admin-badge pending">
+                    <Badge asChild variant="outline"><span className="admin-badge pending">
                       {user.passwordResetExpiresAt &&
                       new Date(user.passwordResetExpiresAt).getTime() <=
                         Date.now()
                         ? "Senha temporária expirada"
                         : "Troca de senha pendente"}
-                    </span>
+                    </span></Badge>
+                  )}
+                  {user.emailVerifiedAt === null && (
+                    <Badge asChild variant="outline"><span className="admin-badge pending">E-mail não confirmado</span></Badge>
+                  )}
+                  {user.activeBan && (
+                    <Badge asChild variant="outline"><span className="admin-badge inactive" title={user.activeBan.expiresAt ? `Até ${date(user.activeBan.expiresAt)}` : "Sem prazo"}>
+                      Bloqueada · {BAN_REASON_LABEL[user.activeBan.reasonCode] ?? user.activeBan.reasonCode}
+                    </span></Badge>
                   )}
                 </div>
                 <div className="admin-user-activity">
@@ -461,24 +497,55 @@ export function AdminPage() {
                     {user.workspaceCount}{" "}
                     {user.workspaceCount === 1 ? "enxoval" : "enxovais"}
                   </small>
+                  <small>
+                    IPs (6 meses): {user.ipAddresses?.length ? user.ipAddresses.join(", ") : "Nenhum registrado"}
+                  </small>
+                  <small>
+                    Aparelhos:{" "}
+                    {user.devices?.length
+                      ? user.devices.map((device) => (
+                          <span key={device.deviceId} className="admin-device" title={`${device.deviceId} · visto em ${date(device.lastSeenAt)}`}>
+                            {describeDevice(device)}
+                          </span>
+                        ))
+                      : "Nenhum registrado"}
+                  </small>
                 </div>
                 <div className="admin-user-actions">
-                  <button
+                  <Button variant="brand" size="brand"
                     className="button button-outline"
                     disabled={!user.isActive || busy}
                     onClick={() => openAction(user, "reset")}
                     aria-label={`Redefinir senha de ${user.email}`}
                   >
                     <KeyRound size={16} /> Redefinir senha
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="brand" size="brand"
                     className="admin-status-action"
                     disabled={busy}
                     onClick={() => openAction(user, "status")}
                     aria-label={`${user.isActive ? "Desativar" : "Reativar"} ${user.email}`}
                   >
                     {user.isActive ? "Desativar conta" : "Reativar conta"}
-                  </button>
+                  </Button>
+                  {user.emailVerifiedAt === null && (
+                    <Button variant="brand" size="brand"
+                      className="admin-status-action"
+                      disabled={busy || verifyingId === user.id}
+                      onClick={() => void confirmEmail(user)}
+                      aria-label={`Confirmar o e-mail de ${user.email}`}
+                    >
+                      Confirmar e-mail
+                    </Button>
+                  )}
+                  <Button variant="brand" size="brand"
+                    className="admin-status-action"
+                    disabled={busy}
+                    onClick={() => setBanUser(user)}
+                    aria-label={`Bloquear ${user.email}`}
+                  >
+                    Bloquear…
+                  </Button>
                 </div>
               </article>
             ))}
@@ -503,8 +570,10 @@ export function AdminPage() {
             mantêm seus itens e listas.
           </p>
         </section>
+        <AdminBanList refreshKey={bansKey} onChanged={bansChanged} onError={(err) => setError(handleError(err))} />
         <AdminCatalog onError={(err) => setError(handleError(err))} />
         <AdminFeedbackList onError={(err) => setError(handleError(err))} />
+        <AdminOperations onError={(err) => setError(handleError(err))} />
       </main>
       <Dialog
         isOpen={Boolean(action)}
@@ -540,12 +609,12 @@ export function AdminPage() {
                   Envie esta senha diretamente à pessoa. Ela precisará escolher
                   uma nova senha antes de acessar o enxoval.
                 </p>
-                <label
+                <Label
                   className="admin-temporary-label"
                   htmlFor="temporary-password"
                 >
                   Senha temporária
-                  <input
+                  <Input
                     id="temporary-password"
                     ref={temporaryRef}
                     readOnly
@@ -554,14 +623,14 @@ export function AdminPage() {
                     spellCheck={false}
                     onFocus={(event) => event.target.select()}
                   />
-                </label>
-                <button
+                </Label>
+                <Button variant="brand" size="brand"
                   className="button button-outline admin-copy"
                   onClick={() => void copyPassword()}
                 >
                   {copied ? <Check size={17} /> : <Copy size={17} />}
                   {copied ? "Senha copiada" : "Copiar senha"}
-                </button>
+                </Button>
                 <p className="admin-temporary-note">
                   Válida até {date(temporary.expiresAt)}. Esta senha aparece
                   apenas agora; ao fechar, será necessário gerar outra se você
@@ -572,7 +641,7 @@ export function AdminPage() {
                     {dialogError}
                   </div>
                 )}
-                <button
+                <Button variant="brand" size="brand"
                   className="button button-dark"
                   onClick={() => {
                     setAction(null);
@@ -580,7 +649,7 @@ export function AdminPage() {
                   }}
                 >
                   Já copiei, concluir
-                </button>
+                </Button>
               </>
             ) : (
               <>
@@ -597,15 +666,15 @@ export function AdminPage() {
                   </div>
                 )}
                 <div className="admin-dialog-actions">
-                  <button
+                  <Button variant="brand" size="brand"
                     className="button button-outline"
                     data-dialog-autofocus
                     disabled={busy}
                     onClick={() => setAction(null)}
                   >
                     Cancelar
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="brand" size="brand"
                     className={`button ${action.kind === "status" && action.user.isActive ? "admin-danger-button" : "button-dark"}`}
                     disabled={busy}
                     onClick={() => void confirmAction()}
@@ -619,13 +688,21 @@ export function AdminPage() {
                     ) : (
                       "Reativar conta"
                     )}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
           </div>
         )}
       </Dialog>
+      <AdminBanDialog
+        user={banUser}
+        onClose={() => setBanUser(null)}
+        onCreated={() => {
+          setBanUser(null);
+          bansChanged();
+        }}
+      />
     </div>
   );
 }

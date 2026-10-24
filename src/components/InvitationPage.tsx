@@ -1,3 +1,6 @@
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -6,7 +9,7 @@ import {
   LoaderCircle,
   TriangleAlert,
   UserPlus,
-} from "lucide-react";
+} from "@/src/components/icons";
 import {
   acceptInvitation,
   checkInvitation,
@@ -16,7 +19,9 @@ import {
 } from "../api";
 import { storeEnxovalId } from "../enxovais";
 import type { BootstrapData, InvitationPreview } from "../types";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordPolicyError } from "../../shared/passwordPolicy";
 import { Brand } from "./Brand";
+import { PasswordRules } from "./PasswordRules";
 
 // O token vem no fragmento (#token=...) do link do e-mail. É lido uma vez, no carregamento do módulo,
 // porque o fragmento é apagado da barra de endereço logo depois (ele não deve ficar no histórico).
@@ -96,6 +101,11 @@ export function InvitationPage() {
 
   function createAccount(event: FormEvent) {
     event.preventDefault();
+    const weak = passwordPolicyError(password);
+    if (weak) {
+      setError(weak);
+      return;
+    }
     if (password !== confirmation) {
       setError("As senhas não coincidem.");
       return;
@@ -130,29 +140,30 @@ export function InvitationPage() {
   const otherAccount = sessionEmail !== null && !sameAccount;
 
   const passwordInput = (id: string, label: string, autoComplete: string) => (
-    <label htmlFor={id}>
+    <Label htmlFor={id}>
       {label}
       <span className="password-field">
-        <input
+        <Input
           id={id}
           type={visible ? "text" : "password"}
           autoComplete={autoComplete}
-          minLength={accountExists ? undefined : 8}
-          maxLength={128}
+          minLength={accountExists ? undefined : PASSWORD_MIN_LENGTH}
+          maxLength={PASSWORD_MAX_LENGTH}
           required
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          aria-describedby={accountExists ? undefined : "invite-password-rules"}
           disabled={busy}
         />
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
           onClick={() => setVisible(!visible)}
         >
           {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
+        </Button>
       </span>
-    </label>
+    </Label>
   );
 
   return (
@@ -185,9 +196,9 @@ export function InvitationPage() {
                 `Ele pode ter expirado (vale por 7 dias), já ter sido usado ou ter
               sido cancelado. Peça um novo convite a quem convidou você.`}
             </p>
-            <a className="button button-dark account-cta" href="/app">
+            <Button asChild variant="brand" size="brand"><a className="button button-dark account-cta" href="/app">
               Ir para o login <ArrowRight size={18} />
-            </a>
+            </a></Button>
           </>
         )}
 
@@ -208,9 +219,9 @@ export function InvitationPage() {
 
             {!accountExists && (
               <form className="auth-form" onSubmit={createAccount} aria-busy={busy}>
-                <label htmlFor="invite-name">
+                <Label htmlFor="invite-name">
                   Seu nome
-                  <input
+                  <Input
                     id="invite-name"
                     type="text"
                     autoComplete="name"
@@ -221,33 +232,34 @@ export function InvitationPage() {
                     onChange={(event) => setName(event.target.value)}
                     disabled={busy}
                   />
-                </label>
+                </Label>
                 {passwordInput("invite-password", "Crie uma senha", "new-password")}
-                <label htmlFor="invite-confirmation">
+                <PasswordRules password={password} id="invite-password-rules" />
+                <Label htmlFor="invite-confirmation">
                   Confirme a senha
-                  <input
+                  <Input
                     id="invite-confirmation"
                     type={visible ? "text" : "password"}
                     autoComplete="new-password"
-                    minLength={8}
-                    maxLength={128}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
                     required
                     value={confirmation}
                     onChange={(event) => setConfirmation(event.target.value)}
                     placeholder="Digite novamente"
                     disabled={busy}
                   />
-                </label>
+                </Label>
                 <p className="account-password-hint">
-                  Use pelo menos 8 caracteres. Esta conta serve para usar os
-                  enxovais para os quais você for convidado.
+                  Esta conta serve para usar os enxovais para os quais você for
+                  convidado.
                 </p>
                 {error && (
                   <div className="form-error" role="alert">
                     {error}
                   </div>
                 )}
-                <button className="button button-dark" type="submit" disabled={busy}>
+                <Button variant="brand" size="brand" className="button button-dark" type="submit" disabled={busy}>
                   {busy ? (
                     <LoaderCircle className="animate-spin" size={18} />
                   ) : (
@@ -255,7 +267,7 @@ export function InvitationPage() {
                       Aceitar e entrar <ArrowRight size={18} />
                     </>
                   )}
-                </button>
+                </Button>
               </form>
             )}
 
@@ -266,7 +278,7 @@ export function InvitationPage() {
                     {error}
                   </div>
                 )}
-                <button
+                <Button variant="brand" size="brand"
                   className="button button-dark"
                   type="button"
                   disabled={busy}
@@ -279,7 +291,7 @@ export function InvitationPage() {
                       Aceitar convite <ArrowRight size={18} />
                     </>
                   )}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -289,13 +301,13 @@ export function InvitationPage() {
                   Você está logado como {sessionEmail}, mas o convite é para{" "}
                   {invited}.
                 </p>
-                <button
+                <Button variant="brand" size="brand"
                   className="button button-dark"
                   type="button"
                   onClick={() => void switchAccount()}
                 >
                   Entrar com {invited} <ArrowRight size={18} />
-                </button>
+                </Button>
               </div>
             )}
 
@@ -312,7 +324,7 @@ export function InvitationPage() {
                     {error}
                   </div>
                 )}
-                <button className="button button-dark" type="submit" disabled={busy}>
+                <Button variant="brand" size="brand" className="button button-dark" type="submit" disabled={busy}>
                   {busy ? (
                     <LoaderCircle className="animate-spin" size={18} />
                   ) : (
@@ -320,7 +332,7 @@ export function InvitationPage() {
                       Entrar e aceitar <ArrowRight size={18} />
                     </>
                   )}
-                </button>
+                </Button>
               </form>
             )}
           </>

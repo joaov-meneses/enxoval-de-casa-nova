@@ -1,5 +1,8 @@
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
 import { useEffect, useState, type FormEvent } from "react";
-import { ArrowRight, KeyRound, LoaderCircle, MailCheck } from "lucide-react";
+import { ArrowRight, KeyRound, LoaderCircle, MailCheck } from "@/src/components/icons";
 import { requestPasswordReset } from "../api";
 import { Brand } from "./Brand";
 
@@ -86,7 +89,7 @@ export function ForgotPasswordPage() {
                 {error}
               </div>
             )}
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               className="button button-outline account-resend"
               disabled={busy || wait > 0}
@@ -99,7 +102,7 @@ export function ForgotPasswordPage() {
               ) : (
                 "Reenviar o link"
               )}
-            </button>
+            </Button>
           </>
         ) : (
           <>
@@ -109,9 +112,9 @@ export function ForgotPasswordPage() {
               para você criar uma nova senha.
             </p>
             <form className="auth-form" onSubmit={send} aria-busy={busy}>
-              <label htmlFor="forgot-email">
+              <Label htmlFor="forgot-email">
                 Seu e-mail
-                <input
+                <Input
                   id="forgot-email"
                   type="email"
                   value={email}
@@ -123,13 +126,13 @@ export function ForgotPasswordPage() {
                   maxLength={254}
                   disabled={busy}
                 />
-              </label>
+              </Label>
               {error && (
                 <div className="form-error" role="alert">
                   {error}
                 </div>
               )}
-              <button
+              <Button variant="brand" size="brand"
                 className="button button-dark"
                 type="submit"
                 disabled={busy || !email.trim()}
@@ -141,7 +144,7 @@ export function ForgotPasswordPage() {
                     Enviar link de redefinição <ArrowRight size={18} />
                   </>
                 )}
-              </button>
+              </Button>
             </form>
           </>
         )}

@@ -1,0 +1,38 @@
+.workspace-loading { min-height: 100dvh; display: grid; grid-template-columns: 280px minmax(0, 1fr); background: var(--cm-bg); color: var(--cm-text); }
+.workspace-loading-sidebar { padding: 28px 24px; border-right: 1px solid var(--cm-line, #e7ded1); background: var(--cm-card, #fff); }
+.workspace-loading-nav { display: grid; gap: 26px; margin-top: 56px; }
+.workspace-loading-nav span, .workspace-loading-bar, .workspace-loading-check { display: block; border-radius: 6px; background: color-mix(in oklab, var(--cm-sand) 25%, var(--cm-bg)); }
+.workspace-loading-nav span { width: 70%; height: 15px; }
+.workspace-loading-nav span:nth-child(even) { width: 55%; }
+.workspace-loading-body { min-width: 0; }
+.workspace-loading-header { min-height: 78px; display: flex; justify-content: space-between; align-items: center; padding: 20px 36px; border-bottom: 1px solid var(--cm-line, #e7ded1); background: var(--cm-card, #fff); }
+.workspace-loading-header > .brand { display: none; }
+.workspace-loading-header > .workspace-loading-bar { width: 180px; height: 24px; }
+.workspace-loading-content { max-width: 1240px; margin: auto; padding: 36px; }
+.workspace-loading-label { margin: 0 0 24px; font-size: 14px; color: var(--cm-muted, #6f6358); }
+.workspace-loading-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 32px; }
+.workspace-loading-summary > div { min-height: 172px; display: grid; align-content: start; gap: 28px; padding: 24px; border: 1px solid var(--cm-line, #e7ded1); border-radius: 12px; background: var(--cm-card, #fff); }
+.workspace-loading-summary .workspace-loading-bar:first-child { height: 14px; width: 45%; }
+.workspace-loading-summary .workspace-loading-bar:last-child { height: 28px; width: 65%; }
+.workspace-loading-items { display: grid; gap: 8px; }
+.workspace-loading-items > div { display: flex; align-items: center; gap: 20px; padding: 24px 20px; min-height: 82px; border: 1px solid var(--cm-line, #e7ded1); border-radius: 8px; }
+.workspace-loading-check { width: 24px; height: 24px; flex: none; }
+.workspace-loading-items .workspace-loading-bar { width: min(55%, 380px); height: 14px; }
+.workspace-loading-error { padding: 24px; margin-bottom: 24px; border: 1px solid var(--cm-line, #e7ded1); border-radius: 12px; background: var(--cm-card, #fff); }
+.workspace-loading-error h1 { font: 500 24px/1.25 var(--serif); margin: 0 0 12px; }
+.workspace-loading-error p { margin: 0 0 18px; }
+.workspace-loading-error > div { display: flex; flex-wrap: wrap; gap: 12px; }
+@media (max-width: 1023px) {
+  .workspace-loading { grid-template-columns: minmax(0, 1fr); }
+  .workspace-loading-sidebar { display: none; }
+  .workspace-loading-header { padding: 16px 20px; }
+  .workspace-loading-header > .brand { display: inline-flex; }
+  .workspace-loading-header > .workspace-loading-bar { width: 36px; height: 24px; }
+  .workspace-loading-content { padding: 24px 20px; }
+}
+@media (max-width: 479px) {
+  .workspace-loading-summary { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 24px; }
+  .workspace-loading-summary > div { min-height: 108px; gap: 20px; padding: 20px; }
+  .workspace-loading-items > div { padding: 18px 14px; min-height: 70px; }
+  .workspace-loading-error { padding: 20px; }
+}

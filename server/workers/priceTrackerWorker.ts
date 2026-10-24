@@ -1,8 +1,13 @@
 // Rotina que relê os preços dos produtos acompanhados, guarda o histórico e avisa por e-mail quando um item baixa.
 // Roda sozinha a cada 12 horas dentro do servidor (ver `startPriceTrackerScheduler`) ou sob demanda: npm run track-prices
 import { getPool } from '../database.ts';
+import { logger } from '../logger.ts';
 import { canDeliverMail, priceOpportunityEmail, sendMail, type PriceOpportunity } from '../mailer.ts';
-import { ScrapeError, scrapeProduct, type ScrapedProductPreview } from '../services/productScraper.ts';
+import { frequencyGate, recordExternalSend } from '../lifecycle/frequency.ts';
+import { registerJob, trackJob } from '../jobMonitor.ts';
+import { captureServerEvent } from '../productAnalytics.ts';
+import { domainOf, ScrapeError, scrapeProduct, type ScrapedProductPreview } from '../services/productScraper.ts';
+import { storeLabel } from '../../src/priceTracking.ts';
 import { recordScrape, recordScrapeFailure, type ScrapeOutcome } from '../trackedProducts.ts';
 
 export const PRICE_CHECK_INTERVAL_MS = 12 * 60 * 60_000;
@@ -48,10 +53,15 @@ async function dueProducts(limit: number, force: boolean) {
   const result = await getPool().query<DueProduct>(`
     SELECT tp.id, tp.url
     FROM tracked_products tp
-    WHERE EXISTS (
+    WHERE (EXISTS (
         SELECT 1 FROM items i
-        WHERE i.tracked_product_id = tp.id AND i.status IN ('needed', 'researching')
-      )
+        WHERE i.tracked_product_id = tp.id AND i.status = 'researching'
+      ) OR EXISTS (
+        -- Outras lojas do item (Fase 11.5) também são relidas enquanto o item está a comprar.
+        SELECT 1 FROM item_offers o
+        INNER JOIN items i ON i.id = o.item_id
+        WHERE o.tracked_product_id = tp.id AND i.status = 'researching'
+      ))
       AND ($2::boolean OR tp.last_scraped_at IS NULL OR tp.last_scraped_at < now() - interval '12 hours')
     ORDER BY tp.last_scraped_at ASC NULLS FIRST
     LIMIT $1
@@ -98,9 +108,10 @@ async function alertCandidates(productId: string) {
       ORDER BY ps.region DESC
       LIMIT 1
     ) cps ON true
-    WHERE i.tracked_product_id = $1
+    WHERE (i.tracked_product_id = $1
+        OR EXISTS (SELECT 1 FROM item_offers o WHERE o.item_id = i.id AND o.tracked_product_id = $1))
       AND i.price_alert_enabled
-      AND i.status IN ('needed', 'researching')
+      AND i.status = 'researching'
   `, [productId]);
   return result.rows;
 }
@@ -145,7 +156,7 @@ async function collectOpportunities(
 
     for (const person of candidate.recipients) {
       const entry = outbox.get(person.email) ?? { name: person.name, items: [] };
-      entry.items.push({ itemId: candidate.item_id, alertedPriceCents: current, itemName: candidate.item_name, enxovalName: candidate.enxoval_name, priceCents: current, reason, url: productUrl, commonRange });
+      entry.items.push({ itemId: candidate.item_id, alertedPriceCents: current, itemName: candidate.item_name, enxovalName: candidate.enxoval_name, priceCents: current, reason, url: productUrl, commonRange, storeName: storeLabel(domainOf(productUrl)) });
       outbox.set(person.email, entry);
     }
   }
@@ -153,7 +164,8 @@ async function collectOpportunities(
 
 /** Uma rodada completa. Devolve o resumo; se outra rodada já está em andamento, não faz nada (`skipped`). */
 export async function runPriceTracker(options: PriceTrackerOptions = {}): Promise<PriceTrackerSummary> {
-  const log = options.log ?? (() => undefined);
+  const log = options.log ?? (message => logger.info({ event: 'prices.refresh.progress' }, message));
+  logger.info({ event: 'prices.refresh.started', options: { limit: options.limit, force: options.force } }, 'Price refresh started.');
   const sleep = options.sleep ?? wait;
   const scrape = options.scrape ?? scrapeProduct;
   const summary: PriceTrackerSummary = { checked: 0, updated: 0, failed: 0, alertsSent: 0, skipped: false };
@@ -179,24 +191,35 @@ export async function runPriceTracker(options: PriceTrackerOptions = {}): Promis
           const outcome = await recordScrape(getPool(), product.id, preview);
           await collectOpportunities(product.id, product.url, preview, outcome, outbox);
           summary.updated += 1;
+          logger.info({ event: 'prices.product.completed', product, preview, outcome }, 'Product price updated.');
           log(`ok ${product.url} -> ${preview.priceCents ?? 'sem preço'}`);
         } catch (error) {
           summary.failed += 1;
+          logger.error({ event: 'prices.product.failed', product, err: error }, 'Product price refresh failed.');
           await recordScrapeFailure(getPool(), product.id, error);
           log(`falhou ${product.url}: ${error instanceof ScrapeError ? error.code : (error as Error).message}`);
         }
       }
 
       if (outbox.size > 0 && canDeliverMail()) {
+        // Mesmo limite dos e-mails de ciclo de vida: quem já recebeu e-mail hoje recebe o alerta na próxima rodada
+        // (o preço não é marcado como avisado, então o alerta continua pendente).
+        const { allowed, deferred } = await frequencyGate([...outbox.keys()]);
+        if (deferred.length) logger.info({ event: 'prices.alert.deferred', count: deferred.length }, 'Price alerts deferred by the frequency limit.');
         for (const [email, { name, items }] of outbox) {
+          if (!allowed.has(email)) continue;
           try {
-            await sendMail(priceOpportunityEmail({ to: email, name, opportunities: items }));
+            const delivery = await sendMail(priceOpportunityEmail({ to: email, name, opportunities: items }));
             summary.alertsSent += 1;
+            const userId = allowed.get(email) ?? null;
+            await recordExternalSend(userId, 'price_drop', delivery.providerMessageId);
+            if (userId) captureServerEvent(userId, 'price_alert_email_sent', { items_count: items.length });
             // Só marca o preço como avisado depois do envio: se o e-mail falhar, a próxima rodada tenta de novo.
             for (const item of items) {
               await getPool().query('UPDATE items SET last_alert_price_cents = $2 WHERE id = $1', [item.itemId, item.alertedPriceCents]);
             }
           } catch (error) {
+            logger.error({ event: 'prices.alert.failed', email, items, err: error }, 'Price alert failed.');
             log(`e-mail não enviado: ${(error as Error).message}`);
           }
         }
@@ -215,12 +238,13 @@ export async function runPriceTracker(options: PriceTrackerOptions = {}): Promis
  * Devolve uma função que cancela o agendamento.
  */
 export function startPriceTrackerScheduler() {
+  registerJob('price_tracker', PRICE_CHECK_INTERVAL_MS);
   const run = () => {
-    runPriceTracker({ log: message => console.log(`[preços] ${message}`) })
+    trackJob('price_tracker', () => runPriceTracker(), summary => summary.skipped)
       .then(summary => {
-        if (!summary.skipped && summary.checked > 0) console.log(`[preços] ${summary.updated} atualizados, ${summary.failed} com falha, ${summary.alertsSent} e-mails.`);
+        logger.info({ event: 'prices.refresh.completed', ...summary }, 'Rotina de preços concluída.');
       })
-      .catch(error => console.error('[preços] rodada interrompida:', error));
+      .catch(err => logger.error({ event: 'prices.refresh.failed', err }, 'Rotina de preços interrompida.'));
   };
   const first = setTimeout(run, 60_000);
   const repeat = setInterval(run, PRICE_CHECK_INTERVAL_MS);

@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
+import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { getLogger } from './logger.ts';
 
 dotenv.config({ path: '.env.local', quiet: true });
 dotenv.config({ quiet: true });
@@ -31,6 +33,9 @@ export function getPool() {
       connectionString,
       ssl: shouldUseSsl(connectionString) ? { rejectUnauthorized: false } : undefined
     }) as Pool;
+    pool.on('error', err => {
+      getLogger().error({ event: 'database.pool.error', err }, 'Conexão ociosa com o PostgreSQL falhou; o pool descartou a conexão.');
+    });
   }
 
   return pool;
@@ -41,13 +46,18 @@ export type Queryable = {
 };
 
 export async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) {
+  const transactionId = randomUUID();
+  const started = Date.now();
   const client = await getPool().connect();
+  getLogger().info({ event: 'database.transaction.started', transactionId }, 'Database transaction started.');
   try {
     await client.query('BEGIN');
     const result = await callback(client);
     await client.query('COMMIT');
+    getLogger().info({ event: 'database.transaction.committed', transactionId, duration_ms: Date.now() - started }, 'Database transaction committed.');
     return result;
   } catch (err) {
+    getLogger().error({ event: 'database.transaction.failed', transactionId, err, duration_ms: Date.now() - started }, 'Database transaction failed.');
     await client.query('ROLLBACK');
     throw err;
   } finally { client.release(); }

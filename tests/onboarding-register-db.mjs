@@ -1,8 +1,8 @@
-// Teste de integração com PostgreSQL real: o cadastro cria só a conta, e o funil /comecar monta o
-// primeiro enxoval depois, já autenticado, em POST /enxovais. Usa um schema descartável e nunca toca
+// checkout ou cria o enxoval de uma conta paga. Usa um schema descartável e nunca toca
 // em contas existentes. Rodar: npm run test:onboarding-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -67,11 +67,11 @@ try {
   /** Registra a conta (sem plano) e, já autenticado, cria o enxoval do funil (com plano). */
   const registerAndBuildPlan = async (answers, email) => {
     const plan = generatePlan(answers);
-    const password = randomBytes(16).toString("base64url");
+    const password = strongPassword();
     // O cadastro não pede o nome: ele vem do funil, junto do plano.
     const registered = await post("/auth/register", { email, password });
     if (registered.status !== 201) return { registered, plan };
-    // Conta paga: aqui o plano do funil precisa entrar inteiro (o corte do gratuito está em tests/freemium-db.mjs).
+    // Conta paga: o plano do funil entra inteiro; os limites de acesso estão em tests/freemium-db.mjs.
     await query("UPDATE users SET plan = 'monthly' WHERE id = $1", [registered.data.user.id]);
     const workspace = await post("/enxovais", {
       name: plan.enxovalName,
@@ -175,6 +175,10 @@ try {
     spendingTier: "equilibrado",
     worries: ["waste", "forget"],
     usage: ["buy", "share"],
+    worriesNone: false,
+    worriesOther: "",
+    usageNone: false,
+    usageOther: "",
     source: "instagram",
   });
 
@@ -230,6 +234,10 @@ try {
     spendingTier: "premium",
     worries: ["start", "waste", "forget", "budget", "time"],
     usage: ["buy", "spend", "links", "share"],
+    worriesNone: false,
+    worriesOther: "",
+    usageNone: false,
+    usageOther: "",
     source: "",
   });
   const secondCategories = await query(
@@ -239,8 +247,38 @@ try {
   assert.deepEqual(secondCategories.map((c) => c.name), ["Sala e Quarto", "Banheiro"]);
   console.log("PASS: studio, estilo minimalista, sem data e todas as preocupações e usos foram gravados.");
 
+  /* ---------------------------- 2b. kitnet, nenhum ambiente agora e "nenhuma das opções" com motivo */
+  const empty = {
+    ...lean,
+    name: "Bia",
+    housing: "kitnet",
+    rooms: [],
+    style: "none",
+    worries: [],
+    worriesNone: true,
+    worriesOther: "  Já tenho  quase tudo  ",
+    usage: [],
+    usageNone: true,
+    usageOther: "",
+  };
+  const third = await registerAndBuildPlan(empty, "bia@example.invalid");
+  assert.equal(third.plan.categories.length, 0, "sem ambientes, o plano vem vazio");
+  assert.equal(third.workspace.status, 201, JSON.stringify(third.workspace.data));
+  const [thirdEnxoval] = await query(
+    "SELECT id, onboarding_profile FROM enxovais WHERE owner_id = $1",
+    [third.registered.data.user.id],
+  );
+  assert.equal(thirdEnxoval.onboarding_profile.housing, "kitnet");
+  assert.deepEqual(thirdEnxoval.onboarding_profile.rooms, []);
+  assert.equal(thirdEnxoval.onboarding_profile.worriesNone, true);
+  assert.equal(thirdEnxoval.onboarding_profile.worriesOther, "Já tenho quase tudo");
+  assert.equal(thirdEnxoval.onboarding_profile.usageNone, true);
+  const [{ n: thirdCategories }] = await query("SELECT count(*)::int AS n FROM categories WHERE enxoval_id = $1", [thirdEnxoval.id]);
+  assert.equal(thirdCategories, 0, "enxoval nasce sem ambientes");
+  console.log("PASS: kitnet, nenhum ambiente e nenhuma das opções com motivo.");
+
   /* -------------------------------------------------------- 3. cadastro simples, sem plano nenhum */
-  const plainPassword = randomBytes(16).toString("base64url");
+  const plainPassword = strongPassword();
   const plain = await post("/auth/register", {
     name: "Sem Funil",
     email: "semfunil@example.invalid",
@@ -259,7 +297,7 @@ try {
   console.log("PASS: cadastro sem plano cria só a conta, sem nenhum enxoval.");
 
   /* ------------------------------------------------------------- 4. cadastro recusa e-mail repetido */
-  const dupe = await post("/auth/register", { name: "Duplicado", email: "jeo@example.invalid", password: "senha-segura" });
+  const dupe = await post("/auth/register", { name: "Duplicado", email: "jeo@example.invalid", password: "senha-segura-9" });
   assert.equal(dupe.status, 409, JSON.stringify(dupe.data));
   const [{ n: jeoAccounts }] = await query("SELECT count(*)::int AS n FROM users WHERE email = $1", ["jeo@example.invalid"]);
   assert.equal(jeoAccounts, 1, "e-mail repetido não duplica a conta");
@@ -269,7 +307,7 @@ try {
   const rejectAccount = await post("/auth/register", {
     name: "Rejeicoes",
     email: "rejeicoes@example.invalid",
-    password: "senha-segura",
+    password: "senha-segura-9",
   });
   assert.equal(rejectAccount.status, 201);
   const rejectUserId = rejectAccount.data.user.id;
@@ -293,7 +331,7 @@ try {
     ["estado inválido", () => ({ ...validPlanBody(), profile: { ...full, state: "ZZ" } })],
     ["data inexistente", () => ({ ...validPlanBody(), profile: { ...full, moveDate: "2026-02-31" } })],
     ["espaço inexistente", () => ({ ...validPlanBody(), profile: { ...full, rooms: ["cozinha", "quintal-secreto"] } })],
-    ["nenhum espaço", () => ({ ...validPlanBody(), profile: { ...full, rooms: [] } })],
+    ["nenhum espaço, mas plano com ambientes", () => ({ ...validPlanBody(), profile: { ...full, rooms: [] } })],
     ["orçamento ausente", () => ({ ...validPlanBody(), profile: { ...full, budget: null } })],
     ["origem com tipo errado", () => ({ ...validPlanBody(), profile: { ...full, source: 123 } })],
   ];
@@ -308,10 +346,23 @@ try {
   assert.equal(rejectedEnxovais, 0, "nenhuma das rejeições deixou um enxoval pela metade");
   console.log(`PASS: ${rejections.length} planos recusados em POST /enxovais (plano ou respostas inválidos) não deixam rastro.`);
 
-  // depois de tudo isso, o mesmo usuário ainda consegue montar o plano normalmente
+  // Após as rejeições, a conta gratuita salva o plano como rascunho até concluir o checkout.
   const finalAttempt = await post("/enxovais", validPlanBody());
-  assert.equal(finalAttempt.status, 201, JSON.stringify(finalAttempt.data));
-  console.log("PASS: depois das rejeições, um plano válido ainda é aceito na mesma conta.");
+  assert.equal(finalAttempt.status, 202, JSON.stringify(finalAttempt.data));
+  assert.deepEqual(finalAttempt.data, { completed: true, requiresCheckout: true });
+  const [savedDraft] = await query(
+    "SELECT plan, onboarding_completed_at, onboarding_draft FROM users WHERE id = $1",
+    [rejectUserId],
+  );
+  assert.equal(savedDraft.plan, 'free', 'salvar o rascunho não libera acesso pago');
+  assert.ok(savedDraft.onboarding_completed_at);
+  assert.deepEqual(savedDraft.onboarding_draft.plan, validPlanBody().plan);
+  const [{ n: activeEnxovais }] = await query(
+    "SELECT count(*)::int AS n FROM enxovais WHERE owner_id = $1",
+    [rejectUserId],
+  );
+  assert.equal(activeEnxovais, 0, 'o enxoval só é criado após ativar o acesso');
+  console.log("PASS: depois das rejeições, um plano válido é salvo até concluir o checkout.");
 } finally {
   if (server)
     await new Promise((resolve, reject) =>

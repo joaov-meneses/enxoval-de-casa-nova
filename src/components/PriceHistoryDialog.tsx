@@ -1,5 +1,7 @@
+import { Button } from "@/src/components/ui/button";
+import { Table, TableCaption, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/src/components/ui/table";
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Flame, LoaderCircle } from "lucide-react";
+import { ExternalLink, Flame, LoaderCircle } from "@/src/components/icons";
 import type { EnxovalItem, ItemPriceHistory } from "../types";
 import { fetchItemPriceHistory } from "../api";
 import { priceChange, storeLabel } from "../priceTracking";
@@ -27,6 +29,24 @@ interface Point {
   cents: number;
 }
 
+/** Outras lojas do item (Fase 11.5): uma linha por loja, em cores de ordem fixa (validadas para daltonismo). */
+const OFFER_COLORS = ["#2f6fa3", "#c98a3c", "#8b5cb8", "#c25a2e"];
+interface OfferSeries {
+  label: string;
+  color: string;
+  points: Point[];
+}
+
+function offerSeriesOf(history: ItemPriceHistory): OfferSeries[] {
+  return (history.offers ?? []).slice(0, OFFER_COLORS.length).flatMap((offer, index) => {
+    const points = offer.points.flatMap((point) => {
+      const time = Date.parse(point.date);
+      return point.priceCents && Number.isFinite(time) ? [{ time, cents: point.priceCents }] : [];
+    });
+    return points.length ? [{ label: storeLabel(offer.domain), color: OFFER_COLORS[index], points }] : [];
+  });
+}
+
 /** Pontos do gráfico no preço que o item acompanha (normal ou Pix); pontos sem esse preço ficam de fora. */
 function seriesOf(history: ItemPriceHistory): Point[] {
   return history.points.flatMap((point) => {
@@ -40,15 +60,19 @@ function PriceChart({
   points,
   initialCents,
   targetCents,
+  others = [],
 }: {
   points: Point[];
   initialCents: number | null;
   targetCents: number | null;
+  others?: OfferSeries[];
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const geometry = useMemo(() => {
+    const otherPoints = others.flatMap((series) => series.points);
     const values = [
       ...points.map((point) => point.cents),
+      ...otherPoints.map((point) => point.cents),
       ...(initialCents ? [initialCents] : []),
       ...(targetCents ? [targetCents] : []),
     ];
@@ -57,8 +81,8 @@ function PriceChart({
     const spread = max - min || max * 0.1 || 1;
     const low = min - spread * 0.12;
     const high = max + spread * 0.12;
-    const t0 = points[0].time;
-    const span = points[points.length - 1].time - t0;
+    const t0 = Math.min(points[0].time, ...otherPoints.map((point) => point.time));
+    const span = Math.max(points[points.length - 1].time, ...otherPoints.map((point) => point.time)) - t0;
     const x = (time: number) =>
       PAD.left +
       (span === 0
@@ -67,7 +91,7 @@ function PriceChart({
     const y = (cents: number) =>
       PAD.top + (1 - (cents - low) / (high - low)) * (HEIGHT - PAD.top - PAD.bottom);
     return { x, y };
-  }, [points, initialCents, targetCents]);
+  }, [points, initialCents, targetCents, others]);
 
   const { x, y } = geometry;
   const baseY = HEIGHT - PAD.bottom;
@@ -110,6 +134,20 @@ function PriceChart({
             <path className="price-chart-line" d={line} />
           </>
         ) : null}
+        {others.map((series) =>
+          series.points.length > 1 ? (
+            <path
+              key={series.label}
+              d={series.points.map((point, index) => `${index ? "L" : "M"}${x(point.time).toFixed(1)} ${y(point.cents).toFixed(1)}`).join(" ")}
+              fill="none"
+              stroke={series.color}
+              strokeWidth={2}
+              strokeLinejoin="round"
+            />
+          ) : (
+            <circle key={series.label} cx={x(series.points[0].time)} cy={y(series.points[0].cents)} r={4} fill={series.color} stroke="#fff" strokeWidth={2} />
+          ),
+        )}
         {active ? (
           <line className="price-chart-cursor" x1={x(active.time)} x2={x(active.time)} y1={PAD.top} y2={baseY} />
         ) : null}
@@ -136,20 +174,33 @@ function PriceChart({
           <span>{longDate.format(active.time)}</span>
         </div>
       ) : null}
-      <table className="sr-only">
-        <caption>Histórico de preços</caption>
-        <thead>
-          <tr><th>Data</th><th>Preço</th></tr>
-        </thead>
-        <tbody>
+      <Table className="sr-only">
+        <TableCaption>Histórico de preços</TableCaption>
+        <TableHeader>
+          <TableRow><TableHead>Data</TableHead><TableHead>Preço</TableHead></TableRow>
+        </TableHeader>
+        <TableBody>
           {points.map((point) => (
-            <tr key={point.time}>
-              <td>{longDate.format(point.time)}</td>
-              <td>{money.format(point.cents / 100)}</td>
-            </tr>
+            <TableRow key={point.time}>
+              <TableCell>{longDate.format(point.time)}</TableCell>
+              <TableCell>{money.format(point.cents / 100)}</TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
+      {others.map((series) => (
+        <Table key={series.label} className="sr-only">
+          <TableCaption>Histórico de preços em {series.label}</TableCaption>
+          <TableBody>
+            {series.points.map((point) => (
+              <TableRow key={point.time}>
+                <TableCell>{longDate.format(point.time)}</TableCell>
+                <TableCell>{money.format(point.cents / 100)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ))}
     </div>
   );
 }
@@ -186,6 +237,7 @@ export function PriceHistoryDialog({
   }, [isOpen, item.id]);
 
   const points = history ? seriesOf(history) : [];
+  const others = history ? offerSeriesOf(history) : [];
   const change = priceChange(tracking);
   const storeUrl = history?.url ?? tracking?.url;
 
@@ -239,9 +291,15 @@ export function PriceHistoryDialog({
               points={points}
               initialCents={history.initialPriceCents}
               targetCents={history.targetPriceCents}
+              others={others}
             />
             <ul className="price-history-legend">
-              <li><i className="legend-line" aria-hidden="true" /> Preço na loja</li>
+              <li><i className="legend-line" aria-hidden="true" /> {others.length ? `Preço em ${storeLabel(history.domain)} (principal)` : "Preço na loja"}</li>
+              {others.map((series) => (
+                <li key={series.label}>
+                  <i className="legend-line" style={{ borderTopColor: series.color }} aria-hidden="true" /> Preço em {series.label}
+                </li>
+              ))}
               {history.initialPriceCents ? (
                 <li><i className="legend-initial" aria-hidden="true" /> Preço em que você cadastrou</li>
               ) : null}
@@ -258,7 +316,7 @@ export function PriceHistoryDialog({
         ) : null}
 
         {storeUrl ? (
-          <a
+          <Button asChild variant="brand" size="brand"><a
             className="button button-dark price-history-store"
             href={storeUrl}
             target="_blank"
@@ -266,7 +324,7 @@ export function PriceHistoryDialog({
           >
             Ir para a loja{tracking ? ` (${storeLabel(tracking.domain)})` : ""}
             <ExternalLink size={15} aria-hidden="true" />
-          </a>
+          </a></Button>
         ) : null}
       </div>
     </Dialog>

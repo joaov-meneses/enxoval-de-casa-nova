@@ -1,0 +1,223 @@
+/* Parcelas por mês: barras empilhadas (assumidas + previsão) contra o teto mensal. Cores validadas (CVD ΔE ≥ 20). */
+.flow-card {
+  --flow-committed: #2f6fa3;
+  --flow-forecast: #c98a3c;
+  --flow-plot: 150px;
+  --flow-base: 26px;
+  display: grid;
+  gap: 16px;
+}
+.flow-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.flow-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.flow-stats div {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--cm-bg) 50%, #fff);
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, #fff);
+}
+.flow-stats dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.flow-stats dd {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--cm-text);
+}
+.flow-budget {
+  display: grid;
+  gap: 6px;
+}
+.flow-budget-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.flow-budget-row input {
+  max-width: 220px;
+}
+.flow-budget small {
+  font-size: 12px;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-bg) 15%, var(--cm-text));
+}
+.flow-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.flow-key {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.flow-key.is-committed { background: var(--flow-committed); }
+.flow-key.is-forecast { background: var(--flow-forecast); }
+.flow-key.is-budget {
+  height: 0;
+  border-top: 2px dashed var(--cm-text);
+  border-radius: 0;
+}
+.flow-chart {
+  position: relative;
+  overflow-x: auto;
+  padding-top: 18px;
+}
+.flow-budget-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--flow-base) + var(--flow-plot) * var(--ratio));
+  border-top: 2px dashed color-mix(in oklab, var(--cm-text) 70%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+.flow-months {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: min-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid color-mix(in oklab, var(--cm-sand) 80%, #fff);
+}
+.flow-month {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  flex: 1 0 40px;
+  max-width: 64px;
+}
+.flow-bar-hit {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 0 2px;
+  background: none;
+  border: 0;
+  cursor: default;
+}
+.flow-bar-hit:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.flow-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 2px;
+  width: 24px;
+  height: calc(var(--flow-plot) + 16px);
+}
+.flow-bar-value {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+  text-align: center;
+  margin: 0 -14px;
+  color: color-mix(in oklab, var(--cm-bg) 15%, var(--cm-text));
+  font-variant-numeric: tabular-nums;
+}
+.flow-seg {
+  display: block;
+  min-height: 3px;
+}
+.flow-seg.is-committed {
+  background: var(--flow-committed);
+}
+.flow-seg.is-forecast {
+  background: var(--flow-forecast);
+}
+.flow-bar > .flow-seg:nth-child(2) {
+  border-radius: 4px 4px 0 0;
+}
+.flow-month.is-over .flow-bar-value,
+.flow-month.is-over .flow-month-label {
+  color: #8a3a12;
+}
+.flow-month-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--flow-base);
+  font-size: 11px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+  white-space: nowrap;
+}
+.flow-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 3;
+  display: none;
+  gap: 2px;
+  min-width: 180px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--cm-text);
+  color: #fff;
+  font-size: 12px;
+  text-align: left;
+  transform: translateX(-50%);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+}
+.flow-bar-hit:hover .flow-tooltip,
+.flow-bar-hit:focus-visible .flow-tooltip {
+  display: grid;
+}
+.flow-tooltip-over {
+  font-weight: 700;
+  color: #ffd29a;
+}
+.flow-table summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--cm-primary-dark);
+}
+.flow-table table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.flow-table th,
+.flow-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in oklab, var(--cm-sand) 60%, #fff);
+  text-align: right;
+}
+.flow-table th:first-child {
+  text-align: left;
+}

@@ -1,13 +1,29 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { Download, FolderDown, Layers } from "lucide-react";
+import { Button } from "@/src/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "./ui/dropdown-menu";
+import { useEffect, useState } from "react";
+import { Dialog } from "./Dialog";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Download, FolderDown, Layers } from "@/src/components/icons";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import { exportItems, type ExportFormat } from "../utils/export";
+import { useSubscriptionCheck } from "./SubscriptionAccess";
 
 interface ExportMenuProps {
   categories: EnxovalCategory[];
   items: EnxovalItem[];
   enxovalName: string;
   activeCategoryId?: string;
+  /** Controlado por fora (celular): a janela abre a partir de "Planilhas", sem o botão próprio. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 const FORMATS: { id: ExportFormat; label: string; hint: string }[] = [
@@ -23,109 +39,177 @@ export function ExportMenu({
   items,
   enxovalName,
   activeCategoryId,
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
 }: ExportMenuProps) {
-  const [open, setOpen] = useState(false);
-  const [format, setFormat] = useState<ExportFormat>("csv");
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
-  const [placement, setPlacement] = useState({ up: false, maxHeight: 420 });
-
-  // Abre para o lado com mais espaço e limita a altura; a lista rola dentro do menu.
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const place = () => {
-      const rect = triggerRef.current!.getBoundingClientRect();
-      const below = window.innerHeight - rect.bottom - 16;
-      const above = rect.top - 16;
-      const up = below < 240 && above > below;
-      setPlacement({
-        up,
-        maxHeight: Math.max(180, Math.min(420, (up ? above : below) - 8)),
-      });
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [open]);
-
+  const checkAccess = useSubscriptionCheck();
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
+  const [mobile, setMobile] = useState(
+    () => window.matchMedia("(max-width: 767px)").matches,
+  );
   useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      setMobile(query.matches);
       setOpen(false);
-      triggerRef.current?.focus();
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const exportEnvironment = (category: EnxovalCategory) => {
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  const [format, setFormat] = useState<ExportFormat>("csv");
+  const exportEnvironment = async (category: EnxovalCategory) => {
     setOpen(false);
+    if (!checkAccess || !(await checkAccess())) return;
     void exportItems(
       items.filter((item) => item.categoryId === category.id),
       `${enxovalName}-${category.name}`,
       format,
     );
   };
-  const exportAll = () => {
+  const exportAll = async () => {
     setOpen(false);
+    if (!checkAccess || !(await checkAccess())) return;
     void exportItems(items, enxovalName, format);
   };
 
-  return (
-    <div className="export-menu" ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="button button-outline button-small export-menu-trigger"
-        aria-label="Exportar"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Download size={17} aria-hidden="true" />
-        <span>Exportar</span>
-      </button>
-      {open && (
-        <div
-          id={menuId}
-          className={`export-menu-panel ${placement.up ? "is-up" : ""}`}
-          style={{ maxHeight: placement.maxHeight }}
-          role="menu"
+  if (mobile)
+    return (
+      <div className="export-menu">
+        {!hideTrigger && (
+          <Button
+            variant="brand"
+            size="brand"
+            type="button"
+            className="button button-outline button-small export-menu-trigger"
+            aria-label="Exportar"
+            aria-haspopup="dialog"
+            onClick={() => setOpen(true)}
+          >
+            <Download size={17} aria-hidden="true" />
+            <span>Exportar</span>
+          </Button>
+        )}
+        <Dialog
+          title="Exportar lista"
+          isOpen={open}
+          onClose={() => setOpen(false)}
         >
-          <div
+          <div className="export-sheet-actions">
+            <RadioGroup
+              value={format}
+              onValueChange={(value) => setFormat(value as ExportFormat)}
+              className="export-sheet-formats"
+              aria-label="Formato do arquivo"
+            >
+              {FORMATS.map((option) => (
+                <RadioGroupItem key={option.id} value={option.id} asChild>
+                  <Button variant="brand" size="brand" type="button">
+                    {option.label} <small>{option.hint}</small>
+                  </Button>
+                </RadioGroupItem>
+              ))}
+            </RadioGroup>
+            <Button
+              variant="brand"
+              size="brand"
+              type="button"
+              onClick={exportAll}
+            >
+              <Layers size={18} aria-hidden="true" />
+              <span>
+                <strong>Baixar todos os ambientes</strong>
+                <small>{countLabel(items.length)} no total</small>
+              </span>
+            </Button>
+            {categories.length > 0 && (
+              <p className="export-sheet-caption">Ou apenas um ambiente</p>
+            )}
+            {categories.map((category) => (
+              <Button
+                key={category.id}
+                variant="brand"
+                size="brand"
+                type="button"
+                onClick={() => void exportEnvironment(category)}
+              >
+                <FolderDown size={18} aria-hidden="true" />
+                <span>
+                  <strong>Baixar {category.name}</strong>
+                  <small>
+                    {countLabel(
+                      items.filter((item) => item.categoryId === category.id)
+                        .length,
+                    )}
+                  </small>
+                </span>
+              </Button>
+            ))}
+          </div>
+        </Dialog>
+      </div>
+    );
+
+  return (
+    <div className="export-menu">
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="brand"
+            size="brand"
+            type="button"
+            className="button button-outline button-small export-menu-trigger"
+            aria-label="Exportar"
+          >
+            <Download size={17} aria-hidden="true" />
+            <span>Exportar</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          sideOffset={8}
+          collisionPadding={12}
+          className="export-menu-panel"
+          aria-label="Exportar lista"
+        >
+          <DropdownMenuRadioGroup
+            value={format}
+            onValueChange={(value) => setFormat(value as ExportFormat)}
             className="export-menu-formats"
-            role="group"
             aria-label="Formato do arquivo"
           >
             {FORMATS.map((option) => (
-              <button
+              <DropdownMenuRadioItem
                 key={option.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={format === option.id}
-                onClick={() => setFormat(option.id)}
+                value={option.id}
+                onSelect={(event) => event.preventDefault()}
+                asChild
               >
-                {option.label} <small>{option.hint}</small>
-              </button>
+                <Button variant="brand" size="brand" type="button">
+                  {option.label} <small>{option.hint}</small>
+                </Button>
+              </DropdownMenuRadioItem>
             ))}
-          </div>
-          <button type="button" role="menuitem" onClick={exportAll}>
-            <Layers size={18} aria-hidden="true" />
-            <span>
-              <strong>Baixar todos os ambientes</strong>
-              <small>{countLabel(items.length)} no total</small>
-            </span>
-          </button>
+          </DropdownMenuRadioGroup>
+          <DropdownMenuItem asChild>
+            <Button
+              variant="brand"
+              size="brand"
+              type="button"
+              onClick={exportAll}
+            >
+              <Layers size={18} aria-hidden="true" />
+              <span>
+                <strong>Baixar todos os ambientes</strong>
+                <small>{countLabel(items.length)} no total</small>
+              </span>
+            </Button>
+          </DropdownMenuItem>
           {categories.length > 0 && (
             <>
               <div className="export-menu-divider" role="presentation">
@@ -133,35 +217,37 @@ export function ExportMenu({
               </div>
               <div className="export-menu-list">
                 {categories.map((category) => (
-                  <button
-                    key={category.id}
-                    type="button"
-                    role="menuitem"
-                    className={
-                      category.id === activeCategoryId ? "is-current" : ""
-                    }
-                    onClick={() => exportEnvironment(category)}
-                  >
-                    <FolderDown size={18} aria-hidden="true" />
-                    <span>
-                      <strong>Baixar {category.name}</strong>
-                      <small>
-                        {countLabel(
-                          items.filter(
-                            (item) => item.categoryId === category.id,
-                          ).length,
-                        )}
-                        {category.id === activeCategoryId &&
-                          " · ambiente atual"}
-                      </small>
-                    </span>
-                  </button>
+                  <DropdownMenuItem key={category.id} asChild>
+                    <Button
+                      variant="brand"
+                      size="brand"
+                      type="button"
+                      className={
+                        category.id === activeCategoryId ? "is-current" : ""
+                      }
+                      onClick={() => exportEnvironment(category)}
+                    >
+                      <FolderDown size={18} aria-hidden="true" />
+                      <span>
+                        <strong>Baixar {category.name}</strong>
+                        <small>
+                          {countLabel(
+                            items.filter(
+                              (item) => item.categoryId === category.id,
+                            ).length,
+                          )}
+                          {category.id === activeCategoryId &&
+                            " · ambiente atual"}
+                        </small>
+                      </span>
+                    </Button>
+                  </DropdownMenuItem>
                 ))}
               </div>
             </>
           )}
-        </div>
-      )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

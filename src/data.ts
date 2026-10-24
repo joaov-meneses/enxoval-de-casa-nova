@@ -251,7 +251,7 @@ export const defaultItems: EnxovalItem[] = DEFAULT_TEMPLATE_ITEMS.map((item, ind
   categoryId: fallbackCategoryId(item.category),
   category: item.category,
   checked: false,
-  status: 'needed',
+  status: 'researching',
   quantity: 1,
   discountCents: 0,
   link: '',

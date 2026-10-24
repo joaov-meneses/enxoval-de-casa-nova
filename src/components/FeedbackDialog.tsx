@@ -1,3 +1,8 @@
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Label } from "@/src/components/ui/label";
+import { Button } from "@/src/components/ui/button";
+import { Input } from "@/src/components/ui/input";
+import { Textarea } from "@/src/components/ui/textarea";
 import {
   useEffect,
   useId,
@@ -20,8 +25,8 @@ import {
   ShieldCheck,
   Trash2,
   X,
-} from "lucide-react";
-import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
+} from "@/src/components/icons";
+import { Dialog as DialogRoot, DialogContent, DialogTitle } from "./ui/dialog";
 import { sendFeedback } from "../api";
 import { Select } from "./Select";
 import {
@@ -38,7 +43,6 @@ import {
   type FeedbackImportance,
   type FeedbackKind,
   type FeedbackSeverity,
-  type FeedbackTech,
 } from "../feedback";
 
 const DRAFT_KEY = "casamia.feedback.draft.v1";
@@ -106,16 +110,6 @@ function clearDraft() {
   }
 }
 
-function collectTech(): FeedbackTech {
-  return {
-    path: window.location.pathname,
-    userAgent: navigator.userAgent,
-    viewport: `${window.innerWidth}x${window.innerHeight}`,
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  };
-}
-
 /* ------------------------------------------------------------- captura de tela */
 
 interface Screenshot {
@@ -181,11 +175,11 @@ function Field({
   return (
     <div className={`fb-field${error ? " has-error" : ""}`}>
       <div className="fb-label-row">
-        <label htmlFor={id}>
+        <Label htmlFor={id}>
           {label}
           {required && <span className="fb-req"> (obrigatório)</span>}
           {optional && <span className="fb-opt"> (opcional)</span>}
-        </label>
+        </Label>
         {counter}
       </div>
       {hint && (
@@ -237,16 +231,10 @@ function ChoiceGroup<T extends string>({
         {required && <span className="fb-req"> (obrigatório)</span>}
         {optional && <span className="fb-opt"> (opcional)</span>}
       </legend>
-      <div className="fb-choice-grid">
+      <RadioGroup name={name} value={String(value)} onValueChange={next => onChange(next as T)} className="fb-choice-grid" aria-label={legend}>
         {options.map((option) => (
-          <label key={option.id} className={`fb-choice${value === option.id ? " is-selected" : ""}`}>
-            <input
-              type="radio"
-              name={name}
-              value={option.id}
-              checked={value === option.id}
-              onChange={() => onChange(option.id)}
-            />
+          <Label htmlFor={`${name}-${option.id}`} key={option.id} className={`fb-choice${value === option.id ? " is-selected" : ""}`}>
+            <RadioGroupItem id={`${name}-${option.id}`} value={option.id} className="choice-control" />
             <span className="fb-choice-mark" aria-hidden="true">
               <Check size={13} strokeWidth={3} />
             </span>
@@ -254,9 +242,9 @@ function ChoiceGroup<T extends string>({
               <strong>{option.label}</strong>
               {option.hint && <small>{option.hint}</small>}
             </span>
-          </label>
+          </Label>
         ))}
-      </div>
+      </RadioGroup>
       {error && (
         <p className="fb-error" role="alert">
           {error}
@@ -283,9 +271,6 @@ export function FeedbackDialog({
   triggerRef?: RefObject<HTMLElement | null>;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [contactOk, setContactOk] = useState(true);
-  const [contactEmail, setContactEmail] = useState(user.email);
-  const [includeTech, setIncludeTech] = useState(true);
   const [screenshot, setScreenshot] = useState<Screenshot | null>(null);
   const [imageError, setImageError] = useState("");
   const [imageBusy, setImageBusy] = useState(false);
@@ -301,7 +286,6 @@ export function FeedbackDialog({
   const close = () => {
     if (!busy) onClose();
   };
-  const dialogRef = useDialogAccessibility(open, close, triggerRef);
 
   // Ao abrir: recupera o rascunho (se houver) e já marca onde a pessoa estava.
   useEffect(() => {
@@ -313,8 +297,6 @@ export function FeedbackDialog({
       ...saved,
       area: saved.area || (currentArea ?? ""),
     });
-    setContactEmail(user.email);
-    setContactOk(true);
     setErrors({});
     setServerError("");
     setSent(null);
@@ -385,9 +367,9 @@ export function FeedbackDialog({
       severity: draft.severity || null,
       problem: draft.problem,
       importance: draft.importance || null,
-      contactOk,
-      contactEmail,
-      tech: includeTech ? collectTech() : null,
+      contactOk: true,
+      contactEmail: user.email,
+      tech: null,
       screenshot: screenshot ? { type: "image/jpeg" as const, data: screenshot.data } : null,
     };
     const { value, errors: found } = validateFeedback(payload);
@@ -408,7 +390,7 @@ export function FeedbackDialog({
       clearDraft();
       setDraft(EMPTY_DRAFT);
       setScreenshot(null);
-      setSent({ email: value.contactOk ? (value.contactEmail ?? "") : "" });
+      setSent({ email: user.email });
       requestAnimationFrame(() => bodyRef.current?.scrollTo({ top: 0 }));
     } catch (err) {
       setServerError(
@@ -426,37 +408,31 @@ export function FeedbackDialog({
   const info = kind ? FEEDBACK_KIND_INFO[kind] : null;
   const KindIcon = kind ? KIND_ICON[kind] : null;
   const errorList = Object.values(errors).filter(Boolean) as string[];
-  const techPreview = includeTech && typeof window !== "undefined" ? collectTech() : null;
 
   const titleId = `${baseId}-title`;
 
   return (
-    <div className="dialog-layer fb-layer">
-      <div className="dialog-backdrop" onClick={close} aria-hidden="true" />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-busy={busy}
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className="fb-dialog"
-      >
+    <DialogRoot open={open} onOpenChange={next => { if (!next) close(); }}>
+      <DialogContent brandLayout layoutClassName="dialog-layer fb-layer" overlayClassName="dialog-backdrop" showCloseButton={false}
+        aria-describedby={undefined} aria-labelledby={titleId} aria-busy={busy} className="fb-dialog"
+        onEscapeKeyDown={event => { if (busy) event.preventDefault(); }}
+        onInteractOutside={event => { if (busy) event.preventDefault(); }}
+        onCloseAutoFocus={event => { if (triggerRef?.current) { event.preventDefault(); triggerRef.current.focus(); } }}>
         <header className="fb-header">
           <span className="fb-header-icon" aria-hidden="true">
             <MessageCircleHeart size={22} />
           </span>
           <div>
-            <h2 id={titleId}>{sent ? "Recebemos a sua mensagem" : "Central de ajuda"}</h2>
+            <DialogTitle id={titleId}>{sent ? "Recebemos a sua mensagem" : "Central de ajuda"}</DialogTitle>
             <p>
               {sent
                 ? "Obrigado por parar um minuto para ajudar."
                 : "Sua voz ajuda o Casa Mia a ficar melhor. Escreva do seu jeito."}
             </p>
           </div>
-          <button type="button" className="fb-close" onClick={close} disabled={busy} aria-label="Fechar janela">
+          <Button variant="brand" size="brand" type="button" className="fb-close" onClick={close} disabled={busy} aria-label="Fechar janela">
             <X size={20} aria-hidden="true" />
-          </button>
+          </Button>
         </header>
 
         <div className="fb-body" ref={bodyRef}>
@@ -470,20 +446,16 @@ export function FeedbackDialog({
                 A sua mensagem chegou para a equipe do Casa Mia. A gente lê cada uma com carinho e usa o que você
                 contou para melhorar o app.
               </p>
-              {sent.email ? (
-                <p>
-                  Se precisarmos de mais detalhes, escrevemos para <strong>{sent.email}</strong>.
-                </p>
-              ) : (
-                <p>Você pediu para não receber resposta por e-mail, e tudo bem: a sua mensagem já ajuda.</p>
-              )}
+              <p>
+                Se precisarmos de mais detalhes, escrevemos para <strong>{sent.email}</strong>.
+              </p>
               <div className="fb-actions fb-actions-center">
-                <button type="button" className="button button-outline" onClick={() => setSent(null)}>
+                <Button variant="brand" size="brand" type="button" className="button button-outline" onClick={() => setSent(null)}>
                   Enviar outra mensagem
-                </button>
-                <button type="button" className="button button-dark" onClick={onClose}>
+                </Button>
+                <Button variant="brand" size="brand" type="button" className="button button-dark" onClick={onClose}>
                   Voltar para o app
-                </button>
+                </Button>
               </div>
             </div>
           ) : !kind ? (
@@ -500,7 +472,7 @@ export function FeedbackDialog({
                 {(Object.keys(FEEDBACK_KIND_INFO) as FeedbackKind[]).map((option) => {
                   const Icon = KIND_ICON[option];
                   return (
-                    <button
+                    <Button variant="brand" size="brand"
                       key={option}
                       type="button"
                       role="listitem"
@@ -514,7 +486,7 @@ export function FeedbackDialog({
                         <strong>{FEEDBACK_KIND_INFO[option].label}</strong>
                         <small>{FEEDBACK_KIND_INFO[option].hint}</small>
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -532,9 +504,9 @@ export function FeedbackDialog({
                   {KindIcon && <KindIcon size={16} aria-hidden="true" />}
                   {info?.label}
                 </span>
-                <button type="button" className="fb-link" onClick={backToKinds} disabled={busy}>
+                <Button variant="brand" size="brand" type="button" className="fb-link" onClick={backToKinds} disabled={busy}>
                   <ArrowLeft size={14} aria-hidden="true" /> Trocar tipo
-                </button>
+                </Button>
               </div>
 
               {kind === "bug" && (
@@ -584,7 +556,7 @@ export function FeedbackDialog({
                         : "Por exemplo: “Dúvida sobre o convite” ou “Adorei o planejamento”."
                   }
                 >
-                  <input
+                  <Input
                     id={`${baseId}-title`}
                     value={draft.title}
                     maxLength={FEEDBACK_LIMITS.title.max + 20}
@@ -633,7 +605,7 @@ export function FeedbackDialog({
                         : undefined
                   }
                 >
-                  <textarea
+                  <Textarea
                     id={`${baseId}-desc`}
                     rows={5}
                     value={draft.description}
@@ -658,7 +630,7 @@ export function FeedbackDialog({
                     counter={<Counter value={draft.steps} max={FEEDBACK_LIMITS.steps.max} />}
                     hint="Conte o que você tocou, uma coisa depois da outra. Por exemplo: 1. Abri o Planejamento. 2. Troquei a semana. 3. Toquei em salvar."
                   >
-                    <textarea
+                    <Textarea
                       id={`${baseId}-steps`}
                       rows={4}
                       value={draft.steps}
@@ -673,7 +645,7 @@ export function FeedbackDialog({
                     error={errors.expected}
                     counter={<Counter value={draft.expected} max={FEEDBACK_LIMITS.expected.max} />}
                   >
-                    <textarea
+                    <Textarea
                       id={`${baseId}-expected`}
                       rows={2}
                       value={draft.expected}
@@ -715,7 +687,7 @@ export function FeedbackDialog({
                     counter={<Counter value={draft.problem} max={FEEDBACK_LIMITS.problem.max} />}
                     hint="Entender o motivo nos ajuda a pensar na melhor solução, que às vezes é diferente da ideia inicial."
                   >
-                    <textarea
+                    <Textarea
                       id={`${baseId}-problem`}
                       rows={3}
                       value={draft.problem}
@@ -747,7 +719,7 @@ export function FeedbackDialog({
                       : "Um desenho, uma captura de tela ou uma foto de como você imagina. Opcional."}{" "}
                     A imagem é reduzida no seu aparelho antes de enviar.
                   </p>
-                  <input
+                  <Input
                     ref={fileRef}
                     type="file"
                     accept="image/*"
@@ -763,17 +735,17 @@ export function FeedbackDialog({
                         <strong>{screenshot.name}</strong>
                         <small>Anexada e pronta para enviar</small>
                       </div>
-                      <button
+                      <Button variant="brand" size="brand"
                         type="button"
                         className="fb-link is-danger"
                         onClick={() => setScreenshot(null)}
                         disabled={busy}
                       >
                         <Trash2 size={14} aria-hidden="true" /> Remover
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <button
+                    <Button variant="brand" size="brand"
                       type="button"
                       className="fb-attach"
                       onClick={() => fileRef.current?.click()}
@@ -785,7 +757,7 @@ export function FeedbackDialog({
                         <ImagePlus size={18} aria-hidden="true" />
                       )}
                       {imageBusy ? "Preparando a imagem…" : "Anexar uma imagem"}
-                    </button>
+                    </Button>
                   )}
                   {(imageError || errors.screenshot) && (
                     <p className="fb-error" role="alert">
@@ -794,66 +766,6 @@ export function FeedbackDialog({
                   )}
                 </section>
               )}
-
-              <section className="fb-section" aria-labelledby={`${baseId}-s4`}>
-                <h3 id={`${baseId}-s4`}>
-                  <span className="fb-step" aria-hidden="true">{kind === "other" ? 2 : 4}</span>
-                  Como falamos com você
-                </h3>
-                <label className="fb-check">
-                  <input
-                    type="checkbox"
-                    checked={contactOk}
-                    onChange={(event) => setContactOk(event.target.checked)}
-                    disabled={busy}
-                  />
-                  <span>
-                    <strong>Pode me responder por e-mail</strong>
-                    <small>Só se a gente precisar de mais detalhes ou tiver novidade sobre a sua mensagem.</small>
-                  </span>
-                </label>
-                {contactOk && (
-                  <Field id={`${baseId}-email`} label="E-mail para resposta" required error={errors.contactEmail}>
-                    <input
-                      id={`${baseId}-email`}
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      value={contactEmail}
-                      onChange={(event) => {
-                        setContactEmail(event.target.value);
-                        if (errors.contactEmail) setErrors((current) => ({ ...current, contactEmail: undefined }));
-                      }}
-                      aria-invalid={Boolean(errors.contactEmail)}
-                      disabled={busy}
-                    />
-                  </Field>
-                )}
-
-                <label className="fb-check">
-                  <input
-                    type="checkbox"
-                    checked={includeTech}
-                    onChange={(event) => setIncludeTech(event.target.checked)}
-                    disabled={busy}
-                  />
-                  <span>
-                    <strong>Enviar informações técnicas</strong>
-                    <small>Ajudam a encontrar o problema: tela, navegador e idioma. Nunca incluem sua senha nem sua lista.</small>
-                  </span>
-                </label>
-                {techPreview && (
-                  <details className="fb-tech">
-                    <summary>Ver o que será enviado</summary>
-                    <dl>
-                      <div><dt>Página</dt><dd>{techPreview.path}</dd></div>
-                      <div><dt>Tamanho da tela</dt><dd>{techPreview.viewport}</dd></div>
-                      <div><dt>Idioma e fuso</dt><dd>{techPreview.language} · {techPreview.timezone}</dd></div>
-                      <div><dt>Navegador</dt><dd>{techPreview.userAgent}</dd></div>
-                    </dl>
-                  </details>
-                )}
-              </section>
 
               {serverError && (
                 <div className="fb-summary is-server" role="alert">
@@ -864,22 +776,22 @@ export function FeedbackDialog({
               <div className="fb-actions">
                 <p className="fb-promise">
                   <ShieldCheck size={16} aria-hidden="true" />
-                  <span>Só a equipe do Casa Mia lê esta mensagem.</span>
+                  <span>Só a equipe do Casa Mia lê esta mensagem. Responderemos pelo e-mail cadastrado na sua conta.</span>
                 </p>
                 <div className="fb-actions-buttons">
-                  <button type="button" className="button button-outline" onClick={close} disabled={busy}>
+                  <Button variant="brand" size="brand" type="button" className="button button-outline" onClick={close} disabled={busy}>
                     Cancelar
-                  </button>
-                  <button type="submit" className="button button-dark" disabled={busy || imageBusy}>
+                  </Button>
+                  <Button variant="brand" size="brand" type="submit" className="button button-dark" disabled={busy || imageBusy}>
                     {busy ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : null}
                     {busy ? "Enviando…" : "Enviar mensagem"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </DialogRoot>
   );
 }

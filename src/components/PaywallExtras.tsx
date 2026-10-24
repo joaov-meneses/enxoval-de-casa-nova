@@ -1,4 +1,4 @@
-import { CalendarCheck, Lock, PartyPopper, Unlock } from "lucide-react";
+import { CalendarCheck, Lock, PartyPopper, Unlock } from "@/src/components/icons";
 import { CATALOG } from "../onboarding/catalog";
 import type { RoomKey } from "../onboarding/types";
 import { roomOfCategory } from "../planning/purchasePlan";

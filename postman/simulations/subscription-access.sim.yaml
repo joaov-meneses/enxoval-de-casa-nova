@@ -1,0 +1,5 @@
+simulation: subscription-access
+routing: path
+mocks:
+  - routeKey: app
+    path: ../mocks/subscription-access/config.yaml

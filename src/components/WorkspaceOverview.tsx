@@ -1,3 +1,7 @@
+import { RoomIcon } from "./RoomIcon";
+import { Card } from "@/src/components/ui/card";
+import { Progress } from "./ui/progress";
+import { Button } from "@/src/components/ui/button";
 import { useState } from "react";
 import {
   ArrowUpRight,
@@ -19,7 +23,7 @@ import {
   Package,
   Plus,
   Wallet,
-} from "lucide-react";
+} from "@/src/components/icons";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import {
   buyOpportunities,
@@ -29,14 +33,16 @@ import {
 } from "../priceTracking";
 import { ExportMenu } from "./ExportMenu";
 import { ImportItemsButton } from "./ImportItemsDialog";
+import { GiftsPanel, HouseDocumentsPanel } from "./HomeRecords";
+import { formatMonth, monthlyFlow } from "../planning/installments";
 import {
   activeItems,
   doneItems,
-  isInactiveStatus,
   isPendingStatus,
   ITEM_STATUSES,
   ITEM_STATUS_META,
   itemSavingsCents,
+  netPriceCents,
   pendingItems,
   sumBought,
   sumItemDiscounts,
@@ -83,46 +89,22 @@ function RoomMini({
 }) {
   return (
     <li>
-      <button
+      <Button variant="brand" size="brand"
         type="button"
         className="stat-room"
         onClick={() => onOpen(room.cat.id)}
         aria-label={`Abrir ${room.cat.name}: ${room.checked} de ${room.total} itens conquistados`}
       >
         <span className="stat-room-name">{room.cat.name}</span>
-        <span className="stat-room-bar" aria-hidden="true">
-          <span style={{ width: `${room.progress * 100}%` }} />
-        </span>
+        <Progress className="stat-room-bar" value={room.progress * 100} aria-hidden="true" />
         <b>
           {room.checked}/{room.total}
         </b>
-      </button>
+      </Button>
     </li>
   );
 }
 
-export function RoomIcon({ name, size = 18 }: { name: string; size?: number }) {
-  const Icon = /cozinha/i.test(name)
-    ? Coffee
-    : /extra|h[óo]spede|visita/i.test(name)
-      ? BedSingle
-      : /quarto/i.test(name)
-        ? BedDouble
-        : /banheiro|lavabo/i.test(name)
-          ? Bath
-          : /sala/i.test(name)
-            ? Sofa
-            : /servi[çc]o|lavanderia/i.test(name)
-              ? WashingMachine
-              : /eletro/i.test(name)
-                ? Microwave
-                : /home\s*office|escrit[óo]rio/i.test(name)
-                  ? Monitor
-                  : /varanda|sacada|quintal|jardim/i.test(name)
-                    ? TreePalm
-                    : Package;
-  return <Icon size={size} strokeWidth={1.6} />;
-}
 
 function safeStoreUrl(value: string) {
   try {
@@ -242,9 +224,9 @@ function SavingsThermometer({
 type RoomOrder = "default" | "pending" | "progress";
 
 const ROOM_ORDERS: { id: RoomOrder; label: string }[] = [
-  { id: "default", label: "Padrão" },
-  { id: "pending", label: "Pendentes" },
-  { id: "progress", label: "Avançados" },
+  { id: "default", label: "Minha ordem" },
+  { id: "pending", label: "Mais na fila" },
+  { id: "progress", label: "Mais conquistados" },
 ];
 
 export function WorkspaceOverview({
@@ -300,9 +282,18 @@ export function WorkspaceOverview({
   const pending = pendingItems(statsItems);
   const planned = sumPending(statsItems);
   const unpriced = pending.filter((i) => !i.priceCents).length;
+  const largestPurchase = pending.reduce<EnxovalItem | undefined>(
+    (largest, item) =>
+      (item.priceCents ?? 0) > 0 && (!largest || netPriceCents(item) > netPriceCents(largest))
+        ? item
+        : largest,
+    undefined,
+  );
   const percentage = statsActive.length
     ? Math.round((done.length / statsActive.length) * 100)
     : 0;
+  // Parcelas já assumidas (só as compras feitas: a previsão dos pendentes fica no Planejamento).
+  const committedFlow = monthlyFlow(statsItems.filter((item) => item.status === "bought"), null, null);
   const money = (c: number) =>
     new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -324,7 +315,7 @@ export function WorkspaceOverview({
     else if (!n) meta.push("Tudo conquistado");
     else if (!checked)
       meta.push(`${n} ${n === 1 ? "item" : "itens"} para começar`);
-    else meta.push(`${n} ${n === 1 ? "pendente" : "pendentes"}`);
+    else meta.push(`${n} na fila`);
     if (n && roomPlanned > 0) meta.push(`${money(roomPlanned)} a investir`);
     else if (!n && roomSpent > 0) meta.push(`${money(roomSpent)} investidos`);
     if (roomUnpriced > 0) meta.push(`${roomUnpriced} sem preço`);
@@ -338,7 +329,7 @@ export function WorkspaceOverview({
       meta: meta.join(" · "),
     };
   });
-  // Ambientes com itens, do mais adiantado ao mais atrasado (só faz sentido comparar com 2 ou mais).
+  // Ambientes com itens, do mais adiantado ao com mais itens na fila (só faz sentido comparar com 2 ou mais).
   const rankedRooms = rooms
     .filter((room) => room.total > 0)
     .sort((a, b) => b.progress - a.progress || b.total - a.total);
@@ -371,20 +362,15 @@ export function WorkspaceOverview({
         );
   return (
     <>
-      <div className="workspace-welcome">
-        <div>
-          <h2>
-            {view === "overview"
-              ? "Seu lar está ganhando forma."
-              : "Pequenos detalhes. Grandes começos."}
-          </h2>
-          <p>
-            {view === "overview"
-              ? "Um olhar sobre tudo o que vocês já construíram."
-              : "Organize os desejos, acompanhe as compras e aproveite o caminho."}
-          </p>
+      {/* Na lista, o título do ambiente já orienta: a frase de boas-vindas fica só em Meu Lar. */}
+      {view === "overview" && (
+        <div className="workspace-welcome">
+          <div>
+            <h2>Seu lar está ganhando forma.</h2>
+            <p>Um olhar sobre tudo o que vocês já construíram.</p>
+          </div>
         </div>
-      </div>
+      )}
       <SavingsThermometer items={statsItems} allItems={items} />
       <p className="stats-scope">
         {scope ? (
@@ -401,8 +387,8 @@ export function WorkspaceOverview({
           </>
         )}
       </p>
-      {/* Telas pequenas: resumo em uma linha de leitura; os cartões completos abrem em "Detalhes". */}
-      <section className="stats-compact" aria-label="Resumo em poucos números">
+      {/* Telas pequenas: resumo compacto com detalhes complementares sob demanda. */}
+      <section className="stats-compact" data-open={statsOpen} aria-label="Resumo em poucos números">
         <div className="stats-compact-main">
           <strong className="stats-compact-percent">
             {percentage}
@@ -412,26 +398,19 @@ export function WorkspaceOverview({
             {done.length} de {statsActive.length}{" "}
             {statsActive.length === 1 ? "conquistado" : "conquistados"}
           </span>
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="stats-compact-toggle"
             aria-expanded={statsOpen}
-            aria-controls="stats-details"
+            aria-controls="stats-mobile-details"
             onClick={() => setStatsOpen((open) => !open)}
           >
             {statsOpen ? "Ocultar" : "Detalhes"}
             <ChevronDown size={14} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
-        <div className="progress-track" aria-hidden="true">
-          <span
-            style={{
-              width: `${percentage}%`,
-              minWidth: done.length > 0 ? 8 : 0,
-            }}
-          />
-        </div>
-        <dl className="stats-compact-grid">
+        <Progress className="progress-track" value={percentage} aria-hidden="true" />
+        <dl className={`stats-compact-grid${savedCents > 0 ? "" : " is-two"}`}>
           <div>
             <dt>Já investimos</dt>
             <dd>
@@ -450,19 +429,53 @@ export function WorkspaceOverview({
               )}
             </dd>
           </div>
-          <div>
-            <dt>Economizou</dt>
-            <dd>
-              <Money cents={savedCents} />
-            </dd>
-          </div>
+          {/* "Economizou R$ 0,00" só lembra o que ainda não aconteceu: a economia aparece com o primeiro valor. */}
+          {savedCents > 0 && (
+            <div>
+              <dt>Economizou</dt>
+              <dd>
+                <Money cents={savedCents} />
+              </dd>
+            </div>
+          )}
         </dl>
+        <div id="stats-mobile-details" className="stats-insights-reveal" data-open={statsOpen} aria-hidden={!statsOpen} inert={!statsOpen}>
+        <div className="stats-insights-clip"><div className="stats-insights">
+          <Card asChild className="block gap-0"><article className="stats-insight">
+            <span className="stats-insight-label">Preços a pesquisar</span>
+            <strong>{unpriced}<small> de {pending.length} na fila</small></strong>
+            <p>{unpriced > 0
+              ? "Complete os preços para saber quanto falta investir."
+              : pending.length > 0
+                ? "Todos os itens na fila já têm preço informado."
+                : "Nada na fila por aqui."}</p>
+            {unpriced > 0 && onShowUnpriced && (
+              <Button variant="brand" size="brand" type="button" className="stat-link" onClick={onShowUnpriced}>
+                Revisar preços <ArrowUpRight size={14} aria-hidden="true" />
+              </Button>
+            )}
+          </article></Card>
+          <Card asChild className="block gap-0"><article className="stats-insight">
+            <span className="stats-insight-label">Maior compra prevista</span>
+            {largestPurchase ? <>
+              <strong><Money cents={netPriceCents(largestPurchase)} /></strong>
+              <p className="stats-insight-name">{largestPurchase.name}</p>
+              <p>O maior valor entre as compras que faltam.</p>
+            </> : <>
+              <strong>—</strong>
+              <p>{pending.length > 0
+                ? "Informe os preços para identificar a compra de maior valor."
+                : "Tudo conquistado. Nenhuma compra para planejar."}</p>
+            </>}
+          </article></Card>
+        </div></div>
+        </div>
       </section>
       <div
         id="stats-details"
-        className={`workspace-stats${statsOpen ? " is-open" : ""}`}
+        className={`workspace-stats${savedCents > 0 ? "" : " is-without-savings"}`}
       >
-        <article className="stat-progress">
+        <Card asChild className="block gap-0"><article className="stat-progress">
           <span className="stat-icon sage">
             <CircleCheck size={20} />
           </span>
@@ -477,46 +490,22 @@ export function WorkspaceOverview({
               ? "item conquistado"
               : "itens conquistados"}
           </span>
-          <div
-            className="progress-track"
-            role="progressbar"
-            aria-label="Progresso do enxoval"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percentage}
-          >
-            <span
-              style={{
-                width: `${percentage}%`,
-                // Com poucos itens conquistados a barra ainda precisa ser visível.
-                minWidth: done.length > 0 ? 8 : 0,
-              }}
-            />
-          </div>
+          <Progress className="progress-track" value={percentage} aria-label="Progresso do enxoval" />
           <ul className="stat-legend stat-progress-legend">
             {compareRooms ? (
               <>
                 <li>
                   <i className="stat-dot stat-dot-todo" aria-hidden="true" />
-                  <span>Pendentes</span>
+                  <span>Na fila</span>
                   <b>{pending.length}</b>
                 </li>
-                {statsItems.length > statsActive.length && (
-                  <li>
-                    <i className="stat-dot stat-dot-out" aria-hidden="true" />
-                    <span>Fora da lista</span>
-                    <b>{statsItems.length - statsActive.length}</b>
-                  </li>
-                )}
               </>
             ) : (
               statusRows.map(({ status, count }) => (
                 <li key={status}>
                   <i
                     className={`stat-dot ${
-                      isInactiveStatus(status)
-                        ? "stat-dot-out"
-                        : isPendingStatus(status)
+                      isPendingStatus(status)
                           ? "stat-dot-todo"
                           : "stat-dot-done"
                     }`}
@@ -538,7 +527,7 @@ export function WorkspaceOverview({
               </ul>
               {laggardRoom && (
                 <>
-                  <span className="stat-sublabel">Mais atrasado</span>
+                  <span className="stat-sublabel">Com mais itens na fila</span>
                   <ul className="stat-rooms">
                     <RoomMini room={laggardRoom} onOpen={onCategory} />
                   </ul>
@@ -546,19 +535,22 @@ export function WorkspaceOverview({
               )}
             </div>
           )}
-        </article>
-        <article className="stat-money">
+        </article></Card>
+        <Card asChild className="block gap-0"><article className="stat-money">
           <span className="stat-icon sand">
             <Wallet size={20} />
           </span>
           <span className="stat-label">Seu dinheiro</span>
           <dl className="stat-receipt">
-            <div>
-              <dt>Compras</dt>
-              <dd>
-                <Money cents={boughtGrossCents} />
-              </dd>
-            </div>
+            {/* Sem desconto, "Compras" repetiria o valor de "Já investimos": a conta só aparece quando há o que subtrair. */}
+            {boughtDiscountsCents > 0 && (
+              <div>
+                <dt>Compras</dt>
+                <dd>
+                  <Money cents={boughtGrossCents} />
+                </dd>
+              </div>
+            )}
             {boughtDiscountsCents > 0 && (
               <div>
                 <dt>Descontos e cashback</dt>
@@ -587,26 +579,33 @@ export function WorkspaceOverview({
             </strong>
             <span className="stat-detail">
               {pending.length === 0
-                ? "Nenhum item pendente."
+                ? "Nenhum item na fila."
                 : planned > 0
                   ? `${pending.length} ${
-                      pending.length === 1 ? "item pendente" : "itens pendentes"
+                      pending.length === 1 ? "item na fila" : "itens na fila"
                     }${unpriced > 0 ? `, ${unpriced} sem preço.` : "."}`
-                  : "Sem estimativa: nenhum item pendente tem preço ainda."}
+                  : "Sem estimativa: nenhum item na fila tem preço ainda."}
             </span>
+            {committedFlow.committedNext3Cents > 0 && (
+              <span className="stat-detail stat-installments">
+                Comprometido nos próximos 3 meses: <b><Money cents={committedFlow.committedNext3Cents} /></b>
+                {committedFlow.lastInstallmentMonth && <> · Última parcela: {formatMonth(committedFlow.lastInstallmentMonth)}</>}
+              </span>
+            )}
             {unpriced > 0 && onShowUnpriced && (
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="stat-link"
                 onClick={onShowUnpriced}
               >
                 Ver os {unpriced} {unpriced === 1 ? "item" : "itens"} sem preço
                 <ArrowUpRight size={14} aria-hidden="true" />
-              </button>
+              </Button>
             )}
           </div>
-        </article>
-        <article className="stat-savings">
+        </article></Card>
+{savedCents > 0 && (
+                <Card asChild className="block gap-0"><article className="stat-savings">
           <span className="stat-icon amber">
             <BadgePercent size={20} />
           </span>
@@ -614,8 +613,7 @@ export function WorkspaceOverview({
           <strong>
             <Money cents={savedCents} />
           </strong>
-          {savedCents > 0 ? (
-            <>
+          <>
               <div
                 className="stat-split"
                 role="img"
@@ -680,21 +678,16 @@ export function WorkspaceOverview({
                   </ul>
                 </div>
               )}
-            </>
-          ) : (
-            <span className="stat-detail">
-              Marque itens como Ganhei ou registre descontos para ver o quanto
-              você economizou.
-            </span>
-          )}
-        </article>
+          </>
+        </article></Card>
+        )}
       </div>
       {view === "overview" && (
         <div className="overview-grid">
           <section className="overview-rooms">
             <div className="rooms-toolbar">
               <h3 className="rooms-toolbar-title">
-                Ambientes
+                Ambientes{" "}
                 <span className="rooms-count">{categories.length}</span>
               </h3>
               <div className="rooms-toolbar-actions">
@@ -709,14 +702,13 @@ export function WorkspaceOverview({
                   items={items}
                   enxovalName={name}
                 />
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   className="panel-add"
                   onClick={onAddCategory}
                 >
-                  <Plus size={15} strokeWidth={2.2} aria-hidden="true" /> Novo
-                  <span className="sr-only"> ambiente</span>
-                </button>
+                    <Plus size={17} strokeWidth={2.2} aria-hidden="true" /> Novo ambiente
+                </Button>
               </div>
             </div>
             {categories.length > 1 && (
@@ -726,20 +718,20 @@ export function WorkspaceOverview({
                 aria-label="Ordenar ambientes"
               >
                 {ROOM_ORDERS.map((o) => (
-                  <button
+                  <Button variant="brand" size="brand"
                     key={o.id}
                     type="button"
                     aria-pressed={roomOrder === o.id}
                     onClick={() => setRoomOrder(o.id)}
                   >
                     {o.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
             <div className="overview-room-list">
               {orderedRooms.map((room) => (
-                <button
+                <Button variant="brand" size="brand"
                   key={room.cat.id}
                   className={`overview-room${room.done ? " is-done" : ""}`}
                   onClick={() => onCategory(room.cat.id)}
@@ -754,25 +746,30 @@ export function WorkspaceOverview({
                         <em className="overview-start">Comece por aqui</em>
                       )}
                     </strong>
-                    <span className="progress-track" aria-hidden="true">
-                      <span style={{ width: `${room.progress * 100}%` }} />
-                    </span>
+                    <Progress className="progress-track" value={room.progress * 100} aria-hidden="true" />
                     <span className="overview-room-meta">{room.meta}</span>
                   </span>
-                  <small aria-hidden="true">
-                    {room.checked}/{room.total}
-                  </small>
-                  <span className="sr-only">
-                    {room.checked} de {room.total}{" "}
-                    {room.total === 1
-                      ? "item conquistado"
-                      : "itens conquistados"}
-                  </span>
+                  {/* Ambiente vazio: "Nenhum item ainda" já está na linha; "0/0" não diria nada. */}
+                  {room.total > 0 && (
+                    <>
+                      <small aria-hidden="true">
+                        {room.checked}/{room.total}
+                      </small>
+                      <span className="sr-only">
+                        {room.checked} de {room.total}{" "}
+                        {room.total === 1
+                          ? "item conquistado"
+                          : "itens conquistados"}
+                      </span>
+                    </>
+                  )}
                   <ArrowUpRight size={17} aria-hidden="true" />
-                </button>
+                </Button>
               ))}
             </div>
           </section>
+          <GiftsPanel items={items} enxovalName={name} />
+          <HouseDocumentsPanel enxovalId={enxovalId} items={items} categories={categories} />
         </div>
       )}
     </>

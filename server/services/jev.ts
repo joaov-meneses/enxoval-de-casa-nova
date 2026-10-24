@@ -8,12 +8,13 @@
  * Nada pessoal é enviado: só nomes de itens e de ambientes, moradia, número de moradores, estado e prazo.
  */
 import { createHash } from 'node:crypto';
+import { getLogger } from '../logger.ts';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { foldText } from '../../src/catalog/normalize.ts';
 import { sharedGet, sharedIncrement, sharedSet } from '../cache/shared.ts';
 import { CATALOG, matchesWhere } from '../../src/onboarding/catalog.ts';
 import { NORDESTE, traitsOfCity } from '../../src/onboarding/regions.ts';
-import { stateInfo } from '../../src/onboarding/plan.ts';
+import { isCompactHousing, stateInfo } from '../../src/onboarding/plan.ts';
 import type { RoomKey } from '../../src/onboarding/types.ts';
 import { URGENCY_RUBRIC_VERSION, URGENCY_SCALE } from '../../src/planning/purchaseUrgency.ts';
 
@@ -135,38 +136,42 @@ function remember(key: string, answers: Record<string, JevAnswer>, now: number) 
 
 async function ask(state: unknown, questions: Record<string, unknown>): Promise<Record<string, JevAnswer> | null> {
   const client = getTransport();
-  if (!client) return null;
+  if (!client) { getLogger().info({ event: 'jev.skipped', state, questions }, 'Jev is not configured.'); return null; }
 
   // L1 (memória do processo), depois L3 (Redis, compartilhado entre instâncias), e só então o Jev.
   const key = createHash('sha1').update(JSON.stringify({ state, questions })).digest('hex');
   const now = Date.now();
   const hit = cache.get(key);
-  if (hit && hit.expires > now) return hit.answers;
+  if (hit && hit.expires > now) { getLogger().info({ event: 'jev.cache.hit', cache: 'memory', state, questions, answers: hit.answers }, 'Jev cache hit.'); return hit.answers; }
   const shared = await sharedGet(`jev:answer:${key}`);
   if (shared) {
     try {
       const answers = JSON.parse(shared) as Record<string, JevAnswer>;
+      getLogger().info({ event: 'jev.cache.hit', cache: 'redis', state, questions, answers }, 'Jev shared cache hit.');
       remember(key, answers, now);
       return answers;
-    } catch {
+    } catch (err) {
+      getLogger().warn({ event: 'jev.cache.invalid', key, value: shared, err }, 'Invalid cached Jev response.');
       // Valor corrompido: pergunta de novo e sobrescreve.
     }
   }
 
   if (!(await takeBudget())) {
-    console.warn('[jev] Limite diário de chamadas atingido; seguindo sem IA.');
+    getLogger().warn({ event: 'jev.budget_exhausted', state, questions }, 'Limite diário de chamadas atingido; seguindo sem IA.');
     return null;
   }
 
   try {
+    getLogger().info({ event: 'jev.request.started', state, questions }, 'Jev request started.');
     callListener?.();
     const { answers } = await client.systemOne({ state, questions });
+    getLogger().info({ event: 'jev.request.completed', state, questions, answers }, 'Jev request completed.');
     remember(key, answers, now);
     void sharedSet(`jev:answer:${key}`, JSON.stringify(answers), sharedCacheTtl());
     return answers;
   } catch (err) {
     // Falha do Jev nunca derruba o app: quem chamou usa a regra de sempre.
-    console.warn('[jev] Chamada falhou:', err instanceof Error ? err.message : err);
+    getLogger().warn({ event: 'jev.request.failed', state, questions, err }, 'Chamada ao Jev falhou; seguindo sem IA.');
     return null;
   }
 }
@@ -177,7 +182,7 @@ const normalize = foldText;
 /* --------------------------------------------------------------------- perfil */
 
 export interface JevProfile {
-  /** apartamento, casa ou studio. */
+  /** apartamento, casa, studio ou kitnet (a kitnet segue as regras do studio). */
   housing: string;
   /** casal, solo, amigos ou troca. */
   moment: string;
@@ -187,18 +192,26 @@ export interface JevProfile {
   spendingTier: string;
   /** Semanas até a mudança, ou null quando a pessoa ainda não sabe a data. */
   weeksToMove: number | null;
+  worries?: string[];
+  usage?: string[];
+  owned?: string;
+  style?: string;
 }
 
 const CLIMATE_LABEL = { hot: 'quente', mild: 'ameno', cold: 'frio' } as const;
 
-function profileState(profile: JevProfile) {
+function profileState(profile: JevProfile, includePreferences = true) {
   return {
     moradia: profile.housing,
     moradores: profile.people,
     situacao: profile.moment,
     clima: CLIMATE_LABEL[stateInfo(profile.uf).climate],
     ...(profile.weeksToMove === null ? {} : { semanas_ate_a_mudanca: profile.weeksToMove }),
-    perfil_de_gasto: profile.spendingTier
+    perfil_de_gasto: profile.spendingTier,
+    ...(includePreferences && profile.worries?.length ? { preocupacoes: profile.worries } : {}),
+    ...(includePreferences && profile.usage?.length ? { objetivos_no_app: profile.usage } : {}),
+    ...(includePreferences && profile.owned ? { itens_que_ja_tem: profile.owned } : {}),
+    ...(includePreferences && profile.style ? { preferencia_de_lista: profile.style } : {})
   };
 }
 
@@ -339,8 +352,8 @@ export function candidatesFor(room: RoomKey, existingNames: string[], profile: J
     if (
       (has('K') && profile.housing !== 'casa') ||
       (has('A') && profile.housing === 'casa') ||
-      (has('X') && profile.housing === 'studio') ||
-      (has('O') && profile.housing !== 'studio') ||
+      (has('X') && isCompactHousing(profile.housing)) ||
+      (has('O') && !isCompactHousing(profile.housing)) ||
       (has('N') && !NORDESTE.has(uf)) ||
       (has('R') && uf !== 'RS') ||
       (has('C') && profile.moment !== 'casal') ||
@@ -458,7 +471,7 @@ const URGENCY_QUESTION =
 export async function prioritizeItems(input: { items: UrgencyInput[]; profile?: JevProfile; state?: Record<string, unknown> }): Promise<ItemUrgency[] | null> {
   // Sem o prazo até a mudança: a nota guardada não envelhece conforme a data chega. O prazo entra no planejamento,
   // junto com o tempo de entrega do catálogo.
-  const state = input.state ?? (input.profile ? profileState({ ...input.profile, weeksToMove: null }) : null);
+  const state = input.state ?? (input.profile ? profileState({ ...input.profile, weeksToMove: null }, false) : null);
   if (!state) return null;
   const items = input.items.slice(0, MAX_URGENCY_ITEMS);
   if (items.length === 0) return null;
@@ -511,7 +524,9 @@ export const BUCKET_SITUATIONS: readonly BucketSituation[] = ['casal', 'solo', '
  * é combinado em código com o prazo de entrega do catálogo.
  */
 export function profileBucket(profile: Pick<JevProfile, 'housing' | 'moment' | 'uf'>) {
-  const housing = (BUCKET_HOUSINGS as readonly string[]).includes(profile.housing) ? profile.housing : 'apartamento';
+  // A kitnet tem as mesmas necessidades do studio: as duas usam a mesma faixa (e a mesma nota do Jev).
+  const compact = profile.housing === 'kitnet' ? 'studio' : profile.housing;
+  const housing = (BUCKET_HOUSINGS as readonly string[]).includes(compact) ? compact : 'apartamento';
   const situation: BucketSituation = profile.moment === 'casal' ? 'casal' : profile.moment === 'solo' ? 'solo' : 'outros';
   return `${housing}|${stateInfo(profile.uf).climate}|${situation}`;
 }

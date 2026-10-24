@@ -1,3 +1,7 @@
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
@@ -7,10 +11,12 @@ import {
   Heart,
   LoaderCircle,
   ShieldCheck,
-} from "lucide-react";
+} from "@/src/components/icons";
 import { login, register } from "../api";
+import { isAppPath } from "../appRoute";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordPolicyError } from "../../shared/passwordPolicy";
+import { PasswordRules } from "./PasswordRules";
 import type { BootstrapData } from "../types";
-import { AuthShowcase } from "./AuthShowcase";
 import { Brand } from "./Brand";
 import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
 import { Nino } from "./Nino";
@@ -22,8 +28,8 @@ const MODE_PATH: Record<AuthMode, string> = {
   register: "/cadastro",
 };
 
-/** Abaixo disso a tela vira "celular e tablet": a cúpula da porta mostra o app no lugar do Nino. */
-const COMPACT_QUERY = "(max-width: 959px)";
+/** Celular e tablet priorizam o formulário, sem a vitrine de telas. */
+const COMPACT_QUERY = "(max-width: 1023px)";
 
 /** `/cadastro` abre a tela já na aba de criar conta (usado pelo CTA "Começar Grátis" da landing). */
 function initialMode(): AuthMode {
@@ -79,44 +85,15 @@ export function AuthPage({
       </div>
 
       <div className="auth-door">
-        {/* Desktop: o Nino espia por cima do cartão. Celular e tablet: as telas do app sobem por trás dele. */}
-        {compact ? <AuthShowcase /> : <Nino pose="wave" size={104} className="auth-nino" />}
-        <div className="auth-card">
-          <div
-            className="auth-tabs"
-            data-mode={mode}
-            role="tablist"
-            aria-label="Entrar ou criar conta"
-          >
-            <button
-              type="button"
-              role="tab"
-              id="auth-tab-login"
-              aria-selected={mode === "login"}
-              aria-controls="auth-panel-login"
-              className="auth-tab"
-              onClick={() => setMode("login")}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="auth-tab-register"
-              aria-selected={mode === "register"}
-              aria-controls="auth-panel-register"
-              className="auth-tab"
-              onClick={() => setMode("register")}
-            >
-              Criar conta
-            </button>
-          </div>
-          {mode === "login" ? (
-            <LoginPanel onAuthenticated={onAuthenticated} onSwitchToRegister={() => setMode("register")} />
-          ) : (
-            <RegisterPanel onSwitchToLogin={() => setMode("login")} />
-          )}
-        </div>
+        {!compact && <Nino pose="wave" size={104} className="auth-nino" />}
+        <Tabs value={mode} onValueChange={value => setMode(value as typeof mode)} className="auth-card">
+          <TabsList className="auth-tabs" data-mode={mode} aria-label="Entrar ou criar conta">
+            <TabsTrigger value="login" className="auth-tab">Entrar</TabsTrigger>
+            <TabsTrigger value="register" className="auth-tab">Criar conta</TabsTrigger>
+          </TabsList>
+          <TabsContent value="login"><LoginPanel onAuthenticated={onAuthenticated} onSwitchToRegister={() => setMode("register")} /></TabsContent>
+          <TabsContent value="register"><RegisterPanel onSwitchToLogin={() => setMode("login")} /></TabsContent>
+        </Tabs>
         <p className="auth-footnote">
           Pequenos planos. Grandes começos. <Heart size={12} aria-hidden="true" />
         </p>
@@ -133,14 +110,14 @@ function PasswordToggle({
   onToggle: () => void;
 }) {
   return (
-    <button
+    <Button variant="brand" size="brand"
       type="button"
       aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
       aria-pressed={visible}
       onClick={onToggle}
     >
       {visible ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
-    </button>
+    </Button>
   );
 }
 
@@ -164,7 +141,7 @@ function LoginPanel({
     try {
       const data = await login(email.trim(), password);
       if (data.user.mustChangePassword) {
-        window.history.replaceState({}, "", "/change-password");
+        if (!isAppPath(window.location.pathname)) window.history.replaceState({}, "", "/change-password");
         onAuthenticated(data);
         return;
       }
@@ -173,7 +150,7 @@ function LoginPanel({
         window.location.assign("/comecar");
         return;
       }
-      window.history.replaceState({}, "", "/app");
+      if (!isAppPath(window.location.pathname)) window.history.replaceState({}, "", "/app");
       onAuthenticated(data);
     } catch (err) {
       setError(
@@ -190,8 +167,6 @@ function LoginPanel({
     <section
       id="auth-panel-login"
       className="auth-panel"
-      role="tabpanel"
-      aria-labelledby="auth-tab-login"
     >
       <header className="auth-heading">
         <h1>Entre, a casa é sua.</h1>
@@ -199,8 +174,8 @@ function LoginPanel({
       </header>
       <form onSubmit={submit} className="auth-form auth-fields">
         <div className="auth-field">
-          <label htmlFor="auth-email">Seu e-mail</label>
-          <input
+          <Label htmlFor="auth-email">Seu e-mail</Label>
+          <Input
             type="email"
             id="auth-email"
             value={email}
@@ -215,7 +190,7 @@ function LoginPanel({
         </div>
         <div className="auth-field">
           <div className="auth-field-head">
-            <label htmlFor="auth-password">Sua senha</label>
+            <Label htmlFor="auth-password">Sua senha</Label>
             <a
               className="auth-forgot"
               href="/esqueci-senha"
@@ -233,7 +208,7 @@ function LoginPanel({
             </a>
           </div>
           <span className="password-field">
-            <input
+            <Input
               type={visible ? "text" : "password"}
               id="auth-password"
               value={password}
@@ -250,7 +225,7 @@ function LoginPanel({
             {error}
           </div>
         )}
-        <button
+        <Button variant="brand" size="brand"
           type="submit"
           disabled={submitting}
           className="button button-dark"
@@ -261,16 +236,16 @@ function LoginPanel({
             "Entrar no meu enxoval"
           )}
           {!submitting && <ArrowRight size={18} aria-hidden="true" />}
-        </button>
+        </Button>
       </form>
       <p className="auth-switch">
         Ainda não tem conta?{" "}
-        <button type="button" className="auth-switch-link" onClick={onSwitchToRegister}>
+        <Button variant="brand" size="brand" type="button" className="auth-switch-link" onClick={onSwitchToRegister}>
           Crie a sua grátis
-        </button>
+        </Button>
       </p>
       <p className="auth-note">
-        <ShieldCheck size={15} aria-hidden="true" /> Sem cartão de crédito. No seu tempo.
+        <ShieldCheck size={15} aria-hidden="true" /> Teste completo por 2 dias. Cancele antes da cobrança.
       </p>
     </section>
   );
@@ -283,10 +258,17 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Consentimento de marketing por e-mail: separado da política e desmarcado por padrão (LGPD).
+  const [emailMarketing, setEmailMarketing] = useState(false);
   const mismatch = confirmation !== "" && confirmation !== password;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const weak = passwordPolicyError(password);
+    if (weak) {
+      setError(weak);
+      return;
+    }
     if (password !== confirmation) {
       setError("As senhas não coincidem.");
       return;
@@ -294,9 +276,10 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
     setSubmitting(true);
     setError("");
     try {
-      await register(email.trim(), password);
-      // Conta criada: o funil de perguntas monta o plano e o primeiro enxoval a seguir.
-      window.location.assign("/comecar");
+      const data = await register(email.trim(), password, { emailMarketing });
+      // Conta criada: o funil de perguntas monta o plano e o primeiro enxoval a seguir. Quando o e-mail
+      // ainda precisa ser confirmado, o app mostra antes a tela de confirmação.
+      window.location.assign(data.user.emailVerified === false ? "/app" : "/comecar");
     } catch (err) {
       setError(
         err instanceof Error
@@ -311,8 +294,6 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
     <section
       id="auth-panel-register"
       className="auth-panel"
-      role="tabpanel"
-      aria-labelledby="auth-tab-register"
     >
       <header className="auth-heading">
         <h1>Crie sua conta grátis.</h1>
@@ -320,8 +301,8 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
       </header>
       <form onSubmit={submit} className="auth-form auth-fields">
         <div className="auth-field">
-          <label htmlFor="register-email">Seu e-mail</label>
-          <input
+          <Label htmlFor="register-email">Seu e-mail</Label>
+          <Input
             type="email"
             id="register-email"
             value={email}
@@ -335,9 +316,9 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           />
         </div>
         <div className="auth-field">
-          <label htmlFor="register-password">Crie uma senha</label>
+          <Label htmlFor="register-password">Crie uma senha</Label>
           <span className="password-field">
-            <input
+            <Input
               type={visible ? "text" : "password"}
               id="register-password"
               value={password}
@@ -345,22 +326,21 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 setPassword(e.target.value);
                 setError("");
               }}
-              placeholder="6 ou mais caracteres"
+              placeholder={`${PASSWORD_MIN_LENGTH} ou mais caracteres`}
               autoComplete="new-password"
               aria-describedby="register-password-hint"
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               required
             />
             <PasswordToggle visible={visible} onToggle={() => setVisible(!visible)} />
           </span>
-          <p className="auth-hint" id="register-password-hint">
-            Use 6 caracteres ou mais.
-          </p>
+          <PasswordRules password={password} id="register-password-hint" />
         </div>
         <div className="auth-field">
-          <label htmlFor="register-password-confirmation">Confirme a senha</label>
+          <Label htmlFor="register-password-confirmation">Confirme a senha</Label>
           <span className="password-field">
-            <input
+            <Input
               type={visible ? "text" : "password"}
               id="register-password-confirmation"
               value={confirmation}
@@ -381,12 +361,23 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             </p>
           )}
         </div>
+        <label className="auth-optin">
+          <input
+            type="checkbox"
+            checked={emailMarketing}
+            onChange={(e) => setEmailMarketing(e.target.checked)}
+          />
+          <span>
+            Quero receber por e-mail lembretes da mudança e dicas para montar a casa. Dá para cancelar a qualquer
+            momento.
+          </span>
+        </label>
         {error && (
           <div className="form-error" role="alert">
             {error}
           </div>
         )}
-        <button
+        <Button variant="brand" size="brand"
           type="submit"
           disabled={submitting}
           className="button button-dark"
@@ -394,16 +385,16 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           {submitting ? (
             <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
           ) : (
-            "Criar conta e montar meu plano"
+            "Criar minha conta"
           )}
           {!submitting && <ArrowRight size={18} aria-hidden="true" />}
-        </button>
+        </Button>
       </form>
       <p className="auth-switch">
         Já tem conta?{" "}
-        <button type="button" className="auth-switch-link" onClick={onSwitchToLogin}>
+        <Button variant="brand" size="brand" type="button" className="auth-switch-link" onClick={onSwitchToLogin}>
           Entre por aqui
-        </button>
+        </Button>
       </p>
       <p className="auth-privacy">
         Ao criar a conta, você concorda com a nossa{" "}
@@ -413,7 +404,7 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
         .
       </p>
       <p className="auth-note">
-        <ShieldCheck size={15} aria-hidden="true" /> Sem cartão de crédito. Seus dados ficam só com você.
+        <ShieldCheck size={15} aria-hidden="true" /> Teste completo por 2 dias. Cancele no app antes da cobrança.
       </p>
     </section>
   );

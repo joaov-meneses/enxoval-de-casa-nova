@@ -1,3 +1,6 @@
+import { Label } from "@/src/components/ui/label";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -7,9 +10,11 @@ import {
   KeyRound,
   LoaderCircle,
   TriangleAlert,
-} from "lucide-react";
+} from "@/src/components/icons";
 import { checkPasswordResetToken, resetPassword } from "../api";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordPolicyError } from "../../shared/passwordPolicy";
 import { Brand } from "./Brand";
+import { PasswordRules } from "./PasswordRules";
 
 // O token vem no fragmento (#token=...) do link do e-mail. É lido uma vez, no carregamento do módulo,
 // porque o fragmento é apagado da barra de endereço logo depois (ele não deve ficar no histórico).
@@ -48,6 +53,11 @@ export function ResetPasswordPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const weak = passwordPolicyError(password);
+    if (weak) {
+      setError(weak);
+      return;
+    }
     if (password !== confirmation) {
       setError("As senhas não coincidem.");
       return;
@@ -94,9 +104,9 @@ export function ResetPasswordPage() {
               Ele pode ter expirado (vale por 1 hora), já ter sido usado ou ter
               sido substituído por um pedido mais novo. É só pedir outro.
             </p>
-            <a className="button button-dark account-cta" href="/esqueci-senha">
+            <Button asChild variant="brand" size="brand"><a className="button button-dark account-cta" href="/esqueci-senha">
               Pedir um novo link <ArrowRight size={18} />
-            </a>
+            </a></Button>
             <a className="account-signout" href="/app">
               Voltar para o login
             </a>
@@ -114,46 +124,48 @@ export function ResetPasswordPage() {
               continuam salvos.
             </p>
             <form className="auth-form" onSubmit={submit} aria-busy={busy}>
-              <label htmlFor="reset-password">
+              <Label htmlFor="reset-password">
                 Nova senha
                 <span className="password-field">
-                  <input
+                  <Input
                     id="reset-password"
                     type={visible ? "text" : "password"}
                     autoComplete="new-password"
-                    minLength={8}
-                    maxLength={128}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
                     required
                     autoFocus
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Pelo menos 8 caracteres"
+                    placeholder={`Pelo menos ${PASSWORD_MIN_LENGTH} caracteres`}
+                    aria-describedby="reset-password-rules"
                     disabled={busy}
                   />
-                  <button
+                  <Button variant="brand" size="brand"
                     type="button"
                     aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
                     onClick={() => setVisible(!visible)}
                   >
                     {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+                  </Button>
                 </span>
-              </label>
-              <label htmlFor="reset-confirmation">
+              </Label>
+              <PasswordRules password={password} id="reset-password-rules" />
+              <Label htmlFor="reset-confirmation">
                 Confirme a nova senha
-                <input
+                <Input
                   id="reset-confirmation"
                   type={visible ? "text" : "password"}
                   autoComplete="new-password"
-                  minLength={8}
-                  maxLength={128}
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={PASSWORD_MAX_LENGTH}
                   required
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}
                   placeholder="Digite novamente"
                   disabled={busy}
                 />
-              </label>
+              </Label>
               <p className="account-password-hint">
                 Ao salvar, você sai de todos os aparelhos e entra de novo com a
                 senha nova.
@@ -163,7 +175,7 @@ export function ResetPasswordPage() {
                   {error}
                 </div>
               )}
-              <button className="button button-dark" type="submit" disabled={busy}>
+              <Button variant="brand" size="brand" className="button button-dark" type="submit" disabled={busy}>
                 {busy ? (
                   <LoaderCircle className="animate-spin" size={18} />
                 ) : (
@@ -171,7 +183,7 @@ export function ResetPasswordPage() {
                     Salvar nova senha <ArrowRight size={18} />
                   </>
                 )}
-              </button>
+              </Button>
             </form>
           </>
         )}
@@ -186,9 +198,9 @@ export function ResetPasswordPage() {
               Tudo certo! Agora é só entrar com a sua nova senha. Também
               enviamos um aviso para o seu e-mail.
             </p>
-            <a className="button button-dark account-cta" href="/app">
+            <Button asChild variant="brand" size="brand"><a className="button button-dark account-cta" href="/app">
               Entrar no meu enxoval <ArrowRight size={18} />
-            </a>
+            </a></Button>
           </>
         )}
       </section>

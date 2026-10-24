@@ -1,5 +1,6 @@
+import { Button } from "@/src/components/ui/button";
 import { useEffect } from "react";
-import { LockKeyhole } from "lucide-react";
+import { LockKeyhole } from "@/src/components/icons";
 import type { AuthUser } from "../types";
 import { Brand } from "./Brand";
 
@@ -31,13 +32,13 @@ export function NoAccessPage({
           Você saiu ou foi removido do enxoval. Para voltar, peça um novo
           convite para {user.email}: ele chega por e-mail.
         </p>
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="button button-dark account-cta"
           onClick={onLogout}
         >
           Sair da conta
-        </button>
+        </Button>
       </section>
       <p className="account-access-footer">Seu lar, tomando forma.</p>
     </main>

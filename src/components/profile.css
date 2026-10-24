@@ -1,0 +1,315 @@
+.user-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg));
+  color: var(--cm-primary-dark);
+  font-weight: 700;
+}
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sidebar-profile-button {
+  width: 100%;
+  text-align: left;
+  border-radius: 12px;
+}
+.sidebar-profile-button:hover {
+  background: color-mix(in oklab, var(--cm-success) 4%, var(--cm-bg));
+}
+.casamia-dialog.profile-dialog {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.profile-dialog > .dialog-heading {
+  flex-shrink: 0;
+}
+.profile-dialog > .profile-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (min-width: 768px) {
+  .casamia-dialog.profile-dialog {
+    width: min(680px, calc(100vw - 48px));
+  }
+}
+.profile-summary {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.profile-summary:focus {
+  outline: none;
+}
+.profile-summary .user-avatar {
+  width: 64px;
+  height: 64px;
+  font-size: 26px;
+}
+.profile-avatar-edit { position: relative; flex-shrink: 0; width: 68px; height: 68px; padding: 2px; border-radius: 50%; cursor: pointer; }
+.profile-avatar-edit:hover { box-shadow: 0 0 0 3px #b5532f33; }
+.profile-avatar-edit:focus-visible { outline: 3px solid var(--cm-action); outline-offset: 3px; }
+.profile-summary .profile-avatar-edit .profile-avatar-camera { position: absolute; right: -2px; bottom: -1px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--cm-primary-dark); color: color-mix(in oklab, var(--cm-bg) 22%, #fff); border: 2px solid color-mix(in oklab, var(--cm-bg) 22%, #fff); box-shadow: 0 2px 5px #3b2a2026; }
+.profile-avatar-camera svg { width: 18px; height: 18px; stroke-width: 2.25; }
+.profile-editable-field { display: flex; align-items: center; position: relative; }
+.profile-editable-field input { padding-right: 52px; }
+.profile-editable-field input:disabled { opacity: 1; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); -webkit-text-fill-color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); background: color-mix(in oklab, var(--cm-sand) 22%, #fff); cursor: default; }
+.profile-editable-field button { position: absolute; right: 3px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; color: var(--cm-primary-dark); }
+.profile-editable-field button:hover:not(:disabled) { background: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-bg)); }
+.profile-editable-field button:disabled { opacity: .35; }
+.profile-field-label { font-weight: 700; margin-top: 7px; }
+.profile-email-info { display: flex; align-items: center; gap: 10px; padding: 12px 0; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); font-size: 14px; }
+.profile-email-info span { min-width: 0; overflow-wrap: anywhere; }
+.profile-email-info svg { flex-shrink: 0; }
+.profile-photo-dialog { max-width: 440px; }
+.profile-photo-picker { display: grid; gap: 12px; }
+.profile-photo-picker > p { margin: 0 0 8px; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); }
+.profile-photo-picker > .button { min-height: 48px; justify-content: center; gap: 12px; }
+.profile-photo-picker small { font-size: 12px; line-height: 1.6; color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text)); }
+.profile-camera-preview { position: relative; }
+.profile-camera-preview video, .profile-camera-photo { display: block; width: 100%; max-height: 38dvh; object-fit: cover; aspect-ratio: 1; border-radius: 14px; background: color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg)); }
+.profile-summary > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.profile-summary strong {
+  color: var(--cm-text);
+  font-family: var(--serif);
+  font-size: 23px;
+  overflow-wrap: anywhere;
+}
+.profile-summary span:not(.user-avatar) {
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.profile-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px;
+  gap: 4px;
+  background: color-mix(in oklab, var(--cm-success) 4%, var(--cm-bg));
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+.profile-tabs button {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border-radius: 9px;
+  color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text));
+  font-size: 14px;
+  padding: 8px;
+}
+.profile-tabs button[aria-selected="true"] {
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
+  color: var(--cm-primary-dark);
+  box-shadow: 0 2px 5px #3b2a2012;
+  font-weight: 700;
+}
+.profile-photo-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.profile-photo-controls small {
+  flex-basis: 100%;
+}
+.profile-content small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
+}
+.profile-form,
+.profile-form fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.profile-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.profile-form label {
+  margin-top: 7px;
+  font-weight: 700;
+}
+.profile-form input {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 56%, #fff);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
+  font-size: 15px;
+  color: var(--cm-text);
+}
+.profile-form input[readonly] {
+  background: color-mix(in oklab, var(--cm-sand) 22%, #fff);
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
+}
+.profile-form > button {
+  justify-self: start;
+  margin-top: 14px;
+  min-height: 44px;
+}
+.profile-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.profile-field-grid > div {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.profile-security {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 47%, #fff);
+}
+.profile-security h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.profile-security p,
+.profile-description,
+.profile-billing p,
+.profile-info {
+  font-size: 14px;
+  line-height: 1.7;
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
+  margin: 10px 0;
+}
+.profile-security small {
+  margin-top: 16px;
+}
+.profile-plan-badge {
+  display: inline-block;
+  padding: 6px 11px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--cm-sand) 24%, var(--cm-bg));
+  color: #985332;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.profile-billing h3 {
+  font-family: var(--serif);
+  font-size: 25px;
+  color: var(--cm-text);
+}
+.profile-billing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.profile-billing-actions .button {
+  min-height: 44px;
+}
+.profile-cancel-button {
+  color: color-mix(in oklab, var(--cm-primary-dark) 96%, #000);
+}
+.profile-error,
+.profile-success {
+  padding: 12px 14px;
+  margin-top: 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.profile-error {
+  color: color-mix(in oklab, var(--cm-primary-dark) 93%, #000);
+  background: color-mix(in oklab, var(--cm-primary) 14%, #fff);
+}
+.profile-success {
+  color: color-mix(in oklab, var(--cm-success) 95%, #000);
+  background: color-mix(in oklab, var(--cm-olive-soft) 16%, #fff);
+}
+.profile-entry-mobile {
+  width: 100%;
+  justify-content: flex-start;
+}
+@media (max-width: 480px) {
+  .profile-tabs button {
+    flex-direction: column;
+    font-size: 12px;
+    gap: 4px;
+  }
+  .profile-field-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-billing-actions .button,
+  .profile-form > button {
+    width: 100%;
+  }
+}
+
+/* E-mails de lembretes e dicas (consentimento de marketing). */
+.profile-optin {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.profile-optin input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--cm-action, #a34c30);
+  cursor: pointer;
+}
+.profile-fiscal {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.profile-fiscal-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 1rem;
+}
+.profile-fiscal-list li {
+  overflow-wrap: anywhere;
+}
+.profile-fiscal-list p {
+  margin: .25rem 0 .5rem;
+}
+.profile-fiscal-select {
+  width: 100%;
+  min-height: 44px;
+  padding: .5rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  background: var(--background);
+  color: inherit;
+}
+.profile-fiscal-address {
+  margin-top: 1rem;
+}

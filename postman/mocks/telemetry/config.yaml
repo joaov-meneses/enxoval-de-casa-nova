@@ -1,0 +1,10 @@
+version: 1
+name: Local OTLP JSON collector for observability verification
+slug: local-otlp-json-collector-for-ob
+protocol: http
+interceptRequests: true
+port: 4901
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

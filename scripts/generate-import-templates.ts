@@ -36,7 +36,7 @@ const rawExamples: Example[] = [
   {
     name: "Travesseiro de plumas",
     category: "Quarto",
-    status: "needed",
+    status: "researching",
     quantity: 2,
     priceCents: 15990,
     discountCents: 0,
@@ -76,7 +76,7 @@ const rawExamples: Example[] = [
   {
     name: "Jogo de panelas antiaderente",
     category: "Cozinha",
-    status: "needed",
+    status: "researching",
     quantity: 1,
     priceCents: 349900,
     discountCents: 0,
@@ -96,7 +96,7 @@ const rawExamples: Example[] = [
   {
     name: "Liquidificador",
     category: "Eletrodomésticos",
-    status: "needed",
+    status: "researching",
     quantity: 1,
     priceCents: 24990,
     discountCents: 0,
@@ -114,9 +114,9 @@ const rawExamples: Example[] = [
     description: "",
   },
   {
-    name: "Mesa de jantar (não preciso mais)",
+    name: "Mesa de jantar",
     category: "Sala de Estar",
-    status: "not_needed",
+    status: "received",
     quantity: 1,
     priceCents: null,
     discountCents: 0,
@@ -141,12 +141,12 @@ const instructions = [
   ["Item", "Nome do item. Até 36 caracteres.", "Sim"],
   [
     "Ambiente",
-    "Onde o item fica (Quarto, Cozinha...). Ambientes que ainda não existem são criados. Até 24 caracteres.",
-    "Sim",
+    "Onde o item fica (Quarto, Cozinha...). Ambientes que ainda não existem são criados. Até 24 caracteres. Em branco: o catálogo sugere o ambiente dos itens que conhece.",
+    "Sim, salvo itens que o catálogo conhece",
   ],
   [
     "Situação",
-    "Preciso comprar · Pesquisando · Comprei · Ganhei · Já tenho · Não preciso · Descartei. Em branco = Preciso comprar.",
+    "Pesquisando · Comprado · Recebido · Já tenho. Em branco = Pesquisando.",
     "Não",
   ],
   ["Quantidade", "Número inteiro de 1 a 999. Em branco = 1.", "Não"],
@@ -157,7 +157,7 @@ const instructions = [
   ],
   [
     "Desconto/cashback (R$)",
-    "Só vale para Preciso comprar, Pesquisando e Comprei, e precisa ser menor ou igual ao preço.",
+    "Só vale para Pesquisando e Comprado, e precisa ser menor ou igual ao preço.",
     "Não",
   ],
   ["Link", "Endereço da loja ou do produto.", "Não"],
@@ -165,7 +165,7 @@ const instructions = [
   [""],
   ["Dicas"],
   [
-    "Item e Ambiente são obrigatórios e precisam estar preenchidos em todas as linhas. Se faltar algo, o arquivo é recusado e nada é importado.",
+    "Item é obrigatório em todas as linhas, e Ambiente também, a não ser que o catálogo conheça o item. Se faltar algo, o arquivo é recusado e nada é importado.",
   ],
   ['A primeira linha da aba "Itens" deve manter os títulos das colunas.'],
   [

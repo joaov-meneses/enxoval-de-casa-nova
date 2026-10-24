@@ -114,22 +114,33 @@ O app envia para a API o **Estado do Usuário** (metragem, perfil de moradores, 
 
 ## 7. Identidade Visual e Acessibilidade (WCAG)
 
-### Paleta Oficial
+### Paleta Oficial: Linho Terracota
 
-| Papel | Nome | Hex | Contraste sobre Creme (`#FBF3E6`) | Conformidade WCAG |
+Adotada em outubro de 2026, depois de um estudo com nove marcas de casa, enxoval, imóveis e listas de presente. A base ficou menos amarelada para que as fotos de produto se destaquem, e o terracota ganhou um tom mais profundo para os botões. O terracota oficial, a identidade do Nino e do logo, não mudou.
+
+| Papel | Nome | Hex | Contraste | Conformidade WCAG |
 |---|---|---|---|---|
-| **Fundo Geral** | Creme Acolhedor | `#FBF3E6` | Base | N/A |
-| **Texto e Títulos** | Café Tostado | `#3B2A20` | **10.8:1** | **AAA** (Excepcional) |
-| **Primária / Ação** | Terracota Artesanal | `#C2603F` | **4.6:1** | **AA** (Aprovado p/ botões e destaques) |
-| **Apoio / Sucesso** | Oliva Natural | `#5C6643` *(ajustado)* | **4.7:1** | **AA** (Aprovado p/ status concluído) |
-| **Acento / Informação**| Azulejo Noturno | `#244B66` *(ajustado)* | **7.2:1** | **AAA** (Aprovado p/ links e badges) |
+| **Fundo Geral** | Linho | `#F8F3EB` | Base | N/A |
+| **Cartões** | Branco | `#FFFFFF` | Base | N/A |
+| **Texto e Títulos** | Café Tostado | `#2F2A26` | **12,9:1** sobre o linho | **AAA** |
+| **Marca** | Terracota Artesanal | `#C2603F` | **3,8:1** sobre o linho; **4,2:1** com texto branco | Só áreas grandes, ilustração e texto a partir de 24px. Não usar como fundo de botão com texto branco |
+| **Ação (botão principal)** | Terracota Profundo | `#A34C30` | **5,8:1** com texto branco; **5,2:1** como texto sobre o linho | **AA** (botões, links, foco) |
+| **Ação em hover** | Terracota Queimado | `#8A3F27` | **7,4:1** com texto branco | **AAA** |
+| **Apoio / Sucesso** | Sálvia | `#5B6E50` | **5,0:1** sobre o linho | **AA** (status concluído) |
+| **Chips de cômodo e semana** | Sálvia Clara | `#E3E9DA` | **7,3:1** com texto `#3F4D38` | **AAA** |
+| **Acento / Informação** | Azulejo Noturno | `#244B66` | **8,4:1** sobre o linho | **AAA** (links e selos) |
+| **Borda de campo** | Areia Escura | `#958571` | **3,2:1** sobre o linho | **AA** para bordas de controle (mínimo 3:1) |
 
-*Nota técnica:* Os tons de Oliva e Azulejo foram levemente calibrados para garantir contraste mínimo de 4.5:1 sobre o fundo Creme, garantindo legibilidade perfeita sob luz solar direta em dispositivos móveis.
+*Nota técnica:* Contrastes calculados pela fórmula de luminância relativa da WCAG 2.1. A versão anterior deste manual informava 4,6:1 para o terracota sobre o creme `#FBF3E6`, mas a conta dá 3,8:1, abaixo do AA para texto comum. Por isso os botões usam o Terracota Profundo, e o terracota oficial fica para a marca e para áreas grandes. A paleta anterior (Creme `#FBF3E6`, Café `#3B2A20`, botão `#B5532F`, Oliva `#5C6643`) continua no Design System como tema "Creme", para comparação.
+
+*No código:* as cores-base ficam em `src/index.css` (`--cm-bg`, `--cm-text`, `--cm-action`, `--cm-success`…) e as variáveis do shadcn em `src/shadcn.css`. Os demais arquivos CSS escrevem seus tons como misturas (`color-mix`) dessas cores-base, então trocar um valor recolore todas as telas.
 
 ### Tipografia
-* **Títulos e Logotipo:** **Fraunces** (serifada quente, orgânica, com terminais suaves que transmitem aconchego e tradição de lar).
-* **Interface, Tabelas e Inputs:** **DM Sans** (alta legibilidade em telas pequenas).
-* **Preços e Números:** **DM Sans Tabular Figures** (para que valores monetários alinhem perfeitamente nas colunas).
+* **Títulos e Logotipo:** **Fraunces** com o eixo **SOFT em 100** (serifada quente e orgânica; o SOFT arredonda as pontas das letras e aproxima os títulos do desenho do Nino). Pesos de 400 a 700, com itálico para destaques como "*item por item*".
+* **Interface, Tabelas e Inputs:** **Nunito** (sans arredondada, amigável e compacta; pesos de 400 a 800).
+* **Preços e Números:** **Nunito**, cujos algarismos já são tabulares por padrão, então os valores alinham em colunas sem configuração extra. Em listas e tabelas, mantenha `font-variant-numeric: tabular-nums` por garantia.
+
+*Por que não DM Sans:* versões anteriores deste manual pediam DM Sans com figuras tabulares, mas a DM Sans não tem esse recurso, e nela o I maiúsculo e o l minúsculo ficam quase iguais. Em outubro de 2026, um estudo comparou Fraunces e Nunito com Lora, Young Serif, Literata, DM Sans, Figtree e Plus Jakarta Sans nas telas do app, e a dupla Fraunces + Nunito foi mantida. A fonte é carregada em `src/index.css`, só com os pesos que o app usa.
 
 ---
 
@@ -239,8 +250,8 @@ Considerando um mix de adesão realista entre os planos:
 4. **Gateway de Pagamento Oficial: Stripe Brasil + Automação Fiscal:**
    * **Processamento Stripe (Cartão + Pix):** mix de 75% Cartão (3,99% + R$ 0,39) e 25% Pix (1,19%): **~R$ 2.325,00 / mês**.
    * **Stripe Billing (0,5%):** dunning inteligente com IA (Smart Retries) e Customer Portal pronto: **~R$ 306,00 / mês**.
-   * **API de Automação de NFS-e (Focus NFe / PlugNotas):** emissão automática de notas fiscais vinculada aos webhooks da Stripe: **~R$ 130,00 / mês**.
-   * *Subtotal Stripe + Fiscal:* **~R$ 2.761,00 / mês** (~4,5% sobre o faturamento).
+   * **NFS-e por integração direta com o Emissor Público Nacional:** sem mensalidade de intermediário; prever certificado ICP-Brasil, operação e manutenção da integração (custos a confirmar).
+   * *Subtotal das taxas Stripe:* **~R$ 2.631,00 / mês**. Certificado e operação fiscal pendentes de orçamento; total geral a revisar.
 5. **Reserva Técnica, Domínios e Ferramental de Suporte:**
    * **~R$ 500,00 / mês**.
 

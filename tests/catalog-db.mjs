@@ -1,7 +1,8 @@
 // Teste de integração do catálogo mestre (Fase 6) com PostgreSQL real e o SDK real do Jev falando com um servidor
 // HTTP falso. Usa um schema descartável. Rodar: npm run test:catalog-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import { createServer } from "node:http";
 import zlib from "node:zlib";
 import express from "express";
@@ -158,7 +159,7 @@ try {
   };
   const register = async (email) => {
     jar.delete("enxoval_session");
-    const result = await call("/auth/register", "POST", { email, password: randomBytes(16).toString("base64url") });
+    const result = await call("/auth/register", "POST", { email, password: strongPassword() });
     assert.equal(result.status, 201, JSON.stringify(result.data));
     // Conta paga: este teste cobre o catálogo, não as travas do plano gratuito (tests/freemium-db.mjs).
     await db.query("UPDATE users SET plan = 'monthly' WHERE id = $1", [result.data.user.id]);
@@ -179,8 +180,16 @@ try {
   assert.equal((await search("jogo de ca"))[0].name, "Jogo de cama", "prefixo do nome, mesmo com palavras vazias");
   assert.ok((await search("liquidificadr")).some((result) => result.name === "Liquidificador"), "tolera erro de digitação");
   assert.deepEqual(await search("a"), []);
+  const matched = await call("/catalog/match", "POST", { names: ["Geladeiras", "Liquidificadorr", "Air fryer Mondial preta", "Liquidificador com filtro", "Coisa desconhecida"] });
+  assert.equal(matched.status, 200, JSON.stringify(matched.data));
+  assert.deepEqual(
+    matched.data.results.map((result) => result && [result.match, result.name]),
+    [["exact", "Geladeira"], ["similar", "Liquidificador"], ["exact", "Air fryer"], ["contained", "Liquidificador"], null],
+    "importação: um nome por linha, na mesma ordem (marca e cor não mudam o item)",
+  );
+  assert.equal((await call("/catalog/match", "POST", { names: Array(501).fill("x") })).status, 400);
   assert.equal(received.length, 0, "a busca nunca consulta o Jev");
-  console.log("PASS: busca por prefixo, apelido e similaridade.");
+  console.log("PASS: busca por prefixo, apelido e similaridade; nomes da planilha em lote.");
 
   // 3. Itens do funil nascem ligados ao catálogo.
   const items = async () => Object.fromEntries((await call(`/items?enxovalId=${enxovalId}`)).data.map((item) => [item.name, item]));

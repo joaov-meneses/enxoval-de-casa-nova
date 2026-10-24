@@ -1,36 +1,47 @@
+import { httpErrorHandler } from './httpLogging.ts';
+import { saveSignupGrowth } from './acquisition.ts';
+import { getLogger, setLogUser } from './logger.ts';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import express, { Express, Request, Response } from 'express';
 import type { PoolClient } from 'pg';
 import { MAX_ENVIRONMENT_NAME_LENGTH, MAX_ITEM_NAME_LENGTH, normalizeEnvironmentName, normalizeEnxovalName } from '../src/data.ts';
 import { DEFAULT_ITEM_QUANTITY, isValidQuantity, quantityFromDescription } from '../src/itemQuantity.ts';
 import { DEFAULT_ITEM_STATUS, isDoneStatus, isItemStatus, resolveDiscountCents, statusFromChecked, type ItemStatus } from '../src/itemStatus.ts';
-import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalInvitation, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace, InvitationPreview, ItemPriceHistory, ItemPriceTracking, ItemTrackingInput, PriceBasis, TrackingStatus } from '../src/types.ts';
+import type { AuthUser, BootstrapData, EnxovalCategory, EnxovalInvitation, EnxovalItem, EnxovalMember, EnxovalSummary, EnxovalWorkspace, InvitationPreview, ItemOffer, ItemPriceHistory, ItemPriceTracking, ItemTrackingInput, PaymentMethod, PriceBasis, TrackingStatus } from '../src/types.ts';
 import { computeSavings } from '../src/priceTracking.ts';
 import { getPool, withTransaction, Queryable } from './database.ts';
 import { asyncHandler, cookieOptions, getCookie, hashPassword, hashSessionToken, HttpError, loginRateLimit, protectMutationOrigin, rateLimit, verifyPassword } from './security.ts';
 import { registerAdminRoutes } from './admin.ts';
+import { recordReturn } from './lifecycle/tracking.ts';
 import { registerFeedbackRoutes } from './feedback.ts';
 import { registerAiRoutes } from './ai.ts';
 import { urgencyKey } from './services/jev.ts';
 import { findItemInTitle, linkItemsToCatalog, queueResolution } from './catalog/store.ts';
 import { registerCatalogRoutes } from './catalog/routes.ts';
-import { appBaseUrl, canDeliverMail, invitationEmail, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
+import { appBaseUrl, canDeliverMail, emailVerificationEmail, invitationEmail, passwordChangedEmail, passwordResetEmail, sendMail } from './mailer.ts';
+import { assertNotBlocked, checkSignupBurst, emailVerificationRequired, enforceBans, ensureDevice, recordDevice, recordLoginFailure, type ClientContext } from './trust.ts';
 import { parseOnboardingProfile, type OnboardingProfile } from './onboarding-profile.ts';
 import { isPriceCategory, isSpendingTier, type PriceCategory, type SpendingTier } from '../src/planning/spending.ts';
 import { isBuyWeek, MAX_BUY_WEEK, MIN_BUY_WEEK, type ItemPriority, type ItemTiming } from '../src/planning/purchasePlan.ts';
 import { cityById, cityMatchesState } from '../src/onboarding/regions.ts';
 import { ScrapeError, rememberPreview, scrapeProduct } from './services/productScraper.ts';
 import { findOrCreateTrackedProduct, requireTrackableUrl } from './trackedProducts.ts';
-import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, effectivePlanSql, trimToLimits } from './freemium.ts';
-import { registerBillingRoutes } from './billing.ts';
+import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, effectivePlanSql, subscriptionRequired, trimToLimits } from './freemium.ts';
+import { registerBillingRoutes, recoverBillingAccess } from './billing.ts';
+import { registerProfileRoutes } from './profile.ts';
+import { offerHistories, registerItemOfferRoutes, syncPrimaryOffer } from './itemOffers.ts';
+import { registerItemDocumentRoutes } from './itemDocuments.ts';
+import { parseItemExtras } from './itemExtras.ts';
 import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
-import { MAX_IMAGE_UPLOAD_BYTES, internalImageId } from '../src/itemImages.ts';
-import { imageBelongsToEnxoval, importImageFromUrl, isExternalImageUrl, processImage, purgeUnusedImages, storeImage, type ProcessedImage } from './services/itemImages.ts';
+import { passwordPolicyError } from '../shared/passwordPolicy.ts';
 
 const SESSION_COOKIE = 'enxoval_session';
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const RESET_TOKEN_TTL_MS = 60 * 60_000;
 const RESET_REQUEST_COOLDOWN_SECONDS = 60;
+const EMAIL_VERIFICATION_TTL_HOURS = 48;
+const EMAIL_VERIFICATION_COOLDOWN_SECONDS = 60;
 const INVITATION_TTL_DAYS = 7;
 const INVITATION_TTL_MS = INVITATION_TTL_DAYS * 24 * 60 * 60_000;
 const INVITATION_RESEND_COOLDOWN_SECONDS = 60;
@@ -45,6 +56,7 @@ interface DbUserRow {
   is_guest: boolean;
   must_change_password: boolean;
   password_reset_expires_at: Date | null;
+  email_verified_at: Date | null;
   plan: AccountPlan;
 }
 
@@ -59,6 +71,7 @@ interface EnxovalRow {
   state: string | null;
   city: string | null;
   spending_tier: SpendingTier;
+  monthly_budget_cents: number | null;
 }
 
 interface InvitationRow {
@@ -73,6 +86,7 @@ interface MemberRow {
   name: string;
   email: string;
   role: 'owner' | 'editor';
+  avatar_version?: string | null;
 }
 
 interface CategoryRow {
@@ -113,7 +127,6 @@ interface ItemRow {
   catalog_region: string | null;
   updated_at: string | Date;
   created_at: string | Date;
-  image_url: string | null;
   selected_variation: string | null;
   tracked_product_id: string | null;
   initial_price_cents: number | null;
@@ -129,6 +142,32 @@ interface ItemRow {
   tracked_low60_cents: number | null;
   tracked_high60_cents: number | null;
   tracked_samples60: number | null;
+  installments: number;
+  first_installment_on: string | null;
+  purchased_at: string | null;
+  payment_method: PaymentMethod | null;
+  installment_cents: number | null;
+  assignee_id: string | null;
+  gift_from: string | null;
+  gift_message: string | null;
+  thanked_at: string | Date | null;
+  warranty_months: number | null;
+  warranty_until: string | null;
+  store_name: string | null;
+  offers: OfferJson[] | null;
+  document_count: number | null;
+}
+
+interface OfferJson {
+  id: string;
+  url: string;
+  domain: string;
+  is_primary: boolean;
+  current_cents: number | null;
+  pix_cents: number | null;
+  in_stock: boolean | null;
+  last_scraped_at: string | null;
+  status: TrackingStatus | null;
 }
 
 interface TemplateRow {
@@ -159,6 +198,14 @@ function requireText(value: unknown, fieldName: string) {
   return value.trim();
 }
 
+/** Só para senha nova: o login segue aceitando senhas cadastradas antes da regra. */
+function requireNewPassword(value: unknown, fieldName: string) {
+  const password = requireText(value, fieldName);
+  const problem = passwordPolicyError(password);
+  if (problem) throw new HttpError(400, problem);
+  return password;
+}
+
 function requireEnvironmentName(value: unknown) {
   // Uma linha só: quebras de linha e espaços repetidos viram um espaço antes de contar os caracteres.
   const name = normalizeEnvironmentName(requireText(value, 'Nome do ambiente'));
@@ -169,12 +216,14 @@ function requireEnvironmentName(value: unknown) {
   return name;
 }
 
-function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password' | 'is_guest' | 'plan'>>): AuthUser {
+function mapUser(row: Pick<DbUserRow, 'id' | 'name' | 'email'> & Partial<Pick<DbUserRow, 'must_change_password' | 'is_guest' | 'plan' | 'email_verified_at'>>): AuthUser {
   return {
     id: row.id,
     name: row.name,
     email: row.email,
     mustChangePassword: row.must_change_password ?? false,
+    // Linha sem a coluna (consulta que não a pediu) não trava ninguém.
+    emailVerified: row.email_verified_at === undefined || Boolean(row.email_verified_at) || !emailVerificationRequired(),
     isGuest: row.is_guest ?? false,
     plan: isAccountPlan(row.plan) ? row.plan : 'free'
   };
@@ -200,16 +249,20 @@ function mapEnxoval(row: EnxovalRow): EnxovalSummary {
     moveDate: row.move_date ?? null,
     state: row.state ?? null,
     city: row.city ?? null,
-    spendingTier: row.spending_tier ?? 'equilibrado'
+    spendingTier: row.spending_tier ?? 'equilibrado',
+    monthlyBudgetCents: row.monthly_budget_cents === null || row.monthly_budget_cents === undefined ? null : Number(row.monthly_budget_cents)
   };
 }
 
-function mapMember(row: MemberRow): EnxovalMember {
+function mapMember(row: MemberRow, enxovalId: string): EnxovalMember {
   return {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role
+    role: row.role,
+    avatarUrl: row.avatar_version
+      ? `/api/enxovais/${encodeURIComponent(enxovalId)}/members/${encodeURIComponent(row.id)}/avatar?v=${row.avatar_version}`
+      : null
   };
 }
 
@@ -248,6 +301,20 @@ function mapPriceTracking(row: ItemRow): ItemPriceTracking | null {
     inStock: row.tracked_in_stock ?? true,
     lastCheckedAt: row.tracked_last_scraped_at ? serializeTimestamp(row.tracked_last_scraped_at) : null,
     status: row.tracked_status ?? 'pending'
+  };
+}
+
+function mapOffer(offer: OfferJson): ItemOffer {
+  return {
+    id: offer.id,
+    url: offer.url,
+    domain: offer.domain,
+    isPrimary: offer.is_primary,
+    currentPriceCents: nullableCents(offer.current_cents),
+    pixPriceCents: nullableCents(offer.pix_cents),
+    inStock: offer.in_stock ?? true,
+    lastCheckedAt: offer.last_scraped_at ?? null,
+    status: offer.status ?? 'pending'
   };
 }
 
@@ -297,9 +364,22 @@ function mapItem(row: ItemRow): EnxovalItem {
       : null,
     createdAt: serializeTimestamp(row.created_at),
     updatedAt: serializeTimestamp(row.updated_at),
-    imageUrl: row.image_url,
     selectedVariation: row.selected_variation,
-    priceTracking: mapPriceTracking(row)
+    priceTracking: mapPriceTracking(row),
+    installments: Number(row.installments ?? 1),
+    firstInstallmentOn: row.first_installment_on ?? null,
+    purchasedAt: row.purchased_at ?? null,
+    paymentMethod: row.payment_method ?? null,
+    installmentCents: nullableCents(row.installment_cents),
+    assigneeId: row.assignee_id ?? null,
+    giftFrom: row.gift_from ?? null,
+    giftMessage: row.gift_message ?? null,
+    thankedAt: row.thanked_at ? serializeTimestamp(row.thanked_at) : null,
+    warrantyMonths: row.warranty_months === null || row.warranty_months === undefined ? null : Number(row.warranty_months),
+    warrantyUntil: row.warranty_until ?? null,
+    storeName: row.store_name ?? null,
+    offers: (row.offers ?? []).map(mapOffer),
+    documentCount: Number(row.document_count ?? 0)
   };
 }
 
@@ -328,7 +408,6 @@ const ITEM_SELECT = `
     i.timing,
     i.created_at,
     i.updated_at,
-    i.image_url,
     i.selected_variation,
     i.tracked_product_id,
     i.initial_price_cents,
@@ -353,7 +432,21 @@ const ITEM_SELECT = `
     CASE WHEN i.price_basis = 'pix' THEN tp.pix_price_cents ELSE tp.current_price_cents END AS tracked_current_cents,
     ps.low_cents AS tracked_low60_cents,
     ps.high_cents AS tracked_high60_cents,
-    ps.samples AS tracked_samples60
+    ps.samples AS tracked_samples60,
+    i.installments,
+    to_char(i.first_installment_on, 'YYYY-MM-DD') AS first_installment_on,
+    to_char(i.purchased_at, 'YYYY-MM-DD') AS purchased_at,
+    i.payment_method,
+    i.installment_cents,
+    i.assignee_id,
+    i.gift_from,
+    i.gift_message,
+    i.thanked_at,
+    i.warranty_months,
+    to_char(i.warranty_until, 'YYYY-MM-DD') AS warranty_until,
+    i.store_name,
+    offers.list AS offers,
+    docs.total AS document_count
   FROM items i
   INNER JOIN categories c ON c.id = i.category_id
   LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
@@ -377,12 +470,26 @@ const ITEM_SELECT = `
     ) recent
     WHERE v IS NOT NULL
   ) ps ON true
+  -- Lojas do item (até 3), a principal primeiro; o preço lido segue o tipo de preço do item.
+  LEFT JOIN LATERAL (
+    SELECT json_agg(json_build_object(
+      'id', o.id, 'url', otp.url, 'domain', otp.domain, 'is_primary', o.is_primary,
+      'current_cents', CASE WHEN i.price_basis = 'pix' THEN otp.pix_price_cents ELSE otp.current_price_cents END,
+      'pix_cents', otp.pix_price_cents, 'in_stock', otp.in_stock,
+      'last_scraped_at', to_char(otp.last_scraped_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'status', otp.last_scrape_status
+    ) ORDER BY o.is_primary DESC, o.created_at ASC) AS list
+    FROM item_offers o
+    INNER JOIN tracked_products otp ON otp.id = o.tracked_product_id
+    WHERE o.item_id = i.id
+  ) offers ON true
+  LEFT JOIN LATERAL (SELECT COUNT(*)::int AS total FROM item_documents d WHERE d.item_id = i.id) docs ON true
 `;
 
 // Data da mudança como texto AAAA-MM-DD: o driver converteria `date` em um Date no fuso do servidor.
 const ENXOVAL_COLUMNS = `
     e.id, e.name, e.owner_id, o.name AS owner_name, e.discount_cents,
-    to_char(e.move_date, 'YYYY-MM-DD') AS move_date, e.state, e.city, e.spending_tier`;
+    to_char(e.move_date, 'YYYY-MM-DD') AS move_date, e.state, e.city, e.spending_tier, e.monthly_budget_cents`;
 
 async function fetchEnxovais(queryable: Queryable, userId: string) {
   const result = await queryable.query<EnxovalRow>(`
@@ -405,6 +512,8 @@ async function requireEnxovalMember(queryable: Queryable, userId: string, enxova
   `, [enxovalId, userId]);
 
   if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
+  const owner = await queryable.query<{plan: string}>(`SELECT ${effectivePlanSql('u')} AS plan FROM enxovais e JOIN users u ON u.id = e.owner_id WHERE e.id = $1`, [enxovalId]);
+  if (owner.rows[0]?.plan === 'free') throw subscriptionRequired();
   return result.rows[0].role;
 }
 async function requireEnxovalOwner(queryable: Queryable, userId: string, enxovalId: string) {
@@ -430,14 +539,14 @@ async function fetchMembers(queryable: Queryable, userId: string, enxovalId: str
   await requireEnxovalMember(queryable, userId, enxovalId);
 
   const result = await queryable.query<MemberRow>(`
-    SELECT u.id, u.name, u.email, em.role
+    SELECT u.id, u.name, u.email, em.role, u.avatar_version
     FROM enxoval_members em
     INNER JOIN users u ON u.id = em.user_id
     WHERE em.enxoval_id = $1
     ORDER BY CASE em.role WHEN 'owner' THEN 0 ELSE 1 END, u.name ASC, u.email ASC
   `, [enxovalId]);
 
-  return result.rows.map(mapMember);
+  return result.rows.map(row => mapMember(row, enxovalId));
 }
 
 async function fetchCategories(queryable: Queryable, userId: string, enxovalId: string) {
@@ -475,11 +584,18 @@ async function fetchWorkspace(queryable: Queryable, userId: string, enxovalId: s
 }
 
 async function fetchBootstrap(user: AuthUser, requestedEnxovalId?: string): Promise<BootstrapData> {
-  if (user.mustChangePassword) return { user, enxovais: [], activeEnxoval: null, members: [], categories: [], items: [] };
+  if (user.mustChangePassword || !user.emailVerified) return { user, enxovais: [], activeEnxoval: null, members: [], categories: [], items: [] };
+  if (user.plan === 'free' && !user.isGuest) {
+    const recovered = await recoverBillingAccess(user.id);
+    if (isAccountPlan(recovered.plan)) user = { ...user, plan: recovered.plan };
+  }
+  const state = await getPool().query<{ onboarding_completed_at: Date | null; trial_used: boolean; avatar_version: string | null }>('SELECT onboarding_completed_at, trial_used, avatar_version FROM users WHERE id = $1', [user.id]);
+  user = { ...user, onboardingCompleted: Boolean(state.rows[0]?.onboarding_completed_at), trialUsed: state.rows[0]?.trial_used ?? false, avatarUrl: state.rows[0]?.avatar_version ? `/api/profile/avatar?v=${state.rows[0].avatar_version}` : null };
   const enxovais = await fetchEnxovais(getPool(), user.id);
   // Um enxoval pedido que a pessoa não acessa mais (ex.: ela foi removida como convidada) cai no primeiro da lista.
   const activeEnxovalId = enxovais.find(enxoval => enxoval.id === requestedEnxovalId)?.id ?? enxovais[0]?.id;
-  const workspace = activeEnxovalId
+  const access = activeEnxovalId ? await getPool().query<{plan: string}>(`SELECT ${effectivePlanSql('u')} AS plan FROM enxovais e JOIN users u ON u.id = e.owner_id WHERE e.id = $1`, [activeEnxovalId]) : null;
+  const workspace = activeEnxovalId && access?.rows[0]?.plan !== 'free'
     ? await fetchWorkspace(getPool(), user.id, activeEnxovalId)
     : null;
 
@@ -603,10 +719,18 @@ const isTiming = (value: unknown): value is ItemTiming => value === 'first_night
 const MAX_PLAN_CATEGORIES = 15;
 const MAX_PLAN_ITEMS = 400;
 
-/** Plano gerado pelo funil de onboarding: ambientes e itens, com limites para não virar um vetor de abuso. */
-function parsePlan(value: unknown): EnxovalPlan | null {
+/**
+ * Plano gerado pelo funil de onboarding: ambientes e itens, com limites para não virar um vetor de abuso.
+ * `allowNoRooms`: a pessoa escolheu "nenhum ambiente agora"; o plano chega vazio e o enxoval nasce sem ambientes.
+ */
+export function parseOnboardingPlan(value: unknown, allowEmptyItems = false, allowNoRooms = false): EnxovalPlan | null {
   if (value === undefined || value === null) return null;
   const categories = (value as { categories?: unknown })?.categories;
+  if (allowNoRooms) {
+    // Sem ambientes escolhidos, o plano só pode vir vazio: nada de ambientes que a pessoa não pediu.
+    if (!Array.isArray(categories) || categories.length > 0) throw new HttpError(400, 'Plano inválido.');
+    return { categories: [] };
+  }
   if (!Array.isArray(categories) || categories.length === 0 || categories.length > MAX_PLAN_CATEGORIES) {
     throw new HttpError(400, 'Plano inválido.');
   }
@@ -642,7 +766,8 @@ function parsePlan(value: unknown): EnxovalPlan | null {
   if (new Set(parsed.map(category => category.name)).size !== parsed.length) {
     throw new HttpError(400, 'Plano com ambientes repetidos.');
   }
-  if (totalItems === 0) throw new HttpError(400, 'Plano sem itens.');
+  if (totalItems === 0 && !allowEmptyItems) throw new HttpError(400, 'Plano sem itens.');
+  if (totalItems > 0 && allowEmptyItems) throw new HttpError(400, 'A escolha sem itens deve criar apenas os ambientes.');
 
   return { categories: parsed };
 }
@@ -717,6 +842,15 @@ function parseUserName(value: unknown): string | null {
   return name;
 }
 
+async function saveOnboardingDraft(userId: string, name: string, plan: EnxovalPlan, profile: OnboardingProfile, userName: string | null) {
+  await withTransaction(async client => {
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    const existing = await client.query('SELECT id FROM enxovais WHERE owner_id = $1 LIMIT 1', [userId]);
+    if (existing.rows.length) throw new HttpError(409, 'Você já tem um enxoval. Acesse o aplicativo para continuar.');
+    await client.query(`UPDATE users SET onboarding_completed_at = COALESCE(onboarding_completed_at, now()), onboarding_draft = $2::jsonb, name = COALESCE($3, name) WHERE id = $1`, [userId, JSON.stringify({ name, plan, profile }), userName]);
+  });
+}
+
 async function createEnxovalForUser(
   userId: string,
   name: string,
@@ -738,14 +872,66 @@ async function createSession(res: Response, userId: string, queryable: Queryable
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
   await queryable.query(`
-    INSERT INTO sessions (id, user_id, token_hash, expires_at)
-    VALUES ($1, $2, $3, $4)
-  `, [randomUUID(), userId, tokenHash, expiresAt]);
+    INSERT INTO sessions (id, user_id, token_hash, expires_at, device_id)
+    VALUES ($1, $2, $3, $4, $5)
+  `, [randomUUID(), userId, tokenHash, expiresAt, typeof res.locals.deviceId === 'string' ? res.locals.deviceId : null]);
 
   res.cookie(SESSION_COOKIE, token, {
     ...cookieOptions(),
     maxAge: SESSION_TTL_MS
   });
+  await recordActivityDay(queryable, userId);
+}
+
+/** Um registro por dia de uso: mede retorno depois de cada e-mail (inclusive do grupo de controle) e a retenção. */
+async function recordActivityDay(queryable: Queryable, userId: string) {
+  await queryable.query(`
+    INSERT INTO user_activity_days (user_id, day) VALUES ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date)
+    ON CONFLICT DO NOTHING
+  `, [userId]);
+}
+
+async function recordUserIpEvent(queryable: Queryable, userId: string, context: ClientContext, event: 'signup' | 'login' | 'invitation_signup') {
+  await recordDevice(queryable, userId, context);
+  if (!context.ip || !isIP(context.ip)) return;
+  await queryable.query(`
+    INSERT INTO user_ip_events (id, user_id, ip, event, device_id, user_agent)
+    VALUES ($1, $2, $3::inet, $4, $5, $6)
+  `, [randomUUID(), userId, context.ip, event, context.deviceId, context.userAgent]);
+}
+
+/**
+ * Cria o link de confirmação de e-mail e o envia. Um novo pedido invalida o anterior; pedidos seguidos dentro do
+ * intervalo mínimo são recusados. Só o hash do token vai para o banco.
+ */
+async function issueEmailVerification(userId: string): Promise<'sent' | 'cooldown' | 'verified'> {
+  const base = appBaseUrl();
+  if (!base) throw new HttpError(503, 'Não foi possível enviar o e-mail de confirmação agora. Tente novamente mais tarde.');
+  const token = randomBytes(32).toString('base64url');
+  const user = await withTransaction(async client => {
+    const found = await client.query<{ name: string; email: string; email_verified_at: Date | null }>(
+      'SELECT name, email, email_verified_at FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    const row = found.rows[0];
+    if (!row || row.email_verified_at) return 'verified' as const;
+    const recent = await client.query(
+      'SELECT 1 FROM email_verification_tokens WHERE user_id = $1 AND created_at > now() - make_interval(secs => $2) LIMIT 1',
+      [userId, EMAIL_VERIFICATION_COOLDOWN_SECONDS]);
+    if (recent.rowCount) return 'cooldown' as const;
+    await client.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [userId]);
+    await client.query(
+      'INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at) VALUES ($1, $2, $3, now() + make_interval(hours => $4))',
+      [randomUUID(), userId, hashSessionToken(token), EMAIL_VERIFICATION_TTL_HOURS]);
+    return row;
+  });
+  if (typeof user === 'string') return user;
+  // O token vai no fragmento (#), que o navegador não envia ao servidor nem a outros sites pelo Referer.
+  await sendMail(emailVerificationEmail({
+    to: user.email,
+    name: user.name,
+    link: `${base}/verificar-email#token=${token}`,
+    hours: EMAIL_VERIFICATION_TTL_HOURS
+  }));
+  return 'sent';
 }
 
 /**
@@ -760,7 +946,7 @@ async function issuePasswordReset(email: string) {
 
   const base = appBaseUrl();
   if (!base) {
-    console.error('Redefinição de senha: configure APP_URL (ex.: https://seu-dominio.com) para montar o link do e-mail.');
+    getLogger().error({ event: 'password_reset.configuration_missing' }, 'Redefinição de senha: configure APP_URL para montar o link do e-mail.');
     return;
   }
 
@@ -796,21 +982,27 @@ async function getCurrentUser(req: Request) {
   if (!token) return null;
 
   const result = await getPool().query<DbUserRow>(`
-    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password, u.is_guest, ${effectivePlanSql('u')} AS plan
+    SELECT u.id, u.name, u.email, u.password_hash, u.must_change_password, u.is_guest, u.email_verified_at, ${effectivePlanSql('u')} AS plan
     FROM sessions s
     INNER JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = $1 AND s.expires_at > now() AND u.is_active = true
+      AND NOT EXISTS (SELECT 1 FROM bans b WHERE b.target_type = 'user' AND b.target_value = u.id::text
+        AND b.revoked_at IS NULL AND (b.expires_at IS NULL OR b.expires_at > now()))
+      AND s.created_at > now() - interval '7 days'
+      AND s.last_activity_at > now() - interval '48 hours'
       AND (NOT u.must_change_password OR u.password_reset_expires_at > now())
     LIMIT 1
   `, [hashSessionToken(token)]);
 
+  if (result.rows[0]) setLogUser(result.rows[0].id);
   return result.rows[0] ? mapUser(result.rows[0]) : null;
 }
 
-async function requireCurrentUser(req: Request, allowPasswordChange = false) {
+async function requireCurrentUser(req: Request, allowPasswordChange = false, allowUnverifiedEmail = false) {
   const user = await getCurrentUser(req);
   if (!user) throw new HttpError(401, 'Faça login para continuar.');
   if (user.mustChangePassword && !allowPasswordChange) throw new HttpError(403, 'Defina uma nova senha antes de acessar seu enxoval.');
+  if (!user.emailVerified && !allowUnverifiedEmail) throw new HttpError(403, 'Confirme seu e-mail para continuar. Enviamos um link para a sua caixa de entrada.', 'EMAIL_NOT_VERIFIED');
   return user;
 }
 
@@ -845,19 +1037,6 @@ function parseBuyWeek(value: unknown): number | null {
   return value;
 }
 
-/** Imagem do produto: só endereços http(s) de tamanho razoável; qualquer outra coisa é descartada sem barrar o item. */
-function sanitizeImageUrl(value: unknown) {
-  if (typeof value !== 'string' || !value.trim() || value.length > 2000) return null;
-  // Imagem já guardada no banco (enviada ou importada antes): o endereço interno é conferido ao gravar o item.
-  if (internalImageId(value.trim())) return value.trim().toLowerCase();
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Lê e valida os campos opcionais de acompanhamento de preço. Só devolve as chaves que vieram no corpo. */
 function parseTrackingInput(body: unknown): ItemTrackingInput {
   const source = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
@@ -874,7 +1053,6 @@ function parseTrackingInput(body: unknown): ItemTrackingInput {
     if (text.length > 80) throw new HttpError(400, 'A variação pode ter no máximo 80 caracteres.');
     input.selectedVariation = text || null;
   }
-  if (has('imageUrl')) input.imageUrl = sanitizeImageUrl(source.imageUrl);
   if (has('priceBasis')) {
     if (source.priceBasis !== 'regular' && source.priceBasis !== 'pix') throw new HttpError(400, 'Tipo de preço inválido.');
     input.priceBasis = source.priceBasis;
@@ -886,29 +1064,7 @@ function parseTrackingInput(body: unknown): ItemTrackingInput {
   return input;
 }
 
-/**
- * Imagem de um endereço externo (a foto que o leitor de lojas achou ou um link colado): baixa e prepara antes
- * da transação, para a rede lenta não segurar o banco. Se não der, o item é salvo mesmo assim com o endereço
- * original, e a foto só aparece se a loja permitir.
- */
-async function prefetchExternalImage(imageUrl: string | null | undefined): Promise<ProcessedImage | null> {
-  if (!isExternalImageUrl(imageUrl)) return null;
-  try {
-    return await importImageFromUrl(imageUrl);
-  } catch {
-    return null;
-  }
-}
-
-/** Endereço final da imagem do item: guarda a baixada, confere a interna e mantém o externo quando não houve como baixar. */
-async function resolveItemImage(client: Queryable, userId: string, enxovalId: string, imageUrl: string | null | undefined, prefetched: ProcessedImage | null) {
-  if (!imageUrl) return null;
-  if (internalImageId(imageUrl)) return (await imageBelongsToEnxoval(client, enxovalId, imageUrl)) ? imageUrl : null;
-  return prefetched ? storeImage(client, enxovalId, userId, prefetched) : imageUrl;
-}
-
 async function createItemForUser(input: { userId: string; enxovalId: string; name: string; categoryId?: string; categoryName?: string; priceCents?: number | null; link?: string; description?: string; status?: ItemStatus; discountCents?: unknown; quantity?: number; buyWeek?: number | null; tracking?: ItemTrackingInput; placement?: 'top' | 'end' }) {
-  const prefetchedImage = await prefetchExternalImage(input.tracking?.imageUrl);
   const created = await withTransaction(async client => {
     await requireEnxovalMember(client, input.userId, input.enxovalId);
 
@@ -937,7 +1093,6 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     const discount = resolveDiscountCents({ status, priceCents: input.priceCents ?? null, discountCents: input.discountCents });
     if ('error' in discount) throw new HttpError(400, discount.error);
     const tracking = input.tracking ?? {};
-    const imageUrl = await resolveItemImage(client, input.userId, input.enxovalId, tracking.imageUrl, prefetchedImage);
     const trackedProductId = tracking.trackedProductUrl
       ? await findOrCreateTrackedProduct(client, tracking.trackedProductUrl, input.name)
       : null;
@@ -946,13 +1101,15 @@ async function createItemForUser(input: { userId: string; enxovalId: string; nam
     await client.query(`
       INSERT INTO items (
         id, user_id, enxoval_id, category_id, name, sort_order, price_cents, discount_cents, link, description, status, checked, quantity,
-        tracked_product_id, initial_price_cents, target_price_cents, selected_variation, image_url, price_alert_enabled, price_basis, buy_week
+        tracked_product_id, initial_price_cents, target_price_cents, selected_variation, price_alert_enabled, price_basis, buy_week, purchased_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+        CASE WHEN $11 = 'bought' THEN (now() AT TIME ZONE 'America/Sao_Paulo')::date END)
     `, [
       itemId, input.userId, input.enxovalId, category.id, input.name, orderResult.rows[0]?.next_order ?? 0, input.priceCents ?? null, discount.value, input.link ?? '', input.description ?? '', status, isDoneStatus(status), quantity,
-      trackedProductId, initialPriceCents, trackedProductId ? (tracking.targetPriceCents ?? null) : null, tracking.selectedVariation ?? null, imageUrl, tracking.priceAlertEnabled ?? true, tracking.priceBasis ?? 'regular', input.buyWeek ?? null
+      trackedProductId, initialPriceCents, trackedProductId ? (tracking.targetPriceCents ?? null) : null, tracking.selectedVariation ?? null, tracking.priceAlertEnabled ?? true, tracking.priceBasis ?? 'regular', input.buyWeek ?? null
     ]);
+    if (trackedProductId) await syncPrimaryOffer(client, itemId);
     const { unresolved } = await linkItemsToCatalog(client, [{ id: itemId, name: input.name }]);
 
     return {
@@ -973,13 +1130,11 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
 
   let renamedTo: string | null = null;
   let unresolved: { id: string; name: string }[] = [];
-  const bodyImage = Object.prototype.hasOwnProperty.call(body, 'imageUrl') ? sanitizeImageUrl((body as Record<string, unknown>).imageUrl) : undefined;
-  const prefetchedImage = await prefetchExternalImage(bodyImage);
-  let imageChanged = false;
   const updated = await withTransaction(async client => {
     // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
-    const current = await client.query<{ enxoval_id: string; category_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null }>(`
-      SELECT i.enxoval_id, i.category_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity, i.tracked_product_id, i.initial_price_cents
+    const current = await client.query<{ enxoval_id: string; category_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null; purchased_at: string | null; warranty_months: number | null; warranty_until: string | null }>(`
+      SELECT i.enxoval_id, i.category_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity, i.tracked_product_id, i.initial_price_cents,
+        to_char(i.purchased_at, 'YYYY-MM-DD') AS purchased_at, i.warranty_months, to_char(i.warranty_until, 'YYYY-MM-DD') AS warranty_until
       FROM items i
       INNER JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
       WHERE i.id = $1 AND em.user_id = $2
@@ -1081,14 +1236,22 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     if (tracking.initialPriceCents !== undefined) addUpdate('initial_price_cents', tracking.initialPriceCents);
     if (tracking.targetPriceCents !== undefined) addUpdate('target_price_cents', tracking.targetPriceCents);
     if (tracking.selectedVariation !== undefined) addUpdate('selected_variation', tracking.selectedVariation);
-    if (tracking.imageUrl !== undefined) {
-      addUpdate('image_url', await resolveItemImage(client, userId, enxovalId, tracking.imageUrl, prefetchedImage));
-      imageChanged = true;
-    }
     if (tracking.priceBasis !== undefined) addUpdate('price_basis', tracking.priceBasis);
     if (tracking.priceAlertEnabled !== undefined) addUpdate('price_alert_enabled', tracking.priceAlertEnabled);
     // Mudou o alvo, o tipo de preço ou o produto: o último aviso enviado deixa de valer.
     if (tracking.targetPriceCents !== undefined || tracking.priceBasis !== undefined || tracking.trackedProductUrl !== undefined) addUpdate('last_alert_price_cents', null);
+
+    // Parcelas, responsável, presente e garantia (Fase 11).
+    const extras = await parseItemExtras(client, updates, {
+      enxovalId,
+      previousStatus: current.rows[0].status,
+      status,
+      statusChanged: has('status') || typeof updates.checked === 'boolean',
+      purchasedAt: current.rows[0].purchased_at,
+      warrantyMonths: current.rows[0].warranty_months === null ? null : Number(current.rows[0].warranty_months),
+      warrantyUntil: current.rows[0].warranty_until,
+    });
+    for (const [column, value] of extras) addUpdate(column, value);
 
     if (setClauses.length === 0) {
       throw new HttpError(400, 'Nenhuma alteração enviada.');
@@ -1102,9 +1265,8 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     `, values);
 
     if (!result.rowCount) throw new HttpError(404, 'Item não encontrado.');
+    if (tracking.trackedProductUrl !== undefined) await syncPrimaryOffer(client, itemId);
     if (renamedTo) ({ unresolved } = await linkItemsToCatalog(client, [{ id: itemId, name: renamedTo }]));
-    // Trocou ou tirou a imagem: a antiga, se ninguém mais usa, sai do banco.
-    if (imageChanged) await purgeUnusedImages(client, enxovalId);
     return fetchItemRow(client, itemId, enxovalId);
   });
   queueResolution(unresolved);
@@ -1124,7 +1286,6 @@ async function deleteItemForUser(userId: string, itemId: string) {
   `, [itemId, userId]);
 
   if (!result.rows[0]) throw new HttpError(404, 'Item não encontrado.');
-  await purgeUnusedImages(getPool(), result.rows[0].enxoval_id);
 }
 
 async function reorderCategoriesForUser(userId: string, enxovalId: string, categoryIds: string[]) {
@@ -1172,59 +1333,62 @@ export function registerApiRoutes(app: Express) {
   const router = express.Router();
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(protectMutationOrigin);
+  router.use(enforceBans);
+  router.use(asyncHandler(async (req, _res, next) => {
+    if (/^\/(auth(?:\/|$)|profile(?:\/|$)|onboarding\/complete$|billing(?:\/|$)|admin(?:\/|$)|bootstrap$|health$|invitations(?:\/|$)|feedback(?:\/|$)|lifecycle\/returned$)/.test(req.path)) return next();
+    // Older onboarding screens post the draft here. The handler saves it without granting access.
+    if (req.method === 'POST' && req.path === '/enxovais' && req.body?.plan !== undefined) return next();
+    const user = await requireCurrentUser(req);
+    const candidate = req.query.enxovalId ?? req.body?.enxovalId ?? req.path.match(/^\/enxovais\/([^/]+)/)?.[1];
+    if (typeof candidate === 'string') await requireEnxovalMember(getPool(), user.id, candidate);
+    else if (user.plan === 'free') throw subscriptionRequired();
+    next();
+  }));
   registerAdminRoutes(router);
+  registerProfileRoutes(router, requireCurrentUser);
   registerFeedbackRoutes(router, requireCurrentUser);
   registerAiRoutes(router, { requireUser: requireCurrentUser, fetchItems, fetchCategories });
   registerCatalogRoutes(router, { requireUser: requireCurrentUser });
-  registerBillingRoutes(router, { requireUser: requireCurrentUser });
+  registerItemOfferRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember, fetchItemRow });
+  registerItemDocumentRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember, fetchItemRow });
 
-  // Imagens dos itens. Enviar um arquivo (corpo cru, `Content-Type: image/*`) ou importar por link: nos dois casos o
-  // servidor confere, reduz e converte a imagem, guarda no banco e devolve o endereço interno para usar no item.
-  const imageUploadLimit = rateLimit(40, 10 * 60_000, 'Muitas imagens em pouco tempo. Aguarde alguns minutos e tente de novo.');
-  router.post('/item-images', imageUploadLimit, express.raw({ type: 'image/*', limit: MAX_IMAGE_UPLOAD_BYTES }), asyncHandler(async (req, res) => {
+  // Foto de quem participa do enxoval (para o avatar do responsável pelo item). Só para quem está no mesmo enxoval.
+  router.get('/enxovais/:id/members/:userId/avatar', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    const enxovalId = requireText(req.query.enxovalId, 'Enxoval');
-    await requireEnxovalMember(getPool(), user.id, enxovalId);
-    if (!Buffer.isBuffer(req.body)) throw new HttpError(415, 'Envie o arquivo da imagem (JPG, PNG, WebP, GIF ou AVIF).');
-    const image = await processImage(req.body);
-    res.status(201).json({ imageUrl: await storeImage(getPool(), enxovalId, user.id, image), width: image.width, height: image.height });
+    await requireEnxovalMember(getPool(), user.id, req.params.id);
+    const result = await getPool().query<{ avatar_data: Buffer | null }>(`
+      SELECT u.avatar_data FROM enxoval_members em INNER JOIN users u ON u.id = em.user_id
+      WHERE em.enxoval_id = $1 AND em.user_id = $2
+    `, [req.params.id, req.params.userId]);
+    const data = result.rows[0]?.avatar_data;
+    if (!data) throw new HttpError(404, 'Foto não encontrada.');
+    res.set({ 'Content-Type': 'image/webp', 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+    res.send(data);
   }));
+  registerBillingRoutes(router, {
+    requireUser: requireCurrentUser,
+    ensureDefaultEnxoval: userId => withTransaction(async client => {
+      const limits = await assertCanCreateEnxoval(client, userId);
+      const existing = await client.query<{ id: string }>('SELECT id FROM enxovais WHERE owner_id = $1 ORDER BY created_at, id LIMIT 1', [userId]);
+      if (existing.rows[0]) return existing.rows[0].id;
+      const saved = await client.query<{ onboarding_draft: { name: string; plan: EnxovalPlan; profile: OnboardingProfile } | null }>('SELECT onboarding_draft FROM users WHERE id = $1', [userId]);
+      const draft = saved.rows[0]?.onboarding_draft;
+      const id = await insertEnxoval(client, userId, draft?.name ?? 'Enxoval de Casa Nova', limits, draft ? { plan: draft.plan, profile: draft.profile } : { useDefaultTemplate: true });
+      await client.query('UPDATE users SET onboarding_draft = NULL WHERE id = $1', [userId]);
+      return id;
+    })
+  });
 
-  router.post('/item-images/from-url', imageUploadLimit, asyncHandler(async (req, res) => {
+  router.post('/onboarding/complete', asyncHandler(async (req, res) => {
     const user = await requireCurrentUser(req);
-    const enxovalId = requireText(req.body?.enxovalId, 'Enxoval');
-    const url = requireText(req.body?.url, 'Link da imagem');
-    if (url.length > 2000 || !isExternalImageUrl(url)) throw new HttpError(400, 'Cole o endereço completo da imagem, começando com https://.');
-    await requireEnxovalMember(getPool(), user.id, enxovalId);
-    const image = await importImageFromUrl(url);
-    res.status(201).json({ imageUrl: await storeImage(getPool(), enxovalId, user.id, image), width: image.width, height: image.height });
-  }));
-
-  router.get('/item-images/:id', asyncHandler(async (req, res) => {
-    const user = await requireCurrentUser(req);
-    const id = internalImageId(`/api/item-images/${req.params.id}`);
-    if (!id) throw new HttpError(404, 'Imagem não encontrada.');
-    const result = await getPool().query<{ data: Buffer; content_type: string; sha256: string }>(`
-      SELECT ii.data, ii.content_type, ii.sha256
-      FROM item_images ii
-      INNER JOIN enxoval_members em ON em.enxoval_id = ii.enxoval_id
-      WHERE ii.id = $1 AND em.user_id = $2
-    `, [id, user.id]);
-    const row = result.rows[0];
-    if (!row) throw new HttpError(404, 'Imagem não encontrada.');
-    // O conteúdo de cada id nunca muda, então o navegador pode guardar a imagem.
-    res.set({
-      'Content-Type': row.content_type,
-      'Cache-Control': 'private, max-age=31536000, immutable',
-      ETag: `"${row.sha256}"`,
-      'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'none'; sandbox",
-    });
-    if (req.headers['if-none-match'] === `"${row.sha256}"`) {
-      res.status(304).end();
-      return;
-    }
-    res.send(row.data);
+    if (user.isGuest) throw new HttpError(403, 'Contas de convidados usam o enxoval do titular.');
+    const name = normalizeEnxovalName(requireText(req.body?.name, 'Nome do enxoval'));
+    const profile = parseOnboardingProfile(req.body?.profile);
+    const plan = parseOnboardingPlan(req.body?.plan, profile.style === 'none', profile.rooms.length === 0);
+    if (!plan) throw new HttpError(400, 'Conclua o planejamento antes de continuar.');
+    const userName = parseUserName(req.body?.userName);
+    await saveOnboardingDraft(user.id, name, plan, profile, userName);
+    res.json({ completed: true });
   }));
 
   router.get('/health', (_req, res) => {
@@ -1232,32 +1396,38 @@ export function registerApiRoutes(app: Express) {
   });
 
   router.get('/bootstrap', asyncHandler(async (req, res) => {
-    const user = await requireCurrentUser(req, true);
+    const user = await requireCurrentUser(req, true, true);
     const requestedEnxovalId = typeof req.query.enxovalId === 'string' ? req.query.enxovalId : undefined;
     res.json(await fetchBootstrap(user, requestedEnxovalId));
   }));
 
   router.post('/auth/register', asyncHandler(async (req, res) => {
     const email = normalizeEmail(req.body?.email);
-    const password = requireText(req.body?.password, 'Senha');
     const name = typeof req.body?.name === 'string' && req.body.name.trim()
       ? req.body.name.trim()
       : email.split('@')[0];
 
     if (!email || !email.includes('@')) throw new HttpError(400, 'E-mail inválido.');
-    if (password.length > 128) throw new HttpError(400, 'A senha pode ter no máximo 128 caracteres.');
-    if (password.length < 6) throw new HttpError(400, 'A senha precisa ter pelo menos 6 caracteres.');
+    const password = requireNewPassword(req.body?.password, 'Senha');
+
+    const context = ensureDevice(req, res);
+    await assertNotBlocked(getPool(), { ip: context.ip, deviceId: context.deviceId });
 
     // O cadastro cria só a conta. O primeiro enxoval (com ou sem o plano do funil /comecar)
     // é criado depois, autenticado, em POST /enxovais.
     const passwordHash = await hashPassword(password);
     const userId = randomUUID();
+    const mustVerify = emailVerificationRequired();
 
     try {
-      await getPool().query(`
-        INSERT INTO users (id, name, email, password_hash, last_login_at)
-        VALUES ($1, $2, $3, $4, now())
-      `, [userId, name, email, passwordHash]);
+      await withTransaction(async client => {
+        await client.query(`
+          INSERT INTO users (id, name, email, password_hash, last_login_at, email_verified_at)
+          VALUES ($1, $2, $3, $4, now(), CASE WHEN $5 THEN NULL ELSE now() END)
+        `, [userId, name, email, passwordHash, mustVerify]);
+        await recordUserIpEvent(client, userId, context, 'signup');
+        await saveSignupGrowth(client, userId, req.body, 'cadastro');
+      });
     } catch (err) {
       if ((err as { code?: string }).code === '23505') {
         throw new HttpError(409, 'Já existe uma conta com esse e-mail.');
@@ -1266,37 +1436,46 @@ export function registerApiRoutes(app: Express) {
     }
 
     await createSession(res, userId);
-    res.status(201).json(await fetchBootstrap(mapUser({ id: userId, name, email, plan: 'free' })));
+    res.status(201).json(await fetchBootstrap(mapUser({ id: userId, name, email, plan: 'free', email_verified_at: mustVerify ? null : new Date() })));
+    void checkSignupBurst(context.ip).catch(err =>
+      getLogger().error({ event: 'security.signup_burst_check_failed', err }, 'Falha ao verificar rajada de cadastros.'));
+    if (mustVerify) void issueEmailVerification(userId).catch(err =>
+      getLogger().error({ event: 'email_verification.failed', err }, 'Falha ao enviar a confirmação de e-mail.'));
   }));
 
   router.post('/auth/login', loginRateLimit(), asyncHandler(async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     const password = requireText(req.body?.password, 'Senha');
     if (password.length > 512) throw new HttpError(400, 'Senha muito longa.');
+    const context = ensureDevice(req, res);
+    await assertNotBlocked(getPool(), { ip: context.ip, deviceId: context.deviceId });
     const user = await withTransaction(async client => {
       const result = await client.query<DbUserRow>(
         'SELECT * FROM users WHERE email = $1 LIMIT 1 FOR UPDATE', [email]);
       const row = result.rows[0];
-      if (!row || !(await verifyPassword(password, row.password_hash))) {
-        throw new HttpError(401, 'E-mail ou senha inválidos.');
-      }
+      if (!row || !(await verifyPassword(password, row.password_hash))) return null;
       if (!row.is_active) throw new HttpError(403, 'Esta conta está inativa. Entre em contato com o suporte.');
+      await assertNotBlocked(client, { userId: row.id });
       if (row.must_change_password && (!row.password_reset_expires_at || row.password_reset_expires_at.getTime() <= Date.now())) {
         throw new HttpError(401, 'Sua senha temporária expirou. Solicite uma nova ao suporte.');
       }
       await client.query('DELETE FROM sessions WHERE user_id = $1 AND expires_at <= now()', [row.id]);
       await client.query('UPDATE users SET last_login_at = now() WHERE id = $1', [row.id]);
+      await recordUserIpEvent(client, row.id, context, 'login');
       await createSession(res, row.id, client);
       return mapUser(row);
     });
+    if (!user) {
+      await recordLoginFailure(context.ip);
+      throw new HttpError(401, 'E-mail ou senha inválidos.');
+    }
     res.json(await fetchBootstrap(user));
   }));
 
   router.post('/auth/change-password', asyncHandler(async (req, res) => {
-    const user = await requireCurrentUser(req, true);
-    const password = requireText(req.body?.password, 'Nova senha');
+    const user = await requireCurrentUser(req, true, true);
+    const password = requireNewPassword(req.body?.password, 'Nova senha');
     const confirmation = requireText(req.body?.confirmation, 'Confirmação da senha');
-    if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
     if (password !== confirmation) throw new HttpError(400, 'As senhas não coincidem.');
     const updatedUser = await withTransaction(async client => {
       const result = await client.query<DbUserRow>(
@@ -1322,7 +1501,7 @@ export function registerApiRoutes(app: Express) {
     // A resposta é a mesma exista ou não uma conta com esse e-mail: ninguém descobre quem tem cadastro.
     res.json({ ok: true });
     void issuePasswordReset(email).catch(err =>
-      console.error('Falha ao preparar a redefinição de senha:', err instanceof Error ? err.message : err));
+      getLogger().error({ event: 'password_reset.failed', err }, 'Falha ao preparar a redefinição de senha.'));
   }));
 
   router.post('/auth/reset-password/check', loginRateLimit(30), asyncHandler(async (req, res) => {
@@ -1340,9 +1519,8 @@ export function registerApiRoutes(app: Express) {
 
   router.post('/auth/reset-password', loginRateLimit(10), asyncHandler(async (req, res) => {
     const token = typeof req.body?.token === 'string' ? req.body.token : '';
-    const password = requireText(req.body?.password, 'Nova senha');
+    const password = requireNewPassword(req.body?.password, 'Nova senha');
     const confirmation = requireText(req.body?.confirmation, 'Confirmação da senha');
-    if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
     if (password !== confirmation) throw new HttpError(400, 'As senhas não coincidem.');
     if (token.length < 20 || token.length > 200) throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo link de redefinição.');
 
@@ -1354,8 +1532,9 @@ export function registerApiRoutes(app: Express) {
         [hashSessionToken(token)]);
       const row = result.rows[0];
       if (!row) throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo link de redefinição.');
+      // O link chegou à caixa de entrada: o e-mail fica confirmado.
       await client.query(
-        'UPDATE users SET password_hash = $2, must_change_password = false, password_reset_expires_at = NULL, updated_at = now() WHERE id = $1',
+        'UPDATE users SET password_hash = $2, must_change_password = false, password_reset_expires_at = NULL, email_verified_at = COALESCE(email_verified_at, now()), updated_at = now() WHERE id = $1',
         [row.id, await hashPassword(password)]);
       // Quem tinha a sessão aberta (inclusive um invasor) é desconectado, e o link não serve de novo.
       await client.query('DELETE FROM sessions WHERE user_id = $1', [row.id]);
@@ -1364,7 +1543,57 @@ export function registerApiRoutes(app: Express) {
     });
     res.json({ ok: true });
     void sendMail(passwordChangedEmail({ to: user.email, name: user.name })).catch(err =>
-      console.error('Falha ao enviar o aviso de senha alterada:', err instanceof Error ? err.message : err));
+      getLogger().error({ event: 'password_changed.notification_failed', err }, 'Falha ao enviar o aviso de senha alterada.'));
+  }));
+
+  // Only explicit browser activity extends the idle window. Polling and reads never do.
+  router.post('/auth/verify-email', loginRateLimit(30), asyncHandler(async (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const invalid = new HttpError(400, 'Este link de confirmação expirou ou já foi usado. Entre na sua conta para receber um novo.');
+    if (token.length < 20 || token.length > 200) throw invalid;
+    await withTransaction(async client => {
+      const result = await client.query<{ user_id: string }>(
+        `SELECT t.user_id FROM email_verification_tokens t INNER JOIN users u ON u.id = t.user_id
+         WHERE t.token_hash = $1 AND t.expires_at > now() AND u.is_active
+         FOR UPDATE OF t, u`,
+        [hashSessionToken(token)]);
+      const row = result.rows[0];
+      if (!row) throw invalid;
+      await client.query('UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()), updated_at = now() WHERE id = $1', [row.user_id]);
+      await client.query('DELETE FROM email_verification_tokens WHERE user_id = $1', [row.user_id]);
+    });
+    res.json({ ok: true });
+  }));
+
+  router.post('/auth/verify-email/resend', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req, true, true);
+    if (user.emailVerified) {
+      res.json({ ok: true, alreadyVerified: true });
+      return;
+    }
+    if (!canDeliverMail()) throw new HttpError(503, 'Não foi possível enviar o e-mail de confirmação agora. Tente novamente mais tarde.');
+    const result = await issueEmailVerification(user.id);
+    if (result === 'cooldown') throw new HttpError(429, 'Acabamos de enviar um link. Aguarde um minuto antes de pedir outro.');
+    res.json({ ok: true, alreadyVerified: result === 'verified' });
+  }));
+
+  router.post('/auth/activity', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req, true, true);
+    const tokenHash = hashSessionToken(getCookie(req, SESSION_COOKIE));
+    const updated = await getPool().query(`UPDATE sessions SET last_activity_at = now()
+      WHERE token_hash = $1 AND expires_at > now()
+        AND created_at > now() - interval '7 days'
+        AND last_activity_at > now() - interval '48 hours'`, [tokenHash]);
+    if (!updated.rowCount) throw new HttpError(401, 'Sua sessão expirou. Faça login novamente.');
+    await recordActivityDay(getPool(), user.id);
+    res.status(204).end();
+  }));
+
+  // Volta ao app pelo link de um e-mail (parâmetro `lm`): mede o retorno por fluxo de ciclo de vida. Fica fora do
+  // bloqueio de assinatura: quem volta por um e-mail pode estar justamente sem plano ativo.
+  router.post('/lifecycle/returned', asyncHandler(async (req, res) => {
+    const user = await requireCurrentUser(req, true, true);
+    res.json({ recorded: await recordReturn(user.id, req.body?.messageId) });
   }));
 
   router.post('/auth/logout', asyncHandler(async (req, res) => {
@@ -1389,11 +1618,17 @@ export function registerApiRoutes(app: Express) {
 
     // O enxoval do funil /comecar chega com o plano gerado e as respostas; sem plano, segue o
     // fluxo normal de "criar novo enxoval" (com ou sem o template padrão).
-    const plan = parsePlan(req.body?.plan);
-    const profile = plan ? parseOnboardingProfile(req.body?.profile) : null;
+    const profile = req.body?.plan != null ? parseOnboardingProfile(req.body?.profile) : null;
+    const plan = parseOnboardingPlan(req.body?.plan, profile?.style === 'none', profile?.rooms.length === 0);
     const useDefaultTemplate = req.body?.useDefaultTemplate !== false;
     // O cadastro não pede o nome; o funil pergunta e ele chega aqui, junto do plano.
     const userName = plan ? parseUserName(req.body?.userName) : null;
+
+    if (user.plan === 'free' && plan && profile) {
+      await saveOnboardingDraft(user.id, name, plan, profile, userName);
+      res.status(202).json({ completed: true, requiresCheckout: true });
+      return;
+    }
 
     const workspace = await createEnxovalForUser(user.id, name, { useDefaultTemplate, plan, profile, userName });
     res.status(201).json(workspace);
@@ -1429,13 +1664,18 @@ export function registerApiRoutes(app: Express) {
 
     // Planejamento (data da mudança, lugar e perfil de gasto) é decisão de quem é dono do enxoval.
     const has = (key: string) => Object.prototype.hasOwnProperty.call(updates, key);
-    if (has('moveDate') || has('spendingTier') || has('state') || has('city')) {
+    if (has('moveDate') || has('spendingTier') || has('state') || has('city') || has('monthlyBudgetCents')) {
       if (role !== 'owner') throw new HttpError(403, 'Apenas o dono pode alterar esse enxoval.');
     }
     if (has('moveDate')) {
       const raw = updates.moveDate;
       if (raw !== null && !isIsoDate(raw)) throw new HttpError(400, 'Data da mudança inválida.');
       addUpdate('move_date', raw);
+    }
+    if (has('monthlyBudgetCents')) {
+      const raw = updates.monthlyBudgetCents;
+      if (raw !== null && (typeof raw !== 'number' || !Number.isInteger(raw) || raw <= 0 || raw > MAX_PRICE_CENTS)) throw new HttpError(400, 'Teto mensal inválido.');
+      addUpdate('monthly_budget_cents', raw);
     }
     if (has('spendingTier')) {
       if (!isSpendingTier(updates.spendingTier)) throw new HttpError(400, 'Perfil de gasto inválido.');
@@ -1461,7 +1701,7 @@ export function registerApiRoutes(app: Express) {
       SET ${setClauses.join(', ')}, updated_at = now()
       WHERE id = $${values.length}
       RETURNING id, name, owner_id, (SELECT name FROM users WHERE id = enxovais.owner_id) AS owner_name, discount_cents,
-        to_char(move_date, 'YYYY-MM-DD') AS move_date, state, city, spending_tier, $${values.length + 1}::text AS role
+        to_char(move_date, 'YYYY-MM-DD') AS move_date, state, city, spending_tier, monthly_budget_cents, $${values.length + 1}::text AS role
     `, [...values, role]);
 
     if (!result.rows[0]) throw new HttpError(404, 'Enxoval não encontrado.');
@@ -1501,7 +1741,7 @@ export function registerApiRoutes(app: Express) {
 
     const base = appBaseUrl();
     if (!base || !canDeliverMail()) {
-      console.error('Convite: configure APP_URL, RESEND_API_KEY e MAIL_FROM para enviar o e-mail do convite.');
+      getLogger().error({ event: 'invitation.configuration_missing' }, 'Convite: configure APP_URL, RESEND_API_KEY e MAIL_FROM para enviar o e-mail do convite.');
       throw new HttpError(503, 'O envio de e-mails não está configurado. Tente novamente mais tarde.');
     }
 
@@ -1557,7 +1797,7 @@ export function registerApiRoutes(app: Express) {
       }));
     } catch (err) {
       await getPool().query('DELETE FROM enxoval_invitations WHERE id = $1', [invitation.id]);
-      console.error('Falha ao enviar o e-mail do convite:', err instanceof Error ? err.message : err);
+      getLogger().error({ event: 'invitation.email_failed', err }, 'Falha ao enviar o e-mail do convite.');
       throw new HttpError(502, 'Não foi possível enviar o e-mail do convite. Tente novamente em instantes.');
     }
 
@@ -1644,6 +1884,8 @@ export function registerApiRoutes(app: Express) {
     if (token.length < 20 || token.length > 200) throw expired;
 
     const signedIn = await getCurrentUser(req);
+    const context = ensureDevice(req, res);
+    await assertNotBlocked(getPool(), { userId: signedIn?.id, ip: context.ip, deviceId: context.deviceId });
 
     const accepted = await withTransaction(async client => {
       const invitation = await client.query<{ id: string; enxoval_id: string; email: string; invited_by: string | null }>(`
@@ -1664,19 +1906,23 @@ export function registerApiRoutes(app: Express) {
         if (signedIn.id !== existing.rows[0].id) throw new HttpError(403, `Este convite é para ${row.email}. Saia da conta atual e entre com esse e-mail.`);
         if (!existing.rows[0].is_active) throw new HttpError(403, 'Esta conta está inativa. Entre em contato com o suporte.');
         userId = existing.rows[0].id;
+        // O convite chegou a este e-mail: ele fica confirmado.
+        await client.query('UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE id = $1', [userId]);
+        await recordDevice(client, userId, context);
       } else {
         // Primeiro acesso: cria uma conta de convidado, que não tem enxoval próprio.
-        const password = requireText(req.body?.password, 'Senha');
-        if (password.length < 8 || password.length > 128) throw new HttpError(400, 'Use uma senha com 8 a 128 caracteres.');
+        const password = requireNewPassword(req.body?.password, 'Senha');
         if (password !== req.body?.confirmation) throw new HttpError(400, 'As senhas não coincidem.');
         const name = typeof req.body?.name === 'string' && req.body.name.trim()
           ? req.body.name.trim().slice(0, 100)
           : row.email.split('@')[0];
         userId = randomUUID();
         await client.query(`
-          INSERT INTO users (id, name, email, password_hash, is_guest, last_login_at)
-          VALUES ($1, $2, $3, $4, true, now())
+          INSERT INTO users (id, name, email, password_hash, is_guest, last_login_at, email_verified_at)
+          VALUES ($1, $2, $3, $4, true, now(), now())
         `, [userId, name, row.email, await hashPassword(password)]);
+        await recordUserIpEvent(client, userId, context, 'invitation_signup');
+        await saveSignupGrowth(client, userId, req.body, 'convite');
         await createSession(res, userId, client);
       }
 
@@ -1687,7 +1933,7 @@ export function registerApiRoutes(app: Express) {
       `, [row.enxoval_id, userId, row.invited_by]);
       await client.query('DELETE FROM enxoval_invitations WHERE id = $1', [row.id]);
 
-      const user = await client.query<DbUserRow>(`SELECT id, name, email, must_change_password, is_guest, ${effectivePlanSql()} AS plan FROM users WHERE id = $1`, [userId]);
+      const user = await client.query<DbUserRow>(`SELECT id, name, email, must_change_password, is_guest, email_verified_at, ${effectivePlanSql()} AS plan FROM users WHERE id = $1`, [userId]);
       return { user: mapUser(user.rows[0]), enxovalId: row.enxoval_id };
     }).catch(err => {
       // Alguém criou uma conta com esse e-mail entre a checagem e a gravação.
@@ -1832,7 +2078,7 @@ export function registerApiRoutes(app: Express) {
       // Resultado parcial (só o nome tirado do link) não é um dado confiável da loja: não vira produto acompanhado.
       if (!preview.partial) rememberPreview(preview);
       // O catálogo sabe o cômodo de quase todo item; o regex de `suggestCategory` fica só como reserva.
-      const catalogItem = preview.title ? await findItemInTitle(preview.title).catch(() => null) : null;
+      const catalogItem = preview.title ? await findItemInTitle(preview.title).catch(err => { getLogger().warn({ event: 'catalog.title.failed', title: preview.title, err }, 'Catalog title lookup failed.'); return null; }) : null;
       res.json({ ...preview, suggestedRoom: catalogItem?.room ?? null });
     } catch (err) {
       if (err instanceof ScrapeError) throw new HttpError(err.code === 'invalid_url' ? 400 : 422, err.message);
@@ -1872,7 +2118,8 @@ export function registerApiRoutes(app: Express) {
       targetPriceCents: nullableCents(item.target_price_cents),
       priceBasis: item.price_basis,
       url: item.url,
-      domain: item.domain ?? ''
+      domain: item.domain ?? '',
+      offers: await offerHistories(req.params.id, days, item.price_basis)
     };
     res.json(history);
   }));
@@ -1884,13 +2131,6 @@ export function registerApiRoutes(app: Express) {
 
   app.use('/api', router);
 
-  app.use('/api', (err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
-    if (err instanceof HttpError) {
-      res.status(err.status).json(err.code ? { error: err.message, code: err.code } : { error: err.message });
-      return;
-    }
+  app.use('/api', httpErrorHandler);
 
-    console.error(err);
-    res.status(500).json({ error: 'Erro interno do servidor.' });
-  });
 }

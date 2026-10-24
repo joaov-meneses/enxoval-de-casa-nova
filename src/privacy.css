@@ -1,7 +1,7 @@
 /* Página /privacidade */
 .privacy-page {
   min-height: 100dvh;
-  background: var(--paper);
+  background: transparent;
   color: var(--ink);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
@@ -21,7 +21,7 @@
   gap: 6px;
   min-height: 44px;
   font-size: 14px;
-  color: #5d5249;
+  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
 }
 .privacy-body {
   width: min(760px, calc(100% - 40px));
@@ -39,7 +39,7 @@
 .privacy-updated {
   margin: 0 0 28px;
   font-size: 14px;
-  color: #5c5148;
+  color: color-mix(in oklab, var(--cm-bg) 21%, var(--cm-text));
 }
 .privacy-body section {
   padding: 22px 0;
@@ -55,7 +55,7 @@
 .privacy-body li {
   font-size: 16px;
   line-height: 1.7;
-  color: #4e352a;
+  color: color-mix(in oklab, var(--cm-sand) 11%, var(--cm-text));
 }
 .privacy-body p {
   margin: 0 0 12px;

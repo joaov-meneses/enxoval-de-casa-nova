@@ -1,0 +1,213 @@
+/* Modo loja (Fase 11.6): letra grande e alvos de toque de 56 px, para usar com uma mão no corredor da loja. */
+.store-mode {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto;
+  font-size: 17px;
+}
+.store-offline-shell {
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--cm-bg);
+  color: var(--cm-text);
+}
+.store-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.store-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 600;
+}
+.store-head p {
+  margin: 2px 0 0;
+  font-size: 15px;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.store-exit,
+.store-search-clear {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 80%, #fff);
+  background: #fff;
+}
+.store-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 650;
+  background: color-mix(in oklab, var(--cm-accent) 8%, #fff);
+  color: var(--cm-accent);
+}
+.store-status.is-offline {
+  background: #fdf1df;
+  color: #7a4309;
+}
+.store-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.store-search > svg {
+  position: absolute;
+  left: 14px;
+  color: color-mix(in oklab, var(--cm-bg) 35%, var(--cm-text));
+  pointer-events: none;
+}
+.store-search input {
+  flex: 1;
+  min-height: 56px;
+  padding-left: 44px;
+  font-size: 18px;
+  border-radius: 14px;
+}
+.store-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.store-chip {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 75%, #fff);
+  background: #fff;
+  font-size: 15px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.store-chip[aria-pressed="true"] {
+  background: var(--cm-primary-dark);
+  border-color: var(--cm-primary-dark);
+  color: #fff;
+}
+.store-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.store-group ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.store-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 70%, #fff);
+  border-radius: 16px;
+  background: #fff;
+}
+.store-item-body {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.store-item-body > strong {
+  font-size: 19px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.store-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 15px;
+  font-weight: 650;
+  color: color-mix(in oklab, var(--cm-sand) 15%, var(--cm-text));
+}
+.store-item-notes {
+  margin: 0;
+  font-size: 15px;
+  color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text));
+  white-space: pre-line;
+}
+.store-buy {
+  flex-shrink: 0;
+  min-width: 96px;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: 14px;
+  /* O verde do círculo de riscar dos cards, com um pouco mais de cor para chamar o toque. */
+  background: color-mix(in oklab, var(--cm-success) 66%, #fff);
+  background: oklch(from color-mix(in oklab, var(--cm-success) 66%, #fff) calc(l - 0.02) calc(c + 0.03) h);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 750;
+}
+.store-buy:hover {
+  background: color-mix(in oklab, var(--cm-success) 78%, #fff);
+  background: oklch(from color-mix(in oklab, var(--cm-success) 78%, #fff) calc(l - 0.02) calc(c + 0.03) h);
+}
+.store-worth-toggle {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 4px;
+  background: none;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cm-primary-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.store-worth {
+  display: grid;
+  gap: 8px;
+}
+.store-worth-input {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.store-worth-input input {
+  min-height: 52px;
+  font-size: 18px;
+}
+.store-worth-lines {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  font-weight: 650;
+}
+.store-worth-lines .is-good { color: #3f5a1f; }
+.store-worth-lines .is-bad { color: #9a3a22; }
+.store-worth-lines .is-neutral { color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text)); }
+.store-empty {
+  padding: 32px 8px;
+  text-align: center;
+  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}

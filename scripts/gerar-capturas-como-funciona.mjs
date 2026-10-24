@@ -51,14 +51,21 @@ function popular(enxovalId) {
     )
     UPDATE items SET
       checked = alvo.feito,
-      status = CASE WHEN NOT alvo.feito THEN 'needed' WHEN alvo.rn % 5 = 0 THEN 'owned' WHEN alvo.rn % 3 = 0 THEN 'received' ELSE 'bought' END,
+      status = CASE WHEN NOT alvo.feito THEN 'researching' WHEN alvo.rn % 5 = 0 THEN 'owned' WHEN alvo.rn % 3 = 0 THEN 'received' ELSE 'bought' END,
       price_cents = CASE WHEN alvo.com_preco AND NOT (alvo.feito AND (alvo.rn % 5 = 0 OR alvo.rn % 3 = 0))
         THEN (1990 + (alvo.rn * 7919) % 28000) / 100 * 100 + 90 END
     FROM alvo WHERE items.id = alvo.id`);
 }
 
 limpar();
-const senha = randomBytes(12).toString("hex");
+// Segue a regra de senha nova (letra, número, caractere especial, sem números em sequência).
+const senhaAleatoria = () => {
+  for (;;) {
+    const candidata = `Casa#${randomBytes(12).toString("hex")}`;
+    if (/d/.test(candidata) && !/012|123|234|345|456|567|678|789|987|876|765|654|543|432|321|210/.test(candidata)) return candidata;
+  }
+};
+const senha = senhaAleatoria();
 const browser = await chromium.launch({ channel: "msedge" });
 const ctx = await browser.newContext({
   viewport: { width: 390, height: 844 },
@@ -132,7 +139,7 @@ try {
   const enxovalId = psql(`SELECT e.id FROM enxovais e JOIN users u ON u.id = e.owner_id WHERE u.email = '${EMAIL_ANA}'`);
   popular(enxovalId);
   const leo = await request.newContext();
-  const regLeo = await leo.post(`${BASE}/api/auth/register`, { data: { email: EMAIL_LEO, password: randomBytes(12).toString("hex") } });
+  const regLeo = await leo.post(`${BASE}/api/auth/register`, { data: { email: EMAIL_LEO, password: senhaAleatoria() } });
   if (regLeo.status() !== 201) throw new Error(`Cadastro do Léo falhou: ${regLeo.status()}`);
   await leo.dispose();
   psql(`UPDATE users SET name = 'Léo' WHERE email = '${EMAIL_LEO}'`);
@@ -142,7 +149,7 @@ try {
   await page.waitForTimeout(1500);
 
   // Passo 2: visão geral com os ambientes e o progresso de cada um.
-  await page.getByRole("button", { name: "Visão geral" }).click();
+  await page.getByRole("button", { name: "Meu Lar" }).click();
   await page.waitForTimeout(900);
   await salvar("passo-2-plano");
 

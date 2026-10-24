@@ -1,0 +1,230 @@
+# Análise de uso com PostHog
+
+## Configuração
+
+1. No projeto do PostHog, copie o **Project token** público (`phc_...`). Não use uma chave pessoal ou administrativa.
+2. Configure `VITE_POSTHOG_KEY` e `VITE_POSTHOG_HOST` no ambiente que executa o build. O host é `https://us.i.posthog.com` para US ou `https://eu.i.posthog.com` para EU.
+3. Execute `npm run build` e publique o build. Variáveis `VITE_*` são incorporadas ao JavaScript pelo Vite; alterar só o ambiente do servidor já compilado não muda a configuração.
+4. Para validar com `npm run dev`, configure também `VITE_POSTHOG_ENABLE_DEV=true` e reinicie o servidor. Prefira um projeto de desenvolvimento separado.
+
+Sem token, o SDK não é inicializado e nenhum evento é enviado. Com token, **nada é capturado antes do consentimento** (seção abaixo). Desenvolvimento fica desligado por padrão. Rotas `/admin` e suas subrotas também registram diagnósticos operacionais e exceções. Não foi criada nenhuma chave, conta ou painel remoto por esta integração.
+
+## Consentimento (LGPD)
+
+O aviso `src/components/ConsentBanner.tsx` aparece em todas as páginas (menos `/admin`) enquanto a pessoa não decide, sempre que o build tem PostHog ou Tag Manager configurado. **Recusar**, **Personalizar** e **Aceitar tudo** têm o mesmo peso visual. A escolha fica em `localStorage` (`casamia:consent`, com versão; mudar `CONSENT_VERSION` em `src/analytics/consent.ts` pede a escolha de novo) e pode ser revista pelo botão **Mudar preferências** em `/privacidade` ou pelo link **Preferências de privacidade** no rodapé da landing.
+
+| Categoria | Cobre | Padrão |
+| --- | --- | --- |
+| Essenciais | Sessão, segurança, identificador do aparelho | Sempre ligados |
+| Análise de uso | PostHog (eventos, identificadores, `$pageview`, exceções e diagnósticos do navegador) e GA4 (`analytics_storage`) | Desligado até aceitar |
+| Anúncios | Google Ads (`ad_storage`, `ad_user_data`, `ad_personalization`), `gclid`/`fbclid` e conversões enviadas pelo servidor | Desligado até aceitar |
+
+- **PostHog:** inicia com `opt_out_capturing_by_default`, `opt_out_persistence_by_default` e `persistence: 'memory'`: antes da escolha nada é enviado nem gravado no aparelho. Ao aceitar, liga a persistência (`localStorage+cookie`) e `opt_in_capturing()`; ao recusar, `opt_out_capturing()`. Como `posthog.reset()` (logout, sessão expirada) devolve o SDK ao opt-out padrão, o consentimento é reaplicado logo depois. `VITE_POSTHOG_COOKIELESS=on_reject` liga o modo sem cookies do PostHog para quem recusa (exige ativar o modo no projeto).
+- **Google:** ver [GA4 e Tag Manager](#ga4-e-tag-manager).
+- O atalho antigo `setAnalyticsOptOut` grava no mesmo consentimento (recusar análise também recusa anúncios).
+
+## GA4 e Tag Manager
+
+Configure `VITE_GTM_ID` (`GTM-XXXX`) antes do build; desenvolvimento só carrega com `VITE_GTM_ENABLE_DEV=true`. O dataLayer sobe com **Consent Mode v2** em `denied` (`ads_data_redaction` ligado) e o script `gtm.js` **só é baixado depois** que a pessoa aceita análise ou anúncios; cada mudança no aviso envia `consent update`.
+
+O app envia ao dataLayer apenas (código em `src/analytics/google.ts`):
+
+| Evento do app | Evento no dataLayer |
+| --- | --- |
+| `$pageview` (rota sem identificadores) | `page_view` com `page_path` e `page_location` |
+| `signup_success` | `sign_up` (`method: email`) |
+| `onboarding_start` / `onboarding_complete` | `tutorial_begin` / `tutorial_complete` |
+| `workspace_created` | `enxoval_created` (conversão de qualidade) |
+| `checkout_started` | `begin_checkout` |
+| `subscription_activated` | `subscription_activated` |
+| `invitation_accepted` | `join_group` |
+
+No contêiner: crie a tag do GA4 com acionadores de **evento personalizado** para esses nomes, desligue "mudanças no histórico" nas medições aprimoradas (o `page_view` é manual), ligue a retenção de 14 meses e a regra de tráfego interno. `purchase` não sai do navegador: o servidor envia com o valor pago (abaixo).
+
+### Conversão de compra pelo servidor
+
+Com `GA4_MEASUREMENT_ID` e `GA4_API_SECRET` no servidor, o webhook da Stripe envia `purchase` pelo Measurement Protocol (`server/googleConversions.ts`), uma vez por cobrança. Só sai para quem deu consentimento de anúncios no cadastro (`users.ad_consent_at`) e tem o `client_id` do GA4 guardado (`users.ga_client_id`). Nunca envia nome ou e-mail.
+
+- **Passe:** `checkout.session.completed` pago (`transaction_id` = sessão do checkout).
+- **Assinatura (receita recorrente):** cada `invoice.paid` com valor, incluindo a primeira cobrança depois do teste grátis e as renovações (`transaction_id` = fatura, `billing_reason` = `subscription_create` ou `subscription_cycle`). O checkout de assinatura não envia nada, para a primeira cobrança não contar duas vezes.
+- O PostHog recebe o mesmo fato pelo servidor, `subscription_payment_succeeded` (`billing_reason`, `amount_cents`, `currency`), independentemente do consentimento de anúncios e sem depender do navegador voltar ao app.
+
+## Primeiro toque (origem do cadastro)
+
+`src/analytics/firstTouch.ts` roda em toda página (menos `/admin`) antes dos redirecionamentos:
+
+- `cm_first_touch` (`localStorage`, 90 dias, nunca sobrescrito no prazo): UTMs (`source`, `medium`, `campaign`, `content`, `term` no formato combinado), domínio de origem e página de entrada (sem query nem fragmento). `cm_last_touch` guarda a última visita com campanha.
+- `gclid`/`fbclid` ficam só no `sessionStorage` e só seguem para a conta com consentimento de anúncios.
+
+O cadastro (`POST /api/auth/register`) e a conta criada por convite enviam o objeto opcional `acquisition`. O servidor valida de novo (`shared/acquisition.ts`: campos e formatos fechados), calcula o **grupo de canal** com uma regra única (`paid_search`, `paid_social`, `email`, `organic_search`, `organic_social`, `referral`, `direct`) e grava em `users.acq_*` (`acq_channel_group`, `acq_source`, `acq_medium`, `acq_campaign`, `acq_content`, `acq_term`, `acq_referrer_host`, `acq_landing_path`, `acq_first_seen_at`, e, com consentimento de anúncios, `acq_gclid`, `acq_fbclid`, `ga_client_id`). No `identify`, o PostHog recebe uma vez (`$set_once`) `initial_channel_group`, `initial_source`, `initial_medium` e `initial_campaign`.
+
+Convenção de UTM para links da equipe: ver seção 5.1 de [analytics-funil-e-reengajamento.md](analytics-funil-e-reengajamento.md).
+
+## Proxy próprio (`/ingest`)
+
+O servidor repassa `/ingest/*` ao PostHog (`server/ingestProxy.ts`), com limite de 1 MB e de taxa, sem repassar o IP do visitante. Para usar: `VITE_POSTHOG_HOST=/ingest` e `VITE_POSTHOG_UI_HOST=https://us.posthog.com` no build; `POSTHOG_PROXY_HOST` (padrão `https://us.i.posthog.com`; use `https://eu.i.posthog.com` na região EU) no servidor. `POSTHOG_PROXY=off` desliga a rota. O servidor (`POSTHOG_HOST`) continua falando direto com o PostHog.
+
+## E-mails de ciclo de vida
+
+Motor em `server/lifecycle/` (regras puras em `policy.ts`, decisão e envio em `engine.ts`), rodando a cada 15 minutos (`server/workers/lifecycleWorker.ts`) ou sob demanda (`npm run lifecycle [-- --simulate]`). Quem decide é o Postgres; o PostHog só mede.
+
+- **Modo:** `LIFECYCLE_MODE=off` (padrão), `simulate` (registra quem receberia, sem enviar; não bloqueia o envio real depois) ou `send`.
+- **Consentimento próprio:** caixa desmarcada no cadastro ("Quero receber por e-mail lembretes da mudança e dicas…"), opção **E-mails do Casa Mia** no perfil para quem já tinha conta (`PATCH /api/profile/marketing`). Grava `marketing_consent_at`, `marketing_consent_source` (`cadastro`, `perfil`) e `marketing_consent_version`.
+- **Fluxos:** L3 contagem regressiva da mudança (T-12, T-8, T-4, T-1 semanas, semana da mudança e T+1; recomeça se a data mudar), L2 primeiro valor (+1, +3 e +7 dias sem item comprado), L1 retomar o funil (+2 h, +1 dia e +4 dias sem enxoval), L4 resumo de atrasos (no máximo um por semana enquanto houver item atrasado, com a mesma regra do planejamento na tela), L8 convite parado (convite sem resposta há 3 dias, um aviso por convite, só para quem convidou), L9 pós-mudança (30 dias depois da data da mudança, pesquisa de 0 a 10), L7 marcos (metade de um ambiente, ambiente completo e 80% do enxoval, só nos 3 dias seguintes à conquista; ambientes com menos de 3 itens não contam) e L6 ausência (21, 45 e 90 dias sem acesso). Prioridade L3 > L2 > L1 > L4 > L8 > L9 > L7 > L6. Atrasos e convites são **lembretes**; marcos e pesquisa são **dicas** (preferências de `/preferencias`).
+- **Limites:** 1 e-mail por dia e 2 por semana por pessoa, das 8h às 20h no fuso da conta (`users.timezone`), nunca o mesmo passo duas vezes (`lifecycle_messages`), supressão em `email_suppressions`, conta ativa e e-mail verificado. O limite é **comum**: alertas de queda de preço (`price_drop`), lembretes de garantia (`warranty`) e campanhas (`campaign`) também ficam em `lifecycle_messages` e contam; o alerta ou o lembrete que esbarra no limite sai na rodada seguinte (`server/lifecycle/frequency.ts`).
+- **Grupo de controle:** 10% das pessoas elegíveis de cada fluxo (hash estável da conta) ficam de fora (`status = 'holdout'`), para medir o efeito real.
+- **Descadastro:** todo e-mail leva `List-Unsubscribe` + `List-Unsubscribe-Post` (um clique, `POST /api/preferences/unsubscribe`) e o link para `/preferencias` (sem login, por token): lembretes da mudança, dicas e novidades, pausar 30 dias, cancelar tudo. O "Cancelar" do rodapé pede confirmação na página, para verificadores de link não descadastrarem ninguém.
+- **Remetente:** `MARKETING_MAIL_FROM` (subdomínio próprio recomendado); sem ele, usa `MAIL_FROM`.
+- **Medição:** `lifecycle_email_sent` (`flow_key`, `step`, `template_version`, `locale`, `holdout`) vai ao PostHog pelo servidor, identificado só pelo UUID da conta. Os links levam `utm_source=newsletter&utm_medium=email&utm_campaign=lifecycle-<fluxo>&utm_content=<passo>` e `lm=<id da mensagem>`.
+- **Retorno do provedor:** o envio guarda o id do Resend (`provider_message_id`). O webhook `POST /api/webhooks/resend` (assinatura Svix conferida com `RESEND_WEBHOOK_SECRET`; sem o segredo a rota responde 404) grava `delivered`, `clicked`, `bounced` e `complained` em `lifecycle_events`, uma vez por evento, e repassa `lifecycle_email_<tipo>` ao PostHog. Rejeição definitiva (`Permanent`) e reclamação de spam entram em `email_suppressions`. Cadastre no Resend o endpoint `<APP_URL>/api/webhooks/resend` com esses quatro eventos.
+- **Volta ao app:** o app lê `lm` na entrada, tira o parâmetro da URL e chama `POST /api/lifecycle/returned` quando há sessão (sem sessão, tenta de novo depois do login na mesma aba). Conta uma vez por mensagem e só para a dona dela (`returned` em `lifecycle_events`, `lifecycle_email_returned` no PostHog). A rota fica fora do bloqueio de assinatura.
+- **Dias de uso:** `user_activity_days` guarda um registro por dia em que a pessoa entrou ou usou o app. É a base da comparação com o grupo de controle, que não recebe link nenhum.
+- **Pesquisa de pós-mudança (`/pesquisa`):** o e-mail traz botões de 0 a 10; a página abre com a nota marcada e só grava quando a pessoa confirma (`survey_responses`, uma resposta por pessoa, com comentário opcional que fica só no banco). O PostHog recebe `survey_answered` com a nota.
+
+### Campanhas e painel de Operação (`/admin`)
+
+A seção **Operação** do `/admin` mostra:
+
+- **Rotinas agendadas** (`job_runs`): intervalo, último sucesso, última falha, versão e situação. Ver "Versão e rotinas" abaixo.
+- **E-mails de relacionamento (90 dias)**, por fluxo: enviados, entregues, cliques, volta ao app, descadastros e o **efeito**: a taxa de quem usou o app nos 7 dias seguintes entre quem recebeu, menos a mesma taxa no grupo de controle, em pontos percentuais. Também o NPS da pesquisa de pós-mudança e os endereços suprimidos.
+- **Campanhas pontuais:** nome, segmento salvo (S1, S2, S5, S6, S8, S9, S10 ou todos), assunto, texto, botão e página do app. "Estimar público" mostra quantos elegíveis existem (já sem descadastros e supressões), quantos ficam no grupo de controle e quantos esbarram hoje no limite de frequência; "Enviar teste" manda o e-mail para um endereço da equipe sem registrar nada. O envio respeita `LIFECYCLE_MODE` (`off` recusa, `simulate` só registra), o consentimento, a supressão e o limite de frequência (quem esbarra fica de fora desta campanha), e deixa 10% de fora para medir o efeito. O destino do botão é sempre um caminho do próprio app.
+
+## Eventos
+
+| Fluxo | Eventos e propriedades |
+| --- | --- |
+| Visitas | `$pageview` (`route`), incluindo troca de abas de login/cadastro via History API |
+| Cadastro e login | `signup_submit`, `signup_success`, `login_success`, `logout` |
+| Onboarding | `onboarding_start` (`resumed`), `step_view` e `step_complete` (`step`, `index`), `onboarding_back` (`step`), `plan_ready` (`items`, `rooms`), `commitment_signed` (pacto assinado), `onboarding_submit`, `onboarding_complete` (respostas em categorias e faixas, abaixo) |
+| Respostas do funil | Em `onboarding_complete` e gravadas na pessoa (`$set`), para quebrar funis, retenção e conversão: `moment`, `housing`, `people_bucket` (`1` a `5+`), `rooms_count`, `items_count`, `no_rooms`, `owned`, `style`, `budget`, `spending_tier`, `has_move_date`, `weeks_to_move_bucket` (`sem_data`, `0-4`, `5-12`, `13-26`, `27+`), `uf`, `has_city`, `worries_count`, `worry_<start/waste/forget/budget/time>`, `worries_none`, `worries_none_reason` (se escreveu um motivo, nunca o texto), `usage_count`, `usage_<buy/spend/links/share>`, `usage_none`, `usage_none_reason`. Nome, data exata, cidade e textos livres não vão (`src/onboarding/metrics.ts`) |
+| Retorno | `app_opened`, após identificar a conta em `/app` ou numa sub-rota do app; deduplicado por sessão do SDK nesta aba, inclusive recargas. Foco/visibilidade detectam uma nova sessão com a página aberta |
+| Navegação interna | `workspace_viewed` (`view`: `list`, `overview`, `plan`), só quando a tela está liberada pelo controle de assinatura |
+| Organização | `workspace_created` (`template`), `environment_created`, `item_created` (`source`: `manual`, `link`, `spreadsheet`; `status`) |
+| Compras e planejamento | `item_status_changed` (`status`), `item_purchase_recorded`, `purchase_scheduled`, `planning_updated` |
+| Edição e exclusão | `item_edited` (`changed_name`, `changed_price`, `changed_quantity`, `changed_notes`, `changed_room`: só quais campos mudaram, nunca os valores), `item_deleted`, `environment_deleted`, `workspace_deleted` |
+| Links e preços | `product_imported` (`has_price`), após extrair os dados do link; `price_history_viewed` |
+| Colaboração | `invitation_sent`, `invitation_accepted` |
+| Assistente | `nino_used` (`feature`: `assess_item`, `recommend`, `prioritize`; `outcome`: `redundancy`, `environment`, `catalog_match`, `recommended`, `complete`, `unknown_room`, `scored` ou `none`; `source`: `catalog` ou `jev` na avaliação de item), quando a API informa disponibilidade |
+| Planilhas | `items_imported` (`count`, `failed`, `stopped`, `catalog_applied`: sugestões do catálogo aceitas), `items_exported` (`format`, `count`) |
+| Mais valor na lista (Fase 11) | `installments_set` (`installments`, `payment_method`), `monthly_budget_set`, `item_assigned` (`self`), `gift_logged` (`has_message`), `gift_thanked` (`channel`), `document_uploaded` (`kind`, `source`), `warranty_set` (`months`), `offer_added` (`offers`), `offer_promoted` (`cheapest`), `offer_cheapest_found` (`savings_cents`), `store_mode_opened` / `store_mode_item_checked` (`offline`), `store_mode_offline_sync` (`count`) |
+| Oferta de planos | `plans_viewed` (`source`: `subscription`, `limit`, `menu`; `reason`, quando disponível) |
+| Checkout | `checkout_started` (`plan`), quando a API retorna o endereço; `checkout_failed` (`plan`), em resposta HTTP de erro; `checkout_canceled`, no retorno cancelado |
+| Assinatura | `subscription_activated` (`plan`, `trial`), `subscription_canceled`, `billing_portal_opened` |
+
+Eventos de ações da API são enviados após uma resposta bem-sucedida. Alterações de situação contam operações confirmadas, não compras únicas: marcar o mesmo item como comprado novamente gera outro evento. Salvar a ficha do item só envia a situação quando ela mudou, para não contar edições como mudanças de situação. Para ativação de usuários, use **usuários únicos** no funil de `item_created`/`item_purchase_recorded`.
+
+Os eventos DOM `casamia:onboarding` continuam funcionando. Os nomes legados `signup_submit` e `signup_success` desse contrato significam salvar o onboarding e são enviados ao PostHog como `onboarding_submit` e `onboarding_complete`. O cadastro real usa `signup_*` na API de registro. As visualizações iniciais do onboarding têm proteção contra repetição de efeitos do React StrictMode, e `onboarding_start` precede a primeira `step_view`.
+
+## Identificação e privacidade
+
+Com consentimento de análise, a resposta autenticada de bootstrap, login, cadastro ou aceite de convite identifica a pessoa pelo ID interno da conta, com `plan` e `is_guest`. Assim, eventos anônimos anteriores podem ser ligados à conta e retornos em outros aparelhos podem ser analisados. Logout, expiração de sessão e troca de conta reiniciam a identidade do navegador.
+
+Os eventos de produto usam apenas propriedades explícitas de cada esquema e metadados de Web Analytics com rotas e campanhas conhecidas. Os diagnósticos operacionais `application.*` e as exceções preservam os dados reais, incluindo URLs, conteúdo de campos, entradas e respostas da API. Esses registros podem conter dados pessoais e credenciais presentes na operação.
+
+O autocapture nativo do SDK, gravação de sessões, heatmaps, pesquisas e feature flags estão desligados. A aplicação registra cliques, alterações de campos e formulários por listeners próprios. Web Vitals captura métricas de desempenho, e Error Tracking captura exceções conforme as seções abaixo. O projeto PostHog descarta o IP do cliente (**Discard client IP data**), sem guardar `$ip` nem cidade, CEP ou coordenadas; como em qualquer requisição de rede, o serviço ainda recebe a conexão do navegador. A opção `ip: false` do SDK sozinha não impede o PostHog de gravar o IP da conexão. O SDK respeita Do Not Track. A página `/privacidade` permite desativar ou reativar a análise neste navegador quando a integração está configurada; a preferência é mantida pelo SDK.
+
+## Web Analytics
+
+### Páginas e saídas
+
+`$pageview` e os eventos de produto recebem `$pathname`, `$host` e `$current_url` reconstruídos. Somente as rotas públicas de `PUBLIC_ROUTES` e as sub-rotas do app são permitidas; qualquer outra vira `/other`. As sub-rotas chegam como modelo, sem identificador: `/app` (todos os ambientes), `/app/itens/:ambiente` (um ambiente), `/app/meu-lar` (visão geral) e `/app/plano` (planejamento); caminho desconhecido dentro do app vira `/app`. Query strings, fragmentos, credenciais e títulos não são enviados. Hosts locais/IPs são representados como `localhost`. O `$pageview` sai antes do diagnóstico `application.navigation`, e os eventos `application.*`, `$exception` e `$web_vitals` recebem a mesma rota sanitizada (`$pathname`, `$current_url`) e a origem sanitizada (`$referring_domain`, UTMs), para que a página de entrada e o canal da sessão nunca fiquem como "Unknown" (o endereço real continua em `url`). O SDK envia `$pageleave` no encerramento da página; a integração também registra a saída da rota anterior nas navegações via History API. O caminho da página anterior é sanitizado, preservando as informações numéricas de duração e rolagem. A recuperação de uma página do cache de voltar/avançar inicia uma nova visualização.
+
+O autocapture continua desligado. A taxa de rejeição nativa deve ser interpretada com essa limitação, pois ela também usa eventos de autocapture em sua definição. Para avaliar intenção, prefira as metas e os cliques explícitos.
+
+### Origem e campanhas
+
+As propriedades `utm_source`, `utm_medium` e `utm_campaign` usam vocabulários controlados. Fontes reconhecidas incluem Instagram, Facebook, WhatsApp, Google, Bing, TikTok, YouTube, LinkedIn, newsletter, e-mail e parceiros. Referrers desses serviços são reduzidos ao domínio canônico; não guardamos o caminho, query ou fragmento de origem. Outros referrers viram `other`; navegação sem origem externa vira `$direct`.
+
+Campanhas permitidas por padrão: `launch`, `bio`, `trial`, `enxoval` e `casa-nova`. Acrescente códigos em `VITE_POSTHOG_CAMPAIGNS` antes do build. Valores desconhecidos viram `other`, inclusive se parecem e-mails, nomes ou tokens. `utm_term`, `utm_content` e identificadores como `gclid`/`fbclid` são descartados. Os dados sanitizados da primeira entrada ficam em `sessionStorage` e acompanham as conversões na mesma sessão do SDK, inclusive após recarregar ou mudar de página. A desativação da análise apaga essa atribuição local.
+
+Exemplo de link de divulgação:
+
+```text
+https://SEU-DOMINIO/?utm_source=instagram&utm_medium=social&utm_campaign=bio
+```
+
+### Metas e cliques
+
+As metas usam eventos de sucesso reais, já implementados: `signup_success`, `onboarding_complete` e `subscription_activated`. O último confirma acesso a um plano, incluindo teste grátis; não representa receita ou cobrança confirmada. Bloqueadores e opt-out podem impedir a coleta do navegador. A fonte financeira continua sendo Stripe/backend.
+
+No projeto PostHog 665798 foram criadas as ações reutilizáveis:
+
+| Meta | Ação |
+| --- | --- |
+| Cadastro concluído | [395646](https://us.posthog.com/project/665798/data-management/actions/395646) |
+| Onboarding concluído | [395647](https://us.posthog.com/project/665798/data-management/actions/395647) |
+| Acesso ao plano ativado | [395648](https://us.posthog.com/project/665798/data-management/actions/395648) |
+
+Em `/web`, clique em **Add conversion goal** e selecione uma dessas ações para ver a meta na visão nativa. A seleção ativa dessa tela não foi alterada pela integração: o MCP disponível não expõe essa preferência e não havia navegador conectado. As três ações e os gráficos salvos já estão configurados no servidor.
+
+`landing_cta_clicked` recebe somente `action` e `position` de listas fixas. Cobre iniciar teste, entrar, abrir o app, ver preços, como funciona, Nino e lista de presentes; distingue cabeçalho, navegação, hero, preços, chamada final e rodapé. Não coleta texto do botão, elementos DOM ou href. O dashboard [Casa Mia — Visão do produto](https://us.posthog.com/project/665798/dashboard/2227629) inclui o funil landing → clique para iniciar teste → cadastro → onboarding, com janela de 7 dias, as metas por dia e cliques para iniciar teste por posição.
+
+### Desempenho
+
+`capture_performance` coleta LCP, INP, CLS e FCP via `$web_vitals`. A integração preserva valores numéricos e identificadores técnicos; remove entradas brutas, atribuição de elementos DOM e URLs de recursos. Métricas atrasadas conservam a rota sanitizada da página que as produziu. Web Vitals nao inclui gravacao de sessao, conteudo ou payloads de rede; os registros operacionais completos sao descritos abaixo. `VITE_POSTHOG_WEB_VITALS=false` desliga a captura. A disponibilidade de cada métrica depende do navegador, do carregamento e das interações reais; sem interação pode não haver INP. A medição usa a navegação inicial da página, sem ativar APIs experimentais de navegação SPA.
+
+### Equipe e testes
+
+Todos os novos eventos recebem `app_environment` (`production`, `development` ou `test`) e `traffic_type` (`external`, `internal` ou `test`). Desenvolvimento e hosts locais são internos automaticamente. Builds de QA podem usar `VITE_POSTHOG_TRAFFIC_TYPE=test`. Para marcar só o navegador da equipe em produção, execute uma vez no console do domínio:
+
+```js
+localStorage.setItem('casamia:analytics:traffic', 'internal');
+```
+
+Remova essa chave para voltar ao comportamento padrão. Não é necessário enviar nomes ou e-mails. O projeto exclui `traffic_type` interno/teste por padrão, preservando a exclusão por coorte que já existia. Os gráficos do dashboard também foram atualizados para respeitar o filtro. É uma separação para análise, não uma regra que descarta eventos na ingestão. Eventos históricos sem essa marcação não são reclassificados automaticamente.
+
+Todas as opções `VITE_*` exigem novo build e publicação. A configuração remota de ações, filtros e gráficos já foi salva; a nova coleta só começa com a publicação do aplicativo. Os testes interceptam a telemetria e não criam visitas ou conversões artificiais no projeto real.
+
+## Error Tracking
+
+Com o token configurado, o navegador captura erros nao tratados, rejeicoes de promises, erros de renderizacao do React e falhas da API, incluindo 4xx e rotas administrativas. Cancelamentos AbortError geram registro operacional, sem excecao manual adicional. `VITE_POSTHOG_ERROR_TRACKING=false` desliga a captura de excecoes; opt-out e Do Not Track continuam valendo no navegador.
+
+O servidor usa `posthog-node` com `POSTHOG_KEY` (alternativa `VITE_POSTHOG_KEY`) e `POSTHOG_HOST`. Em producao fica ativo com token; em desenvolvimento exige `POSTHOG_ENABLE_DEV=true`. `POSTHOG_ERROR_TRACKING=false` desliga excecoes do servidor. O middleware encaminha os erros recebidos, incluindo 4xx e administracao, com contexto e ID da requisicao. As respostas publicas da API permanecem iguais.
+
+Excecoes preservam integralmente o payload produzido pelo SDK: mensagem, tipo, causas, mecanismo, frames, caminhos, source context e propriedades diagnosticas. Nao ha omissao ou mascaramento textual. Eventos operacionais `application.*` tambem preservam dados reais de navegacao, cliques, campos, formularios e chamadas da API. Os eventos de produto e Web Vitals continuam com seus schemas. Consulte [logs.md](logs.md) e [logging-coverage.md](logging-coverage.md) para detalhes e limites de entrega.
+
+### Source maps no build
+
+`npm run build` gera mapas ocultos do frontend e um mapa externo do bundle do servidor. O `postbuild` executa `scripts/posthog-sourcemaps.mjs`:
+
+- Sem `POSTHOG_UPLOAD_SOURCEMAPS=true`, remove os mapas do diretório público e não faz upload.
+- Com essa opção, exige `POSTHOG_CLI_PROJECT_ID` e `POSTHOG_CLI_API_KEY`, injeta os IDs nos bundles e envia os mapas e os bundles correspondentes ao PostHog. Use uma chave pessoal com os escopos `error tracking write` e `organization read`, somente no ambiente de build. `POSTHOG_CLI_HOST` usa o host de administração (`https://us.posthog.com`), não o host de ingestão.
+- Uma falha no envio reprova o build. Os `.map` são removidos mesmo em caso de falha, para não serem publicados pelo Express. Publique os bundles resultantes dessa mesma execução, pois contêm os IDs usados pelo PostHog.
+
+As variáveis `VITE_*` precisam estar configuradas antes do build. As variáveis do servidor são lidas em runtime. A integração não altera configurações remotas, cria chaves nem publica uma versão do aplicativo.
+
+Referências: [captura de exceções](https://posthog.com/docs/error-tracking/capture), [Node/Express](https://posthog.com/docs/error-tracking/installation/node) e [source maps pela CLI](https://posthog.com/docs/error-tracking/upload-source-maps/cli).
+
+`npm run test:error-tracking` cobre preservacao dos dados originais, middleware Express, erros esperados e administrativos e o payload do SDK Node real com transporte local. `npm run test:analytics` cobre o filtro do navegador e o desligamento da captura. `npm run test:analytics-browser` verifica o SDK JavaScript real, incluindo exceções e opt-out, interceptando as requisições sem enviar dados ao PostHog.
+
+Para evitar duplicar a confirmação do mesmo checkout na aba, guardamos apenas localmente uma lista limitada de chaves de deduplicação no `sessionStorage`. O evento de conversao usa metadados limitados; o contexto operacional da chamada preserva o ID real do checkout. A deduplicação é uma conveniência do cliente, não um registro financeiro.
+
+## Versão e rotinas
+
+- **Versão:** `app_version` (commit publicado pela Railway, `RAILWAY_GIT_COMMIT_SHA` com 7 caracteres, ou `APP_VERSION`) vai em toda exceção do servidor e do navegador, nos eventos do navegador e nos eventos do servidor. No PostHog, crie alertas de Error Tracking filtrando ou agrupando por `app_version` para ver "quebrou no deploy X". O build do navegador lê a versão em tempo de build (`__APP_VERSION__` no `vite.config.ts`).
+- **Rotinas agendadas:** ciclo de vida, preços, catálogo, avisos do teste grátis, notas fiscais, garantias e retenção de IPs registram cada rodada em `job_runs` (`server/jobMonitor.ts`). Uma falha vira exceção agrupada por rotina (`scheduled_job_failed`); uma rotina sem sucesso há mais de 2,5 intervalos vira `scheduled_job_stale` e log de erro, no máximo uma vez a cada 6 horas. Rotinas desligadas deixam de ser vigiadas em 24 horas.
+
+## SEO técnico
+
+O app é renderizado no navegador, então em produção o servidor entrega o `index.html` com título, descrição, `canonical`, Open Graph com endereço completo e, na página inicial, dados estruturados (`WebSite` e `WebApplication`) para as páginas públicas: `/`, `/como-o-nino-escolhe`, `/comecar` e `/privacidade` (`server/seo.ts`). As privadas (`/app`, `/admin`, `/login`, `/cadastro`, `/convite`, `/preferencias`, `/pesquisa`, recuperação de senha e confirmação de e-mail) recebem `noindex` na página e no cabeçalho `X-Robots-Tag`. `/robots.txt` bloqueia as privadas e aponta o sitemap; `/sitemap.xml` lista as públicas. O endereço canônico vem de `APP_URL` (sem ele, não há canonical nem sitemap). Envie `<APP_URL>/sitemap.xml` ao Search Console.
+
+## Painéis sugeridos
+
+- **Aquisição:** `$pageview` (rota `/`) → `signup_success` → `onboarding_start` → `onboarding_complete`.
+- **Abandono:** funil de `step_view` por `step`, usando os nomes e a ordem das etapas exibidas em `/comecar`.
+- **Ativação:** `onboarding_complete` → `subscription_activated` → `item_created` → `item_purchase_recorded`. Analise a janela de conversão conforme o ciclo de compra do enxoval.
+- **Retenção:** usuários de `app_opened` que retornam semanalmente; complemente com retorno a `item_status_changed` para medir atualização da lista.
+- **Recursos:** usuários únicos por `workspace_viewed`, `product_imported`, `price_history_viewed`, `invitation_sent` e `nino_used`.
+- **Conversão:** `plans_viewed` → `checkout_started` → `subscription_activated`, segmentado por plano e `trial`. Um teste mensal ativado não é uma cobrança confirmada.
+
+`subscription_activated` exige que `/api/billing/sync` confirme acesso em um plano pago; o parâmetro `assinatura=sucesso` sozinho não gera conversão. Esse evento do navegador mede o retorno do usuário ao app; as cobranças de verdade (primeira cobrança depois do teste e renovações, mesmo sem o navegador voltar) chegam pelo servidor como `subscription_payment_succeeded` (ver "Conversão de compra pelo servidor"). Para conciliação, a fonte de verdade continua sendo Stripe/backend.
+
+## Validação
+
+`npm run test:lifecycle` cobre a origem do cadastro, o grupo de canal, as regras do motor de ciclo de vida (inclusive atrasos, marcos, convite parado e pós-mudança), os e-mails, a assinatura do webhook do Resend, o SEO, a conversão de compra e de cobrança recorrente, o efeito incremental, as campanhas e o vigia das rotinas. `npm run test:growth-db` (PostgreSQL real) cobre cadastro com origem e consentimentos, envio, grupo de controle, não repetição, preferências, descadastro com um clique, a opção do perfil, o resumo de atrasos com o planejamento real, os webhooks (deduplicação e supressão), a volta ao app, a pesquisa, o limite comum de frequência, as campanhas, o painel e o monitor de rotinas.
+
+`npm run test:analytics` verifica consentimento antes da captura, Tag Manager com Consent Mode, `$set_once` do primeiro toque, esquemas, remoção de metadados sensíveis, eventos da API, confirmação de assinatura, inicialização condicional, navegação, identidade, sessões, deduplicação entre recargas, opt-out e tolerância a falhas do SDK/armazenamento. Usa um SDK substituto e não envia dados externos.
+
+`npm run test:analytics-browser` inicia um Vite isolado e usa o SDK real em um navegador Playwright (Edge no Windows). Intercepta localmente todo o tráfego de análise e simula a API, sem precisar de banco ou token real. Confere que nada é enviado nem gravado antes do aviso de consentimento, os eventos enviados depois do aceite, a remoção de dados privados e a persistência da recusa após recarregar a página. Se o `.env` local tiver `VITE_POSTHOG_TRAFFIC_TYPE=test`, rode com `VITE_POSTHOG_TRAFFIC_TYPE=internal`.
+
+Com as variáveis configuradas, faça um cadastro de teste, percorra o onboarding, abra um plano, adicione um item e marque-o como comprado. Confira os eventos no PostHog e valide que não contêm dados pessoais nem tokens. Essa verificação depende do token e do projeto reais.

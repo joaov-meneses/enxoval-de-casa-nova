@@ -1,3 +1,4 @@
+import { logger, stopPosthogLogs } from '../logger.ts';
 // Executa uma rodada da rotina do catálogo e termina. Uso: npm run catalog:refresh [-- --urgency [--limit 600]]
 import { getPool } from '../database.ts';
 import { runCatalogRefresh } from './catalogWorker.ts';
@@ -9,10 +10,11 @@ try {
   const summary = await runCatalogRefresh({
     urgency: process.argv.includes('--urgency'),
     urgencyLimit: Number.isInteger(limit) && limit! > 0 ? limit : undefined,
-    log: message => console.log(message),
   });
-  if (summary.skipped) console.log('Outra rodada já está em andamento. Nada a fazer.');
-  else console.log(`Concluído: ${summary.linked} itens ligados, ${summary.promoted} itens novos, ${summary.priceRanges} faixas de preço, ${summary.urgencies} urgências pré-calculadas.`);
+  logger.info({ event: 'catalog.refresh.completed', ...summary }, 'Worker run completed.');
+} catch (err) {
+  logger.error({ event: 'catalog.refresh.failed', err }, 'Worker run failed.');
+  process.exitCode = 1;
 } finally {
-  await getPool().end();
+  await Promise.allSettled([getPool().end(), stopPosthogLogs()]);
 }

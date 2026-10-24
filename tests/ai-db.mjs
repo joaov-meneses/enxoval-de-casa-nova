@@ -1,7 +1,7 @@
-// Teste de integração das rotas do Nino (/api/ai/*) com PostgreSQL real e o SDK real do Jev falando com um servidor
 // HTTP falso (nada sai para a internet nem gasta a chave). Usa um schema descartável. Rodar: npm run test:ai-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import { createServer } from "node:http";
 import zlib from "node:zlib";
 import express from "express";
@@ -151,7 +151,7 @@ try {
   assert.equal((await call("/ai/status")).status, 401);
   assert.equal((await call("/ai/assess-item", "POST", { enxovalId: "x", name: "Torradeira" })).status, 401);
 
-  const registered = await call("/auth/register", "POST", { email: OWNER_EMAIL, password: randomBytes(16).toString("base64url") });
+  const registered = await call("/auth/register", "POST", { email: OWNER_EMAIL, password: strongPassword() });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
   // Conta paga: este teste cobre o Nino, não as travas do plano gratuito (tests/freemium-db.mjs).
   await getPool().query("UPDATE users SET plan = 'monthly' WHERE id = $1", [registered.data.user.id]);
@@ -334,7 +334,7 @@ try {
   // 6. Outra pessoa não consulta o enxoval alheio.
   const ownerCookie = cookie;
   cookie = "";
-  const stranger = await call("/auth/register", "POST", { email: "intrusa@example.invalid", password: randomBytes(16).toString("base64url") });
+  const stranger = await call("/auth/register", "POST", { email: "intrusa@example.invalid", password: strongPassword() });
   assert.equal(stranger.status, 201, JSON.stringify(stranger.data));
   received.length = 0;
   for (const [path, body] of [

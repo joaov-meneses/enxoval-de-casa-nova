@@ -1,3 +1,8 @@
+import { OwnedProgressIcons } from "../icons";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Checkbox } from "../ui/checkbox";
+import { MotionLabel } from "@/src/components/ui/motion";
+import { Button } from "@/src/components/ui/button";
 import {
   useCallback,
   useEffect,
@@ -9,7 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import { animate, AnimatePresence, motion } from "motion/react";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "@/src/components/icons";
 import { parseLocalDate, toISODate } from "../../onboarding/plan";
 
 /* ------------------------------------------------------------- animações */
@@ -77,7 +82,13 @@ export function CountUp({
   return <span className={className}>{value}</span>;
 }
 
-const CONFETTI = ["#c2603f", "#e7b89a", "#5c6643", "#c9a46c", "#f1dfbf"];
+const CONFETTI = [
+  "var(--cm-primary)",
+  "var(--cm-sand)",
+  "var(--cm-success)",
+  "var(--cm-olive-soft)",
+  "var(--cm-bg)",
+];
 
 export function Confetti({ reduced }: { reduced: boolean }) {
   if (reduced) return null;
@@ -157,26 +168,21 @@ export function RadioOptions<T extends string | number>({
   reduced: boolean;
 }) {
   return (
-    <fieldset className="ob-fieldset">
+    <RadioGroup asChild name={name} value={value === null ? "" : String(value)} onValueChange={next => { const option = options.find(entry => String(entry.value) === next); if (option) onChange(option.value); }} aria-label={legend}><fieldset className="ob-fieldset">
       <legend className="ob-sr">{legend}</legend>
       <Stagger className="ob-options" reduced={reduced}>
         {options.map((option) => {
           const selected = option.value === value;
           return (
-            <motion.label
+            <MotionLabel
               key={String(option.value)}
+              htmlFor={`${name}-${String(option.value)}`}
               className="ob-option"
               data-selected={selected}
               variants={reduced ? undefined : itemVariants}
               whileTap={reduced ? undefined : { scale: 0.985 }}
             >
-              <input
-                type="radio"
-                name={name}
-                value={String(option.value)}
-                checked={selected}
-                onChange={() => onChange(option.value)}
-              />
+              <RadioGroupItem id={`${name}-${String(option.value)}`} value={String(option.value)} className="choice-control" />
               {option.icon && <span className="ob-option-icon">{option.icon}</span>}
               <span className="ob-option-text">
                 <strong>{option.label}</strong>
@@ -184,11 +190,11 @@ export function RadioOptions<T extends string | number>({
               </span>
               {option.meta && <span className="ob-option-meta">{option.meta}</span>}
               <Tick selected={selected} reduced={reduced} shape="round" />
-            </motion.label>
+            </MotionLabel>
           );
         })}
       </Stagger>
-    </fieldset>
+    </fieldset></RadioGroup>
   );
 }
 
@@ -214,20 +220,15 @@ export function CheckOptions<T extends string>({
         {options.map((option) => {
           const selected = values.includes(option.value);
           return (
-            <motion.label
+            <MotionLabel
               key={option.value}
+              htmlFor={`${name}-${option.value}`}
               className="ob-option"
               data-selected={selected}
               variants={reduced ? undefined : itemVariants}
               whileTap={reduced ? undefined : { scale: 0.985 }}
             >
-              <input
-                type="checkbox"
-                name={name}
-                value={option.value}
-                checked={selected}
-                onChange={() => onToggle(option.value)}
-              />
+              <Checkbox id={`${name}-${option.value}`} name={name} value={option.value} checked={selected} onCheckedChange={() => onToggle(option.value)} className="choice-control" />
               {option.icon && <span className="ob-option-icon">{option.icon}</span>}
               <span className="ob-option-text">
                 <strong>{option.label}</strong>
@@ -235,7 +236,7 @@ export function CheckOptions<T extends string>({
               </span>
               {option.meta && <span className="ob-option-meta">{option.meta}</span>}
               <Tick selected={selected} reduced={reduced} shape="square" />
-            </motion.label>
+            </MotionLabel>
           );
         })}
       </Stagger>
@@ -558,18 +559,18 @@ export function CalendarPicker({
   return (
     <div className="ob-calendar">
       <div className="ob-calendar-head">
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           onClick={() => shift(-1)}
           disabled={atCurrentMonth}
           aria-label="Mês anterior"
         >
           <ChevronLeft size={18} />
-        </button>
+        </Button>
         <strong aria-live="polite">{monthFormatter.format(first)}</strong>
-        <button type="button" onClick={() => shift(1)} aria-label="Próximo mês">
+        <Button variant="brand" size="brand" type="button" onClick={() => shift(1)} aria-label="Próximo mês">
           <ChevronRight size={18} />
-        </button>
+        </Button>
       </div>
       <div className="ob-calendar-week" aria-hidden="true">
         {WEEKDAYS.map((d, i) => (
@@ -593,7 +594,7 @@ export function CalendarPicker({
             const selected = iso === value;
             const past = date < today;
             return (
-              <button
+              <Button variant="brand" size="brand"
                 key={iso}
                 type="button"
                 className="ob-day"
@@ -611,7 +612,7 @@ export function CalendarPicker({
                   />
                 )}
                 <span className="ob-day-number">{day}</span>
-              </button>
+              </Button>
             );
           })}
         </motion.div>
@@ -622,22 +623,6 @@ export function CalendarPicker({
 
 /** Pizza de preenchimento usada em "Você já tem alguma coisa?". */
 export function Pie({ fill }: { fill: 0 | 1 | 2 }) {
-  const r = 9;
-  const c = 11;
-  const angle = fill === 1 ? 90 : 270;
-  const rad = (angle * Math.PI) / 180;
-  const x = c + r * Math.sin(rad);
-  const y = c - r * Math.cos(rad);
-  const large = angle > 180 ? 1 : 0;
-  return (
-    <svg width="24" height="24" viewBox="0 0 22 22" aria-hidden="true">
-      <circle cx={c} cy={c} r={r} fill="none" stroke="currentColor" strokeWidth="1.6" />
-      {fill > 0 && (
-        <path
-          d={`M ${c} ${c} L ${c} ${c - r} A ${r} ${r} 0 ${large} 1 ${x} ${y} Z`}
-          fill="currentColor"
-        />
-      )}
-    </svg>
-  );
+  const Icon = OwnedProgressIcons[fill];
+  return <Icon size={24} strokeWidth={1.6} aria-hidden="true" />;
 }

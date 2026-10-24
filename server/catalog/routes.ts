@@ -15,6 +15,7 @@ import {
   getCatalogIndex,
   invalidateCatalogIndex,
   mapCatalogItem,
+  matchCatalogNames,
   searchCatalog,
   type CatalogItem
 } from './store.ts';
@@ -22,6 +23,8 @@ import {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UFS = /^[A-Z]{2}$/;
 const MAX_NAME_LENGTH = 120;
+/** O mesmo limite de linhas da importação por planilha (IMPORT_LIMITS.maxRows). */
+const MAX_MATCH_NAMES = 500;
 
 function catalogId(value: unknown) {
   const id = String(value ?? '');
@@ -118,6 +121,16 @@ export function registerCatalogRoutes(router: Router, deps: { requireUser: (req:
     res.json({ results: await searchCatalog(query, { limit: Number.isInteger(limit) ? limit : 8, region }) });
   }));
 
+  // Revisão da importação por planilha: todos os nomes do arquivo numa chamada só (até 500 linhas não caberiam no
+  // limite da busca acima). Também sem Jev e sem rede externa.
+  router.post('/catalog/match', rateLimit(30, 10 * 60_000, 'Muitas importações seguidas. Aguarde um instante.'), asyncHandler(async (req, res) => {
+    await deps.requireUser(req);
+    const names = (req.body as { names?: unknown } | undefined)?.names;
+    if (!Array.isArray(names) || names.length > MAX_MATCH_NAMES || names.some(name => typeof name !== 'string'))
+      throw new HttpError(400, `Envie até ${MAX_MATCH_NAMES} nomes.`);
+    res.json({ results: await matchCatalogNames((names as string[]).map(name => name.slice(0, MAX_NAME_LENGTH))) });
+  }));
+
   /* ----------------------------------------------------------------- admin */
 
   router.get('/admin/catalog/overview', asyncHandler(async (req, res) => {
@@ -139,8 +152,8 @@ export function registerCatalogRoutes(router: Router, deps: { requireUser: (req:
       ),
       getPool().query<{ unlinked: number; linked: number; without_urgency: number; aliases: number; price_ranges: number }>(
         `SELECT
-           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NULL AND status NOT IN ('not_needed', 'discarded')) AS unlinked,
-           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NOT NULL AND status NOT IN ('not_needed', 'discarded')) AS linked,
+           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NULL) AS unlinked,
+           (SELECT COUNT(*)::int FROM items WHERE catalog_item_id IS NOT NULL) AS linked,
            (SELECT COUNT(*)::int FROM catalog_items ci WHERE NOT EXISTS (
               SELECT 1 FROM catalog_item_urgency u WHERE u.item_id = ci.id AND u.rubric_version = $1)) AS without_urgency,
            (SELECT COUNT(*)::int FROM catalog_item_aliases) AS aliases,

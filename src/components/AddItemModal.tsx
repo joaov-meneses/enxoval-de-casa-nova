@@ -1,10 +1,18 @@
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
+import { Input } from "@/src/components/ui/input";
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
+import { Textarea } from "@/src/components/ui/textarea";
 import React, { useEffect, useRef, useState } from "react";
-import { Sparkles, LoaderCircle, PackageCheck, PackageX, X } from "lucide-react";
+import { ChevronDown, Sparkles, LoaderCircle, PackageCheck, PackageX, X } from "@/src/components/icons";
 import type {
   CatalogSearchResult,
   EnxovalCategory,
   EnxovalItem,
+  EnxovalMember,
+  ItemExtrasInput,
   ItemStatus,
+  PaymentMethod,
   ItemTrackingInput,
   ItemAssessment,
   PriceBasis,
@@ -22,12 +30,22 @@ import {
 import { MAX_ENVIRONMENT_NAME_LENGTH, normalizeEnvironmentName, sanitizeEnvironmentNameInput } from "../data";
 import { DEFAULT_ITEM_QUANTITY, MAX_ITEM_QUANTITY } from "../itemQuantity";
 import { MAX_ITEM_NAME_LENGTH } from "../data";
+import { MAX_INSTALLMENTS, PAYMENT_METHOD_LABEL } from "../planning/installments";
 import { Dialog } from "./Dialog";
 import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
-import { ItemImageField } from "./ItemImageField";
 
 const NEW_CATEGORY_VALUE = "__new_category__";
+const PAYMENT_OPTIONS = [
+  { value: "", label: "Não informado" },
+  ...(Object.keys(PAYMENT_METHOD_LABEL) as PaymentMethod[]).map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] })),
+];
+const INSTALLMENT_OPTIONS = Array.from({ length: MAX_INSTALLMENTS }, (_, index) => ({
+  value: String(index + 1),
+  label: index === 0 ? "À vista" : `${index + 1}x`,
+}));
+const FIELD_CLASS =
+  "w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood";
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -44,10 +62,14 @@ interface AddItemModalProps {
       EnxovalItem,
       "priceCents" | "quantity" | "discountCents" | "link" | "description" | "status"
     > &
-      ItemTrackingInput,
+      ItemTrackingInput &
+      ItemExtrasInput,
   ) => Promise<void> | void;
   defaultCategoryId: string;
   categories: EnxovalCategory[];
+  /** Quem participa do enxoval: "Quem vai comprar" só aparece com mais de uma pessoa. */
+  members?: EnxovalMember[];
+  currentUserId?: string;
   /** Enxoval em que o item será criado; com ele (e o Jev ligado) o Nino ajuda a escolher o ambiente e avisa de repetições. */
   enxovalId?: string;
 }
@@ -102,8 +124,17 @@ export function AddItemModal({
   onAdd,
   defaultCategoryId,
   categories,
+  members = [],
+  currentUserId,
   enxovalId,
 }: AddItemModalProps) {
+  const [installmentsText, setInstallmentsText] = useState("1");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [purchasedAt, setPurchasedAt] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [warrantyMonthsText, setWarrantyMonthsText] = useState("");
+  const [storeName, setStoreName] = useState("");
+  const [giftFrom, setGiftFrom] = useState("");
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -114,6 +145,8 @@ export function AddItemModal({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ItemStatus>(DEFAULT_ITEM_STATUS);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [error, setError] = useState("");
   // Importação por link: a leitura é só uma ajuda; falhar não impede preencher tudo à mão.
   const [importUrl, setImportUrl] = useState("");
@@ -121,9 +154,6 @@ export function AddItemModal({
   const [importStatus, setImportStatus] = useState<"idle" | "loading" | "done" | "partial" | "error">("idle");
   const [importError, setImportError] = useState("");
   const [preview, setPreview] = useState<ScrapedProductPreview | null>(null);
-  const [imageFailed, setImageFailed] = useState(false);
-  // Imagem do item: a da loja (vinda da importação), um arquivo enviado ou o link de uma imagem.
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [priceBasis, setPriceBasis] = useState<PriceBasis>("regular");
   const [voltage, setVoltage] = useState("");
   const [color, setColor] = useState("");
@@ -131,8 +161,6 @@ export function AddItemModal({
   // Só preenche sozinho o que a pessoa ainda não mexeu.
   const autoName = useRef("");
   const autoPrice = useRef("");
-  // Imagem que a importação por link colocou sozinha: só ela pode ser trocada por outra importação.
-  const autoImage = useRef("");
   const categoryTouched = useRef(false);
   const importTicket = useRef(0);
   // Último endereço já lido, para o campo "Link do produto" não buscar a mesma loja de novo ao perder o foco.
@@ -260,9 +288,6 @@ export function AddItemModal({
     setImportStatus("idle");
     setImportError("");
     setPreview(null);
-    setImageFailed(false);
-    setImageUrl(null);
-    autoImage.current = "";
     setPriceBasis("regular");
     setVoltage("");
     setColor("");
@@ -279,7 +304,16 @@ export function AddItemModal({
     setLink("");
     setDescription("");
     setStatus(DEFAULT_ITEM_STATUS);
+    setInstallmentsText("1");
+    setPaymentMethod("");
+    setPurchasedAt("");
+    setAssigneeId("");
+    setWarrantyMonthsText("");
+    setStoreName("");
+    setGiftFrom("");
     setError("");
+    setLinkOpen(false);
+    setMoreOpen(false);
   }, [categories, defaultCategoryId, isOpen]);
 
   const draftPrice = Number(priceText.replace(/\D/g, "")) || 0;
@@ -295,10 +329,6 @@ export function AddItemModal({
 
   const applyPreview = (data: ScrapedProductPreview) => {
     setPreview(data);
-    setImageFailed(false);
-    const previousAutoImage = autoImage.current;
-    autoImage.current = data.imageUrl ?? "";
-    setImageUrl((current) => (!current || current === previousAutoImage ? (data.imageUrl ?? null) : current));
     setPriceBasis("regular");
     setColor("");
     setVoltage(data.variations?.voltage?.length === 1 ? data.variations.voltage[0] : "");
@@ -366,9 +396,6 @@ export function AddItemModal({
     setImportStatus("idle");
     setImportError("");
     setPreview(null);
-    const autoImageUrl = autoImage.current;
-    autoImage.current = "";
-    setImageUrl((current) => (current === autoImageUrl ? null : current));
     setVoltage("");
     setColor("");
     setTargetText("");
@@ -419,6 +446,25 @@ export function AddItemModal({
     setIsSubmitting(true);
     setError("");
 
+    const installments = Number(installmentsText) || 1;
+    const warrantyMonths = Number(warrantyMonthsText) || null;
+    const todayBr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const extras: ItemExtrasInput = {
+      installments: installments > 1 ? installments : undefined,
+      ...(status === "bought"
+        ? {
+            purchasedAt: purchasedAt || todayBr,
+            paymentMethod: (paymentMethod || null) as PaymentMethod | null,
+          }
+        : {}),
+      warrantyMonths: warrantyMonths ?? undefined,
+      storeName: storeName.trim() || undefined,
+      ...(status === "received" && giftFrom.trim() ? { giftFrom: giftFrom.trim() } : {}),
+      ...(members.length > 1 && assigneeId ? { assigneeId } : {}),
+    };
+    // Só manda o que a pessoa preencheu; o resto continua com o padrão do servidor.
+    if (extras.paymentMethod === null) delete extras.paymentMethod;
+
     try {
       await onAdd(
         trimmedName,
@@ -431,7 +477,7 @@ export function AddItemModal({
           link: link.trim(),
           description: description.trim(),
           status,
-          ...(imageUrl ? { imageUrl } : {}),
+          ...extras,
           ...(preview && importStatus === "done"
             ? {
                 trackedProductUrl: preview.url,
@@ -467,241 +513,22 @@ export function AddItemModal({
     >
       <form onSubmit={handleSubmit} className="add-item-form">
         <div className="add-item-form-body">
-        <section
-          aria-labelledby="import-link-title"
-          className="add-item-import rounded-2xl border border-brand-wood/20 bg-brand-wood/5 p-3.5 space-y-3"
-        >
-          <div>
-            <h3 id="import-link-title" className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
-              <Sparkles size={15} aria-hidden="true" /> Importar por link
-            </h3>
-            <p id="import-link-hint" className="mt-0.5 text-xs text-stone-500">
-              Cole o link de um produto (Mercado Livre, Amazon, Magalu...) e a gente preenche nome, foto e preço. Depois acompanhamos se ele ficou mais barato.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <input
-              id="import-link-url"
-              type="text"
-              inputMode="url"
-              autoComplete="off"
-              aria-label="Link do produto para importar"
-              aria-describedby="import-link-hint"
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
-              onPaste={(e) => {
-                const pasted = e.clipboardData.getData("text").trim();
-                if (!looksLikeUrl(pasted)) return;
-                e.preventDefault();
-                setImportUrl(pasted);
-                void runImport(pasted);
-              }}
-              onKeyDown={(e) => {
-                // Enter aqui busca o produto em vez de enviar o formulário inteiro.
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                void runImport(importUrl);
-              }}
-              placeholder="https://..."
-              disabled={isSubmitting}
-              className="min-w-0 flex-1 px-3.5 py-2.5 text-base border border-stone-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-            />
-            <button
-              type="button"
-              onClick={() => void runImport(importUrl)}
-              disabled={!importUrl.trim() || importStatus === "loading" || isSubmitting}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-dark px-3.5 py-2.5 text-sm font-medium text-white hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {importStatus === "loading" ? (
-                <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-              ) : (
-                <Sparkles size={16} aria-hidden="true" />
-              )}
-              <span>Buscar<span className="hidden sm:inline"> informações</span></span>
-            </button>
-          </div>
 
-          <div aria-live="polite">
-            {importStatus === "loading" && (
-              <div className="flex gap-3 rounded-xl border border-stone-200 bg-white p-3" role="status" aria-label="Buscando informações do produto">
-                <div className="h-16 w-16 shrink-0 animate-pulse rounded-lg bg-stone-200" />
-                <div className="flex-1 space-y-2 pt-1">
-                  <div className="h-3 w-4/5 animate-pulse rounded bg-stone-200" />
-                  <div className="h-3 w-3/5 animate-pulse rounded bg-stone-200" />
-                  <div className="h-3 w-1/3 animate-pulse rounded bg-stone-200" />
-                </div>
-              </div>
-            )}
-            {importStatus === "error" && (
-              <p role="alert" className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                {importError}
-              </p>
-            )}
-            {importStatus === "partial" && preview && (
-              <div role="status" className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                <p className="min-w-0 flex-1">
-                  Essa loja não deixou ler o preço e a foto. Preenchemos o nome pelo link: confira o nome e informe o preço abaixo.
-                </p>
-                <button
-                  type="button"
-                  onClick={clearImport}
-                  aria-label="Remover importação"
-                  title="Remover importação"
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-amber-800 hover:bg-amber-100"
-                >
-                  <X size={14} aria-hidden="true" />
-                </button>
-              </div>
-            )}
-            {importStatus === "done" && preview && (
-              <div className="rounded-xl border border-stone-200 bg-white p-3">
-                <div className="flex gap-3">
-                  {preview.imageUrl && !imageFailed ? (
-                    <img
-                      src={preview.imageUrl}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      onError={() => setImageFailed(true)}
-                      className="h-16 w-16 shrink-0 rounded-lg border border-stone-100 bg-white object-contain"
-                    />
-                  ) : (
-                    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg bg-stone-100 text-stone-400" aria-hidden="true">
-                      <PackageCheck size={22} />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-semibold text-stone-700">
-                        {storeLabel(preview.domain)}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${preview.inStock ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}
-                      >
-                        {preview.inStock ? <PackageCheck size={11} aria-hidden="true" /> : <PackageX size={11} aria-hidden="true" />}
-                        {preview.inStock ? "Em estoque" : "Indisponível"}
-                      </span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-sm font-medium text-stone-800">{preview.title}</p>
-                    <p className="mt-0.5 text-sm text-stone-600">
-                      {preview.priceCents ? moneyText(preview.priceCents) : "Preço não encontrado"}
-                      {preview.pixPriceCents ? ` · ${moneyText(preview.pixPriceCents)} no Pix` : ""}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={clearImport}
-                    aria-label="Remover importação"
-                    title="Remover importação"
-                    className="h-8 w-8 shrink-0 grid place-items-center rounded-lg text-stone-500 hover:bg-stone-100"
-                  >
-                    <X size={16} aria-hidden="true" />
-                  </button>
-                </div>
-
-                {preview.pixPriceCents && preview.priceCents ? (
-                  <div className="mt-3">
-                    <span id="import-price-basis" className="block text-xs font-medium text-stone-600 mb-1">
-                      Qual preço usar?
-                    </span>
-                    <div role="radiogroup" aria-labelledby="import-price-basis" className="grid grid-cols-2 gap-1.5">
-                      {([
-                        ["regular", "Normal", preview.priceCents],
-                        ["pix", "No Pix", preview.pixPriceCents],
-                      ] as const).map(([value, label, cents]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          role="radio"
-                          aria-checked={priceBasis === value}
-                          onClick={() => choosePriceBasis(value)}
-                          className={`rounded-lg border px-2 py-2 text-sm transition-colors ${priceBasis === value ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
-                        >
-                          {label} · {moneyText(cents)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {preview.variations?.voltage?.length ? (
-                  <div className="mt-3">
-                    <span id="import-voltage" className="block text-xs font-medium text-stone-600 mb-1">Voltagem</span>
-                    <div role="radiogroup" aria-labelledby="import-voltage" className="flex flex-wrap gap-1.5">
-                      {preview.variations.voltage.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          role="radio"
-                          aria-checked={voltage === option}
-                          onClick={() => setVoltage(voltage === option ? "" : option)}
-                          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${voltage === option ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {preview.variations?.colors?.length ? (
-                  <div className="mt-3">
-                    <span id="import-color" className="block text-xs font-medium text-stone-600 mb-1">Cor</span>
-                    <div role="radiogroup" aria-labelledby="import-color" className="flex flex-wrap gap-1.5">
-                      {preview.variations.colors.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          role="radio"
-                          aria-checked={color === option}
-                          onClick={() => setColor(color === option ? "" : option)}
-                          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${color === option ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-3">
-                  <label htmlFor="import-target" className="block text-xs font-medium text-stone-600 mb-1">
-                    Me avise se o preço cair abaixo de <span className="font-normal text-stone-500">(opcional)</span>
-                  </label>
-                  <input
-                    id="import-target"
-                    type="text"
-                    inputMode="numeric"
-                    value={targetText}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
-                      setTargetText(digits ? money.format(Number(digits) / 100) : "");
-                    }}
-                    placeholder="R$ 0,00"
-                    disabled={isSubmitting}
-                    className="w-full px-3.5 py-2.5 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500">Sobre o item</h3>
 
         <div>
           <div className="flex items-baseline justify-between gap-3 mb-1">
-            <label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700">
+            <Label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700">
               Nome do produto
-            </label>
+            </Label>
             <span className={`name-counter${name.length >= MAX_ITEM_NAME_LENGTH ? " is-full" : ""}`} aria-hidden="true">
               {name.length}/{MAX_ITEM_NAME_LENGTH}
             </span>
           </div>
           <div className="relative">
-            <input
+            <Input
               type="text"
               id="new-item-name"
+              data-dialog-autofocus
               required
               maxLength={MAX_ITEM_NAME_LENGTH}
               value={name}
@@ -754,7 +581,7 @@ export function AddItemModal({
           {ninoTip?.redundancy && (
             <p
               role="status"
-              className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-snug text-amber-900"
+              className="nino-tip mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-snug"
             >
               <Sparkles size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
               <span>
@@ -774,9 +601,9 @@ export function AddItemModal({
 
         <div className="add-item-row grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="new-item-category" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-category" className="block text-sm font-medium text-stone-700 mb-1">
               Ambiente
-            </label>
+            </Label>
             <Select
               id="new-item-category"
               value={categoryId}
@@ -797,9 +624,9 @@ export function AddItemModal({
             )}
           </div>
           <div>
-            <label htmlFor="new-item-status" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-status" className="block text-sm font-medium text-stone-700 mb-1">
               Situação
-            </label>
+            </Label>
             <Select
               id="new-item-status"
               value={status}
@@ -821,10 +648,10 @@ export function AddItemModal({
 
         {categoryId === NEW_CATEGORY_VALUE && (
           <div>
-            <label htmlFor="new-item-category-name" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-category-name" className="block text-sm font-medium text-stone-700 mb-1">
               Nome do ambiente
-            </label>
-            <input
+            </Label>
+            <Input
               id="new-item-category-name"
               required
               maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
@@ -844,14 +671,12 @@ export function AddItemModal({
           </div>
         )}
 
-        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Valores</h3>
-
-        <div className="add-item-row add-item-row-values grid gap-4 sm:grid-cols-2">
+        <div className="add-item-row grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="new-item-price" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-price" className="block text-sm font-medium text-stone-700 mb-1">
               Preço
-            </label>
-            <input
+            </Label>
+            <Input
               id="new-item-price"
               type="text"
               inputMode="numeric"
@@ -870,16 +695,247 @@ export function AddItemModal({
                 Faixa comum: {moneyText(priceRange.p10)} a {moneyText(priceRange.p90)}
                 {priceRange.region ? ` em ${priceRange.region}` : ""}.
                 {draftPrice > priceRange.p90 && (
-                  <span className="block font-medium text-amber-800">Este preço está acima do comum.</span>
+                  <span className="price-above-hint block font-medium">Este preço está acima do comum.</span>
                 )}
               </p>
             )}
           </div>
+        </div>
+
+        {/* O link é um atalho opcional: fica recolhido para o formulário começar pelo nome. */}
+        {!linkOpen ? (
+          <Button variant="brand" size="brand"
+            type="button"
+            className="add-item-disclosure"
+            aria-expanded={false}
+            aria-controls="add-item-import"
+            onClick={() => {
+              setLinkOpen(true);
+              requestAnimationFrame(() => document.getElementById("import-link-url")?.focus());
+            }}
+          >
+            <Sparkles size={16} aria-hidden="true" />
+            Tem o link da loja? Preencher pelo link
+          </Button>
+        ) : (
+        <section
+          aria-labelledby="import-link-title"
+          id="add-item-import"
+          className="add-item-import rounded-2xl border border-brand-wood/20 bg-brand-wood/5 p-3.5 space-y-3"
+        >
           <div>
-            <label htmlFor="new-item-discount" className="block text-sm font-medium text-stone-700 mb-1">
+            <h3 id="import-link-title" className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
+              <Sparkles size={15} aria-hidden="true" /> Importar por link
+            </h3>
+            <p id="import-link-hint" className="mt-0.5 text-xs text-stone-500">
+              Cole o link de um produto (Mercado Livre, Amazon, Magalu...) e a gente preenche nome e preço. Depois acompanhamos se ele ficou mais barato.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              id="import-link-url"
+              type="text"
+              inputMode="url"
+              autoComplete="off"
+              aria-label="Link do produto para importar"
+              aria-describedby="import-link-hint"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData("text").trim();
+                if (!looksLikeUrl(pasted)) return;
+                e.preventDefault();
+                setImportUrl(pasted);
+                void runImport(pasted);
+              }}
+              onKeyDown={(e) => {
+                // Enter aqui busca o produto em vez de enviar o formulário inteiro.
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                void runImport(importUrl);
+              }}
+              placeholder="https://..."
+              disabled={isSubmitting}
+              className="min-w-0 flex-1 px-3.5 py-2.5 text-base border border-stone-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+            <Button variant="brand" size="brand"
+              type="button"
+              onClick={() => void runImport(importUrl)}
+              disabled={!importUrl.trim() || importStatus === "loading" || isSubmitting}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-brand-dark px-3.5 py-2.5 text-sm font-medium text-white hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {importStatus === "loading" ? (
+                <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Sparkles size={16} aria-hidden="true" />
+              )}
+              <span>Buscar<span className="hidden sm:inline"> informações</span></span>
+            </Button>
+          </div>
+
+          <div aria-live="polite">
+            {importStatus === "loading" && (
+              <div className="flex gap-3 rounded-xl border border-stone-200 bg-white p-3" role="status" aria-label="Buscando informações do produto">
+                <div className="h-16 w-16 shrink-0 animate-pulse rounded-lg bg-stone-200" />
+                <div className="flex-1 space-y-2 pt-1">
+                  <div className="h-3 w-4/5 animate-pulse rounded bg-stone-200" />
+                  <div className="h-3 w-3/5 animate-pulse rounded bg-stone-200" />
+                  <div className="h-3 w-1/3 animate-pulse rounded bg-stone-200" />
+                </div>
+              </div>
+            )}
+            {importStatus === "error" && (
+              <p role="alert" className="form-error">
+                {importError}
+              </p>
+            )}
+            {importStatus === "partial" && preview && (
+              <div role="status" className="nino-tip flex items-start gap-2 rounded-lg px-3 py-2 text-sm">
+                <p className="min-w-0 flex-1">
+                  Essa loja não deixou ler o preço. Preenchemos o nome pelo link: confira o nome e informe o preço abaixo.
+                </p>
+                <Button variant="brand" size="brand"
+                  type="button"
+                  onClick={clearImport}
+                  aria-label="Remover importação"
+                  title="Remover importação"
+                  className="nino-tip-close grid h-11 w-11 -my-2 -mr-2 shrink-0 place-items-center rounded-md"
+                >
+                  <X size={14} aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+            {importStatus === "done" && preview && (
+              <div className="rounded-xl border border-stone-200 bg-white p-3">
+                <div className="flex gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs font-semibold text-stone-700">
+                        {storeLabel(preview.domain)}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold ${preview.inStock ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}
+                      >
+                        {preview.inStock ? <PackageCheck size={11} aria-hidden="true" /> : <PackageX size={11} aria-hidden="true" />}
+                        {preview.inStock ? "Em estoque" : "Indisponível"}
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm font-medium text-stone-800">{preview.title}</p>
+                    <p className="mt-0.5 text-sm text-stone-600">
+                      {preview.priceCents ? moneyText(preview.priceCents) : "Preço não encontrado"}
+                      {preview.pixPriceCents ? ` · ${moneyText(preview.pixPriceCents)} no Pix` : ""}
+                    </p>
+                  </div>
+                  <Button variant="brand" size="brand"
+                    type="button"
+                    onClick={clearImport}
+                    aria-label="Remover importação"
+                    title="Remover importação"
+                    className="h-8 w-8 shrink-0 grid place-items-center rounded-lg text-stone-500 hover:bg-stone-100"
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </Button>
+                </div>
+
+                {preview.pixPriceCents && preview.priceCents ? (
+                  <div className="mt-3">
+                    <span id="import-price-basis" className="block text-xs font-medium text-stone-600 mb-1">
+                      Qual preço usar?
+                    </span>
+                    <RadioGroup value={priceBasis} onValueChange={value => setPriceBasis(value as PriceBasis)} aria-labelledby="import-price-basis" className="grid grid-cols-2 gap-1.5">
+                      {([
+                        ["regular", "Normal", preview.priceCents],
+                        ["pix", "No Pix", preview.pixPriceCents],
+                      ] as const).map(([value, label, cents]) => (
+                        <RadioGroupItem key={value} value={value} asChild><Button variant="brand" size="brand"
+                          key={value}
+                          type="button"
+                          className={`rounded-lg border px-2 py-2 text-sm transition-colors ${priceBasis === value ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
+                        >
+                          {label} · {moneyText(cents)}
+                        </Button></RadioGroupItem>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                ) : null}
+
+                {preview.variations?.voltage?.length ? (
+                  <div className="mt-3">
+                    <span id="import-voltage" className="block text-xs font-medium text-stone-600 mb-1">Voltagem</span>
+                    <RadioGroup value={voltage} onValueChange={value => setVoltage(value)} aria-labelledby="import-voltage" className="flex flex-wrap gap-1.5">
+                      {preview.variations.voltage.map((option) => (
+                        <RadioGroupItem key={option} value={option} asChild><Button variant="brand" size="brand"
+                          key={option}
+                          type="button"
+                          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${voltage === option ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
+                        >
+                          {option}
+                        </Button></RadioGroupItem>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                ) : null}
+
+                {preview.variations?.colors?.length ? (
+                  <div className="mt-3">
+                    <span id="import-color" className="block text-xs font-medium text-stone-600 mb-1">Cor</span>
+                    <RadioGroup value={color} onValueChange={value => setColor(value)} aria-labelledby="import-color" className="flex flex-wrap gap-1.5">
+                      {preview.variations.colors.map((option) => (
+                        <RadioGroupItem key={option} value={option} asChild><Button variant="brand" size="brand"
+                          key={option}
+                          type="button"
+                          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${color === option ? "border-brand-dark bg-brand-dark text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"}`}
+                        >
+                          {option}
+                        </Button></RadioGroupItem>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                ) : null}
+
+                <div className="mt-3">
+                  <Label htmlFor="import-target" className="block text-xs font-medium text-stone-600 mb-1">
+                    Me avise se o preço cair abaixo de <span className="font-normal text-stone-500">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="import-target"
+                    type="text"
+                    inputMode="numeric"
+                    value={targetText}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
+                      setTargetText(digits ? money.format(Number(digits) / 100) : "");
+                    }}
+                    placeholder="R$ 0,00"
+                    disabled={isSubmitting}
+                    className="w-full px-3.5 py-2.5 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+        )}
+
+        <Button variant="brand" size="brand"
+          type="button"
+          className="add-item-disclosure"
+          aria-expanded={moreOpen}
+          aria-controls="add-item-more"
+          onClick={() => setMoreOpen((open) => !open)}
+        >
+          <ChevronDown size={16} aria-hidden="true" className="add-item-disclosure-chevron" />
+          {moreOpen ? "Menos detalhes" : "Mais detalhes"}
+        </Button>
+
+        <div id="add-item-more" hidden={!moreOpen} className="add-item-more space-y-4">
+
+        <div className="add-item-row add-item-row-values grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="new-item-discount" className="block text-sm font-medium text-stone-700 mb-1">
               Desconto ou cashback
-            </label>
-            <input
+            </Label>
+            <Input
               id="new-item-discount"
               type="text"
               inputMode="numeric"
@@ -901,9 +957,9 @@ export function AddItemModal({
             </p>
           </div>
           <div>
-            <label htmlFor="new-item-quantity" className="block text-sm font-medium text-stone-700 mb-1">
+            <Label htmlFor="new-item-quantity" className="block text-sm font-medium text-stone-700 mb-1">
               Quantidade
-            </label>
+            </Label>
             <QuantityStepper
               id="new-item-quantity"
               value={quantityText}
@@ -935,14 +991,144 @@ export function AddItemModal({
           </div>
         </div>
 
-        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Detalhes</h3>
+        {(
+          <div className="add-item-row grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="new-item-installments" className="block text-sm font-medium text-stone-700 mb-1">
+                Parcelas
+              </Label>
+              <Select
+                id="new-item-installments"
+                ariaLabel="Parcelas"
+                value={installmentsText}
+                options={INSTALLMENT_OPTIONS}
+                onChange={setInstallmentsText}
+                disabled={isSubmitting}
+              />
+              <p className="mt-1 text-xs text-stone-500">
+                {status === "bought" ? "Entra no fluxo mensal do Planejamento." : "Ajusta a previsão de parcelas do Planejamento."}
+              </p>
+            </div>
+            {(
+              <div>
+                <Label htmlFor="new-item-payment" className="block text-sm font-medium text-stone-700 mb-1">
+                  Meio de pagamento
+                </Label>
+                <Select
+                  id="new-item-payment"
+                  ariaLabel="Meio de pagamento"
+                  value={paymentMethod}
+                  options={PAYMENT_OPTIONS}
+                  onChange={setPaymentMethod}
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
+            {(
+              <div>
+                <Label htmlFor="new-item-purchased" className="block text-sm font-medium text-stone-700 mb-1">
+                  Data da compra
+                </Label>
+                <Input
+                  id="new-item-purchased"
+                  type="date"
+                  value={purchasedAt}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setPurchasedAt(e.target.value)}
+                  disabled={isSubmitting || status !== "bought"}
+                  className={FIELD_CLASS}
+                />
+                <p className="mt-1 text-xs text-stone-500">
+                  {status === "bought" ? "Em branco: hoje." : "Preenche ao marcar como Comprado."}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status === "received" && (
+          <div>
+            <Label htmlFor="new-item-gift-from" className="block text-sm font-medium text-stone-700 mb-1">
+              De quem foi o presente?
+            </Label>
+            <Input
+              id="new-item-gift-from"
+              value={giftFrom}
+              maxLength={120}
+              placeholder="Ex.: Tia Rosa"
+              onChange={(e) => setGiftFrom(e.target.value)}
+              disabled={isSubmitting}
+              className={FIELD_CLASS}
+            />
+          </div>
+        )}
+
+        {members.length > 1 && (
+          <div>
+            <Label htmlFor="new-item-assignee" className="block text-sm font-medium text-stone-700 mb-1">
+              Quem vai comprar
+            </Label>
+            <Select
+              id="new-item-assignee"
+              ariaLabel="Quem vai comprar"
+              value={assigneeId}
+              options={[
+                { value: "", label: "Ninguém ainda" },
+                ...members.map((member) => ({
+                  value: member.id,
+                  label: member.id === currentUserId ? `${member.name || member.email} (você)` : member.name || member.email,
+                })),
+              ]}
+              onChange={setAssigneeId}
+              disabled={isSubmitting}
+            />
+            <p className="mt-1 text-xs text-stone-500">Evita compra repetida entre quem divide a lista.</p>
+          </div>
+        )}
+
+        {(
+          <div className="add-item-row grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="new-item-warranty" className="block text-sm font-medium text-stone-700 mb-1">
+                Garantia (meses)
+              </Label>
+              <Input
+                id="new-item-warranty"
+                inputMode="numeric"
+                value={warrantyMonthsText}
+                placeholder="Ex.: 12"
+                onChange={(e) => setWarrantyMonthsText(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                disabled={isSubmitting}
+                className={FIELD_CLASS}
+              />
+              <p className="mt-1 text-xs text-stone-500">Avisamos 30 e 7 dias antes de vencer.</p>
+            </div>
+            <div>
+              <Label htmlFor="new-item-store" className="block text-sm font-medium text-stone-700 mb-1">
+                Onde foi comprado
+              </Label>
+              <Input
+                id="new-item-store"
+                value={storeName}
+                maxLength={80}
+                placeholder="Ex.: Loja do bairro"
+                onChange={(e) => setStoreName(e.target.value)}
+                disabled={isSubmitting}
+                className={FIELD_CLASS}
+              />
+            </div>
+            <p className="text-xs text-stone-500 sm:col-span-2">
+              Nota fiscal, garantia em foto e outras lojas ficam no item, depois de adicionar.
+            </p>
+          </div>
+        )}
 
         <div className="add-item-pair">
         <div>
-          <label htmlFor="new-item-link" className="block text-sm font-medium text-stone-700 mb-1">
+          <Label htmlFor="new-item-link" className="block text-sm font-medium text-stone-700 mb-1">
             Link do produto
-          </label>
-          <input
+          </Label>
+          <Input
             id="new-item-link"
             type="url"
             value={link}
@@ -968,15 +1154,15 @@ export function AddItemModal({
             className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
           />
           <p className="add-item-link-hint mt-1 text-xs text-stone-500">
-            Cole o link e preenchemos nome, preço e foto automaticamente.
+            Cole o link e preenchemos nome e preço automaticamente.
           </p>
         </div>
 
         <div>
-          <label htmlFor="new-item-description" className="block text-sm font-medium text-stone-700 mb-1">
+          <Label htmlFor="new-item-description" className="block text-sm font-medium text-stone-700 mb-1">
             Observações
-          </label>
-          <textarea
+          </Label>
+          <Textarea
             id="new-item-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -987,31 +1173,25 @@ export function AddItemModal({
           />
         </div>
         </div>
-
-        <ItemImageField
-          enxovalId={enxovalId}
-          value={imageUrl}
-          onChange={setImageUrl}
-          disabled={isSubmitting}
-        />
+        </div>
         </div>
 
         <div className="add-item-form-footer">
           {error && (
             <p
               role="alert"
-              className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
+              className="form-error"
             >
               {error}
             </p>
           )}
-          <button
+          <Button variant="brand" size="brand"
             type="submit"
             disabled={!name.trim() || isSubmitting}
             className="add-item-submit w-full py-4 bg-brand-dark text-white rounded-xl font-medium text-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Salvando..." : "Adicionar à lista"}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>

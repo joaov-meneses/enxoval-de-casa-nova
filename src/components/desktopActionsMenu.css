@@ -1,0 +1,94 @@
+.desktop-actions-menu {
+  position: relative;
+}
+.desktop-actions-trigger {
+  min-height: 42px;
+  gap: 9px;
+}
+.desktop-actions-trigger[data-pointer-focus="true"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+.desktop-actions-trigger .desktop-actions-avatar {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--cm-sand) 26%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 81%, var(--cm-text));
+  font-size: 12px;
+}
+.desktop-actions-trigger > svg {
+  transition: transform 0.15s ease;
+}
+.desktop-actions-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+.desktop-actions-popup {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: 280px;
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 49%, #fff);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
+  box-shadow: 0 16px 48px #3b2a2026;
+}
+.desktop-actions-identity {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border-bottom: 1px solid color-mix(in oklab, var(--cm-sand) 39%, #fff);
+  margin-bottom: 6px;
+}
+.desktop-actions-identity strong {
+  color: var(--cm-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+.desktop-actions-identity span {
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.desktop-actions-popup button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 11px;
+  width: 100%;
+  min-height: 43px;
+  margin: 0;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: color-mix(in oklab, var(--cm-sand) 14%, var(--cm-text));
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  white-space: normal;
+  box-shadow: none;
+}
+.desktop-actions-popup button svg {
+  flex-shrink: 0;
+}
+.desktop-actions-popup button:hover,
+.desktop-actions-popup button:focus-visible {
+  background: color-mix(in oklab, var(--cm-success) 4%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 77%, var(--cm-text));
+  outline: 2px solid transparent;
+}
+.desktop-actions-popup button:focus-visible {
+  box-shadow: inset 0 0 0 2px #bb7353;
+}
+.desktop-actions-popup .desktop-menu-separator {
+  height: 1px;
+  margin: 7px 4px;
+  background: color-mix(in oklab, var(--cm-sand) 39%, #fff);
+}

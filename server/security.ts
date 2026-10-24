@@ -5,7 +5,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { promisify } from "node:util";
-import type { Request, RequestHandler, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 
 const scrypt = promisify(scryptCallback);
 
@@ -21,10 +21,10 @@ export class HttpError extends Error {
 }
 
 export function asyncHandler(
-  handler: (req: Request, res: Response) => Promise<void>,
+  handler: (req: Request, res: Response, next: NextFunction) => Promise<void>,
 ): RequestHandler {
   return (req, res, next) => {
-    Promise.resolve(handler(req, res)).catch(next);
+    Promise.resolve(handler(req, res, next)).catch(next);
   };
 }
 
@@ -140,8 +140,12 @@ export const protectMutationOrigin: RequestHandler = (req, res, next) => {
   const contentType = req.get("content-type")?.toLowerCase() ?? "";
   // O envio de imagem manda o arquivo cru. Tipos image/* também não passam em pedido cruzado sem autorização
   // prévia do navegador (CORS), então a defesa é a mesma do JSON.
-  const isImageUpload = req.path === "/item-images" && contentType.startsWith("image/");
-  if (!contentType.startsWith("application/json") && !isImageUpload) {
+  const isImageUpload = req.path === "/profile/avatar" && contentType.startsWith("image/");
+  // Notas e garantias dos itens: foto ou PDF cru. Nenhum desses tipos é "simples" para o CORS, então um pedido
+  // cruzado também precisaria de autorização prévia do navegador.
+  const isDocumentUpload = /^\/items\/[^/]+\/documents$/.test(req.path)
+    && /^(image\/|application\/pdf|application\/octet-stream)/.test(contentType);
+  if (!contentType.startsWith("application/json") && !isImageUpload && !isDocumentUpload) {
     res.status(415).json({ error: "Envie os dados no formato JSON." });
     return;
   }

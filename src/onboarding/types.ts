@@ -1,9 +1,9 @@
 import type { SpendingTier, PriceCategory } from "../planning/spending";
 
 export type Moment = "casal" | "solo" | "amigos" | "troca";
-export type Housing = "apartamento" | "casa" | "studio";
+export type Housing = "apartamento" | "casa" | "studio" | "kitnet";
 export type Owned = "nada" | "algumas" | "boa";
-export type PlanStyle = "full" | "min";
+export type PlanStyle = "full" | "min" | "none";
 export type Budget = "lt10" | "10-25" | "25-50" | "gt50" | "unknown";
 export type Climate = "hot" | "mild" | "cold";
 export type Worry = "start" | "waste" | "forget" | "budget" | "time";
@@ -42,6 +42,11 @@ export interface Answers {
   budget: Budget | null;
   worries: Worry[];
   usage: Usage[];
+  /** "Nenhuma das opções": a pessoa conta o motivo, se quiser (texto livre, só vai para o banco). */
+  worriesNone: boolean;
+  worriesOther: string;
+  usageNone: boolean;
+  usageOther: string;
   source: string;
 }
 

@@ -1,0 +1,114 @@
+/* Aviso de consentimento: cartão fixo no rodapé, sem bloquear a página. */
+.consent-banner {
+  position: fixed;
+  z-index: 60;
+  left: 16px;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid var(--cm-sand, #d8c9b3);
+  border-radius: 16px;
+  background: #fffaf1;
+  color: var(--cm-text, #2f2a26);
+  box-shadow: 0 12px 32px rgb(47 42 38 / 0.16);
+  font-family: var(--font-sans);
+}
+
+.consent-title {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.consent-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.consent-text a {
+  color: var(--cm-primary-dark, #a34c30);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.consent-options {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.consent-option {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.consent-option input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--cm-action, #a34c30);
+}
+
+.consent-option input:disabled {
+  cursor: not-allowed;
+}
+
+.consent-option strong {
+  display: block;
+  font-weight: 700;
+}
+
+.consent-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* Os três botões têm o mesmo peso: recusar é tão fácil quanto aceitar. */
+.consent-button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--cm-action, #a34c30);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cm-action, #a34c30);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.consent-button:hover {
+  background: var(--cm-action, #a34c30);
+  color: #fff;
+}
+
+.consent-button:focus-visible {
+  outline: 3px solid var(--cm-accent, #244b66);
+  outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+  .consent-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-button {
+    transition: none;
+  }
+}

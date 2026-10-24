@@ -13,6 +13,17 @@ export interface CatalogSearchResult {
   priceRange: { p10: number; p50: number; p90: number; samples: number; region: string } | null;
 }
 
+/**
+ * Item do catálogo reconhecido num nome da planilha. exact: é o próprio item · similar: quase igual, provável erro de
+ * digitação · contained: uma variação dele ("Jogo de cama casal 4 peças"), e só o cômodo vale.
+ */
+export interface CatalogNameMatch {
+  match: "exact" | "similar" | "contained";
+  id: string;
+  name: string;
+  room: RoomKey | null;
+}
+
 /** Item do catálogo mestre como o /admin vê: com apelidos, origem e quantos itens de enxovais usam. */
 export interface AdminCatalogItem {
   id: string;
@@ -67,6 +78,8 @@ export interface EnxovalSummary {
   city: string | null;
   /** Perfil de gasto: define as faixas de referência de cada item e de cada período de compra. */
   spendingTier: SpendingTier;
+  /** Teto mensal que o casal quer respeitar nas parcelas (opcional, só o dono edita). */
+  monthlyBudgetCents?: number | null;
 }
 
 export interface EnxovalMember {
@@ -74,6 +87,8 @@ export interface EnxovalMember {
   name: string;
   email: string;
   role: EnxovalRole;
+  /** Foto do perfil, servida só para quem participa do mesmo enxoval. */
+  avatarUrl?: string | null;
 }
 
 export interface EnxovalInvitation {
@@ -131,9 +146,24 @@ export interface ItemTrackingInput {
   initialPriceCents?: number | null;
   targetPriceCents?: number | null;
   selectedVariation?: string | null;
-  imageUrl?: string | null;
   priceBasis?: PriceBasis;
   priceAlertEnabled?: boolean;
+}
+
+/** Campos da Fase 11 que o item aceita ao salvar. `thanked` marca (ou desmarca) o agradecimento como enviado. */
+export interface ItemExtrasInput {
+  installments?: number;
+  firstInstallmentOn?: string | null;
+  purchasedAt?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  installmentCents?: number | null;
+  assigneeId?: string | null;
+  giftFrom?: string | null;
+  giftMessage?: string | null;
+  thanked?: boolean;
+  warrantyMonths?: number | null;
+  warrantyUntil?: string | null;
+  storeName?: string | null;
 }
 
 /** Dados lidos do link de um produto, para preencher o formulário. */
@@ -172,6 +202,8 @@ export interface ItemPriceHistory {
   priceBasis: PriceBasis;
   url: string;
   domain: string;
+  /** Histórico das outras lojas do item, para o gráfico mostrar uma linha por loja. */
+  offers?: { domain: string; url: string; points: { date: string; priceCents: number }[] }[];
 }
 
 export interface SavingsSummary {
@@ -185,6 +217,38 @@ export interface SavingsSummary {
   totalIncreaseCents: number;
   itemsWithDropsCount: number;
   itemsAtLowestPriceCount: number;
+}
+
+/** Como a compra foi paga. Opcional: serve para o resumo por meio de pagamento. */
+export type PaymentMethod = 'pix' | 'credit' | 'debit' | 'boleto' | 'cash' | 'other';
+
+/** Uma loja onde o item está à venda (até 3 por item). A principal define o preço do item. */
+export interface ItemOffer {
+  id: string;
+  url: string;
+  domain: string;
+  isPrimary: boolean;
+  /** Último preço lido, no mesmo tipo de preço que o item acompanha (normal ou Pix). */
+  currentPriceCents: number | null;
+  pixPriceCents: number | null;
+  inStock: boolean;
+  lastCheckedAt: string | null;
+  status: TrackingStatus;
+}
+
+export type ItemDocumentKind = 'invoice' | 'warranty' | 'manual' | 'other';
+
+/** Nota fiscal, certificado de garantia ou manual guardado no item. */
+export interface ItemDocument {
+  id: string;
+  itemId: string;
+  kind: ItemDocumentKind;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+  /** Endereço de download (sempre pelo servidor, que confere o acesso). */
+  url: string;
 }
 
 export interface EnxovalItem {
@@ -220,18 +284,46 @@ export interface EnxovalItem {
   catalog?: CatalogItemMeta | null;
   updatedAt: string;
   createdAt?: string;
-  /** Foto do produto, quando o item veio do link de uma loja. */
-  imageUrl?: string | null;
   /** Variação escolhida na importação, como "220V" ou "110V · Preto". */
   selectedVariation?: string | null;
   priceTracking?: ItemPriceTracking | null;
+  /** Em quantas parcelas a compra foi (ou será) feita: 1 é à vista. */
+  installments?: number;
+  /** AAAA-MM-DD do mês da primeira parcela. Nulo: vale o mês da compra ou o da semana planejada. */
+  firstInstallmentOn?: string | null;
+  /** AAAA-MM-DD do dia da compra, gravado ao passar para Comprado (editável). */
+  purchasedAt?: string | null;
+  paymentMethod?: PaymentMethod | null;
+  /** Valor de cada parcela, só quando há juros (parcela × N diferente do preço). */
+  installmentCents?: number | null;
+  /** Quem do enxoval vai comprar o item. Nulo: ninguém ainda. */
+  assigneeId?: string | null;
+  /** De quem veio o presente (itens Recebidos). */
+  giftFrom?: string | null;
+  giftMessage?: string | null;
+  /** Quando o agradecimento foi marcado como enviado. */
+  thankedAt?: string | null;
+  warrantyMonths?: number | null;
+  /** AAAA-MM-DD do fim da garantia (calculado pela data da compra, mas editável). */
+  warrantyUntil?: string | null;
+  /** Onde foi comprado, quando não há link. */
+  storeName?: string | null;
+  /** Lojas onde o item está à venda; a principal (`isPrimary`) define o preço. */
+  offers?: ItemOffer[];
+  /** Quantos documentos (nota, garantia, manual) estão guardados no item. */
+  documentCount?: number;
 }
 
 export interface AuthUser {
+  avatarUrl?: string | null;
+  onboardingCompleted?: boolean;
+  trialUsed?: boolean;
   id: string;
   name: string;
   email: string;
   mustChangePassword?: boolean;
+  /** Falso enquanto a conta nova não confirma o e-mail: o app mostra só a tela de confirmação. */
+  emailVerified?: boolean;
   /** Conta criada por convite: usa só os enxovais de quem convidou e não cria enxovais próprios. */
   isGuest?: boolean;
   /** Plano da própria conta. Num enxoval compartilhado, valem os limites do plano de quem é dono. */
@@ -247,7 +339,40 @@ export interface AdminUser {
   passwordResetExpiresAt: string | null;
   createdAt: string;
   lastLoginAt: string | null;
+  ipAddresses?: string[];
   workspaceCount: number;
+  emailVerifiedAt?: string | null;
+  devices?: AdminUserDevice[];
+  /** Bloqueio da própria conta em vigor, se houver. */
+  activeBan?: { id: string; reasonCode: string; expiresAt: string | null } | null;
+}
+
+export interface AdminUserDevice {
+  deviceId: string;
+  browser: string | null;
+  os: string | null;
+  device: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export type AdminBanTarget = "user" | "ip" | "cidr" | "device";
+
+export interface AdminBan {
+  id: string;
+  targetType: AdminBanTarget;
+  targetValue: string;
+  /** Nome e e-mail quando o alvo é uma conta. */
+  targetLabel: string | null;
+  scope: "block_all" | "block_auth";
+  reasonCode: string;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  active: boolean;
 }
 
 export interface EnxovalWorkspace {

@@ -1,7 +1,7 @@
-// Teste de integração com PostgreSQL real: situação do item (preciso, ganhei, comprei...), compatibilidade com o
 // marcador antigo `checked` e backfill da migração. Usa um schema descartável. Rodar: npm run test:item-status-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -69,7 +69,7 @@ try {
   const registered = await call("/auth/register", "POST", {
     name: "Cliente Situação",
     email: "situacao@example.invalid",
-    password: randomBytes(16).toString("base64url"),
+    password: strongPassword(),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
   // Conta paga: este teste cobre a situação dos itens, não as travas do plano gratuito (tests/freemium-db.mjs).
@@ -101,23 +101,23 @@ try {
   assert.equal(funnelWorkspace.status, 201, JSON.stringify(funnelWorkspace.data));
   const enxovalId = funnelWorkspace.data.enxoval.id;
   const [seeded] = funnelWorkspace.data.items;
-  assert.equal(seeded.status, "needed", "itens do plano começam como 'Preciso comprar'");
+  assert.equal(seeded.status, "researching", "itens do plano começam como 'Pesquisando'");
   assert.equal(seeded.checked, false);
   assert.equal(seeded.quantity, 4, "o funil grava a quantidade citada na descrição (4 un.)");
 
   const create = (body) =>
     call("/items", "POST", { enxovalId, categoryName: "Cozinha", ...body });
 
-  // criar já com situação: "Ganhei" conta como conquistado e entra marcado
+  // criar já com situação: "Recebido" conta como conquistado e entra marcado
   const gift = await create({ name: "Jogo de taças", priceCents: 12000, status: "received" });
   assert.equal(gift.status, 201, JSON.stringify(gift.data));
   assert.equal(gift.data.item.status, "received");
   assert.equal(gift.data.item.checked, true);
   const plain = await create({ name: "Escorredor" });
-  assert.equal(plain.data.item.status, "needed", "sem situação informada o padrão é 'Preciso comprar'");
+  assert.equal(plain.data.item.status, "researching", "sem situação informada o padrão é 'Pesquisando'");
   assert.equal(plain.data.item.checked, false);
   assert.equal((await create({ name: "Inválido", status: "inexistente" })).status, 400);
-  console.log("PASS: criação com situação e padrão 'Preciso comprar'.");
+  console.log("PASS: criação com situação e padrão 'Pesquisando'.");
 
   // todas as situações podem ser gravadas e mantêm `checked` coerente
   for (const status of ITEM_STATUSES) {
@@ -131,20 +131,22 @@ try {
     400,
   );
   const [row] = await query("SELECT status, checked FROM items WHERE id = $1", [plain.data.item.id]);
-  assert.deepEqual(row, { status: "discarded", checked: false });
-  console.log("PASS: as 7 situações gravam e mantêm `checked` coerente; situação inválida é recusada.");
+  assert.deepEqual(row, { status: "owned", checked: true });
+  console.log("PASS: as 4 situações gravam e mantêm `checked` coerente; situação inválida é recusada.");
 
   // marcador antigo `checked` continua funcionando sem estragar situações já concluídas
   const toggle = (checked) => call(`/items/${gift.data.item.id}`, "PATCH", { checked });
-  assert.equal((await toggle(true)).data.status, "received", "marcar não troca 'Ganhei' por 'Comprei'");
+  assert.equal((await toggle(true)).data.status, "received", "marcar não troca 'Recebido' por 'Comprado'");
   const unchecked = await toggle(false);
-  assert.equal(unchecked.data.status, "needed", "desmarcar volta para 'Preciso comprar'");
+  assert.equal(unchecked.data.status, "researching", "desmarcar volta para 'Pesquisando'");
   assert.equal(unchecked.data.checked, false);
   const rechecked = await toggle(true);
-  assert.equal(rechecked.data.status, "bought", "marcar um item pendente vira 'Comprei'");
+  assert.equal(rechecked.data.status, "bought", "marcar um item pendente vira 'Comprado'");
   assert.equal(rechecked.data.checked, true);
-  await call(`/items/${gift.data.item.id}`, "PATCH", { status: "not_needed" });
-  assert.equal((await toggle(false)).data.status, "not_needed", "desmarcar não reativa item fora da lista");
+  for (const obsolete of ['needed', 'not_needed', 'discarded']) {
+    assert.equal((await call(`/items/${gift.data.item.id}`, "PATCH", { status: obsolete })).status, 400);
+    assert.equal((await create({ name: "Situação removida", status: obsolete })).status, 400);
+  }
   console.log("PASS: compatibilidade com o marcador `checked`.");
 
   // totais: ganhos não entram em "Já investimos"
@@ -152,14 +154,14 @@ try {
   const bought = await create({ name: "Panela de pressão", priceCents: 30000, status: "bought" });
   await create({ name: "Frigideira", priceCents: 8000 });
   await create({ name: "Peneira", priceCents: 2000, status: "researching" });
-  await create({ name: "Item descartado", priceCents: 99900, status: "discarded" });
+  assert.equal((await create({ name: "Item descartado", priceCents: 99900, status: "discarded" })).status, 400);
   const workspace = await call(`/enxovais/${enxovalId}`);
   assert.equal(workspace.status, 200);
   const items = workspace.data.items;
   assert.ok(items.every((i) => ITEM_STATUSES.includes(i.status) && typeof i.checked === "boolean"));
-  assert.equal(sumBought(items), 30000, "só 'Comprei' conta como investido");
-  assert.equal(sumReceived(items), 12000, "'Ganhei' vira ganho, não investimento");
-  assert.equal(sumPending(items), 10000, "pendentes: Preciso comprar + Pesquisando (descartado não conta)");
+  assert.equal(sumBought(items), 30000, "só 'Comprado' conta como investido");
+  assert.equal(sumReceived(items), 12000, "'Recebido' vira ganho, não investimento");
+  assert.equal(sumPending(items), 10000, "somente itens em Pesquisando entram no valor pendente");
   assert.ok(bought.data.item.checked);
   console.log("PASS: totais separam investido, ganho e pendente.");
 
@@ -188,9 +190,9 @@ try {
   assert.equal(reduced.data.discountCents, 12000);
   assert.equal((await call(`/items/${air}`, "PATCH", { priceCents: 11000 })).status, 400, "baixar o preço abaixo do desconto é recusado");
   const gifted = await call(`/items/${air}`, "PATCH", { status: "received" });
-  assert.equal(gifted.data.discountCents, 0, "virar 'Ganhei' zera o desconto");
-  assert.equal((await call(`/items/${air}`, "PATCH", { status: "needed" })).data.discountCents, 0, "voltar não ressuscita o desconto");
-  assert.equal((await call(`/items/${air}`, "PATCH", { discountCents: 5000, status: "received" })).data.discountCents, 0, "desconto enviado junto com 'Ganhei' é ignorado");
+  assert.equal(gifted.data.discountCents, 0, "virar 'Recebido' zera o desconto");
+  assert.equal((await call(`/items/${air}`, "PATCH", { status: "researching" })).data.discountCents, 0, "voltar não ressuscita o desconto");
+  assert.equal((await call(`/items/${air}`, "PATCH", { discountCents: 5000, status: "received" })).data.discountCents, 0, "desconto enviado junto com 'Recebido' é ignorado");
   const [persisted] = await query("SELECT discount_cents FROM items WHERE id = $1", [air]);
   assert.equal(persisted.discount_cents, 0);
   assert.equal((await call(`/items/${blender.data.item.id}`, "PATCH", { checked: false })).data.discountCents, 5000, "desmarcar compra mantém o desconto previsto");
@@ -222,7 +224,7 @@ try {
   assert.equal((await call(`/items/${towelId}`, "PATCH", { checked: false })).data.quantity, 6, "marcar/desmarcar não mexe na quantidade");
   console.log("PASS: quantidade validada e informativa: não altera preço, desconto nem totais.");
 
-  // migração: item antigo marcado (checked = true, status padrão) vira 'Comprei' e a migração é idempotente
+  // migração: item antigo marcado (checked = true, status padrão) vira 'Comprado' e a migração é idempotente
   const legacyId = randomUUID();
   const [{ id: userId }] = await query("SELECT id FROM users LIMIT 1");
   const [{ id: categoryId }] = await query("SELECT id FROM categories WHERE enxoval_id = $1 LIMIT 1", [enxovalId]);
@@ -230,8 +232,23 @@ try {
     "INSERT INTO items (id, user_id, enxoval_id, category_id, name, checked) VALUES ($1, $2, $3, $4, 'Item antigo', true)",
     [legacyId, userId, enxovalId, categoryId],
   );
+  // Simula dados reais da versão anterior antes de rodar a migração.
+  await query("ALTER TABLE items DROP CONSTRAINT items_status_valid");
+  const obsoleteIds = [];
+  for (const status of ['needed', 'not_needed', 'discarded']) {
+    const oldId = randomUUID();
+    obsoleteIds.push(oldId);
+    await query("INSERT INTO items (id, user_id, enxoval_id, category_id, name, status, checked, price_cents) VALUES ($1, $2, $3, $4, 'Legado', $5, false, 1234)", [oldId, userId, enxovalId, categoryId, status]);
+  }
+  await query("UPDATE items SET status = 'needed' WHERE id = $1", [legacyId]);
   await migrateDatabase();
   await migrateDatabase();
+  const migrated = await query("SELECT id, status, checked, price_cents FROM items WHERE id = ANY($1::uuid[])", [obsoleteIds]);
+  assert.equal(migrated.length, 3, 'a migração preserva todos os itens');
+  assert.ok(migrated.every(item => item.status === 'researching' && item.checked === false && item.price_cents === 1234));
+  for (const obsolete of ['needed', 'not_needed', 'discarded']) {
+    await assert.rejects(query("UPDATE items SET status = $1 WHERE id = $2", [obsolete, legacyId]), /items_status_valid/);
+  }
   const [legacy] = await query("SELECT status, checked FROM items WHERE id = $1", [legacyId]);
   assert.deepEqual(legacy, { status: "bought", checked: true });
   const [kept] = await query("SELECT status FROM items WHERE id = $1", [gift.data.item.id]);

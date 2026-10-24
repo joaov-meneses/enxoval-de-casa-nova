@@ -12,9 +12,9 @@ import { HttpError } from './security.ts';
 export const ONBOARDING_PROFILE_VERSION = 1;
 
 const MOMENTS = ['casal', 'solo', 'amigos', 'troca'] as const;
-const HOUSINGS = ['apartamento', 'casa', 'studio'] as const;
+const HOUSINGS = ['apartamento', 'casa', 'studio', 'kitnet'] as const;
 const OWNED = ['nada', 'algumas', 'boa'] as const;
-const STYLES = ['full', 'min'] as const;
+const STYLES = ['full', 'min', 'none'] as const;
 const BUDGETS = ['lt10', '10-25', '25-50', 'gt50', 'unknown'] as const;
 const WORRIES = ['start', 'waste', 'forget', 'budget', 'time'] as const;
 const USAGES = ['buy', 'spend', 'links', 'share'] as const;
@@ -45,7 +45,17 @@ export interface OnboardingProfile {
   spendingTier: SpendingTier;
   worries: string[];
   usage: string[];
+  /** "Nenhuma das opções" nas preocupações e no uso, com o motivo opcional digitado pela pessoa (só no banco). */
+  worriesNone: boolean;
+  worriesOther: string;
+  usageNone: boolean;
+  usageOther: string;
   source: string;
+}
+
+/** Motivo livre de "nenhuma das opções": texto curto, sem quebras de linha. */
+function readReason(value: unknown) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
 }
 
 const invalid = (label: string) => new HttpError(400, `Resposta inválida no funil: ${label}.`);
@@ -128,13 +138,18 @@ export function parseOnboardingProfile(value: unknown): OnboardingProfile {
     city: readCity(raw.city, state),
     housing: requireOne(HOUSINGS, raw.housing, 'moradia'),
     people: raw.people,
-    rooms: readMany(ROOMS, raw.rooms, 'espaços', 1),
+    // Lista vazia: a pessoa escolheu "nenhum ambiente agora" e cria os seus depois, no app.
+    rooms: readMany(ROOMS, raw.rooms, 'espaços'),
     owned: requireOne(OWNED, raw.owned, 'o que você já tem'),
     style: requireOne(STYLES, raw.style, 'estilo'),
     budget,
     spendingTier: readSpendingTier(raw.spendingTier, budget),
     worries: readMany(WORRIES, raw.worries, 'preocupações'),
     usage: readMany(USAGES, raw.usage, 'uso'),
+    worriesNone: raw.worriesNone === true,
+    worriesOther: raw.worriesNone === true ? readReason(raw.worriesOther) : '',
+    usageNone: raw.usageNone === true,
+    usageOther: raw.usageNone === true ? readReason(raw.usageOther) : '',
     source: typeof raw.source === 'string' ? raw.source.trim().slice(0, 60) : ''
   };
 }

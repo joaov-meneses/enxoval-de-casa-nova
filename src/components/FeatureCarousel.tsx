@@ -1,5 +1,6 @@
+import { Button } from "@/src/components/ui/button";
 import { useCallback, useEffect, useId, useState, type KeyboardEvent } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play } from "@/src/components/icons";
 import { Nino } from "./Nino";
 
 /** Cada slide é uma funcionalidade de alto valor, com a captura real da tela (sem dados pessoais). */
@@ -36,7 +37,7 @@ export const SLIDES = [
   {
     kicker: "Importar por link",
     title: "Cole o link, a gente preenche.",
-    text: "Traga um produto do Mercado Livre, da Amazon ou do Magalu e o Casa Mia busca nome, foto e preço. Depois acompanha se ele ficou mais barato.",
+    text: "Traga um produto do Mercado Livre, da Amazon ou do Magalu e o Casa Mia busca nome e preço. Depois acompanha se ele ficou mais barato.",
     image: "/images/carrossel/carrossel-05-link.webp",
     alt: "Janela Novo item do Casa Mia com o campo Importar por link e o botão Buscar informações.",
   },
@@ -49,8 +50,8 @@ export const SLIDES = [
   },
   {
     kicker: "Lista a dois",
-    title: "Montem juntos, em tempo real.",
-    text: "Convide quem mora com você por e-mail. Vocês editam a mesma lista e cada conquista aparece para todo mundo.",
+    title: "Montem juntos, na mesma lista.",
+    text: "Convide quem mora com você por e-mail. Vocês editam a mesma lista: o que um risca, o outro vê ao abrir o app.",
     image: "/images/carrossel/carrossel-07-lista-a-dois.webp",
     alt: "Janela Convidar pessoa do Casa Mia, com o campo de e-mail e a explicação de que a pessoa convidada edita a lista junto.",
   },
@@ -180,7 +181,7 @@ export function FeatureCarousel({
       </div>
 
       <div className="cm-carousel-controls">
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="cm-carousel-arrow"
           onClick={() => go(index - 1)}
@@ -188,13 +189,13 @@ export function FeatureCarousel({
           aria-controls={`${baseId}-stage`}
         >
           <ChevronLeft size={18} aria-hidden="true" />
-        </button>
+        </Button>
         <ol className="cm-carousel-dots" aria-label="Escolher funcionalidade">
           {SLIDES.map((slide, slideIndex) => {
             const active = slideIndex === index;
             return (
               <li key={slide.title}>
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   className={`cm-carousel-dot${active ? " is-active" : ""}${
                     active && playing ? " is-running" : ""
@@ -206,12 +207,12 @@ export function FeatureCarousel({
                   aria-controls={`${baseId}-stage`}
                 >
                   <span aria-hidden="true" />
-                </button>
+                </Button>
               </li>
             );
           })}
         </ol>
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="cm-carousel-arrow"
           onClick={() => go(index + 1)}
@@ -219,9 +220,9 @@ export function FeatureCarousel({
           aria-controls={`${baseId}-stage`}
         >
           <ChevronRight size={18} aria-hidden="true" />
-        </button>
+        </Button>
         {!reduced && (
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="cm-carousel-arrow cm-carousel-pause"
             onClick={() => setUserPaused((current) => !current)}
@@ -235,7 +236,7 @@ export function FeatureCarousel({
             ) : (
               <Pause size={16} aria-hidden="true" />
             )}
-          </button>
+          </Button>
         )}
       </div>
     </section>

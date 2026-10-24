@@ -6,6 +6,10 @@ O Casa Mia ajuda quem está montando a casa nova a planejar o enxoval por ambien
 
 A estratégia de marca, o tom de voz, a paleta e o modelo de negócio estão em [docs/branding-casa-mia.md](docs/branding-casa-mia.md). O roteiro do que ainda falta construir está em [docs/implementacoes-futuras.md](docs/implementacoes-futuras.md).
 
+A integração opcional de análise de uso com PostHog, suas variáveis, eventos e sugestões de painéis estão em [docs/analytics.md](docs/analytics.md).
+
+Os logs estruturados do backend e o envio completo ao PostHog Logs estão em [docs/logs.md](docs/logs.md).
+
 ## Sumário
 
 - [Rotas](#rotas)
@@ -28,6 +32,7 @@ A estratégia de marca, o tom de voz, a paleta e o modelo de negócio estão em 
 | `/login` e `/cadastro` | A mesma tela, com as abas "Entrar" e "Criar conta" (`/cadastro` abre na segunda). `/login?cadastro=1` vai para `/cadastro` e `/signup` vai para `/comecar` |
 | `/comecar` | Funil pós-cadastro: exige conta e nenhum enxoval ainda. Pergunta o nome e algumas perguntas curtas, monta o plano e cria o primeiro enxoval já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md) |
 | `/app` | Aplicativo conectado à conta |
+| `/app/:enxovalId`, `/app/:enxovalId/itens/:ambienteId`, `/app/:enxovalId/meu-lar` e `/app/:enxovalId/plano` | Enxoval e tela definidos na URL; links antigos continuam funcionando. Detalhes em [docs/rotas-do-app.md](docs/rotas-do-app.md) |
 | `/convite#token=…` | Aceite de convite para participar de um enxoval |
 | `/esqueci-senha` e `/redefinir-senha` | Recuperação de senha por e-mail |
 | `/privacidade` | Política de privacidade |
@@ -122,12 +127,12 @@ No modal de novo item, "Importar por link" lê o endereço de um produto de loja
 
 **Organização**
 - Itens agrupados por ambiente, com visão geral de progresso, total investido, descontos e cashback e estimativa dos itens pendentes.
-- Cada item tem uma situação, filtrável na lista: **Preciso comprar** (padrão), **Pesquisando**, **Comprei**, **Ganhei**, **Já tenho**, **Não preciso** e **Descartei**. Comprei, Ganhei e Já tenho contam como conquistados; Não preciso e Descartei saem do progresso e dos totais. Só **Comprei** entra em "Já investimos". O valor cheio dos itens **Ganhei** soma-se aos descontos no cartão "Descontos e cashback" e nunca entra em "Já investimos". As situações ficam em `items.status`; `checked` segue gravado, derivado da situação.
+- Cada item tem uma situação, filtrável na lista: **Pesquisando** (padrão), **Comprado**, **Recebido** e **Já tenho**. As três últimas contam como conquistadas; somente **Comprado** entra em "Já investimos". O valor de itens **Recebido** soma-se aos descontos no cartão "Descontos e cashback". Situações antigas "Preciso comprar", "Não preciso" e "Descartei" passam para **Pesquisando**, preservando os itens e voltando a contar no progresso e nos valores pendentes. As situações ficam em `items.status`; `checked` é derivado da situação.
 - **Quantidade** de 1 a 999 (padrão 1, com botões − e +). É só informativa: não multiplica o preço nem altera resumos ou descontos.
 - **Desconto ou cashback** por item, no cadastro, na edição ou no diálogo "Descontos e cashback". O valor é abatido do preço e o servidor valida que não passe do preço do item. O desconto geral antigo do enxoval (`enxovais.discount_cents`) continua somando no resumo até ser removido no diálogo.
 - Busca sem distinção de acentos, filtros e ordenação por nome, alterações recentes ou "Minha ordem". Nesta última, sem busca nem filtros, as alças reordenam os itens do ambiente; ambientes também podem ser arrastados. As alças aceitam as setas do teclado e a ordem é persistida.
 - Lápis junto aos nomes para renomear o enxoval e os ambientes. A data de adição vem de `created_at` e permanece após editar.
-- Importação de itens por CSV ou XLSX, com modelos em `public/modelos/casamia-modelo-importacao.*` (gerados por `scripts/generate-import-templates.ts`), e exportação CSV do enxoval completo ou de um ambiente, em português, UTF-8 e separador `;`, com proteção contra células interpretadas como fórmulas. A exportação por ambiente inclui todos os itens, independentemente dos filtros ativos.
+- Importação de itens por CSV ou XLSX, com modelos em `public/modelos/casamia-modelo-importacao.*` (gerados por `scripts/generate-import-templates.ts`), e exportação CSV do enxoval completo ou de um ambiente, em português, UTF-8 e separador `;`, com proteção contra células interpretadas como fórmulas. A exportação por ambiente inclui todos os itens, independentemente dos filtros ativos. Na revisão da importação, o catálogo mestre (`POST /api/catalog/match`, sem Jev) sugere a grafia correta dos itens e o ambiente de cada um; um Ambiente vazio é preenchido quando o catálogo conhece o item.
 
 **Telas e dispositivos**
 - Landing page, login e cadastro adaptados para celular, tablet e computador.
@@ -156,7 +161,7 @@ Tipografia: **Fraunces** nos títulos e na assinatura, **Nunito** na interface (
 | Arquivo | O que é |
 |---|---|
 | `src/components/Brand.tsx` | Logo da interface: o Nino acenando ao lado de "Casa Mia" |
-| `src/components/Nino.tsx` | Mascote Nino com a arte final, em duas poses: acenando (`wave`) e com prancheta e trena (`think`) |
+| `src/components/Nino.tsx` | Mascote Nino: acenando (`wave`), com prancheta e trena (`think`), feliz (`happy`), comemorando (`celebrate`) e descansando no arco (`rest`). Estados e validação do Jev em [Nino — Fase 3](docs/nino-fase3.md) |
 | `public/brand/nino.{png,webp}` | Arte-base do Nino acenando, com fundo transparente. É a fonte do logo e dos ícones |
 | `public/brand/nino-plan.{png,webp}` | Nino com a prancheta e a trena (seção "Conheça o Nino") |
 | `public/brand/nino-logo.{png,webp}` | Versão leve do Nino acenando (224 px), usada no cabeçalho e no funil |
@@ -196,6 +201,8 @@ npm run test:price-tracking-db
 
 ## Build e execução em produção
 
+A configuração do Pix no Passe e da integração direta com o Emissor Público Nacional está em [Pagamentos e notas fiscais](docs/pagamentos-e-notas-fiscais.md). A transmissão fiscal permanece desligada até validar certificado ICP-Brasil, habilitação do CNPJ e política contábil. O backend registra obrigações mesmo desligada e preserva o acesso pago em caso de falha fiscal.
+
 ```sh
 npm run build
 npm start
@@ -205,4 +212,35 @@ npm start
 
 ## Escopo comercial desta versão
 
-Os planos e preços da landing page são **ilustrativos**. Não existem cobrança, checkout, assinatura nem limites de plano aplicados. A recuperação de senha pode ser feita pela própria pessoa, por e-mail, ou assistida pelo administrador. Confirmação de e-mail no cadastro, pagamentos, o motor de IA e a página pública de Chá de Casa Nova ainda não estão implementados: o plano para isso está em [docs/implementacoes-futuras.md](docs/implementacoes-futuras.md).
+O checkout, a assinatura mensal com trial e o Passe são processados pela Stripe. O acesso é validado no servidor, com sincronização por webhook e recuperação de pagamentos aprovados. A recuperação de senha pode ser feita pela própria pessoa, por e-mail, ou assistida pelo administrador.
+
+
+### Trial e cobrança
+
+O login expira após 48 horas sem atividade ou, no máximo, 7 dias desde a autenticação. Os limites são verificados no servidor. O navegador registra interações em memória e envia atividade no máximo uma vez por minuto; consultas automáticas de assinatura não renovam a sessão. Tokens continuam em cookie HttpOnly, com apenas o hash no banco. A migração limita também sessões antigas, sem estender sua validade. Validação: `npm run test:session-db` e, com o app aberto, `node tests/session-ui.mjs`.
+
+Novas contas concluem primeiro o onboarding. O plano completo fica salvo na conta antes do cadastro do cartão, sem iniciar o trial. Em seguida, a pessoa escolhe Mensal ou Passe em uma tela com os preços consultados na Stripe. O Mensal tem trial de 48 horas e renovação mensal; o Passe é pagamento único imediato por 12 meses, sem trial ou renovação automática. Após a confirmação do cartão ou pagamento na Stripe, o app abre diretamente o enxoval com todos os itens do onboarding. No Mensal, a Stripe concede 2 dias completos (48 horas) de acesso e faz a cobrança mensal automaticamente após o trial. O modal usa o preço da assinatura confirmada; no Passe, mostra o total efetivamente pago (incluindo descontos) e a validade. A escolha informada na URL nunca concede acesso nem determina o valor exibido. O trial só pode ser usado uma vez por conta; reativação é cobrada sem novo período gratuito. Checkouts abertos são reutilizados para evitar assinaturas duplicadas em duas abas.
+
+O aviso de início do trial aparece em um modal no primeiro acesso ao enxoval, sem faixa permanente. A confirmação é salva na conta por assinatura, evitando repetição ao recarregar ou trocar de dispositivo. O lembrete das últimas 24 horas também aparece uma única vez. O gerenciamento e o cancelamento ficam em **Meu perfil → Assinatura**, com confirmação antes de encerrar o acesso. O perfil é acessado pelo menu suspenso do desktop, pelo menu do celular ou pelo cartão de usuário na lateral.
+
+O carregamento inicial usa a estrutura do app; as verificações seguintes de acesso acontecem em segundo plano. Falhas temporárias mostram um aviso com nova tentativa, enquanto recusas do servidor e expiração continuam bloqueando o acesso. Detalhes e testes em [Carregamento e verificação de acesso](docs/carregamento-e-acesso.md).
+
+O servidor envia o aviso inicial e um lembrete quando restam 24 horas, pela rotina de notificações executada a cada minuto. Configure `RESEND_API_KEY`, `MAIL_FROM`, `APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_MONTHLY` e `STRIPE_WEBHOOK_SECRET`. Em produção, o início do checkout exige envio de e-mail configurado. Mantenha o serviço em execução para os lembretes serem enviados no horário. O webhook deve receber `customer.subscription.created`, `customer.subscription.updated` e `customer.subscription.deleted`; os eventos de checkout existentes continuam atendendo os Passes já comprados.
+
+O cancelamento no app é imediato: bloqueia titular e convidados, inclusive leitura, importação e exportação, preservando contas, vínculos e dados. Assinaturas canceladas pelo portal também são bloqueadas pelo webhook, mesmo quando o cancelamento está agendado. Passes em vigor e contas fundadoras mantêm o acesso existente.
+
+Em desenvolvimento, o checkout retorna à mesma origem que o iniciou: `localhost` e o IP da rede têm cookies separados. Em produção, use o endereço canônico de `APP_URL` para entrar no app e no checkout. O retorno confirma a assinatura na Stripe sem encerrar a sessão.
+
+Validação: `npm run test:billing-db`, `npm run lint` e `npm run build`. Para o teste visual, execute `npm exec vite preview -- --port 4173`, depois `node tests/trial-ui.mjs` (ou informe `TRIAL_UI_URL`).
+
+### Perfil e informações do lar
+
+**Meu perfil** permite alterar o nome pelo ícone de lápis, atualizar a foto pelo avatar e solicitar redefinição de senha. O avatar abre opções de tirar, enviar ou remover foto; celular/tablet usam a captura nativa quando disponível e desktop usa a webcam com prévia antes de confirmar. A câmera exige HTTPS ou localhost e é desligada ao sair. Os nomes do perfil e do lar começam bloqueados até o clique no lápis. O e-mail de acesso é apresentado apenas para consulta. A foto é validada pelos bytes, convertida para WebP sem metadados e armazenada no banco; a leitura exige a sessão do próprio usuário. As informações pessoais continuam disponíveis mesmo sem assinatura ativa.
+
+**Meu lar** permite ao titular alterar nome, data da mudança, estado, cidade de referência e perfil de gasto, usando as permissões já aplicadas ao enxoval. Convidados podem consultar os dados, mas não alterá-los. **Assinatura** reúne situação do plano, término do trial ou validade do Passe, renovação, portal da Stripe e cancelamento.
+
+Validação: `npm run test:profile-db` e, com o app aberto, `node tests/profile-ui.mjs` (opcionalmente `PROFILE_UI_URL`).
+
+Na edição de um item, um link novo ou alterado oferece buscar os dados da loja antes de consultar. A prévia permite usar o nome da loja ou definir um nome próprio; preço e foto encontrados ficam no rascunho até salvar. Erros e leituras parciais permitem continuar manualmente. Os links do produto e da imagem têm botão de copiar; imagens por URL são carregadas ao sair do campo ou pressionar Enter. A miniatura fica ao lado das informações no celular e no tablet. `node tests/item-links-ui.mjs` verifica o fluxo com API simulada e larguras de 320 a 1920 pixels.
+
+`node tests/item-layout-ui.mjs` compara as dimensões e o alinhamento dos mesmos itens em Todos e nos ambientes, com e sem foto, verifica a reordenação pelo teclado e a barra de ambientes em 320, 375, 768 e 1440 pixels. No celular, a alça compartilha a coluna do checkbox e as ações da barra ocupam uma linha própria, com alvos de toque de 44 pixels.

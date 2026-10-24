@@ -1,0 +1,425 @@
+/* Ajustes de design do funil (/comecar): CTA que pulsa, foco sem contorno afastado, calendário e "Outros
+   ambientes" com destaque, data só depois de escolhida, "nenhuma das opções" com motivo e o pacto. */
+
+/* Foco dos botões principais: brilho suave em vez do anel com recuo. */
+.ob .ob-cta {
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  outline: none;
+}
+.ob .ob-cta:focus-visible {
+  box-shadow: var(--ob-shadow), 0 0 0 4px color-mix(in oklab, var(--cm-action) 26%, transparent);
+}
+/* Boas-vindas: o botão pulsa (halo que cresce e some) e um brilho o atravessa de tempos em tempos. */
+.ob[data-step="welcome"] .ob-cta:not(:disabled) {
+  position: relative;
+  overflow: hidden;
+  animation: ob-cta-pulse 2.4s ease-out infinite;
+}
+.ob[data-step="welcome"] .ob-cta:not(:disabled)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.32) 48%, transparent 66%);
+  transform: translateX(-120%);
+  animation: ob-cta-shine 3.6s ease-in-out 1.2s infinite;
+  pointer-events: none;
+}
+@keyframes ob-cta-pulse {
+  0% {
+    box-shadow: var(--ob-shadow), 0 0 0 0 color-mix(in oklab, var(--cm-action) 46%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: var(--ob-shadow), 0 0 0 14px color-mix(in oklab, var(--cm-action) 0%, transparent);
+  }
+}
+@keyframes ob-cta-shine {
+  0%,
+  55% {
+    transform: translateX(-120%);
+  }
+  85%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+/* Campos de texto: a borda escurece e ganha um halo leve, colado ao campo. */
+.ob .ob-input,
+.ob .ob-textarea {
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+.ob .ob-input:focus-visible,
+.ob .ob-textarea:focus-visible {
+  outline: none;
+  border-color: var(--ob-wood);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--ob-wood) 14%, transparent);
+}
+
+/* "Escolher um dia no calendário": botão com fundo, ícone e seta. */
+.ob-date-picker [data-slot="collapsible-trigger"] {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 50px;
+  background: var(--ob-card);
+  border-color: var(--ob-line);
+  border-radius: var(--ob-radius);
+  box-shadow: var(--ob-shadow);
+}
+.ob-date-picker [data-slot="collapsible-trigger"] > span {
+  flex: 1;
+}
+.ob-date-picker [data-slot="collapsible-trigger"]:hover {
+  background: color-mix(in oklab, var(--cm-sand) 18%, var(--cm-bg));
+}
+.ob-disclosure-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+[data-state="open"] > [data-slot="collapsible-trigger"] .ob-disclosure-chevron {
+  transform: rotate(180deg);
+}
+
+/* Resposta da data: aparece só depois da escolha. */
+.ob-date-unsure {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: var(--ob-radius);
+  background: var(--ob-sage);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ob-date-unsure strong {
+  font-size: 15px;
+}
+
+/* "Outros ambientes": cartão tracejado com ícone, os nomes que estão ali e a seta. */
+.ob-extra-rooms [data-slot="collapsible-trigger"] {
+  width: 100%;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 1.5px dashed color-mix(in oklab, var(--ob-wood) 45%, var(--ob-line));
+  border-radius: var(--ob-radius);
+  background: color-mix(in oklab, var(--cm-sand) 10%, #fff);
+  color: var(--ob-ink);
+}
+.ob-extra-rooms [data-slot="collapsible-trigger"]:hover {
+  background: var(--ob-selected);
+}
+.ob-extra-rooms[data-state="open"] [data-slot="collapsible-trigger"] {
+  margin-bottom: 10px;
+  border-style: solid;
+}
+.ob-extra-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cm-action);
+  color: #fff;
+}
+.ob-extra-text {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.ob-extra-text strong {
+  font-size: 15px;
+  color: var(--ob-wood-deep);
+}
+.ob-extra-text small {
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--ob-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ob[data-step="rooms"] .ob-extra-rooms + .ob-fieldset,
+.ob[data-step="rooms"] .ob-fieldset + .ob-fieldset {
+  margin-top: 10px;
+}
+/* "Nenhum ambiente agora": linha inteira, com ícone e explicação, separada da grade de ambientes. */
+.ob .ob-options:has(> .ob-option[for="rooms-none-none"]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ob .ob-option[for="rooms-none-none"] {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border-style: dashed;
+  background: transparent;
+}
+.ob .ob-option[for="rooms-none-none"] .ob-option-icon,
+.ob .ob-option[for="rooms-none-none"] .ob-option-text small {
+  display: revert;
+}
+.ob .ob-option[for="rooms-none-none"] .ob-option-text strong {
+  font-size: 14px;
+}
+.ob .ob-option[for="rooms-none-none"] .ob-tick {
+  position: static;
+  margin-left: auto;
+}
+.ob .ob-option[for="rooms-none-none"][data-selected="true"] {
+  border-style: solid;
+  background: var(--ob-selected);
+}
+
+/* Moradores: o cartão escolhido solta uma onda curta (o número pula pela animação do React). */
+.ob-person[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 2px solid var(--ob-wood);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: ob-person-ripple 0.55s ease-out both;
+}
+@keyframes ob-person-ripple {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+
+/* "Nenhuma das opções": campo para o motivo. */
+.ob-none-reason {
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+  padding-top: 12px;
+}
+.ob-none-reason label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ob-wood-deep);
+}
+.ob .ob-textarea {
+  min-height: 84px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--ob-control-line);
+  border-radius: var(--ob-radius);
+  background: color-mix(in oklab, var(--cm-bg) 20%, #fff);
+  font-size: 16px;
+  resize: vertical;
+}
+
+/* Agradecimento: o coração bate e solta ondas. O círculo é menor aqui, para o pacto caber na tela. */
+.ob-thanks .ob-ring {
+  position: relative;
+}
+.ob-thanks .ob-ring-lg {
+  width: 112px;
+  height: 112px;
+}
+.ob-thanks .ob-ring-lg svg {
+  width: 44px;
+  height: 44px;
+}
+.ob-thanks .ob-title {
+  margin-top: 12px;
+}
+.ob-thanks .ob-note {
+  margin-top: 12px;
+}
+.ob-heartbeat {
+  display: grid;
+  place-items: center;
+  color: var(--cm-action);
+}
+.ob-heart-ripple,
+.ob-heart-ripple::after {
+  position: absolute;
+  inset: 0;
+  border: 2px solid color-mix(in oklab, var(--cm-action) 40%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: ob-heart-ripple 1.9s ease-out infinite;
+}
+.ob-heart-ripple::after {
+  content: "";
+  inset: -2px;
+  animation-delay: 0.6s;
+}
+@keyframes ob-heart-ripple {
+  from {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+
+/* O pacto: texto do compromisso, linha da assinatura e o botão de segurar. */
+.ob-pact {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 18px 16px 16px;
+  border: 1px solid var(--ob-line);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in oklab, var(--cm-sand) 22%, transparent), transparent 70%),
+    color-mix(in oklab, var(--cm-bg) 30%, #fff);
+  box-shadow: var(--ob-shadow);
+  text-align: center;
+}
+.ob-pact-text {
+  max-width: 34ch;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--ob-ink);
+}
+.ob-pact-text strong {
+  color: var(--ob-wood-deep);
+}
+.ob-pact-sign {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 72px;
+}
+.ob-pact-line {
+  align-self: end;
+  width: min(240px, 80%);
+  padding-top: 6px;
+  border-top: 1.5px dashed color-mix(in oklab, var(--ob-wood) 40%, var(--ob-line));
+  font-size: 12px;
+  color: var(--ob-muted);
+}
+.ob-pact-signature {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+.ob-pact-name {
+  font-family: var(--serif);
+  font-size: 34px;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--ob-wood-deep);
+}
+.ob-pact-swash {
+  width: 200px;
+  height: 16px;
+  margin-top: -2px;
+  fill: none;
+  stroke: var(--cm-action);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.ob-pact-signature small {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ob-muted);
+}
+.ob-pact-signature .ob-confetti {
+  top: 50%;
+  right: 50%;
+}
+.ob-pact-hearts {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  color: var(--cm-action);
+}
+.ob-pact-hearts > span {
+  position: absolute;
+  display: grid;
+}
+.ob-pact-hold {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  padding: 6px 20px 6px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--cm-action);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: var(--ob-shadow);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  transition: transform 0.15s ease, background 0.2s;
+}
+.ob-pact-hold[data-holding="true"] {
+  transform: scale(0.97);
+  background: var(--cm-action-hover);
+}
+.ob-pact-hold:focus-visible {
+  outline: none;
+  box-shadow: var(--ob-shadow), 0 0 0 4px color-mix(in oklab, var(--cm-action) 26%, transparent);
+}
+.ob-pact-ring {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  transform: translateY(-50%) rotate(-90deg);
+}
+.ob-pact-ring circle {
+  fill: none;
+  stroke-width: 4;
+}
+.ob-pact-ring-track {
+  stroke: rgb(255 255 255 / 0.25);
+}
+.ob-pact-ring-fill {
+  stroke: #fff;
+  stroke-linecap: round;
+}
+.ob-pact-hold-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.14);
+}
+.ob-pact-hint {
+  font-size: 12.5px;
+  color: var(--ob-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob[data-step="welcome"] .ob-cta:not(:disabled),
+  .ob[data-step="welcome"] .ob-cta:not(:disabled)::after,
+  .ob-person[data-selected="true"]::after,
+  .ob-heart-ripple,
+  .ob-heart-ripple::after {
+    animation: none;
+  }
+}

@@ -14,6 +14,7 @@ import type {
   PlanCategory,
   PlanItem,
   PlanPayload,
+  PlanStyle,
   RoomKey,
   Savings,
 } from "./types";
@@ -33,6 +34,10 @@ export const emptyAnswers: Answers = {
   budget: null,
   worries: [],
   usage: [],
+  worriesNone: false,
+  worriesOther: "",
+  usageNone: false,
+  usageOther: "",
   source: "",
 };
 
@@ -130,15 +135,21 @@ export function defaultPeople(moment: Moment | null) {
   return 2;
 }
 
+/** Studio e kitnet têm sala e quarto no mesmo ambiente: o plano trata os dois do mesmo jeito. */
+export function isCompactHousing(housing: Housing | string | null | undefined) {
+  return housing === "studio" || housing === "kitnet";
+}
+
 export function defaultRooms(
   housing: Housing | null,
   people: number | null,
 ): OptionalRoom[] {
   const rooms: OptionalRoom[] =
-    housing === "studio"
+    isCompactHousing(housing)
       ? ["cozinha", "banheiro", "sala", "servico"]
-      : ["cozinha", "banheiro", "sala", "quarto", "servico", "externa"];
-  if (housing !== "studio" && (people ?? 0) >= 3) rooms.push("quartoExtra");
+      : ["cozinha", "banheiro", "sala", "quarto", "servico"];
+  if (housing === "casa") rooms.push("externa");
+  if (!isCompactHousing(housing) && (people ?? 0) >= 3) rooms.push("quartoExtra");
   return rooms;
 }
 
@@ -186,7 +197,7 @@ interface Resolved {
   /** Características da cidade (umidade, maresia, estação seca, chuva forte). */
   traits: Set<Trait>;
   climate: Climate;
-  style: "full" | "min";
+  style: PlanStyle;
   budget: Budget;
   name: string;
 }
@@ -198,8 +209,8 @@ function resolve(a: Answers): Resolved {
   const rooms = new Set<RoomKey>(a.rooms ?? defaultRooms(housing, people));
   // Eletrodomésticos acompanham a cozinha.
   if (rooms.has("cozinha")) rooms.add("eletro");
-  // Studio tem sala e quarto juntos: marcar a sala traz o quarto.
-  if (housing === "studio") {
+  // Studio e kitnet têm sala e quarto juntos: marcar a sala traz o quarto.
+  if (isCompactHousing(housing)) {
     rooms.delete("quartoExtra");
     if (rooms.has("sala")) rooms.add("quarto");
     else rooms.delete("quarto");
@@ -238,8 +249,8 @@ function evaluate(entry: CatalogEntry, r: Resolved, full: boolean): Evaluation {
   if (
     (has("K") && r.housing !== "casa") ||
     (has("A") && r.housing === "casa") ||
-    (has("X") && r.housing === "studio") ||
-    (has("O") && r.housing !== "studio")
+    (has("X") && isCompactHousing(r.housing)) ||
+    (has("O") && !isCompactHousing(r.housing))
   ) {
     return skip("housing");
   }
@@ -277,7 +288,7 @@ function itemsFor(r: Resolved, full: boolean) {
       r.moment === "casal" ? "de casal" : "de solteiro",
     );
     const roomKey: RoomKey =
-      r.housing === "studio" && entry.room === "quarto" ? "sala" : entry.room;
+      isCompactHousing(r.housing) && entry.room === "quarto" ? "sala" : entry.room;
     const dedupeKey = `${roomKey}:${name.toLowerCase()}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
@@ -342,10 +353,11 @@ export function generatePlan(answers: Answers): GeneratedPlan {
 
   const categories: PlanCategory[] = [];
   for (const key of ROOM_ORDER) {
-    const items = chosen.get(key);
-    if (!items?.length) continue;
+    const suggested = chosen.get(key);
+    if (!suggested?.length) continue;
+    const items = r.style === "none" ? [] : suggested;
     const name =
-      key === "sala" && r.housing === "studio"
+      key === "sala" && isCompactHousing(r.housing)
         ? "Sala e Quarto"
         : key === "externa"
           ? r.housing === "casa"
@@ -364,8 +376,8 @@ export function generatePlan(answers: Answers): GeneratedPlan {
     categories.push({ key, name, items: [...items] });
   }
 
-  // Studio: a sala (que agora também guarda o quarto) vem primeiro.
-  if (r.housing === "studio") {
+  // Studio e kitnet: a sala (que agora também guarda o quarto) vem primeiro.
+  if (isCompactHousing(r.housing)) {
     categories.sort((a, b) =>
       a.key === "sala" ? -1 : b.key === "sala" ? 1 : 0,
     );

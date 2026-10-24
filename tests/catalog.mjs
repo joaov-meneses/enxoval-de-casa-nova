@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compactKey, foldText, itemKey, normalizeText, singular, slugify, trigrams, trigramSimilarity } from "../src/catalog/normalize.ts";
 import { categoryForRoom } from "../src/catalog/rooms.ts";
+import { parseImportRows } from "../src/utils/importItems.ts";
+import { applyCatalogSuggestions, catalogSuggestions, defaultAcceptedSuggestions, remainingIssues } from "../src/utils/importCatalog.ts";
 import { buildPurchasePlan, itemBand, planPurchases } from "../src/planning/purchasePlan.ts";
 import { priceOpportunityEmail } from "../server/mailer.ts";
 import { CATALOG_SEED_VERSION, KNOWN_FUNCTION_GROUPS, parseRow, seedItems } from "../server/catalog/seed.ts";
@@ -109,7 +111,7 @@ test("ambiente do enxoval para um cômodo do catálogo", () => {
 
 test("faixa real de preço substitui a de referência, conforme o perfil de gasto", () => {
   const priceRange = { p10: 100_000, p50: 150_000, p90: 250_000, samples: 12, region: "" };
-  const item = { id: "g", name: "Geladeira", category: "Cozinha", status: "needed", priceCents: null, discountCents: 0, catalog: { priceCategory: 4, priority: "essential", timing: null, leadTimeWeeks: 2, priceRange } };
+  const item = { id: "g", name: "Geladeira", category: "Cozinha", status: "researching", priceCents: null, discountCents: 0, catalog: { priceCategory: 4, priority: "essential", timing: null, leadTimeWeeks: 2, priceRange } };
   assert.deepEqual(itemBand(item, "economico"), { band: { minCents: 100_000, maxCents: 150_000 }, source: "real" });
   assert.deepEqual(itemBand(item, "equilibrado"), { band: { minCents: 100_000, maxCents: 250_000 }, source: "real" });
   assert.deepEqual(itemBand(item, "confortavel"), { band: { minCents: 150_000, maxCents: 250_000 }, source: "real" });
@@ -135,7 +137,7 @@ test("e-mail de preço abaixo do comum", () => {
 });
 
 test("planejamento usa o catálogo mestre e antecipa a compra pelo prazo de entrega", () => {
-  const base = { status: "needed", priceCents: null, discountCents: 0, category: "Quarto" };
+  const base = { status: "researching", priceCents: null, discountCents: 0, category: "Quarto" };
   const plan = planPurchases(
     [
       // Sem catálogo: primeira noite, uma semana antes.
@@ -151,4 +153,49 @@ test("planejamento usa o catálogo mestre e antecipa a compra pelo prazo de entr
   assert.equal(plan.get("b").week, -4);
   assert.match(plan.get("b").reason, /3 semanas/);
   assert.equal(plan.get("c").week, -2, "essencial de valor baixo: perto da mudança");
+});
+
+test("importação por planilha: o catálogo corrige a grafia e sugere o ambiente", () => {
+  const parsed = parseImportRows([
+    ["Item", "Ambiente"],
+    ["geladera", "Cozinha"],
+    ["Liquidificador", "Cozinha"],
+    ["Toalha de banho", ""],
+    ["Jogo de cama casal 4 peças", "Quarto"],
+    ["Coisa que ninguém conhece", ""],
+    ["Panela", "Casa da praia"],
+  ]);
+  assert.equal(parsed.rows.length, 6, "Ambiente vazio não tira a linha da revisão");
+  assert.deepEqual(parsed.issues.map((issue) => [issue.line, issue.code]), [[4, "missing-category"], [6, "missing-category"]]);
+  const matches = [
+    { match: "similar", id: "g", name: "Geladeira", room: "eletro" },
+    { match: "exact", id: "l", name: "Liquidificador", room: "eletro" },
+    { match: "exact", id: "t", name: "Toalha de banho", room: "banheiro" },
+    { match: "contained", id: "j", name: "Jogo de cama", room: "quarto" },
+    null,
+    { match: "exact", id: "p", name: "Panela", room: "cozinha" },
+  ];
+  const suggestions = catalogSuggestions(parsed.rows, matches, ["Cozinha", "Eletro Cozinha", "Quarto"]);
+  assert.deepEqual(
+    suggestions.map((s) => [s.key, s.from, s.to]),
+    [
+      ["2:name", "geladera", "Geladeira"],
+      ["2:category", "Cozinha", "Eletro Cozinha"],
+      ["3:category", "Cozinha", "Eletro Cozinha"],
+      ["4:fill", "", "Banheiro"],
+    ],
+    "variação mantém o nome; ambiente com nome próprio não recebe sugestão",
+  );
+  assert.equal(catalogSuggestions(parsed.rows, matches, ["Cozinha"]).filter((s) => s.kind === "category").length, 0, "sem Eletro Cozinha, Cozinha já serve");
+
+  const accepted = defaultAcceptedSuggestions(suggestions);
+  assert.deepEqual([...accepted], ["4:fill"], "só o preenchimento vem marcado");
+  const rows = applyCatalogSuggestions(parsed.rows, suggestions, accepted);
+  assert.equal(rows[0].name, "geladera");
+  assert.equal(rows[2].categoryName, "Banheiro");
+  assert.deepEqual(remainingIssues(parsed.issues, rows).map((issue) => issue.line), [6], "só o item desconhecido continua sem ambiente");
+
+  const all = applyCatalogSuggestions(parsed.rows, suggestions, new Set(suggestions.map((s) => s.key)));
+  assert.deepEqual([all[0].name, all[0].categoryName, all[1].categoryName], ["Geladeira", "Eletro Cozinha", "Eletro Cozinha"]);
+  assert.equal(parsed.rows[0].name, "geladera", "as linhas lidas não mudam");
 });

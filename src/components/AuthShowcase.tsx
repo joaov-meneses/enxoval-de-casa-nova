@@ -1,3 +1,4 @@
+import { Button } from "@/src/components/ui/button";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { STEPS as SLIDES } from "./HowItWorks";
 
@@ -143,7 +144,7 @@ export function AuthShowcase() {
       <ol className="auth-showcase-dots" aria-label="Escolher captura">
         {SLIDES.map((slide, slideIndex) => (
           <li key={slide.title}>
-            <button
+            <Button variant="brand" size="brand"
               type="button"
               className={`auth-showcase-dot${slideIndex === index ? " is-active" : ""}`}
               onClick={() => goTo(slideIndex)}
@@ -151,7 +152,7 @@ export function AuthShowcase() {
               aria-current={slideIndex === index ? "true" : undefined}
             >
               <span aria-hidden="true" />
-            </button>
+            </Button>
           </li>
         ))}
       </ol>

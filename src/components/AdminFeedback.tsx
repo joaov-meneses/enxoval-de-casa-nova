@@ -1,5 +1,6 @@
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bug, ChevronDown, LoaderCircle, MessageCircleHeart, Lightbulb } from "lucide-react";
+import { Bug, ChevronDown, LoaderCircle, MessageCircleHeart, Lightbulb } from "@/src/components/icons";
 import { fetchAdminFeedback, updateAdminFeedbackStatus } from "../api";
 import {
   FEEDBACK_AREAS,
@@ -95,7 +96,7 @@ export function AdminFeedbackList({ onError }: { onError: (err: unknown) => void
       </div>
       <div className="fb-admin-filters" role="group" aria-label="Filtrar mensagens">
         {(["all", ...FEEDBACK_STATUSES] as const).map((status) => (
-          <button
+          <Button variant="brand" size="brand"
             key={status}
             type="button"
             aria-pressed={filter === status}
@@ -103,7 +104,7 @@ export function AdminFeedbackList({ onError }: { onError: (err: unknown) => void
           >
             {status === "all" ? "Todas" : FEEDBACK_STATUS_LABEL[status]}
             <span>{counts[status]}</span>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -120,7 +121,7 @@ export function AdminFeedbackList({ onError }: { onError: (err: unknown) => void
             const open = openId === entry.id;
             return (
               <li key={entry.id} className={`fb-admin-item${open ? " is-open" : ""}`}>
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   className="fb-admin-head"
                   aria-expanded={open}
@@ -139,7 +140,7 @@ export function AdminFeedbackList({ onError }: { onError: (err: unknown) => void
                   {entry.severity === "blocked" && <span className="fb-admin-flag">Trava o uso</span>}
                   <span className={`fb-admin-status is-${entry.status}`}>{FEEDBACK_STATUS_LABEL[entry.status]}</span>
                   <ChevronDown size={18} aria-hidden="true" className="fb-admin-chevron" />
-                </button>
+                </Button>
                 {open && (
                   <div className="fb-admin-body">
                     <p className="fb-admin-text">{entry.description}</p>
@@ -182,7 +183,7 @@ export function AdminFeedbackList({ onError }: { onError: (err: unknown) => void
                     )}
                     <div className="fb-admin-actions" role="group" aria-label="Andamento da mensagem">
                       {FEEDBACK_STATUSES.map((status) => (
-                        <button
+                        <Button variant="brand" size="brand"
                           key={status}
                           type="button"
                           aria-pressed={entry.status === status}
@@ -190,7 +191,7 @@ export function AdminFeedbackList({ onError }: { onError: (err: unknown) => void
                           onClick={() => void setStatus(entry.id, status)}
                         >
                           {FEEDBACK_STATUS_LABEL[status]}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>

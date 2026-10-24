@@ -1,4 +1,4 @@
-import { MAX_IMAGE_UPLOAD_BYTES } from "./itemImages";
+import { MAX_IMAGE_UPLOAD_BYTES } from "./imageUploadLimits";
 
 /** Fotos de celular passam fácil de 5 MB; antes de enviar, reduzimos para o que o servidor vai guardar de qualquer jeito. */
 const SEND_MAX_SIDE = 1280;
@@ -10,11 +10,15 @@ const LIGHT_BYTES = 1.2 * 1024 * 1024;
  * Prepara o arquivo escolhido para o envio: respeita a rotação da foto, reduz o maior lado e comprime quando
  * o arquivo é pesado. Se o navegador não conseguir abrir o formato, o original segue e o servidor decide.
  */
-export async function prepareImageForUpload(file: File): Promise<Blob> {
+export async function prepareImageForUpload(
+  file: File,
+  // Fotos de nota fiscal precisam continuar legíveis: quem envia documentos pede um lado maior.
+  { maxSide = SEND_MAX_SIDE, quality = SEND_QUALITY }: { maxSide?: number; quality?: number } = {},
+): Promise<Blob> {
   if (file.type === "image/gif" || (file.size <= LIGHT_BYTES && file.type.startsWith("image/"))) return file;
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const scale = Math.min(1, SEND_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -25,7 +29,7 @@ export async function prepareImageForUpload(file: File): Promise<Blob> {
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", SEND_QUALITY));
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
     return blob && blob.size < file.size ? blob : file;
   } catch {
     return file;

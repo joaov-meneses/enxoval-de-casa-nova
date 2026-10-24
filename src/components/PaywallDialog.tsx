@@ -1,7 +1,9 @@
+import { Button } from "@/src/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
-import { Check } from "lucide-react";
+import { Check } from "@/src/components/icons";
 import { Dialog } from "./Dialog";
 import { Nino } from "./Nino";
+import { capture } from '../analytics';
 import {
   PaywallPeek,
   PaywallTimeline,
@@ -34,8 +36,8 @@ const TITLES: Record<LimitCode, string> = {
 const UNLOCKS = [
   "Cômodos e itens ilimitados",
   "Mais de um enxoval",
-  "Lista a dois, em tempo real",
-  "Página do Chá de Casa Nova",
+  "Lista a dois, com quem mora com você",
+  "Página do Chá de Casa Nova (em breve)",
 ];
 
 /**
@@ -75,10 +77,12 @@ export function PaywallDialog({
 
   useEffect(() => {
     const onLimit = (event: Event) => {
+      capture('plans_viewed', { source: 'limit', reason: (event as CustomEvent<LimitReachedDetail>).detail.code });
       setError("");
       setLimit((event as CustomEvent<LimitReachedDetail>).detail);
     };
     const onOpenPlans = () => {
+      capture('plans_viewed', { source: 'menu' });
       setError("");
       setIsPlansOpen(true);
     };
@@ -156,21 +160,21 @@ export function PaywallDialog({
       >
         <div className="paywall">
           <div className="paywall-intro">
-            <Nino pose="wave" size={96} />
+            <Nino pose="keys" size={96} />
             <p>
               {result === "success"
                 ? "Obrigado por apoiar o Casa Mia! Estamos liberando o seu plano: em instantes, cômodos e itens ficam sem limites."
                 : "Nada foi cobrado. Quando quiser, é só conhecer os planos de novo."}
             </p>
           </div>
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="button button-dark"
             onClick={close}
             data-dialog-autofocus
           >
             Continuar
-          </button>
+          </Button>
         </div>
       </Dialog>
     );
@@ -184,38 +188,11 @@ export function PaywallDialog({
     >
       <div className="paywall">
         <div className="paywall-intro">
-          <Nino pose="wave" size={96} />
-          {variant === "peek" ? (
-            <p>Vamos abrir as portas de todos os cômodos do seu lar?</p>
-          ) : (
-            <p>
-              No plano gratuito, você pode testar até{" "}
-              {FREE_PLAN_LIMITS.environments} cômodos com{" "}
-              {FREE_PLAN_LIMITS.itemsPerEnvironment} itens cada. Vamos abrir as
-              portas de todos os cômodos do seu lar?
-            </p>
-          )}
+          <Nino pose="keys" size={96} />
+          <p>Acesso completo a todos os recursos. Sua conta e seus dados ficam preservados após o cancelamento.</p>
         </div>
-        {variant === "peek" && (
-          <PaywallPeek categories={categories} items={items} />
-        )}
-        {variant === "timeline" && <PaywallTimeline />}
-        {variant === "control" && (
-          <ul
-            className="paywall-unlocks"
-            aria-label="O que os planos pagos liberam"
-          >
-            {UNLOCKS.map((text) => (
-              <li key={text}>
-                <Check size={15} aria-hidden="true" /> {text}
-              </li>
-            ))}
-          </ul>
-        )}
         <ul className="paywall-plans" aria-label="Planos">
-          {PAID_PLAN_OFFERS.filter(
-            (offer) => !(hasPass && offer.id === "monthly"),
-          ).map((offer) => (
+          {PAID_PLAN_OFFERS.filter((offer) => offer.id === "pass" || !hasPass).map((offer) => (
             <li
               key={offer.id}
               className={offer.featured ? "is-featured" : undefined}
@@ -229,7 +206,7 @@ export function PaywallDialog({
                 {offer.per}
               </span>
               <span className="paywall-plan-billing">{offer.billing}</span>
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className={`button button-small ${offer.featured ? "button-dark" : "button-outline"} paywall-plan-action`}
                 disabled={pendingPlan !== null}
@@ -243,7 +220,7 @@ export function PaywallDialog({
                       ? "Estender"
                       : "Comprar"
                     : "Assinar"}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -263,13 +240,13 @@ export function PaywallDialog({
           O pagamento é feito num ambiente seguro da Stripe. Tudo o que você já
           cadastrou continua com você, mesmo quando o acesso termina.
         </p>
-        <button
+        <Button variant="brand" size="brand"
           type="button"
           className="button button-outline"
           onClick={close}
         >
           Agora não
-        </button>
+        </Button>
       </div>
     </Dialog>
   );

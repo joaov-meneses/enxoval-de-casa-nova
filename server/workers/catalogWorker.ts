@@ -2,6 +2,8 @@
 // demanda: npm run catalog:refresh. Nenhum passo padrão chama o Jev; o pré-cálculo das urgências (que chama) só roda
 // quando pedido: npm run catalog:refresh -- --urgency [--limit 600]
 import { getPool } from '../database.ts';
+import { logger } from '../logger.ts';
+import { registerJob, trackJob } from '../jobMonitor.ts';
 import { itemKey } from '../../src/catalog/normalize.ts';
 import type { RoomKey } from '../../src/onboarding/types.ts';
 import { roomOfCategory } from '../../src/planning/purchasePlan.ts';
@@ -62,7 +64,6 @@ export async function refreshPriceStats() {
          LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
          WHERE i.catalog_item_id IS NOT NULL
            AND i.quantity = 1
-           AND i.status NOT IN ('not_needed', 'discarded')
            AND COALESCE(i.price_cents, tp.current_price_cents) > 0
          GROUP BY 1, 2, 3
        ),
@@ -205,7 +206,8 @@ export async function precomputeUrgencies(limit = 600, log: (message: string) =>
 }
 
 export async function runCatalogRefresh(options: CatalogRefreshOptions = {}): Promise<CatalogRefreshSummary> {
-  const log = options.log ?? (() => {});
+  const log = options.log ?? (message => logger.info({ event: 'catalog.refresh.progress' }, message));
+  logger.info({ event: 'catalog.refresh.started', urgency: options.urgency, urgencyLimit: options.urgencyLimit }, 'Catalog refresh started.');
   const lockClient = await getPool().connect();
   try {
     const lock = await lockClient.query<{ locked: boolean }>('SELECT pg_try_advisory_lock($1) AS locked', [ADVISORY_LOCK_KEY]);
@@ -232,10 +234,11 @@ export async function runCatalogRefresh(options: CatalogRefreshOptions = {}): Pr
 
 /** Agenda a rotina dentro do servidor. A primeira rodada sai alguns minutos depois de subir, fora do caminho do boot. */
 export function startCatalogScheduler() {
+  registerJob('catalog_refresh', CATALOG_REFRESH_INTERVAL_MS);
   const run = () =>
-    runCatalogRefresh({ log: message => console.log(`[catalog] ${message}`) }).catch(err =>
-      console.error('[catalog] Rotina falhou:', err instanceof Error ? err.message : err)
-    );
+    trackJob('catalog_refresh', () => runCatalogRefresh(), summary => summary.skipped)
+      .then(summary => logger.info({ event: 'catalog.refresh.completed', ...summary }, 'Rotina do catálogo concluída.'))
+      .catch(err => logger.error({ event: 'catalog.refresh.failed', err }, 'Rotina do catálogo falhou.'));
   setTimeout(run, 5 * 60_000).unref();
   setInterval(run, CATALOG_REFRESH_INTERVAL_MS).unref();
 }

@@ -1,0 +1,148 @@
+/* Pesquisa de pós-mudança (/pesquisa): nota de 0 a 10 em botões que cabem na largura do celular. */
+.survey-card {
+  max-width: 520px;
+}
+.survey-scores {
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.survey-scores legend {
+  margin-bottom: 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--cm-text);
+}
+.survey-score-row {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 4px;
+}
+.survey-score {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 62%, #fff);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--cm-primary-dark);
+  font-weight: 700;
+  font-size: 15px;
+}
+.survey-score[aria-pressed="true"] {
+  border-color: var(--cm-action);
+  background: var(--cm-action);
+  color: #fff;
+}
+.survey-score:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.survey-score-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+}
+.survey-comment {
+  display: grid;
+  gap: 6px;
+  margin: 18px 0;
+  font-size: 14px;
+  color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text));
+}
+.survey-comment textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 62%, #fff);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 15px;
+  color: var(--cm-text);
+  resize: vertical;
+}
+@media (max-width: 380px) {
+  .survey-score-row {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+/* /admin, seção Operação: tabelas compactas com rolagem horizontal própria. */
+.admin-ops h3 {
+  margin: 22px 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cm-text);
+}
+.admin-ops .admin-users-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-ops .admin-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 62%, #fff);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+}
+.admin-ops-note {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.admin-ops-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+.admin-ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.admin-ops-table th,
+.admin-ops-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid color-mix(in oklab, var(--cm-sand) 30%, #fff);
+  text-align: left;
+  white-space: nowrap;
+}
+.admin-ops-table th {
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+}
+.admin-ops-table .is-alert {
+  color: var(--cm-action);
+  font-weight: 700;
+}
+.admin-ops-table .is-ok {
+  color: var(--cm-success);
+}
+.admin-ops-form .admin-ops-wide {
+  grid-column: 1 / -1;
+}
+.admin-ops-form textarea {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 62%, #fff);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  color: var(--cm-text);
+  resize: vertical;
+}
+.admin-ops-form .admin-ops-send {
+  background: var(--cm-action);
+  color: #fff;
+}

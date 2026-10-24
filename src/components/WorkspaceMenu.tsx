@@ -1,3 +1,5 @@
+import { Button } from "@/src/components/ui/button";
+import { Label } from "@/src/components/ui/label";
 import type { RefObject } from "react";
 import {
   Home,
@@ -9,7 +11,9 @@ import {
   X,
   ListChecks,
   MessageCircleHeart,
-} from "lucide-react";
+  ChevronRight,
+  ShoppingBag,
+} from "@/src/components/icons";
 import type {
   AuthUser,
   EnxovalSummary,
@@ -17,11 +21,12 @@ import type {
   EnxovalItem,
   EnxovalMember,
 } from "../types";
-import { useDialogAccessibility } from "../hooks/useDialogAccessibility";
+import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 import { Select } from "./Select";
 import { EnvironmentList } from "./EnvironmentList";
-import { activeItems } from "../itemStatus";
+import { activeItems, doneItems } from "../itemStatus";
 import { enxovalSelectOptions } from "../enxovais";
+import { UserAvatar } from './UserAvatar';
 
 interface WorkspaceMenuProps {
   open: boolean;
@@ -50,15 +55,12 @@ interface WorkspaceMenuProps {
   onLogout: () => void;
   /** Abre a central de ajuda (relatar problema ou sugerir melhoria). */
   onHelp: () => void;
+  onProfile: () => void;
+  /** Modo loja: só o que falta, com letra grande, para riscar rápido na loja física. */
+  onStoreMode?: () => void;
 }
 
 export function WorkspaceMenu(props: WorkspaceMenuProps) {
-  const ref = useDialogAccessibility(
-    props.open,
-    props.onClose,
-    props.triggerRef,
-  );
-  if (!props.open) return null;
   const hasEnxoval = Boolean(props.activeEnxoval);
   const isOwner = props.activeEnxoval?.role === "owner";
   const run = (action: () => void) => {
@@ -66,43 +68,41 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
     action();
   };
   return (
-    <div className="workspace-menu-layer">
-      <div
-        className="workspace-menu-backdrop"
-        onClick={props.onClose}
-        aria-hidden="true"
-      />
-      <div
-        ref={ref}
-        id="workspace-menu"
-        className="workspace-menu-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="workspace-menu-title"
-        tabIndex={-1}
-      >
+    <Sheet open={props.open} onOpenChange={open => { if (!open) props.onClose(); }}>
+      <SheetContent brandLayout layoutClassName="workspace-menu-layer" overlayClassName="workspace-menu-backdrop" showCloseButton={false}
+        id="workspace-menu" className="workspace-menu-panel" aria-labelledby="workspace-menu-title" aria-describedby={undefined}
+        onCloseAutoFocus={event => { event.preventDefault(); props.triggerRef.current?.focus(); }}>
         <div className="workspace-menu-heading">
           <div>
-            <span className="workspace-menu-eyebrow">SEU CANTINHO</span>
-            <h2 id="workspace-menu-title">Menu do enxoval</h2>
+            <SheetTitle id="workspace-menu-title">Menu do enxoval</SheetTitle>
           </div>
-          <button
+          <Button variant="brand" size="brand"
             type="button"
             className="workspace-menu-close"
             aria-label="Fechar menu do enxoval"
             onClick={props.onClose}
           >
             <X size={20} />
-          </button>
+          </Button>
         </div>
         <div className="workspace-menu-content">
+          {/* O perfil abre o menu: quem é a pessoa vem antes do que ela organiza. */}
+          <Button variant="brand" size="brand" type="button" className="profile-entry-mobile" aria-label="Meu perfil"
+            onClick={() => run(props.onProfile)}>
+            <UserAvatar name={props.user.name} src={props.user.avatarUrl} className="profile-entry-avatar" />
+            <span className="profile-entry-text">
+              <strong>Meu perfil</strong>
+              <small>{props.user.name}</small>
+            </span>
+            <ChevronRight size={18} className="profile-entry-chevron" aria-hidden="true" />
+          </Button>
           <section
             className="workspace-menu-switcher"
             aria-label="Seus enxovais"
           >
-            <label htmlFor="menu-enxoval">
+            <Label htmlFor="menu-enxoval">
               <Home size={17} /> Trocar de enxoval
-            </label>
+            </Label>
             {props.enxovais.length > 0 ? (
               <Select
                 id="menu-enxoval"
@@ -116,16 +116,26 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               <p>Vamos começar seu primeiro enxoval?</p>
             )}
             {props.user.isGuest !== true && (
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="workspace-menu-create"
                 disabled={props.busy}
                 onClick={() => run(props.onCreate)}
               >
                 <Plus size={17} /> Criar novo enxoval
-              </button>
+              </Button>
             )}
           </section>
+          {hasEnxoval && props.onStoreMode && (
+            <Button variant="brand" size="brand"
+              type="button"
+              className="workspace-menu-create workspace-menu-store"
+              disabled={props.busy}
+              onClick={() => run(props.onStoreMode!)}
+            >
+              <ShoppingBag size={17} /> Estou na loja
+            </Button>
+          )}
           {hasEnxoval && !isOwner && (
             <section
               className="workspace-menu-invite workspace-menu-guest"
@@ -149,13 +159,13 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           )}
           {hasEnxoval && !isOwner && (
             <div className="workspace-menu-danger">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 disabled={props.busy}
                 onClick={() => run(props.onLeave)}
               >
                 <DoorOpen size={18} /> Sair do enxoval
-              </button>
+              </Button>
               <p>Você confirma antes de sair.</p>
             </div>
           )}
@@ -185,14 +195,14 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                     : "Chame quem vai montar a casa com você: vocês editam a mesma lista."}
                 </p>
               </div>
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 className="invite-button"
                 disabled={props.busy}
                 onClick={() => run(props.onInvite)}
               >
                 <UserPlus size={18} aria-hidden="true" /> Convidar pessoas
-              </button>
+              </Button>
             </section>
           )}
           {hasEnxoval && (
@@ -206,7 +216,7 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 className={`environment-row environment-all-row ${props.allSelected ? "active" : ""}`}
               >
                 <span className="environment-all-spacer" aria-hidden="true" />
-                <button
+                <Button variant="brand" size="brand"
                   type="button"
                   className="environment-select"
                   disabled={props.busy}
@@ -215,8 +225,15 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 >
                   <ListChecks size={18} strokeWidth={1.6} aria-hidden="true" />
                   <span>Todos</span>
-                  <small>{activeItems(props.items).length}</small>
-                </button>
+                  <small className="environment-progress">
+                    <span className="environment-count" aria-hidden="true">
+                      {doneItems(props.items).length}/{activeItems(props.items).length}
+                    </span>
+                    <span className="sr-only">
+                      , {doneItems(props.items).length} de {activeItems(props.items).length} conquistados
+                    </span>
+                  </small>
+                </Button>
               </div>
               <EnvironmentList
                 categories={props.categories}
@@ -236,17 +253,17 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           )}
           {isOwner && (
             <div className="workspace-menu-danger">
-              <button
+              <Button variant="brand" size="brand"
                 type="button"
                 disabled={props.busy}
                 onClick={() => run(props.onDelete)}
               >
                 <Trash2 size={18} /> Excluir enxoval
-              </button>
+              </Button>
             </div>
           )}
           <div className="workspace-menu-help">
-            <button type="button" onClick={() => run(props.onHelp)}>
+            <Button variant="brand" size="brand" type="button" onClick={() => run(props.onHelp)}>
               <span className="workspace-menu-help-icon" aria-hidden="true">
                 <MessageCircleHeart size={20} />
               </span>
@@ -254,22 +271,20 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 <strong>Central de ajuda</strong>
                 <small>Relate um problema ou sugira uma melhoria</small>
               </span>
-            </button>
+            </Button>
           </div>
         </div>
         <div className="workspace-menu-account">
-          <span className="workspace-menu-avatar">
-            {props.user.name.slice(0, 1).toUpperCase()}
-          </span>
+          <UserAvatar name={props.user.name} src={props.user.avatarUrl} className="workspace-menu-avatar" />
           <div>
             <strong>{props.user.name}</strong>
             <span>{props.user.email}</span>
           </div>
-          <button type="button" onClick={() => run(props.onLogout)}>
+          <Button variant="brand" size="brand" type="button" onClick={() => run(props.onLogout)}>
             <LogOut size={17} /> Sair
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
