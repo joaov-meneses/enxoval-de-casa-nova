@@ -170,8 +170,7 @@
   box-shadow: 0 0 0 1px var(--cm-primary-dark);
 }
 .pp-tier:has(input:focus-visible) {
-  outline: 2px solid var(--cm-accent);
-  outline-offset: 2px;
+  box-shadow: inset 0 0 0 2px var(--cm-primary-dark);
 }
 .pp-tiers:disabled .pp-tier {
   cursor: default;
@@ -286,10 +285,6 @@
   color: inherit;
   cursor: pointer;
   border-radius: 8px;
-}
-.pp-period-toggle:focus-visible {
-  outline: 2px solid var(--cm-accent);
-  outline-offset: 4px;
 }
 .pp-period-text {
   display: grid;
@@ -1097,10 +1092,6 @@
 .pp-how [data-slot="collapsible-trigger"]:hover {
   background: color-mix(in oklab, var(--cm-accent) 9%, #fff);
 }
-.pp-how [data-slot="collapsible-trigger"]:focus-visible {
-  outline: 2px solid var(--cm-accent);
-  outline-offset: 2px;
-}
 .pp-how-icon {
   display: inline-grid;
   place-items: center;
@@ -1424,10 +1415,6 @@
   color: color-mix(in oklab, var(--cm-sand) 11%, var(--cm-text));
 }
 .pp-room-group > [data-slot="collapsible-trigger"]::-webkit-details-marker { display: none; }
-.pp-room-group > [data-slot="collapsible-trigger"]:focus-visible {
-  outline: 2px solid var(--cm-primary);
-  outline-offset: 2px;
-}
 .pp-room-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
 .pp-room-count { font-size: 12px; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); }
 .pp-room-group > [data-slot="collapsible-trigger"] > svg { flex-shrink: 0; }

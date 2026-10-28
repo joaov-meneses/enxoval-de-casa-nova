@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { ApiError, fetchPublicHousewarming, sendHousewarmingGuest } from '../api';
 import type { PublicHousewarming } from '../housewarming';
 import { Brand } from './Brand';
+import { Nino } from './Nino';
 import { Dialog } from './Dialog';
 import { Gift, Heart, Copy, CalendarDays, MessageCircleHeart } from './icons';
 import { Button } from './ui/button';
@@ -118,7 +119,7 @@ export function HousewarmingPage() {
           <div className="housewarming-actions">{Boolean(data.items.length) && <Button asChild variant="brand" size="brand" className="button button-dark"><a href="#presentes"><Gift size={19} /> Escolher um presente</a></Button>}
             {data.pix && <Button variant="outline" onClick={() => setDialog('pix')}><Heart size={19} /> Presentear via Pix</Button>}
             <Button variant="ghost" onClick={() => setDialog('message')}><MessageCircleHeart size={19} /> Deixar um recado</Button>
-          </div></div><div className="housewarming-nino"><img src="/brand/nino-logo.webp" alt="Nino, o companheiro da casa nova" width={224} height={264} /><span>Cada carinho encontra seu lugar.</span></div>
+          </div></div><div className="housewarming-nino"><Nino pose={success ? 'happy' : 'wave'} size={160} title="Nino, o companheiro da casa nova" /><span>Cada carinho encontra seu lugar.</span></div>
         </section>
         {success && <p role="status" className="housewarming-success">{success}</p>}
         {error && <p role="alert" className="form-error">{error}</p>}

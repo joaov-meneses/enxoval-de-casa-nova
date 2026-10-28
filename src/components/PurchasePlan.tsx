@@ -70,6 +70,7 @@ interface PurchasePlanViewProps {
   canEdit: boolean;
   onUpdateEnxoval: (updates: PlanningUpdates) => Promise<void>;
   onUpdateItem: (id: string, updates: TimingUpdates) => Promise<void>;
+  onMoveItem: (id: string, categoryId: string) => Promise<void>;
   onUrgencyScores?: (scores: { id: string; name: string; categoryId: string; urgency: number; confidence: number }[]) => void;
   onAddItem: (
     name: string,
@@ -483,6 +484,7 @@ export function PurchasePlanView({
   canEdit,
   onUpdateEnxoval,
   onUpdateItem,
+  onMoveItem,
   onAddItem,
 }: PurchasePlanViewProps) {
   const [error, setError] = useState("");
@@ -787,6 +789,7 @@ export function PurchasePlanView({
         categories={categories}
         items={items}
         onAddItem={onAddItem}
+        onMoveItem={onMoveItem}
       />
 
       {populated.length === 0 ? (

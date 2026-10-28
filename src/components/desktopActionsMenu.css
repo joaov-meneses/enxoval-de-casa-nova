@@ -82,7 +82,6 @@
 .desktop-actions-popup button:focus-visible {
   background: color-mix(in oklab, var(--cm-success) 4%, var(--cm-bg));
   color: color-mix(in oklab, var(--cm-primary-dark) 77%, var(--cm-text));
-  outline: 2px solid transparent;
 }
 .desktop-actions-popup button:focus-visible {
   box-shadow: inset 0 0 0 2px #bb7353;

@@ -785,6 +785,7 @@ export default function App() {
                     onUpdateEnxoval={updatePlanning}
                     onUrgencyScores={applyUrgencyScores}
                     onUpdateItem={(id, updates) => updateItem(id, updates)}
+                    onMoveItem={(id, categoryId) => updateItem(id, { categoryId })}
                     onAddItem={(name, categoryId, categoryName) =>
                       addItem(name, categoryId, categoryName)
                     }
@@ -852,8 +853,8 @@ export default function App() {
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               >
-                <LayoutDashboard size={19} />
-                Meu Lar
+                <LayoutDashboard size={20} />
+                <span>Meu Lar</span>
               </Button>
               <Button
                 variant="brand"
@@ -862,8 +863,8 @@ export default function App() {
                 aria-current={workspaceView === "list" ? "page" : undefined}
                 onClick={showAllItems}
               >
-                <ListChecks size={19} />
-                Meu enxoval
+                <ListChecks size={20} />
+                <span>Meu enxoval</span>
               </Button>
               <Button
                 variant="brand"
@@ -876,13 +877,13 @@ export default function App() {
                 }}
                 disabled={!hasEnxoval}
               >
-                <CalendarClock size={19} />
-                Planejamento
+                <CalendarClock size={20} />
+                <span>Planejamento</span>
               </Button>
               <Button variant="brand" size="brand" className={workspaceView === 'housewarming' ? 'active' : ''}
                 aria-current={workspaceView === 'housewarming' ? 'page' : undefined}
                 onClick={() => { setWorkspaceView('housewarming'); window.scrollTo({ top: 0 }); }} disabled={!hasEnxoval}>
-                <Gift size={19} /> Chá de Casa Nova
+                <Gift size={20} /> <span>Chá de casa</span>
               </Button>
             </nav>
             <Button

@@ -116,7 +116,7 @@ test('late Wake Lock permission is released after leaving the store', async () =
     const page = await context.newPage();
     await page.goto('/app/home/loja');
     await expect.poll(() => page.evaluate(() => (window as unknown as { wakeRequests: number }).wakeRequests)).toBe(1);
-    await page.getByRole('button', { name: 'Sair do modo loja', exact: true }).click();
+    await page.locator('.mobile-bottom-nav').getByRole('button', { name: /Meu Lar/ }).click();
     await expect(page.locator('.store-mode')).toHaveCount(0);
     await page.evaluate(() => (window as unknown as { resolveWake: () => void }).resolveWake());
     await expect.poll(() => page.evaluate(() => (window as unknown as { wakeReleases: number }).wakeReleases)).toBe(1);

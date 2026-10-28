@@ -141,10 +141,6 @@
   box-shadow: 0 4px 14px #422d2418;
   transform: translateY(-1px);
 }
-.fb-kind:focus-visible {
-  outline: 2px solid var(--cm-accent);
-  outline-offset: 2px;
-}
 .fb-kind-icon {
   display: grid;
   place-items: center;
@@ -331,8 +327,6 @@
 }
 .fb-field input:not([type="checkbox"]):focus-visible,
 .fb-field textarea:focus-visible {
-  outline: 2px solid var(--cm-accent);
-  outline-offset: 1px;
   border-color: var(--cm-accent);
 }
 .fb-field.has-error input:not([type="checkbox"]),
@@ -425,8 +419,7 @@
   color: #fff;
 }
 .fb-choice:has(input:focus-visible) {
-  outline: 2px solid var(--cm-accent);
-  outline-offset: 2px;
+  box-shadow: inset 0 0 0 2px var(--cm-primary-dark);
 }
 .fb-choices.has-error .fb-choice {
   border-color: color-mix(in oklab, var(--cm-primary) 58%, #fff);
@@ -519,8 +512,7 @@
   cursor: pointer;
 }
 .fb-check:has(input:focus-visible) {
-  outline: 2px solid var(--cm-accent);
-  outline-offset: 2px;
+  box-shadow: inset 0 0 0 2px var(--cm-primary-dark);
 }
 .fb-check > span {
   display: grid;

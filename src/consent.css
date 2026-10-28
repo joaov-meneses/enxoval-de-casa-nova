@@ -96,11 +96,6 @@
   color: #fff;
 }
 
-.consent-button:focus-visible {
-  outline: 3px solid var(--cm-accent, #244b66);
-  outline-offset: 2px;
-}
-
 @media (max-width: 420px) {
   .consent-actions {
     grid-template-columns: 1fr;

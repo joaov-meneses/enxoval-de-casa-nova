@@ -34,7 +34,6 @@
   border-radius: 8px;
 }
 .subscription-signout:hover { background: color-mix(in oklab, var(--cm-sand) 31%, #fff); }
-.subscription-signout:focus-visible { outline: 3px solid var(--cm-action); outline-offset: 2px; }
 .subscription-card h1 {
   margin: 0;
   font-family: var(--serif);
@@ -95,7 +94,6 @@
   .subscription-plan-option.subscription-pass-pulse,
   .subscription-plan-checkout > .subscription-pass-cta-pulse { animation: none; }
 }
-.subscription-plan-option input:focus-visible { outline: 2px solid var(--cm-action); outline-offset: 3px; }
 .subscription-plan-option input { position: absolute; top: 18px; right: 16px; accent-color: var(--cm-action); width: 20px; height: 20px; margin: 0; }
 .subscription-plan-options:disabled { opacity: .65; }
 .subscription-plan-content { display: grid; gap: 6px; width: 100%; min-width: 0; }
@@ -118,7 +116,7 @@
 .subscription-included [data-slot="collapsible-trigger"]::after { content: '+'; font-size: 18px; }
 .subscription-included[data-state="open"] [data-slot="collapsible-trigger"]::after { content: '−'; }
 .subscription-included [data-slot="collapsible-trigger"]::-webkit-details-marker { display: none; }
-.subscription-included [data-slot="collapsible-trigger"]:focus-visible { outline: 3px solid var(--cm-action); outline-offset: 2px; border-radius: 6px; }
+.subscription-included [data-slot="collapsible-trigger"]:focus-visible { border-radius: 6px; }
 .subscription-included ul { display: grid; gap: 10px; margin: 0; padding: 6px 0 12px; list-style: none; }
 .subscription-included li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.5; color: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text)); }
 .subscription-included li svg { flex: 0 0 15px; margin-top: 2px; color: var(--cm-action); }
@@ -128,7 +126,7 @@
 .subscription-trial-help { position: absolute; top: 0; right: 0; display: flex; align-items: center; justify-content: flex-start; gap: 6px; width: calc(50% - 8px); min-height: 44px; padding: 3px 0; color: color-mix(in oklab, var(--cm-primary-dark) 96%, #000); text-align: left; font-size: 12px; line-height: 1.4; }
 .subscription-trial-help svg { flex: 0 0 16px; }
 .subscription-trial-help:hover span { text-decoration: underline; }
-.subscription-trial-help:focus-visible { outline: 2px solid var(--cm-action); outline-offset: 3px; border-radius: 6px; }
+.subscription-trial-help:focus-visible { border-radius: 6px; }
 .subscription-trial-explanation { max-width: 500px; display: flex; flex-direction: column; overflow: hidden; }
 .subscription-trial-explanation > .dialog-heading { flex-shrink: 0; }
 .subscription-trial-explanation > .subscription-trial-explanation-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

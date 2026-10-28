@@ -199,6 +199,13 @@ export function registerHousewarmingRoutes(router: Router, deps: Deps) {
         await db.query('SELECT id FROM enxovais WHERE id = $1 FOR UPDATE', [id]);
         const valid = await db.query('SELECT id FROM items WHERE enxoval_id = $1 AND id = ANY($2::uuid[])', [id, input.itemIds]);
         if (valid.rowCount !== input.itemIds.length) throw new HttpError(400, 'Escolha apenas itens deste enxoval.');
+        // Item conquistado não entra no convite; os que já estavam (presenteados pelo Chá) podem continuar.
+        const conquered = await db.query(`
+          SELECT i.id FROM items i
+          WHERE i.id = ANY($2::uuid[]) AND i.status <> 'researching' AND NOT EXISTS (
+            SELECT 1 FROM housewarming_items h JOIN housewarming_lists l ON l.id = h.list_id WHERE l.enxoval_id = $1 AND h.item_id = i.id)
+        `, [id, input.itemIds]);
+        if (conquered.rowCount) throw new HttpError(400, 'Escolha só itens que ainda estão na fila. Os já conquistados não entram no convite.');
         const saved = await db.query<{ id: string }>(`
           INSERT INTO housewarming_lists (id, enxoval_id, user_id, slug, title, message, event_date, is_public, pix_key, pix_key_type, pix_receiver_name, pix_city)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)

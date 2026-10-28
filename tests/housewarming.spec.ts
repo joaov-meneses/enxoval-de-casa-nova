@@ -140,6 +140,8 @@ for (const width of [375, 1440]) {
       await expect(page.locator('.housewarming-manager').getByRole('status')).toContainText('Seu Chá está publicado');
       expect(saved).toMatchObject({ slug: 'lar-da-ana-e-leo', itemIds: [itemId], isPublic: true, pix: null });
       await expect(page.getByLabel('Link para compartilhar')).toHaveValue(/\/cha\/lar-da-ana-e-leo$/);
+      const inboxTab = page.getByRole('tab', { name: /Recados e reservas/ });
+      if (await inboxTab.isVisible()) await inboxTab.click();
       await expect(page.locator('.housewarming-inbox blockquote')).toHaveText('<script>carinho privado</script>');
       await page.getByRole('button', { name: 'Já recebi este presente' }).click();
       await expect(page.locator('.housewarming-manager').getByRole('status')).toContainText('Presente recebido');

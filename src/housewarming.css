@@ -1,12 +1,8 @@
 .housewarming-manager, .housewarming-public { color: var(--cm-text); }
-.housewarming-heading { margin: 8px 0 24px; }
-.housewarming-heading h2, .housewarming-manager h3, .housewarming-public h1, .housewarming-public h2, .housewarming-public h3 { font-family: var(--font-serif, 'Fraunces', Georgia, serif); }
-.housewarming-heading h2 { display: flex; align-items: center; gap: 12px; font-size: clamp(26px, 4vw, 36px); margin: 8px 0; }
-.housewarming-heading p, .housewarming-manager p, .housewarming-public p { line-height: 1.65; }
-.housewarming-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.housewarming-manager h3, .housewarming-public h1, .housewarming-public h2, .housewarming-public h3 { font-family: var(--font-serif, 'Fraunces', Georgia, serif); }
+.housewarming-manager p, .housewarming-public p { line-height: 1.65; }
 .housewarming-panel { padding: clamp(18px, 3vw, 28px); border: 1px solid color-mix(in srgb, var(--cm-sand) 65%, white); border-radius: 16px; background: white; min-width: 0; }
 .housewarming-panel h3 { font-size: 22px; display: flex; align-items: center; gap: 8px; margin: 0 0 14px; }
-.housewarming-side { display: grid; gap: 24px; min-width: 0; }
 .housewarming-form fieldset { border: 0; padding: 0; min-width: 0; }
 .housewarming-form label, .housewarming-panel > label, .housewarming-pix label { display: grid; gap: 7px; font-weight: 700; margin: 0 0 18px; }
 .housewarming-form label > span:not(:first-child), .housewarming-form small, .housewarming-panel small { font-weight: 400; }
@@ -15,10 +11,6 @@
 .housewarming-form p { margin-bottom: 14px; }
 .housewarming-form select { min-height: 44px; border: 1px solid var(--input); border-radius: 7px; padding: 8px 12px; background: white; font: inherit; width: 100%; }
 .housewarming-form input:not([type=checkbox]), .housewarming-panel input, .housewarming-form textarea { min-height: 44px; }
-.housewarming-form .housewarming-check { display: flex; align-items: center; gap: 12px; min-height: 44px; margin-bottom: 6px; cursor: pointer; }
-.housewarming-check input { accent-color: var(--cm-action); width: 20px; height: 20px; flex: 0 0 auto; }
-.housewarming-check span { display: grid; }
-.housewarming-item-picker { max-height: 350px; overflow-y: auto; overscroll-behavior: contain; border-block: 1px solid var(--input); padding: 10px 4px; }
 .housewarming-section-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .housewarming-form .housewarming-section-title { margin-top: 26px; }
 .housewarming-form .housewarming-section-title h3 { margin: 0; }
@@ -27,10 +19,6 @@
 .housewarming-actions button, .housewarming-gift-card button { white-space: normal; height: auto; }
 .housewarming-feedback:empty { display: none; }
 .housewarming-feedback, .housewarming-success { padding: 14px 18px; background: color-mix(in srgb, var(--cm-success) 13%, white); border-radius: 10px; margin-bottom: 20px; }
-.housewarming-inbox { list-style: none; padding: 0; margin: 18px 0 0; }
-.housewarming-inbox li { border-top: 1px solid var(--input); padding: 18px 0; overflow-wrap: anywhere; }
-.housewarming-inbox p { margin: 0 0 6px; }
-.housewarming-inbox blockquote { margin: 12px 0; padding-left: 14px; border-left: 3px solid var(--cm-sand); white-space: pre-wrap; }
 .housewarming-badge { display: inline-block; font-size: 12px; background: color-mix(in srgb, var(--cm-success) 15%, white); border-radius: 5px; padding: 3px 8px; margin-left: 8px; }
 .housewarming-notice { display: flex; align-items: center; width: 100%; padding: 14px 18px; gap: 14px; margin: 0 0 20px; border: 1px solid var(--cm-sand); background: color-mix(in srgb, var(--cm-success) 9%, white); border-radius: 12px; text-align: left; }
 .housewarming-notice > span:first-of-type { display: grid; gap: 3px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -72,7 +60,6 @@
 .housewarming-pix img { max-width: 100%; margin-inline: auto; border: 1px solid var(--input); }
 .housewarming-pix textarea { font-family: monospace; font-size: 12px; overflow-wrap: anywhere; }
 @media (max-width: 900px) {
-  .housewarming-layout { grid-template-columns: minmax(0, 1fr); }
   .housewarming-hero { grid-template-columns: minmax(0, 1fr) 160px; gap: 24px; }
   .housewarming-gift-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .housewarming-notice > span:last-child { display: none; }
@@ -93,4 +80,240 @@
   .housewarming-gifts { padding-block: 32px; }
   .housewarming-manager .housewarming-actions { align-items: stretch; }
   .housewarming-manager .housewarming-actions > * { flex: 1 1 auto; }
+}
+
+/* Chá de Casa Nova: tela dos moradores */
+.housewarming-manager {
+  --hw-line: color-mix(in srgb, var(--cm-sand) 55%, white);
+  --hw-muted: color-mix(in srgb, var(--cm-text) 74%, var(--cm-bg));
+  --hw-tint: color-mix(in srgb, var(--cm-sand) 14%, white);
+  --hw-field: color-mix(in srgb, var(--cm-sand) 40%, var(--cm-text));
+  --hw-breath: 0 1px 2px #422d240d, 0 10px 24px -18px #3b2a2040;
+  max-width: 1160px;
+  margin-inline: auto;
+}
+.housewarming-manager ::selection { background: color-mix(in srgb, var(--cm-primary) 22%, white); color: var(--cm-text); }
+.housewarming-manager h3 { font-variation-settings: 'SOFT' 100; font-weight: 600; letter-spacing: -0.01em; }
+
+.housewarming-intro {
+  display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px 24px;
+  margin: 4px 0 20px; padding: clamp(22px, 4vw, 34px);
+  border: 1px solid var(--hw-line); border-radius: 18px; box-shadow: var(--hw-breath);
+  background:
+    radial-gradient(110% 150% at 100% 0%, color-mix(in srgb, var(--cm-primary) 16%, transparent), transparent 58%),
+    radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, var(--cm-olive-soft) 16%, transparent), transparent 60%),
+    linear-gradient(165deg, white, color-mix(in srgb, var(--cm-sand) 20%, var(--cm-bg)));
+}
+.housewarming-intro h2 {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 8px;
+  font-family: var(--font-serif); font-variation-settings: 'SOFT' 100; font-weight: 600;
+  font-size: clamp(28px, 4.4vw, 40px); line-height: 1.1; letter-spacing: -0.02em; text-wrap: balance;
+}
+.housewarming-intro h2 svg { color: var(--cm-primary-dark); flex: none; }
+.housewarming-intro p { margin: 0; max-width: 56ch; color: var(--hw-muted); font-size: 16px; }
+.housewarming-state {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px;
+  font-size: 13px; font-weight: 800; white-space: nowrap;
+  background: color-mix(in srgb, var(--cm-sand) 32%, white); border: 1px solid var(--hw-line);
+}
+.housewarming-state::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--hw-field); }
+.housewarming-state.is-live { background: color-mix(in srgb, var(--cm-olive-soft) 26%, white); color: color-mix(in srgb, var(--cm-success) 78%, var(--cm-text)); border-color: color-mix(in srgb, var(--cm-olive-soft) 45%, white); }
+.housewarming-state.is-live::before { background: var(--cm-success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cm-success) 20%, transparent); }
+
+.housewarming-manager .housewarming-feedback { display: flex; align-items: center; gap: 10px; border: 1px solid color-mix(in srgb, var(--cm-success) 25%, white); border-radius: 12px; color: color-mix(in srgb, var(--cm-success) 70%, var(--cm-text)); font-weight: 700; }
+.housewarming-manager .housewarming-feedback:empty { display: none; }
+
+.housewarming-tabs { display: none; }
+.workspace-app.workspace-view-housewarming .mobile-fab-add { display: none; }
+.housewarming-layout {
+  display: grid; gap: 20px; align-items: start;
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr);
+  grid-template-areas: "form share" "form inbox";
+  grid-template-rows: auto 1fr;
+}
+.housewarming-layout > .housewarming-form { grid-area: form; }
+.housewarming-layout > .housewarming-share { grid-area: share; }
+.housewarming-layout > .housewarming-inbox-card { grid-area: inbox; }
+
+/* Prévia do convite: a porta em arco do Nino */
+.housewarming-share { background: white; border: 1px solid var(--hw-line); border-radius: 18px; box-shadow: var(--hw-breath); overflow: hidden; min-width: 0; }
+.housewarming-preview {
+  display: grid; justify-items: center; align-content: center; gap: 8px; text-align: center;
+  margin: 14px 14px 0; min-height: 176px; padding: 34px 26px 22px;
+  border-radius: 160px 160px 12px 12px; color: white;
+  background:
+    radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--cm-primary) 70%, transparent), transparent 70%),
+    linear-gradient(170deg, var(--cm-action), var(--cm-action-hover));
+}
+.housewarming-preview svg { width: 40px; height: 40px; padding: 9px; border-radius: 50%; background: color-mix(in srgb, white 16%, transparent); box-sizing: border-box; }
+.housewarming-preview strong {
+  font-family: var(--font-serif); font-variation-settings: 'SOFT' 100; font-weight: 600; font-size: 22px; line-height: 1.2;
+  overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.housewarming-preview span { display: block; font-size: 14px; font-weight: 700; }
+.housewarming-preview span::first-letter { text-transform: uppercase; }
+.housewarming-share-body { padding: 18px 22px 22px; }
+.housewarming-share-body h3 { font-size: 20px; margin: 0 0 2px; }
+.housewarming-share-meta { margin: 0 0 14px; color: var(--hw-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.housewarming-share-body > p:last-child { margin: 0; color: var(--hw-muted); font-size: 14.5px; }
+.housewarming-share-body label { display: grid; gap: 7px; font-size: 14px; font-weight: 700; }
+.housewarming-share-body .housewarming-actions { margin-top: 14px; }
+.housewarming-share-body .housewarming-actions > * { flex: 1 1 140px; }
+
+/* Cartões do formulário */
+.housewarming-manager .housewarming-form fieldset { display: grid; gap: 16px; }
+.housewarming-card { background: white; border: 1px solid var(--hw-line); border-radius: 14px; padding: clamp(18px, 3vw, 26px); min-width: 0; box-shadow: 0 1px 2px #422d240d; }
+.housewarming-card h3 { display: flex; align-items: center; gap: 8px; font-size: 21px; line-height: 1.2; margin: 0 0 16px; }
+.housewarming-card h3 svg { color: var(--cm-primary-dark); }
+.housewarming-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.housewarming-card-heading h3 { margin: 0; }
+.housewarming-card-heading > span { padding: 4px 11px; border-radius: 999px; background: color-mix(in srgb, var(--cm-sand) 30%, white); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.housewarming-card-heading + p { margin: 0 0 16px; color: var(--hw-muted); font-size: 14.5px; }
+.housewarming-manager .housewarming-card label { font-size: 14px; margin-bottom: 16px; }
+.housewarming-manager .housewarming-card .housewarming-switch { margin: 0; }
+.housewarming-manager .housewarming-card .housewarming-pick { margin: 0 0 6px; }
+.housewarming-label > span { font-weight: 400; color: var(--hw-muted); }
+.housewarming-manager .housewarming-card small { font-size: 13px; color: var(--hw-muted); }
+.housewarming-manager .housewarming-form label > span:not(:first-child) { font-weight: 400; color: var(--hw-muted); }
+.housewarming-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.housewarming-fields > label { align-content: start; }
+.housewarming-manager input, .housewarming-manager textarea, .housewarming-manager select { border-color: var(--hw-field); background: white; caret-color: var(--cm-primary-dark); }
+.housewarming-manager .housewarming-form select { border-radius: 10px; min-height: 44px; }
+.housewarming-field-icon { position: relative; display: block; }
+.housewarming-field-icon > svg { position: absolute; left: 13px; top: 0; bottom: 0; margin-block: auto; color: var(--hw-muted); pointer-events: none; }
+.housewarming-manager .housewarming-field-icon input { padding-left: 38px; }
+
+/* Seletor de presentes por cômodo */
+.housewarming-manager .housewarming-item-picker {
+  max-height: 400px; overflow-y: auto; overscroll-behavior: contain; padding: 0 10px 10px;
+  border: 1px solid var(--hw-line); border-radius: 12px; background: var(--hw-tint);
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--cm-sand) 80%, var(--cm-text)) transparent;
+}
+.housewarming-room + .housewarming-room { margin-top: 6px; }
+.housewarming-room-heading {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 2px 4px; background: var(--hw-tint); font-size: 13px; color: var(--hw-muted); font-variant-numeric: tabular-nums;
+}
+.housewarming-room-heading strong { color: var(--cm-text); font-size: 14px; font-weight: 800; margin-right: 4px; }
+.housewarming-room-heading button {
+  min-height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; cursor: pointer;
+  color: var(--cm-primary-dark); font: inherit; font-size: 13px; font-weight: 800; transition: background-color 150ms;
+}
+.housewarming-room-heading button:hover:not(:disabled) { background: color-mix(in srgb, var(--cm-primary) 10%, white); color: var(--cm-action-hover); }
+.housewarming-room-heading button:disabled { opacity: .5; cursor: default; }
+.housewarming-manager .housewarming-pick {
+  display: flex; align-items: center; gap: 12px; min-height: 50px; margin: 0 0 6px; padding: 10px 14px;
+  background: white; border: 1px solid var(--hw-line); border-radius: 10px; cursor: pointer;
+  font-size: 15px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere;
+  transition: background-color 150ms, border-color 150ms;
+}
+.housewarming-manager .housewarming-pick:hover { border-color: color-mix(in srgb, var(--cm-primary) 35%, white); }
+.housewarming-manager .housewarming-pick:has(input:checked) { background: color-mix(in srgb, var(--cm-primary) 8%, white); border-color: color-mix(in srgb, var(--cm-primary) 45%, white); }
+.housewarming-pick input {
+  appearance: none; flex: none; width: 22px; height: 22px; margin: 0; border-radius: 7px; cursor: pointer;
+  border: 1.5px solid var(--hw-field); background: white center / 14px no-repeat; transition: background-color 150ms, border-color 150ms;
+}
+.housewarming-pick input:checked {
+  background-color: var(--cm-action); border-color: var(--cm-action);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+.housewarming-pick input:disabled { opacity: .45; cursor: not-allowed; }
+.housewarming-manager .housewarming-pick:has(input:focus-visible), .housewarming-manager .housewarming-switch:has(input:focus-visible) { box-shadow: inset 0 0 0 2px var(--cm-primary-dark); }
+.housewarming-empty { margin: 0; padding: 22px 12px; text-align: center; color: var(--hw-muted); font-size: 14.5px; }
+.housewarming-note {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 14px; padding: 12px 14px;
+  border: 1px solid var(--hw-line); border-radius: 12px; background: color-mix(in srgb, var(--cm-sand) 22%, white);
+}
+.housewarming-note p { flex: 1 1 220px; margin: 0; font-size: 14px; }
+.housewarming-note button { min-height: 44px; }
+
+/* Interruptores de Pix e publicação */
+.housewarming-manager .housewarming-switch {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0; padding: 14px 16px;
+  border: 1px solid var(--hw-line); border-radius: 12px; background: var(--hw-tint); cursor: pointer;
+  font-size: 15px; font-weight: 700; transition: border-color 150ms, background-color 150ms;
+}
+.housewarming-manager .housewarming-switch:has(input:checked) { background: color-mix(in srgb, var(--cm-primary) 6%, white); border-color: color-mix(in srgb, var(--cm-primary) 35%, white); }
+.housewarming-switch > span { display: grid; gap: 3px; }
+.housewarming-manager .housewarming-switch small { font-weight: 400; }
+.housewarming-switch input {
+  appearance: none; position: relative; flex: none; width: 50px; height: 30px; margin: 0; border-radius: 999px; cursor: pointer;
+  background: color-mix(in srgb, var(--cm-sand) 70%, white); border: 1.5px solid var(--hw-field); transition: background-color 200ms, border-color 200ms;
+}
+.housewarming-switch input::before {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%;
+  background: white; box-shadow: 0 1px 3px #3b2a2040; transition: transform 220ms cubic-bezier(.22, 1, .36, 1);
+}
+.housewarming-switch input:checked { background: var(--cm-action); border-color: var(--cm-action); }
+.housewarming-switch input:checked::before { transform: translateX(20px); }
+.housewarming-pix-fields { margin-top: 16px; }
+.housewarming-hint {
+  display: flex; align-items: flex-start; gap: 9px; margin: 0 0 16px; padding: 11px 14px; border-radius: 10px;
+  background: color-mix(in srgb, var(--cm-accent) 7%, white); font-size: 14px; line-height: 1.55;
+}
+.housewarming-hint svg { flex: none; margin-top: 2px; color: var(--cm-accent); }
+
+/* Barra de salvar */
+.housewarming-savebar {
+  position: sticky; bottom: 16px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 10px 10px 18px; border: 1px solid var(--hw-line); border-radius: 16px;
+  background: color-mix(in srgb, white 90%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 18px 36px -20px #3b2a2059, 0 1px 2px #422d240d;
+}
+.housewarming-savebar > span { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--hw-muted); }
+.housewarming-savebar > span.is-dirty { color: var(--cm-primary-dark); }
+.housewarming-savebar > span.is-dirty::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.housewarming-savebar button { min-height: 48px; flex: none; }
+
+/* Recados e reservas */
+.housewarming-inbox-card > p { margin: 0 0 14px; color: var(--hw-muted); font-size: 14.5px; }
+.housewarming-inbox-card .housewarming-card-heading > span { background: var(--cm-action); color: white; }
+.housewarming-manager .housewarming-inbox { list-style: none; padding: 0; margin: 14px 0 0; }
+.housewarming-manager .housewarming-inbox li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; padding: 16px 0; border-top: 1px solid var(--hw-line); overflow-wrap: anywhere; }
+.housewarming-manager .housewarming-inbox p { margin: 0 0 2px; line-height: 1.5; }
+.housewarming-avatar {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  background: color-mix(in srgb, var(--cm-primary) 13%, white); color: var(--cm-primary-dark);
+  font-family: var(--font-serif); font-variation-settings: 'SOFT' 100; font-size: 18px; font-weight: 600;
+}
+.housewarming-inbox li.is-new .housewarming-avatar { box-shadow: 0 0 0 2px white, 0 0 0 4px color-mix(in srgb, var(--cm-primary) 55%, white); }
+.housewarming-manager .housewarming-inbox blockquote {
+  margin: 10px 0 0; padding: 10px 14px; border: 0; border-radius: 4px 14px 14px 14px;
+  background: color-mix(in srgb, var(--cm-sand) 22%, white); white-space: pre-wrap;
+}
+.housewarming-manager .housewarming-inbox .housewarming-actions { margin-top: 12px; }
+.housewarming-manager .housewarming-actions > .housewarming-badge { margin-left: 0; }
+.housewarming-manager .housewarming-badge { margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; vertical-align: 2px; background: color-mix(in srgb, var(--cm-olive-soft) 28%, white); color: color-mix(in srgb, var(--cm-success) 78%, var(--cm-text)); }
+
+@media (max-width: 1023px) {
+  .housewarming-tabs {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 0 16px; padding: 4px;
+    border-radius: 14px; background: color-mix(in srgb, var(--cm-sand) 34%, var(--cm-bg));
+  }
+  .housewarming-tabs button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 10px;
+    border: 0; border-radius: 10px; background: transparent; color: var(--hw-muted); cursor: pointer;
+    font: inherit; font-size: 14px; font-weight: 800; transition: background-color 180ms, color 180ms;
+  }
+  .housewarming-tabs button[aria-selected=true] { background: white; color: var(--cm-primary-dark); box-shadow: 0 1px 2px #422d2414, 0 4px 10px -6px #3b2a2040; }
+  .housewarming-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--cm-action); color: white; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .housewarming-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "share" "form" "inbox"; grid-template-rows: none; gap: 16px; }
+  .housewarming-layout[data-tab=invite] > [data-pane=inbox], .housewarming-layout[data-tab=inbox] > [data-pane=invite] { display: none; }
+  .housewarming-savebar { bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 640px) {
+  .housewarming-intro { padding: 20px 18px; border-radius: 16px; margin-bottom: 16px; }
+  .housewarming-intro h2 { font-size: 27px; gap: 10px; }
+  .housewarming-intro h2 svg { width: 24px; height: 24px; }
+  .housewarming-intro p { font-size: 15px; }
+  .housewarming-fields { grid-template-columns: minmax(0, 1fr); }
+  .housewarming-card { padding: 18px 16px; }
+  .housewarming-preview { min-height: 150px; padding: 28px 20px 18px; }
+  .housewarming-share-body { padding: 16px 18px 18px; }
+  .housewarming-savebar { padding: 8px 8px 8px 14px; }
+  .housewarming-savebar > span { font-size: 13px; }
+  .housewarming-manager .housewarming-item-picker { max-height: 360px; padding-inline: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .housewarming-manager *, .housewarming-manager *::before { transition: none !important; }
 }

@@ -1,0 +1,63 @@
+.date-picker-trigger {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--cm-sand) 40%, var(--cm-text)); border-radius: 10px; background: white;
+  color: var(--cm-text); font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.date-picker-trigger > svg { flex: none; color: var(--cm-primary-dark); }
+.date-picker-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.date-picker-trigger > span::first-letter { text-transform: uppercase; }
+.date-picker-trigger[data-empty] { color: color-mix(in srgb, var(--cm-text) 70%, var(--cm-bg)); font-weight: 400; }
+.date-picker-trigger:hover:not(:disabled) { border-color: var(--cm-primary-dark); }
+.date-picker-trigger[data-state=open] { border-color: var(--cm-primary-dark); }
+.date-picker-trigger:disabled { opacity: .5; cursor: not-allowed; }
+
+.date-picker-pop {
+  width: min(320px, calc(100vw - 32px)); padding: 14px; border: 1px solid color-mix(in srgb, var(--cm-sand) 55%, white);
+  border-radius: 16px; color: var(--cm-text); font-family: var(--font-sans);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cm-sand) 16%, white), white 34%);
+  box-shadow: 0 1px 2px #422d240d, 0 24px 48px -24px #3b2a2066;
+}
+.date-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.date-picker-head strong {
+  font-family: var(--font-serif); font-variation-settings: 'SOFT' 100; font-size: 18px; font-weight: 600; letter-spacing: -0.01em;
+}
+.date-picker-head strong::first-letter { text-transform: uppercase; }
+.date-picker-head button {
+  display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--cm-primary-dark); cursor: pointer; transition: background-color 150ms;
+}
+.date-picker-head button:hover { background: color-mix(in srgb, var(--cm-primary) 10%, white); }
+
+.date-picker-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.date-picker-weekday {
+  display: grid; place-items: center; height: 28px; font-size: 12px; font-weight: 800;
+  color: color-mix(in srgb, var(--cm-text) 65%, var(--cm-bg));
+}
+.date-picker-day {
+  display: grid; place-items: center; aspect-ratio: 1; min-height: 38px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--cm-text); font: inherit; font-size: 15px; font-weight: 600;
+  font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color 120ms, color 120ms;
+}
+.date-picker-day:hover { background: color-mix(in srgb, var(--cm-primary) 10%, white); color: var(--cm-action-hover); }
+.date-picker-day[data-outside] { color: color-mix(in srgb, var(--cm-text) 42%, var(--cm-bg)); font-weight: 400; }
+.date-picker-day[data-today] { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--cm-primary) 70%, white); font-weight: 800; }
+.date-picker-day[aria-pressed=true] { background: var(--cm-action); color: white; box-shadow: 0 2px 6px #873c2533; }
+.date-picker-day[aria-pressed=true]:hover { background: var(--cm-action-hover); color: white; }
+.date-picker-day[aria-disabled=true] { color: color-mix(in srgb, var(--cm-text) 30%, var(--cm-bg)); cursor: not-allowed; background: transparent; }
+
+.date-picker-foot {
+  display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--cm-sand) 55%, white);
+}
+.date-picker-foot button {
+  min-height: 40px; padding: 0 14px; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--cm-primary-dark); transition: background-color 150ms;
+}
+.date-picker-foot button:last-child { border-color: color-mix(in srgb, var(--cm-primary) 40%, white); background: white; }
+.date-picker-foot button:hover:not(:disabled) { background: color-mix(in srgb, var(--cm-primary) 10%, white); }
+.date-picker-foot button:disabled { opacity: .45; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .date-picker-trigger, .date-picker-day, .date-picker-head button, .date-picker-foot button { transition: none; }
+}

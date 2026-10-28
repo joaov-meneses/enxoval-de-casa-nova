@@ -185,7 +185,7 @@ Os componentes são artesanais e táteis no comportamento: cantos macios, alvos 
 Uma paleta de barro e linho: neutros quentes e levemente rosados, um terracota em três intensidades, sálvia para conquistas e um único azul profundo para informação.
 
 ### Primary
-- **Terracota Profundo** (`terracota-profundo`): fundo do botão principal, links, textos em terracota, itálico de destaque nos títulos e anel de foco. É o terracota que passa no contraste com texto branco.
+- **Terracota Profundo** (`terracota-profundo`): fundo do botão principal, links, textos em terracota, itálico de destaque nos títulos e indicador de foco. É o terracota que passa no contraste com texto branco.
 - **Terracota Queimado** (`terracota-queimado`): hover e estado pressionado do botão principal e dos botões de apoio.
 - **Terracota Artesanal** (`terracota-artesanal`): a cor da marca, do Nino e do logo. Só em áreas grandes, ilustração, barras de progresso de destaque e texto a partir de 24px (como os números "01" a "04" do Como funciona).
 
@@ -277,7 +277,7 @@ Cantos macios em toda parte, escalando com o tamanho do objeto: etiqueta de situ
 Artesanais e táteis: sobem no hover, encolhem para 98% ao pressionar, nunca brilham.
 - **Shape:** 14px na landing (`button`), 7px no app (`button-app`).
 - **Primary:** terracota profundo com texto branco e leve sombra; 44px de altura (40px no pequeno, 54px no grande). No app, 50px (42px no pequeno).
-- **Hover / Focus:** hover em terracota queimado; foco com contorno sólido de 3px em terracota profundo, 4px de distância.
+- **Hover / Focus:** hover em terracota queimado; foco com linha interna de 2px em terracota profundo (no botão preenchido, linha branca de 2px por dentro). Nunca um contorno afastado do botão.
 - **Secondary:** fundo branco, contorno de 1,5px e texto em terracota profundo; hover em linho tingido. É o mesmo para "Entrar", "Ver como funciona" e o plano não destacado, para nunca sumir no linho.
 - **Navegação da landing:** links em pílula cujo preenchimento terracota "varre" da esquerda para a direita no hover.
 
@@ -294,7 +294,7 @@ Artesanais e táteis: sobem no hover, encolhem para 98% ao pressionar, nunca bri
 
 ### Inputs / Fields
 - **Style:** `Input` do shadcn: fundo transparente (herda o cartão ou o linho), borda `areia-escura`, raio 10px, 36px de altura e 12px de respiro lateral. O rótulo fica acima do campo.
-- **Focus:** contorno sólido de 2px em terracota profundo, 2px de distância (regra global de `src/product.css`), somado ao anel do shadcn.
+- **Focus:** só a borda passa para terracota profundo, sem anel nem contorno externo (regra global de `src/focus.css`).
 - **Error:** texto e borda em `destrutivo`, sempre com mensagem.
 
 ### Navigation
@@ -313,7 +313,7 @@ Trilho fino (4–8px) em `trilho-progresso` com a fração escrita ao lado ("9 d
 - **Do** usar uma única ação terracota profunda por tela; o resto é botão de apoio branco com contorno.
 - **Do** separar superfícies com a borda `linha` (#e7ded1) e tons de fundo antes de recorrer a sombra.
 - **Do** escrever todo tom novo como `color-mix` das cores-base de `src/index.css`.
-- **Do** manter texto a 4,5:1 (3:1 a partir de 24px) e foco visível em 3px terracota profundo.
+- **Do** manter texto a 4,5:1 (3:1 a partir de 24px) e foco visível por dentro do elemento, em terracota profundo.
 - **Do** usar a arte oficial do Nino (`public/brand/`) sem redesenhar, recolorir ou adicionar acessórios.
 - **Do** limitar movimento automático a menos de 5 s e respeitar `prefers-reduced-motion`; transições de 150 a 300ms.
 
@@ -324,3 +324,4 @@ Trilho fino (4–8px) em `trilho-progresso` com a fração escrita ao lado ("9 d
 - **Don't** colocar a Fraunces em colunas de valores nem trocar a Nunito por DM Sans.
 - **Don't** criar cartões com borda colorida grossa de um lado só nem halos coloridos sem deslocamento.
 - **Don't** deixar animação em loop infinito chamando atenção (CTA pulando, plano pulsando).
+- **Don't** usar contorno de foco afastado do elemento (`outline-offset`, `ring-offset`) nem anel por fora: o foco é a borda ou uma linha interna.

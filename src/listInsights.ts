@@ -165,6 +165,11 @@ function catalogRoomOf(categoryName: string): RoomKey | null {
   return room;
 }
 
+/** O catálogo conhece o tipo deste ambiente (cozinha, quarto, banheiro...)? */
+export function knowsRoom(categoryName: string) {
+  return catalogRoomOf(categoryName) !== null;
+}
+
 function displayName(entry: CatalogEntry) {
   return entry.name.replace("{cama}", "de casal");
 }

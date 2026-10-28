@@ -15,10 +15,21 @@ const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL
 const wholeMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 
+/**
+ * Escala das colunas: raiz do valor (potência 0,6) com piso. Em escala linear, um mês de R$ 240 ao lado de um de R$ 5,8 mil
+ * vira um risco e o outro uma torre; assim a diferença continua visível sem ficar discrepante. Os valores seguem escritos.
+ */
+export function barRatio(cents: number, max: number) {
+  if (cents <= 0 || max <= 0) return 0;
+  return Math.min(1, Math.max(0.14, Math.pow(cents / max, 0.6)));
+}
+
 function MonthBar({ month, max, budget }: { month: FlowMonth; max: number; budget: number | null }) {
   const total = month.committedCents + month.forecastCents;
   const over = budget !== null && total > budget;
-  const height = (cents: number) => `calc(var(--flow-plot) * ${max > 0 ? cents / max : 0})`;
+  // A coluna inteira usa a escala; o trecho assumido ocupa a parte proporcional dela.
+  const column = barRatio(total, max);
+  const height = (cents: number) => `calc(var(--flow-plot) * ${total > 0 ? (column * cents) / total : 0})`;
   const label = `${formatMonth(month.month)}: ${money.format(month.committedCents / 100)} em parcelas assumidas${
     month.forecastCents ? ` e ${money.format(month.forecastCents / 100)} previstos` : ""
   }${over ? ", acima do teto" : ""}`;
@@ -170,7 +181,7 @@ export function InstallmentsPlan({
           </ul>
           <div className="flow-chart" role="group" aria-label="Parcelas por mês">
             {budget !== null && budget <= max && (
-              <span className="flow-budget-line" style={{ "--ratio": budget / max } as React.CSSProperties} aria-hidden="true" />
+              <span className="flow-budget-line" style={{ "--ratio": barRatio(budget, max) } as React.CSSProperties} aria-hidden="true" />
             )}
             <ol className="flow-months">
               {flow.months.map((month) => (

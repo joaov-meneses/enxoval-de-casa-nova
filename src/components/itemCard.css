@@ -180,10 +180,6 @@
   background: var(--tag-bg);
   color: var(--cm-primary-dark);
 }
-.workspace-app .item-row .item-actions .item-delete:focus-visible {
-  outline: 2px solid var(--cm-primary-dark);
-  outline-offset: -2px;
-}
 
 /* ───────── Edição do item em janela ─────────
    Celular: sobe de baixo como folha; desktop: janela central mais larga, para a grade de campos caber. */

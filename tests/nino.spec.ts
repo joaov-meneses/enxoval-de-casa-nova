@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 async function workspace(page: Page, options: { holdSave?: boolean } = {}) {
+  await page.addInitScript(() => localStorage.setItem('casamia:consent', JSON.stringify({ analytics: false, marketing: false, version: '2026-10', decidedAt: new Date().toISOString() })));
   const home = { id: 'home', name: 'Nossa casa', ownerId: 'owner', role: 'owner', discountCents: 0, moveDate: null, state: 'BA', city: null, spendingTier: 'equilibrado' };
   const categories = [{ id: 'kitchen', name: 'Cozinha', sortOrder: 0 }, { id: 'bedroom', name: 'Quarto', sortOrder: 1 }, { id: 'empty', name: 'Escritório', sortOrder: 2 }];
   const base = { link: '', description: '', quantity: 1, discountCents: 0, buyWeek: null, priceCategory: null, priority: null, timing: null, createdAt: '2026-10-18T12:00:00Z', updatedAt: '2026-10-20T12:00:00Z' };
@@ -107,6 +108,7 @@ test('planejamento mostra estados do ambiente selecionado e respeita movimento r
 });
 
 test('comemora só após salvar e acompanha a navegação para o planejamento', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   const api = await workspace(page, { holdSave: true });
   await completePan(page);
   await expect.poll(api.saving).toBe(true);
@@ -115,5 +117,10 @@ test('comemora só após salvar e acompanha a navegação para o planejamento', 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('.workspace-sidebar').getByRole('button', { name: 'Planejamento', exact: true }).click();
   await expect(page.locator('.pp-nino')).toHaveAttribute('data-nino-state', 'celebrating');
+  const celebration = page.locator('.nino-mood.is-celebrating .nino');
+  await celebration.scrollIntoViewIfNeeded();
+  await expect(celebration).toHaveAttribute('data-animated', 'true');
+  await expect(celebration).toHaveCSS('animation-name', 'nino-celebrate');
+  await expect(celebration).toHaveCSS('animation-iteration-count', '1');
   await expect(page.locator('.pp-nino')).toHaveAttribute('data-nino-state', 'resting', { timeout: 6000 });
 });

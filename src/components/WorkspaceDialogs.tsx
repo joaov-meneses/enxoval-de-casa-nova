@@ -429,7 +429,7 @@ export function WorkspaceDialogs({
             <h4 className="mb-2 text-sm font-semibold text-stone-700">
               Mostrar
             </h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="brand"
                 size="brand"
@@ -496,7 +496,7 @@ export function WorkspaceDialogs({
             <h4 className="mb-2 text-sm font-semibold text-stone-700">
               Atalhos
             </h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="brand"
                 size="brand"
@@ -615,7 +615,7 @@ export function WorkspaceDialogs({
             <h4 className="mb-2 text-sm font-semibold text-stone-700">
               Ordenar
             </h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="brand"
                 size="brand"

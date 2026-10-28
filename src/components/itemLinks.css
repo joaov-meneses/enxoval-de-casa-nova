@@ -4,7 +4,6 @@
 .add-link-control > .add-link-button { flex: 0 0 44px; width: 44px; height: auto; min-height: 0; align-self: stretch; display: grid; place-items: center; padding: 0; color: #fff; background: var(--cm-primary-dark); border-radius: 10px; }
 .add-link-button:hover:not(:disabled) { background: color-mix(in oklab, var(--cm-primary-dark) 88%, #000); }
 .add-link-button:disabled { opacity: .4; cursor: default; }
-.add-link-button:focus-visible { outline: 2px solid var(--cm-primary-dark); outline-offset: 2px; }
 .add-link-feedback { display: block; margin-top: 6px; font-size: 12px; line-height: 1.5; color: color-mix(in oklab, var(--cm-primary-dark) 84%, var(--cm-text)); }
 .item-link-import { display: grid; gap: 12px; padding: 16px; border: 1px solid color-mix(in oklab, var(--cm-sand) 53%, var(--cm-bg)); background: var(--cm-bg); border-radius: 12px; }
 .item-field-link { display: grid; gap: 8px; min-width: 0; }
