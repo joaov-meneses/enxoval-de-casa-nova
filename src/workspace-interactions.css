@@ -1159,13 +1159,18 @@
   font-size: 13px;
   color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
 }
+.workspace-app .room-suggestions-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  margin: -6px -6px 0 0;
+}
 .workspace-app .room-suggestions-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  margin: -6px -6px 0 0;
   border-radius: 10px;
   color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
 }
@@ -1200,6 +1205,10 @@
 .workspace-app .room-suggestion:focus-visible {
   outline: 3px solid var(--cm-primary-dark);
   outline-offset: 2px;
+}
+.workspace-app .room-suggestion.is-move {
+  border-style: dashed;
+  text-align: left;
 }
 .workspace-app .room-suggestion small {
   font-size: 11px;

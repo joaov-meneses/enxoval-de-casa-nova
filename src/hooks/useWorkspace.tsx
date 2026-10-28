@@ -67,6 +67,7 @@ groupByBuyWeek,
 isBoughtWithoutPrice,
 matchesAssignee,
 matchesQuickFilter,
+roomMoves,
 roomSuggestions,
 thisWeekIds,
 type AssigneeFilter,
@@ -2314,12 +2315,16 @@ export function useWorkspace() {
     () => (activeCategory ? roomSuggestions(activeCategory.name, items) : []),
     [activeCategory, items],
   );
+  const movesForRoom = useMemo(
+    () => (activeCategory ? roomMoves(activeCategory, items, categories) : []),
+    [activeCategory, items, categories],
+  );
   const showRoomSuggestions =
     Boolean(activeCategory) &&
     !isSearching &&
     !hasItemFilters &&
     !isShowingLatestChanges &&
-    suggestionsForRoom.length > 0;
+    (suggestionsForRoom.length > 0 || movesForRoom.length > 0);
   const weekGroups = useMemo(
     () =>
       itemSortMode === "week"
@@ -2540,6 +2545,7 @@ export function useWorkspace() {
     showToast,
     showRoomSuggestions,
     suggestionsForRoom,
+    movesForRoom,
     searchScopeLabel,
     searchQuery,
     setIsFilterOpen,
