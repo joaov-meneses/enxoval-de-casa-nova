@@ -1,7 +1,7 @@
 // "Parcelas por mês" no Planejamento (Fase 11.1): quanto da renda de cada mês já está comprometido com parcelas,
 // mais a previsão dos itens pendentes pela semana de compra, contra o teto mensal que o casal escolher.
 import type React from "react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { CreditCard, TriangleAlert } from "@/src/components/icons";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -15,10 +15,21 @@ const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL
 const wholeMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const compact = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 
+/**
+ * Escala das colunas: raiz do valor (potência 0,6) com piso. Em escala linear, um mês de R$ 240 ao lado de um de R$ 5,8 mil
+ * vira um risco e o outro uma torre; assim a diferença continua visível sem ficar discrepante. Os valores seguem escritos.
+ */
+export function barRatio(cents: number, max: number) {
+  if (cents <= 0 || max <= 0) return 0;
+  return Math.min(1, Math.max(0.14, Math.pow(cents / max, 0.6)));
+}
+
 function MonthBar({ month, max, budget }: { month: FlowMonth; max: number; budget: number | null }) {
   const total = month.committedCents + month.forecastCents;
   const over = budget !== null && total > budget;
-  const height = (cents: number) => `calc(var(--flow-plot) * ${max > 0 ? cents / max : 0})`;
+  // A coluna inteira usa a escala; o trecho assumido ocupa a parte proporcional dela.
+  const column = barRatio(total, max);
+  const height = (cents: number) => `calc(var(--flow-plot) * ${total > 0 ? (column * cents) / total : 0})`;
   const label = `${formatMonth(month.month)}: ${money.format(month.committedCents / 100)} em parcelas assumidas${
     month.forecastCents ? ` e ${money.format(month.forecastCents / 100)} previstos` : ""
   }${over ? ", acima do teto" : ""}`;
@@ -63,6 +74,7 @@ export function InstallmentsPlan({
   const [budgetText, setBudgetText] = useState(budget ? money.format(budget / 100) : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  useEffect(() => setBudgetText(budget ? money.format(budget / 100) : ""), [budget]);
   const id = useId();
   const max = Math.max(1, budget ?? 0, ...flow.months.map((month) => month.committedCents + month.forecastCents));
   const overCount = budget === null ? 0 : flow.months.filter((month) => month.committedCents + month.forecastCents > budget).length;
@@ -82,15 +94,21 @@ export function InstallmentsPlan({
     }
   }
 
+  async function clearBudget() {
+    setSaving(true); setError("");
+    try { await onSaveBudget(null); setBudgetText(""); }
+    catch (err) { setError(err instanceof Error ? err.message : "Não foi possível remover o orçamento."); }
+    finally { setSaving(false); }
+  }
+
   return (
     <section className="pp-card flow-card" aria-labelledby={`${id}-title`}>
       <div className="flow-head">
         <h3 id={`${id}-title`}>
-          <CreditCard size={16} aria-hidden="true" /> Parcelas por mês
+          <CreditCard size={16} aria-hidden="true" /> Orçamento e compras por mês
         </h3>
         <p className="pp-hint">
-          Quanto de cada mês já está comprometido com parcelas, mais a previsão dos itens que faltam pela semana de compra.
-          "Já investimos" continua sendo o valor total das compras.
+          Compras à vista e parcelas já assumidas, mais a previsão dos itens que faltam. O orçamento ajuda a distribuir as compras opcionais.
         </p>
       </div>
 
@@ -112,7 +130,7 @@ export function InstallmentsPlan({
       </dl>
 
       <div className="flow-budget">
-        <Label htmlFor={`${id}-budget`}>Teto mensal para parcelas</Label>
+        <Label htmlFor={`${id}-budget`}>Quanto você pode destinar à casa por mês?</Label>
         <div className="flow-budget-row">
           <Input
             id={`${id}-budget`}
@@ -133,7 +151,7 @@ export function InstallmentsPlan({
             }}
           />
           {canEdit && budget !== null && (
-            <Button variant="brand" size="brand" type="button" className="pp-link" disabled={saving} onClick={() => { setBudgetText(""); void onSaveBudget(null).catch(() => undefined); }}>
+            <Button variant="brand" size="brand" type="button" className="pp-link" disabled={saving} onClick={() => void clearBudget()}>
               Tirar teto
             </Button>
           )}
@@ -143,7 +161,7 @@ export function InstallmentsPlan({
             ? "Só quem criou o enxoval define o teto."
             : overCount > 0
               ? `${overCount} ${overCount === 1 ? "mês passa" : "meses passam"} do teto.`
-              : "Os meses que passarem do teto ficam marcados no gráfico."}
+              : enxoval.moveDate ? "O planejamento respeita este valor ao distribuir os opcionais. Itens sem preço usam estimativas." : "Informe a data da mudança para distribuir as compras pelo orçamento mensal."}
         </small>
         {error && <p className="pp-error" role="alert">{error}</p>}
       </div>
@@ -163,7 +181,7 @@ export function InstallmentsPlan({
           </ul>
           <div className="flow-chart" role="group" aria-label="Parcelas por mês">
             {budget !== null && budget <= max && (
-              <span className="flow-budget-line" style={{ "--ratio": budget / max } as React.CSSProperties} aria-hidden="true" />
+              <span className="flow-budget-line" style={{ "--ratio": barRatio(budget, max) } as React.CSSProperties} aria-hidden="true" />
             )}
             <ol className="flow-months">
               {flow.months.map((month) => (

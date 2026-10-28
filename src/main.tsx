@@ -17,6 +17,7 @@ if (!/^\/(admin|pesquisa)(?:\/|$)/.test(window.location.pathname)) recordLifecyc
 
 // Cada rota vira um pedaço próprio do pacote: a home não baixa o app, o admin nem o onboarding.
 const App = lazy(() => import('./App.tsx'));
+const HousewarmingPage = lazy(() => import('./components/HousewarmingPage').then(m => ({ default: m.HousewarmingPage })));
 const AdminPage = lazy(() => import('./components/AdminPage').then((m) => ({ default: m.AdminPage })));
 const ForgotPasswordPage = lazy(() => import('./components/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })));
 const InvitationPage = lazy(() => import('./components/InvitationPage').then((m) => ({ default: m.InvitationPage })));
@@ -60,6 +61,8 @@ createRoot(document.getElementById('root')!, {
     <Suspense fallback={null}>
     {window.location.pathname === '/' ? (
       <LandingRoute />
+    ) : /^\/cha\/[^/]+\/?$/.test(window.location.pathname) ? (
+      <HousewarmingPage />
     ) : /^\/admin(?:\/|$)/.test(window.location.pathname) ? (
       <AdminPage />
     ) : window.location.pathname === '/comecar' ? (

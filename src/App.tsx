@@ -16,6 +16,7 @@ DropdownMenuTrigger,
 import { WorkspaceAnalytics } from "./components/WorkspaceAnalytics";
 import { WorkspaceDialogs } from "./components/WorkspaceDialogs";
 import { WorkspaceLoading } from "./components/WorkspaceLoading";
+import { HousewarmingNotice } from './components/HousewarmingNotice';
 
 import {
 CalendarClock,
@@ -23,6 +24,7 @@ Check,
 ChevronDown,
 DoorOpen,
 Home,
+Gift,
 LayoutDashboard,
 ListChecks,
 ListPlus,
@@ -58,6 +60,7 @@ const ListRoute = lazy(() => import("./routes/ListRoute"));
 const PlanRoute = lazy(() => import("./routes/PlanRoute"));
 const StoreRoute = lazy(() => import("./routes/StoreRoute"));
 const OfflineStore = lazy(() => import("./routes/OfflineStore"));
+const HousewarmingRoute = lazy(() => import('./routes/HousewarmingRoute'));
 
 export default function App() {
   const workspace = useWorkspace();
@@ -116,6 +119,7 @@ export default function App() {
     error,
     ninoCelebration,
     updatePlanning,
+    applyUrgencyScores,
     updateItem,
     addItem,
     enxovalDiscountCents,
@@ -139,6 +143,9 @@ export default function App() {
       categories={categories}
       name={activeEnxoval!.name}
       enxovalId={activeEnxoval!.id}
+      purchasePlan={workspace.purchasePlan}
+      moveDate={activeEnxoval.moveDate}
+      onPlanning={() => setWorkspaceView("plan")}
       onImported={handleRefresh}
       onAddCategory={openCreateCategory}
       discountCents={enxovalDiscountCents}
@@ -336,6 +343,11 @@ export default function App() {
                       {rescheduleCount} a reagendar
                     </span>
                   )}
+                </Button>
+                <Button variant="brand" size="brand" className={workspaceView === 'housewarming' ? 'active' : ''}
+                  aria-current={workspaceView === 'housewarming' ? 'page' : undefined}
+                  onClick={() => setWorkspaceView('housewarming')} disabled={!hasEnxoval}>
+                  <Gift size={18} /> Chá de Casa Nova
                 </Button>
               </nav>
               {/* Todos os enxovais à vista: trocar é um clique e criar um novo não depende de achar o menu do título. */}
@@ -742,6 +754,7 @@ export default function App() {
             </motion.header>
 
             <main id="workspace-main" className="workspace-main">
+              {hasEnxoval && workspaceView !== 'housewarming' && <HousewarmingNotice key={activeEnxoval!.id} enxovalId={activeEnxoval!.id} onOpen={() => setWorkspaceView('housewarming')} />}
               {error && (
                 <div className="form-error workspace-error" role="alert">
                   {error}
@@ -770,7 +783,9 @@ export default function App() {
                     categories={categories}
                     canEdit={isOwner}
                     onUpdateEnxoval={updatePlanning}
+                    onUrgencyScores={applyUrgencyScores}
                     onUpdateItem={(id, updates) => updateItem(id, updates)}
+                    onMoveItem={(id, categoryId) => updateItem(id, { categoryId })}
                     onAddItem={(name, categoryId, categoryName) =>
                       addItem(name, categoryId, categoryName)
                     }
@@ -792,6 +807,8 @@ export default function App() {
                     showToast={showToast}
                   />
                 )}
+                {hasEnxoval && workspaceView === 'housewarming' && <HousewarmingRoute key={activeEnxoval!.id}
+                  enxoval={activeEnxoval!} items={items} canEdit={isOwner} onSavedItem={replaceItem} onRefresh={() => void handleRefresh()} />}
                 {hasEnxoval && workspaceView === "overview" && overview}
                 {hasEnxoval && workspaceView === "list" && (
                   <ListRoute workspace={workspace} overview={overview} />
@@ -836,8 +853,8 @@ export default function App() {
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               >
-                <LayoutDashboard size={19} />
-                Meu Lar
+                <LayoutDashboard size={20} />
+                <span>Meu Lar</span>
               </Button>
               <Button
                 variant="brand"
@@ -846,8 +863,8 @@ export default function App() {
                 aria-current={workspaceView === "list" ? "page" : undefined}
                 onClick={showAllItems}
               >
-                <ListChecks size={19} />
-                Meu enxoval
+                <ListChecks size={20} />
+                <span>Meu enxoval</span>
               </Button>
               <Button
                 variant="brand"
@@ -860,8 +877,13 @@ export default function App() {
                 }}
                 disabled={!hasEnxoval}
               >
-                <CalendarClock size={19} />
-                Planejamento
+                <CalendarClock size={20} />
+                <span>Planejamento</span>
+              </Button>
+              <Button variant="brand" size="brand" className={workspaceView === 'housewarming' ? 'active' : ''}
+                aria-current={workspaceView === 'housewarming' ? 'page' : undefined}
+                onClick={() => { setWorkspaceView('housewarming'); window.scrollTo({ top: 0 }); }} disabled={!hasEnxoval}>
+                <Gift size={20} /> <span>Chá de casa</span>
               </Button>
             </nav>
             <Button

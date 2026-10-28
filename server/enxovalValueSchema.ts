@@ -70,6 +70,13 @@ export async function migrateEnxovalValue(pool: Pool) {
     );
     CREATE INDEX IF NOT EXISTS item_documents_item_idx ON item_documents(item_id, created_at);
     CREATE INDEX IF NOT EXISTS item_documents_enxoval_idx ON item_documents(enxoval_id, created_at);
+    ALTER TABLE item_documents ADD COLUMN IF NOT EXISTS receipt_preview jsonb;
+    CREATE TABLE IF NOT EXISTS document_read_usage (
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      read_day date NOT NULL,
+      attempts integer NOT NULL DEFAULT 1 CHECK (attempts > 0),
+      PRIMARY KEY (user_id, read_day)
+    );
     CREATE TABLE IF NOT EXISTS item_document_blobs (
       document_id uuid PRIMARY KEY REFERENCES item_documents(id) ON DELETE CASCADE,
       data bytea NOT NULL

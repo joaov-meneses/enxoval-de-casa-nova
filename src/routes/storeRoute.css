@@ -1,4 +1,6 @@
-/* Modo loja (Fase 11.6): letra grande e alvos de toque de 56 px, para usar com uma mão no corredor da loja. */
+/* Modo loja (Fase 11.6): letra grande e alvos de toque de 56 px, para usar com uma mão no corredor da loja.
+   Hierarquia de cada cartão: nome e referência de preço (o que decide a compra), depois as duas ações lado a lado,
+   na altura do polegar: "Vale a pena?" (apoio) e "Comprei" (ação principal, em verde). */
 .store-mode {
   display: grid;
   gap: 14px;
@@ -17,6 +19,10 @@
   align-items: center;
   gap: 12px;
 }
+.store-head-text {
+  flex: 1;
+  min-width: 0;
+}
 .store-head h2 {
   display: flex;
   align-items: center;
@@ -25,12 +31,17 @@
   font-family: var(--font-serif);
   font-size: 26px;
   font-weight: 600;
+  line-height: 1.15;
+}
+.store-head h2 svg {
+  color: var(--cm-primary-dark);
 }
 .store-head p {
   margin: 2px 0 0;
   font-size: 15px;
   color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
 }
+/* "Sair" só existe no modo loja aberto sem conexão, onde não há a barra inferior do app. */
 .store-exit,
 .store-search-clear {
   display: grid;
@@ -41,6 +52,43 @@
   border-radius: 14px;
   border: 1px solid color-mix(in oklab, var(--cm-sand) 80%, #fff);
   background: #fff;
+}
+/* Progresso: quantos itens já foram conquistados, com a barra por baixo do número. */
+.store-progress {
+  flex-shrink: 0;
+  display: grid;
+  gap: 5px;
+  min-width: 58px;
+  text-align: right;
+}
+.store-progress strong {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--cm-primary-dark);
+}
+.store-progress small {
+  font-size: 13px;
+  font-weight: 650;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+}
+.store-progress span {
+  position: relative;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--cm-sand) 55%, #fff);
+}
+.store-progress span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--store-progress, 0%);
+  border-radius: inherit;
+  background: var(--cm-success);
+  transition: width 0.3s ease;
 }
 .store-status {
   display: flex;
@@ -58,6 +106,18 @@
   background: #fdf1df;
   color: #7a4309;
 }
+/* Busca e ambientes ficam à vista enquanto a lista rola. */
+.store-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 10px;
+  margin: 0 -14px;
+  padding: 8px 14px 10px;
+  background: var(--cm-bg);
+  box-shadow: 0 8px 12px -12px #422d2459;
+}
 .store-search {
   position: relative;
   display: flex;
@@ -67,22 +127,35 @@
 .store-search > svg {
   position: absolute;
   left: 14px;
+  z-index: 1;
   color: color-mix(in oklab, var(--cm-bg) 35%, var(--cm-text));
   pointer-events: none;
 }
 .store-search input {
   flex: 1;
-  min-height: 56px;
+  min-height: 52px;
   padding-left: 44px;
-  font-size: 18px;
+  font-size: 17px;
   border-radius: 14px;
+  background: #fff;
+}
+.store-search-clear {
+  position: absolute;
+  right: 4px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
 }
 .store-chips {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
   scrollbar-width: none;
+}
+.store-chips::-webkit-scrollbar {
+  display: none;
 }
 .store-chip {
   flex-shrink: 0;
@@ -100,89 +173,159 @@
   border-color: var(--cm-primary-dark);
   color: #fff;
 }
+.store-group {
+  display: grid;
+  gap: 10px;
+}
 .store-group h3 {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 8px 0;
-  font-size: 15px;
-  font-weight: 750;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+  gap: 10px;
+  margin: 10px 0 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--cm-text);
+}
+.store-group h3 small {
+  margin-left: auto;
+  min-width: 26px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--cm-sand) 40%, #fff);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text));
+}
+.store-group-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--cm-primary) 12%, #fff);
+  color: var(--cm-primary-dark);
 }
 .store-group ul {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .store-item {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
   gap: 12px;
-  padding: 14px;
-  border: 1px solid color-mix(in oklab, var(--cm-sand) 70%, #fff);
-  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 65%, #fff);
+  border-radius: 18px;
   background: #fff;
+  box-shadow: 0 1px 2px #422d240a;
 }
 .store-item-body {
   display: grid;
-  gap: 6px;
-  flex: 1;
+  gap: 8px;
   min-width: 0;
 }
-.store-item-body > strong {
-  font-size: 19px;
-  line-height: 1.3;
+.store-item-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.store-item-title > strong {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
-.store-item-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
+.store-qty {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--cm-sand) 40%, #fff);
+  font-size: 13px;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text));
+}
+.store-item-variation {
   font-size: 15px;
-  font-weight: 650;
-  color: color-mix(in oklab, var(--cm-sand) 15%, var(--cm-text));
+  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
+}
+/* A referência de preço é o dado que a pessoa procura na prateleira: rótulo pequeno, valor em destaque. */
+.store-price {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--cm-sand) 22%, #fff);
+}
+.store-price span {
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.store-price strong {
+  font-size: 18px;
+  font-weight: 750;
+  color: var(--cm-text);
 }
 .store-item-notes {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text));
   white-space: pre-line;
 }
+.store-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 10px;
+}
+.store-worth-toggle,
 .store-buy {
-  flex-shrink: 0;
-  min-width: 96px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 56px;
-  padding: 0 16px;
+  padding: 0 14px;
   border-radius: 14px;
-  /* O verde do círculo de riscar dos cards, com um pouco mais de cor para chamar o toque. */
-  background: color-mix(in oklab, var(--cm-success) 66%, #fff);
-  background: oklch(from color-mix(in oklab, var(--cm-success) 66%, #fff) calc(l - 0.02) calc(c + 0.03) h);
-  color: #fff;
   font-size: 17px;
   font-weight: 750;
 }
+.store-worth-toggle {
+  border: 1.5px solid color-mix(in oklab, var(--cm-primary-dark) 45%, var(--cm-sand));
+  background: #fff;
+  color: var(--cm-primary-dark);
+}
+.store-worth-toggle[aria-expanded="true"] {
+  background: color-mix(in oklab, var(--cm-primary) 10%, #fff);
+}
+.store-buy {
+  /* O verde do círculo de riscar dos cards, com um pouco mais de cor para chamar o toque. */
+  background: color-mix(in oklab, var(--cm-success) 66%, #fff);
+  background: oklch(from color-mix(in oklab, var(--cm-success) 66%, #fff) calc(l - 0.06) calc(c + 0.03) h);
+  color: #fff;
+  box-shadow: 0 6px 14px -6px color-mix(in oklab, var(--cm-success) 70%, transparent);
+}
 .store-buy:hover {
   background: color-mix(in oklab, var(--cm-success) 78%, #fff);
-  background: oklch(from color-mix(in oklab, var(--cm-success) 78%, #fff) calc(l - 0.02) calc(c + 0.03) h);
+  background: oklch(from color-mix(in oklab, var(--cm-success) 78%, #fff) calc(l - 0.06) calc(c + 0.03) h);
 }
-.store-worth-toggle {
-  justify-self: start;
-  min-height: 44px;
-  padding: 0 4px;
-  background: none;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--cm-primary-dark);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+.store-buy:active {
+  transform: scale(0.98);
 }
 .store-worth {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--cm-sand) 14%, var(--cm-bg));
 }
 .store-worth-input {
   display: grid;
@@ -193,21 +336,57 @@
 .store-worth-input input {
   min-height: 52px;
   font-size: 18px;
+  background: #fff;
 }
 .store-worth-lines {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
   font-size: 15px;
   font-weight: 650;
 }
-.store-worth-lines .is-good { color: #3f5a1f; }
-.store-worth-lines .is-bad { color: #9a3a22; }
-.store-worth-lines .is-neutral { color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text)); }
+.store-worth-lines li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+.store-worth-lines li > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.store-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin: 7px 4px 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+.store-worth-lines .is-good { background: #eef4e3; color: #3f5a1f; }
+.store-worth-lines .is-bad { background: #fbece7; color: #9a3a22; }
+.store-worth-lines .is-neutral { background: #fff; color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text)); }
 .store-empty {
-  padding: 32px 8px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 36px 12px;
   text-align: center;
   color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
+}
+.store-empty svg {
+  color: var(--cm-primary-dark);
+}
+.store-empty p {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 19px;
+}
+.store-offline-readiness { margin: 0; font-size: 13px; line-height: 1.5; color: var(--cm-success); }
+@media (prefers-reduced-motion: reduce) {
+  .store-progress span::after { transition: none; }
+  .store-buy:active { transform: none; }
 }

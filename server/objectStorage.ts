@@ -1,6 +1,6 @@
-// Onde ficam os comprovantes e garantias dos itens. Produção usa um bucket de objetos compatível com S3 (Cloudflare R2
-// ou S3) com download por URL assinada de 5 minutos; sem bucket configurado, os arquivos ficam numa tabela própria do
-// Postgres (desenvolvimento e homologação). O banco guarda só a referência (`storage_key`).
+// Comprovantes e garantias podem ficar no Postgres, com cota por conta e backups, ou em um bucket privado compatível
+// com S3 (Cloudflare R2 ou S3) com download por URL assinada de 5 minutos. O bucket é opcional, inclusive em produção.
+// No modo S3, o banco guarda só a referência (`storage_key`).
 import { createHash, createHmac } from 'node:crypto';
 import type { Queryable } from './database.ts';
 import { getLogger } from './logger.ts';

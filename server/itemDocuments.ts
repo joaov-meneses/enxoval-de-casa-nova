@@ -7,6 +7,7 @@ import { getLogger } from './logger.ts';
 import { asyncHandler, HttpError, rateLimit } from './security.ts';
 import { discardStoredObject, presignedDownloadUrl, readDocument, saveDatabaseBlob, storeDocument } from './objectStorage.ts';
 import { uniqueZipName, ZipWriter } from './zip.ts';
+import { readReceiptImage, receiptDailyLimit, receiptReaderBusy } from './services/receiptReader.ts';
 import type { AuthUser, EnxovalItem, ItemDocument, ItemDocumentKind } from '../src/types.ts';
 
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -132,6 +133,7 @@ export function registerItemDocumentRoutes(router: Router, deps: DocumentDeps) {
       const storageKey = await storeDocument(getPool(), documentId, access.enxoval_id, data, contentType);
       try {
         const result = await withTransaction(async client => {
+          await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 742))', [access.owner_id]);
           await itemEnxoval(client, deps, user.id, req.params.id, true);
           await checkLimits(client);
           const inserted = await client.query<DocumentRow>(`
@@ -179,6 +181,7 @@ export function registerItemDocumentRoutes(router: Router, deps: DocumentDeps) {
   router.get('/documents/:id/file', asyncHandler(async (req, res) => {
     const user = await deps.requireUser(req);
     const document = await documentOf(getPool(), deps, user.id, req.params.id);
+    res.set('Cache-Control', 'private, no-store');
     const signed = presignedDownloadUrl(document.storage_key, document.file_name);
     if (signed) {
       res.redirect(302, signed);
@@ -193,6 +196,26 @@ export function registerItemDocumentRoutes(router: Router, deps: DocumentDeps) {
       'X-Content-Type-Options': 'nosniff',
     });
     res.send(data);
+  }));
+
+  router.post('/documents/:id/read-receipt', rateLimit(6, 10 * 60_000), asyncHandler(async (req, res) => {
+    const user = await deps.requireUser(req);
+    const document = await documentOf(getPool(), deps, user.id, req.params.id);
+    res.set('Cache-Control', 'private, no-store');
+    if (document.kind !== 'invoice' || !document.content_type.startsWith('image/'))
+      throw new HttpError(415, 'A leitura automática aceita fotos de notas fiscais. Para PDF, preencha os dados manualmente.');
+    const cached = await getPool().query<{ receipt_preview: unknown }>('SELECT receipt_preview FROM item_documents WHERE id = $1', [document.id]);
+    if (cached.rows[0]?.receipt_preview) { res.json({ preview: cached.rows[0].receipt_preview, cached: true }); return; }
+    if (receiptReaderBusy()) throw new HttpError(503, 'Outra nota está sendo lida. Tente novamente em alguns instantes.');
+    const limit = receiptDailyLimit();
+    const reserved = await getPool().query(`INSERT INTO document_read_usage(user_id, read_day) VALUES ($1, (now() AT TIME ZONE 'America/Sao_Paulo')::date)
+      ON CONFLICT(user_id, read_day) DO UPDATE SET attempts = document_read_usage.attempts + 1
+      WHERE document_read_usage.attempts < $2 RETURNING attempts`, [user.id, limit]);
+    if (!reserved.rowCount) throw new HttpError(429, 'Você atingiu o limite diário de leitura de notas. Tente amanhã ou preencha manualmente.', 'RECEIPT_DAILY_LIMIT');
+    const preview = await readReceiptImage(await readDocument(getPool(), document.storage_key));
+    await getPool().query('UPDATE item_documents SET receipt_preview = $2::jsonb WHERE id = $1', [document.id, JSON.stringify(preview)]);
+    getLogger().info({ event: 'documents.receipt.read', documentId: document.id, cached: false }, 'Receipt fields extracted for review.');
+    res.json({ preview, cached: false });
   }));
 
   router.delete('/documents/:id', asyncHandler(async (req, res) => {

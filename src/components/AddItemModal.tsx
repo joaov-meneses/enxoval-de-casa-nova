@@ -321,7 +321,7 @@ export function AddItemModal({
     ? Math.min(Number(discountText.replace(/\D/g, "")) || 0, draftPrice)
     : 0;
   const draftFinal = draftPrice - draftDiscount;
-  // Faixa comum de preço do item, vinda do que outras listas registraram (só agregados, com amostra mínima).
+  // Faixa nacional estimada do item, baseada em lojas ou em clientes distintos; nunca vira preço preenchido.
   const priceRange =
     (pickedItem && plain(pickedItem.name) === plain(name.trim()) ? pickedItem.priceRange : null) ??
     ninoTip?.catalogItem?.priceRange ??
@@ -692,10 +692,12 @@ export function AddItemModal({
             />
             {priceRange && (
               <p id="new-item-price-range" className="mt-1 text-xs text-stone-500">
-                Faixa comum: {moneyText(priceRange.p10)} a {moneyText(priceRange.p90)}
-                {priceRange.region ? ` em ${priceRange.region}` : ""}.
+                Faixa estimada nacional: {moneyText(priceRange.p10)} a {moneyText(priceRange.p90)}.
+                {priceRange.meanCents != null && <> Média: {moneyText(priceRange.meanCents)}.</>}
+                {" "}{priceRange.samples} {priceRange.source === 'serpapi' ? 'lojas pesquisadas' : 'clientes'}.
+                {priceRange.samples < 5 && <> Amostra inicial.</>}
                 {draftPrice > priceRange.p90 && (
-                  <span className="price-above-hint block font-medium">Este preço está acima do comum.</span>
+                  <span className="price-above-hint block font-medium">Este preço está acima da faixa estimada.</span>
                 )}
               </p>
             )}

@@ -240,6 +240,33 @@ try {
   assert.equal(boot.data.items.find((entry) => entry.id === sofaId).buyWeek, 104);
   console.log("PASS: semana de compra manual, volta ao automático e limites.");
 
+
+  const dependencyId = funnel.data.items[0].id;
+  const timing = { leadTimeWeeks: 6, researchWeeks: 2, hasTemporarySolution: true, dependsOnItemId: dependencyId };
+  item = await call(`/items/${sofaId}`, 'PATCH', timing);
+  assert.equal(item.status, 200, JSON.stringify(item.data));
+  for (const [key, value] of Object.entries(timing)) assert.equal(item.data[key], value);
+  const persisted = await call('/bootstrap');
+  for (const [key, value] of Object.entries(timing)) assert.equal(persisted.data.items.find(i => i.id === sofaId)[key], value);
+  for (const invalid of [{ leadTimeWeeks: -1 }, { leadTimeWeeks: 53 }, { researchWeeks: 13 }, { researchWeeks: 1.5 }, { leadTimeWeeks: '2' }, { hasTemporarySolution: 1 }, { dependsOnItemId: sofaId }, { dependsOnItemId: randomUUID() }]) {
+    assert.equal((await call(`/items/${sofaId}`, 'PATCH', invalid)).status, 400, JSON.stringify(invalid));
+  }
+  assert.equal((await call(`/items/${dependencyId}`, 'PATCH', { dependsOnItemId: sofaId })).status, 400, 'reject cycles');
+  const otherHomeItem = derived.data.items[0].id;
+  assert.equal((await call(`/items/${sofaId}`, 'PATCH', { dependsOnItemId: otherHomeItem })).status, 400, 'reject cross-workspace links');
+  // Concurrent reverse dependencies must not both succeed.
+  await call(`/items/${sofaId}`, 'PATCH', { dependsOnItemId: null });
+  const reverse = await Promise.all([
+    call(`/items/${sofaId}`, 'PATCH', { dependsOnItemId: dependencyId }),
+    call(`/items/${dependencyId}`, 'PATCH', { dependsOnItemId: sofaId })
+  ]);
+  assert.deepEqual(reverse.map(result => result.status).sort(), [200, 400]);
+  await call(`/items/${sofaId}`, 'PATCH', { dependsOnItemId: null });
+  await call(`/items/${dependencyId}`, 'PATCH', { dependsOnItemId: null });
+  assert.equal((await call(`/items/${sofaId}`, 'PATCH', { leadTimeWeeks: null, researchWeeks: null, hasTemporarySolution: false })).status, 200);
+  await assert.rejects(query('UPDATE items SET lead_time_weeks = -1 WHERE id = $1', [sofaId]));
+  console.log('PASS: persisted timing, validation, workspace isolation and concurrent cycle rejection.');
+
   // 7. O banco recusa valores fora do permitido, mesmo sem passar pela API.
   await assert.rejects(query("UPDATE items SET buy_week = 200 WHERE id = $1", [sofaId]));
   await assert.rejects(query("UPDATE items SET price_category = 5 WHERE id = $1", [sofaId]));

@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from "react";
+import "./nino.css";
+
 /**
  * Nino, o mascote do Casa Mia: uma casinha-chaveiro viva, com a barriguinha em arco
  * (que se ilumina) e uma chave dourada na alça. A arte fica em `public/brand`.
@@ -22,6 +25,7 @@ export function Nino({
   title,
   className = "",
   loading,
+  animated = true,
 }: {
   pose?: keyof typeof POSES;
   /** Largura em px; a altura acompanha a proporção da pose. */
@@ -31,7 +35,28 @@ export function Nino({
   className?: string;
   /** "lazy" para poses abaixo da dobra; sem valor, o navegador carrega de imediato. */
   loading?: "lazy" | "eager";
+  /** Movimento curto ao aparecer ou trocar de pose. Use false para uma ilustração estática. */
+  animated?: boolean;
 }) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [loadedPose, setLoadedPose] = useState<string | null>(null);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image || !animated) return;
+    if (image.complete && image.naturalWidth > 0) setLoadedPose(pose);
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      setVisible(entry.isIntersecting);
+    });
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [pose, animated]);
+
   const art = POSES[pose];
   // Versões de 260 e 500 px (public/brand/*-260w.webp e *-500w.webp): o navegador escolhe pela
   // largura exibida e pela densidade da tela, sem baixar a arte inteira para um Nino pequeno.
@@ -41,8 +66,13 @@ export function Nino({
     <picture>
       <source srcSet={srcSet} sizes={`${size}px`} type="image/webp" />
       <img
+        key={pose}
+        ref={imageRef}
         className={`nino ${className}`.trim()}
+        data-pose={pose}
+        data-animated={animated && visible && loadedPose === pose}
         src={art.fallback}
+        onLoad={() => setLoadedPose(pose)}
         alt={title ?? ""}
         aria-hidden={title ? undefined : true}
         width={size}

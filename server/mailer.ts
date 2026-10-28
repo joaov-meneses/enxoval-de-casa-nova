@@ -346,6 +346,7 @@ export function trialEmail(input: { to: string; endsAt: Date; reminder: boolean 
 export function warrantyEmail(input: {
   to: string;
   name: string;
+  messageId?: string;
   items: { itemName: string; enxovalName: string; until: string; daysLeft: number }[];
 }): MailMessage {
   const many = input.items.length > 1;
@@ -355,14 +356,17 @@ export function warrantyEmail(input: {
     ? `${input.items.length} garantias do seu enxoval estão perto de vencer`
     : `A garantia de ${input.items[0].itemName} ${left(input.items[0].daysLeft)}`;
   const lines = input.items.map(item => `${item.itemName}: garantia ${left(item.daysLeft)} (${date(item.until)})`);
-  const settings = `${appBaseUrl() ?? ""}/app`;
+  const params = new URLSearchParams({ utm_source: 'newsletter', utm_medium: 'email', utm_campaign: 'lifecycle-warranty' });
+  if (input.messageId) params.set('lm', input.messageId);
+  const settings = `${appBaseUrl() ?? ""}/app?${params}`;
   const text = `Olá, ${input.name}.
 
 ${many ? "Estas garantias estão perto de vencer:" : "Uma garantia está perto de vencer:"}
 
 ${lines.map(line => `- ${line}`).join("\n")}
 
-Se algo deu problema, este é o momento de acionar a loja ou o fabricante. A nota e o certificado ficam guardados no item, em ${settings}.
+Se algo deu problema, este é o momento de acionar a loja ou o fabricante. A nota e o certificado ficam guardados no item:
+${settings}
 Para não receber estes avisos, desligue "Avisar antes de a garantia vencer" no seu perfil.`;
   const html = layout(
     many ? "Garantias perto de vencer" : "Garantia perto de vencer",

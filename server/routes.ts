@@ -31,6 +31,7 @@ import { assertCanAddItem, assertCanCreateEnvironment, assertCanCreateEnxoval, e
 import { registerBillingRoutes, recoverBillingAccess } from './billing.ts';
 import { registerProfileRoutes } from './profile.ts';
 import { offerHistories, registerItemOfferRoutes, syncPrimaryOffer } from './itemOffers.ts';
+import { registerPublicHousewarmingRoutes, registerHousewarmingRoutes } from './housewarming.ts';
 import { registerItemDocumentRoutes } from './itemDocuments.ts';
 import { parseItemExtras } from './itemExtras.ts';
 import { isAccountPlan, type AccountPlan, type PlanLimits } from '../src/plans.ts';
@@ -109,6 +110,10 @@ interface ItemRow {
   quantity: number;
   sort_order: number;
   buy_week: number | null;
+  lead_time_weeks: number | null;
+  research_weeks: number | null;
+  has_temporary_solution: boolean;
+  depends_on_item_id: string | null;
   ai_urgency: number | null;
   ai_urgency_confidence: number | null;
   ai_urgency_key: string | null;
@@ -125,6 +130,9 @@ interface ItemRow {
   catalog_p90: number | null;
   catalog_samples: number | null;
   catalog_region: string | null;
+  catalog_mean_cents: number | null;
+  catalog_price_source: 'customers' | 'serpapi' | null;
+  catalog_price_updated_at: string | Date | null;
   updated_at: string | Date;
   created_at: string | Date;
   selected_variation: string | null;
@@ -338,6 +346,10 @@ function mapItem(row: ItemRow): EnxovalItem {
     sortOrder: row.sort_order,
     buyWeek: row.buy_week === null || row.buy_week === undefined ? null : Number(row.buy_week),
     // A nota do Jev só vale para o nome e o ambiente em que foi inferida.
+    leadTimeWeeks: row.lead_time_weeks == null ? null : Number(row.lead_time_weeks),
+    researchWeeks: row.research_weeks == null ? null : Number(row.research_weeks),
+    hasTemporarySolution: row.has_temporary_solution ?? false,
+    dependsOnItemId: row.depends_on_item_id ?? null,
     aiUrgency: hasValidUrgency(row) ? Number(row.ai_urgency) : null,
     aiUrgencyConfidence: hasValidUrgency(row) ? Number(row.ai_urgency_confidence ?? 0) : null,
     priceCategory: isPriceCategory(Number(row.price_category)) ? Number(row.price_category) as PriceCategory : null,
@@ -358,7 +370,10 @@ function mapItem(row: ItemRow): EnxovalItem {
                 p50: Number(row.catalog_p50),
                 p90: Number(row.catalog_p90),
                 samples: Number(row.catalog_samples),
-                region: row.catalog_region ?? ''
+                region: '',
+                ...(row.catalog_mean_cents != null ? { meanCents: Number(row.catalog_mean_cents) } : {}),
+                ...(row.catalog_price_source ? { source: row.catalog_price_source } : {}),
+                ...(row.catalog_price_updated_at ? { updatedAt: serializeTimestamp(row.catalog_price_updated_at) } : {})
               }
         }
       : null,
@@ -400,6 +415,7 @@ const ITEM_SELECT = `
     i.quantity,
     i.sort_order,
     i.buy_week,
+    i.lead_time_weeks, i.research_weeks, i.has_temporary_solution, i.depends_on_item_id,
     i.ai_urgency,
     i.ai_urgency_confidence,
     i.ai_urgency_key,
@@ -424,6 +440,9 @@ const ITEM_SELECT = `
     cps.p90 AS catalog_p90,
     cps.samples AS catalog_samples,
     cps.region AS catalog_region,
+    cps.mean_cents AS catalog_mean_cents,
+    cps.source AS catalog_price_source,
+    cps.updated_at AS catalog_price_updated_at,
     tp.url AS tracked_url,
     tp.domain AS tracked_domain,
     tp.in_stock AS tracked_in_stock,
@@ -451,13 +470,12 @@ const ITEM_SELECT = `
   INNER JOIN categories c ON c.id = i.category_id
   LEFT JOIN tracked_products tp ON tp.id = i.tracked_product_id
   LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
-  -- Faixa real de preço do item: a do estado do enxoval quando há amostra, senão a do Brasil todo ('').
+  -- A mesma faixa nacional é usada em todos os enxovais, independentemente da UF.
   LEFT JOIN LATERAL (
-    SELECT ps.p10, ps.p50, ps.p90, ps.samples, ps.region
+    SELECT ps.p10, ps.p50, ps.p90, ps.samples, ps.region, ps.mean_cents, ps.source, ps.updated_at
     FROM catalog_price_stats ps
     WHERE ps.item_id = i.catalog_item_id
-      AND ps.region IN ('', COALESCE((SELECT e.state FROM enxovais e WHERE e.id = i.enxoval_id), ''))
-    ORDER BY ps.region DESC
+      AND ps.region = ''
     LIMIT 1
   ) cps ON true
   LEFT JOIN LATERAL (
@@ -1132,6 +1150,11 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
   let unresolved: { id: string; name: string }[] = [];
   const updated = await withTransaction(async client => {
     // FOR UPDATE: situação, preço e desconto são validados em conjunto, então ninguém pode alterá-los no meio.
+    if (Object.prototype.hasOwnProperty.call(body, 'dependsOnItemId')) {
+      await client.query(`SELECT pg_advisory_xact_lock(hashtextextended(i.enxoval_id::text, 731))
+        FROM items i JOIN enxoval_members em ON em.enxoval_id = i.enxoval_id
+        WHERE i.id = $1 AND em.user_id = $2`, [itemId, userId]);
+    }
     const current = await client.query<{ enxoval_id: string; category_id: string; name: string; status: ItemStatus; price_cents: number | null; discount_cents: number; quantity: number; tracked_product_id: string | null; initial_price_cents: number | null; purchased_at: string | null; warranty_months: number | null; warranty_until: string | null }>(`
       SELECT i.enxoval_id, i.category_id, i.name, i.status, i.price_cents, i.discount_cents, i.quantity, i.tracked_product_id, i.initial_price_cents,
         to_char(i.purchased_at, 'YYYY-MM-DD') AS purchased_at, i.warranty_months, to_char(i.warranty_until, 'YYYY-MM-DD') AS warranty_until
@@ -1205,6 +1228,33 @@ async function updateItemForUser(userId: string, itemId: string, body: unknown) 
     }
 
     if (has('buyWeek')) addUpdate('buy_week', parseBuyWeek(updates.buyWeek));
+    for (const [key, column, max] of [['leadTimeWeeks', 'lead_time_weeks', 52], ['researchWeeks', 'research_weeks', 12]] as const) {
+      if (!has(key)) continue;
+      const value = updates[key];
+      if (value !== null && (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > max))
+        throw new HttpError(400, `Prazo inválido. Use de 0 a ${max} semanas.`);
+      addUpdate(column, value);
+    }
+    if (has('hasTemporarySolution')) {
+      if (typeof updates.hasTemporarySolution !== 'boolean') throw new HttpError(400, 'Solução temporária inválida.');
+      addUpdate('has_temporary_solution', updates.hasTemporarySolution);
+    }
+    if (has('dependsOnItemId')) {
+      const dependency = updates.dependsOnItemId;
+      if (dependency !== null) {
+        if (typeof dependency !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dependency) || dependency === itemId)
+          throw new HttpError(400, 'Dependência de compra inválida.');
+        const found = await client.query('SELECT id FROM items WHERE id = $1 AND enxoval_id = $2', [dependency, enxovalId]);
+        if (!found.rowCount) throw new HttpError(400, 'Escolha um item deste enxoval.');
+        const cycle = await client.query(`WITH RECURSIVE chain AS (
+          SELECT id, depends_on_item_id FROM items WHERE id = $1 AND enxoval_id = $2
+          UNION SELECT i.id, i.depends_on_item_id FROM items i JOIN chain c ON i.id = c.depends_on_item_id WHERE i.enxoval_id = $2
+        ) SELECT 1 FROM chain WHERE id = $3`, [dependency, enxovalId, itemId]);
+        if (cycle.rowCount) throw new HttpError(400, 'Esta dependência cria um ciclo. Escolha outro item.');
+      }
+      addUpdate('depends_on_item_id', dependency);
+    }
+
 
     if (has('status') || has('priceCents') || has('discountCents') || typeof updates.checked === 'boolean') {
       const discount = resolveDiscountCents({
@@ -1334,6 +1384,7 @@ export function registerApiRoutes(app: Express) {
   router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   router.use(protectMutationOrigin);
   router.use(enforceBans);
+  registerPublicHousewarmingRoutes(router);
   router.use(asyncHandler(async (req, _res, next) => {
     if (/^\/(auth(?:\/|$)|profile(?:\/|$)|onboarding\/complete$|billing(?:\/|$)|admin(?:\/|$)|bootstrap$|health$|invitations(?:\/|$)|feedback(?:\/|$)|lifecycle\/returned$)/.test(req.path)) return next();
     // Older onboarding screens post the draft here. The handler saves it without granting access.
@@ -1351,6 +1402,7 @@ export function registerApiRoutes(app: Express) {
   registerCatalogRoutes(router, { requireUser: requireCurrentUser });
   registerItemOfferRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember, fetchItemRow });
   registerItemDocumentRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember, fetchItemRow });
+  registerHousewarmingRoutes(router, { requireUser: requireCurrentUser, requireEnxovalMember });
 
   // Foto de quem participa do enxoval (para o avatar do responsável pelo item). Só para quem está no mesmo enxoval.
   router.get('/enxovais/:id/members/:userId/avatar', asyncHandler(async (req, res) => {

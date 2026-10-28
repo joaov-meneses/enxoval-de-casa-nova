@@ -1,3 +1,6 @@
+import { PurchaseTimingFields, purchaseDateLabel } from './PurchaseTiming';
+import { PriceOpportunityNote } from './PriceOpportunityNote';
+import type { SchedulingInput } from '../planning/scheduling';
 import { Badge } from "@/src/components/ui/badge";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "@/src/components/ui/button";
@@ -89,6 +92,7 @@ export interface ItemBuyPlan {
 
 interface ItemRowProps {
   item: EnxovalItem;
+  planningItems?: EnxovalItem[];
   completionExiting?: boolean;
   categories: EnxovalCategory[];
   categoryName?: string;
@@ -165,6 +169,11 @@ function sameRowProps(previous: ItemRowProps, next: ItemRowProps) {
       const a = previous.knownGiftNames, b = next.knownGiftNames;
       return !!a && !!b && a.length === b.length && a.every((name, index) => name === b[index]);
     }
+    if (key === "planningItems") {
+      const a = previous.planningItems, b = next.planningItems;
+      return !!a && !!b && a.length === b.length && a.every((entry, index) =>
+        entry.id === b[index].id && entry.name === b[index].name && entry.dependsOnItemId === b[index].dependsOnItemId);
+    }
     return false;
   });
 }
@@ -174,6 +183,7 @@ function sameRowProps(previous: ItemRowProps, next: ItemRowProps) {
  */
 export const ItemRow = memo(function ItemRow({
   item,
+  planningItems = [],
   completionExiting = false,
   categories,
   categoryName,
@@ -210,6 +220,7 @@ export const ItemRow = memo(function ItemRow({
     const timeout = window.setTimeout(() => setCompleting(false), 760);
     return () => window.clearTimeout(timeout);
   }, [completing]);
+  const [timingDraft, setTimingDraft] = useState<SchedulingInput>({});
   const [name, setName] = useState(item.name);
   const [priceText, setPriceText] = useState("");
   const [discountText, setDiscountText] = useState("");
@@ -251,6 +262,8 @@ export const ItemRow = memo(function ItemRow({
   }, [importStep, id]);
   useEffect(() => {
     if (expanded) return;
+    setTimingDraft({ leadTimeWeeks: item.leadTimeWeeks ?? null, researchWeeks: item.researchWeeks ?? null,
+      hasTemporarySolution: item.hasTemporarySolution ?? false, dependsOnItemId: item.dependsOnItemId ?? null });
     setName(item.name);
     setPriceText(item.priceCents ? money.format(item.priceCents / 100) : "");
     setQuantityText(String(normalizeQuantity(item.quantity)));
@@ -308,6 +321,8 @@ export const ItemRow = memo(function ItemRow({
   const assignee = item.assigneeId ? members.find((member) => member.id === item.assigneeId) : undefined;
   const installmentsTag = item.status === "bought" ? installmentBadge(item) : null;
   const warrantyDays = warrantyExpiringSoon(item) ? warrantyDaysLeft(item) : null;
+  const showAcquisitionDetails = status === "bought" || status === "received";
+  const showPurchasePlanning = status === "researching";
   const draftInstallments = Number(installmentsText) || 1;
   const draftPlan = installmentPlan({
     status,
@@ -427,7 +442,7 @@ export const ItemRow = memo(function ItemRow({
     if ((paymentMethod || null) !== (item.paymentMethod ?? null)) extras.paymentMethod = (paymentMethod || null) as PaymentMethod | null;
     const firstOn = firstInstallmentMonth ? `${firstInstallmentMonth}-01` : null;
     if (firstOn !== (item.firstInstallmentOn ?? null)) extras.firstInstallmentOn = firstOn;
-    if (status === "bought" && (purchasedAt || null) !== (item.purchasedAt ?? null)) extras.purchasedAt = purchasedAt || null;
+    if (showAcquisitionDetails && (purchasedAt || null) !== (item.purchasedAt ?? null)) extras.purchasedAt = purchasedAt || null;
     if ((assigneeId || null) !== (item.assigneeId ?? null)) extras.assigneeId = assigneeId || null;
     if (giftFrom.trim() !== (item.giftFrom ?? "")) extras.giftFrom = giftFrom.trim() || null;
     if (giftMessage.trim() !== (item.giftMessage ?? "")) extras.giftMessage = giftMessage.trim() || null;
@@ -442,6 +457,7 @@ export const ItemRow = memo(function ItemRow({
     try {
       await onUpdate(item.id, {
         ...extras,
+        ...timingDraft,
         name: name.trim(),
         priceCents: priceValue,
         quantity: quantityValue,
@@ -583,14 +599,15 @@ export const ItemRow = memo(function ItemRow({
             )}
             <OffersSummary item={item} onOpen={() => !expanded && toggle()} />
             {/* Sem a data da mudança, "11 semanas depois" não diz nada: a semana fica só no Planejamento. */}
-            {buyPlan?.moveDate && !item.checked && (
-              <span
+            {buyPlan && !item.checked && (
+              <button
+                type="button" onClick={() => !expanded && toggle()} aria-label={`Quando comprar ${item.name}`}
                 className={`item-week-tag${buyPlan.overdue ? " is-late" : ""}${buyPlan.manual ? " is-manual" : ""}`}
                 title={buyPlan.reason}
               >
                 <StaticListIcon name="calendar-clock" size={12} />
-                {buyPlan.overdue ? "Semana sugerida já passou" : weekTagLabel(buyPlan.week)}
-              </span>
+                {buyPlan.overdue ? "Semana sugerida já passou" : purchaseDateLabel(buyPlan.week, buyPlan.moveDate)}
+              </button>
             )}
             {itemDiscount > 0 && (
               <span className="item-discount-tag">
@@ -724,6 +741,7 @@ export const ItemRow = memo(function ItemRow({
           >
             <div className="item-inline-grid">
               <h4 className="item-inline-section item-inline-wide">Sobre o item</h4>
+              <div className="item-inline-wide"><PriceOpportunityNote item={item} /></div>
               <Label htmlFor={`${id}-name`} className="item-inline-wide item-field-name">
                 <span className="item-inline-label-row">
                   Nome do item
@@ -777,7 +795,7 @@ export const ItemRow = memo(function ItemRow({
                   {ITEM_STATUS_META[status].hint}
                 </span>
               </Label>
-              {buyPlan && (
+              {buyPlan && showPurchasePlanning && (
                 <Label
                   htmlFor={`${id}-week`}
                   className="item-inline-wide item-field-week"
@@ -803,6 +821,9 @@ export const ItemRow = memo(function ItemRow({
                   </span>
                 </Label>
               )}
+              {buyPlan && <div className="item-inline-wide"><PurchaseTimingFields item={item} items={planningItems}
+                value={timingDraft} onChange={setTimingDraft} disabled={busy} showPlanningFields={showPurchasePlanning} /></div>}
+
               {shared && (
                 <Label htmlFor={`${id}-assignee`} className="item-inline-wide item-field-assignee">
                   Quem vai comprar
@@ -823,6 +844,18 @@ export const ItemRow = memo(function ItemRow({
                   <span className="item-inline-hint">Evita compra repetida. Qualquer pessoa do enxoval continua podendo editar o item.</span>
                 </Label>
               )}
+              <Label htmlFor={`${id}-quantity`} className="item-field-qty" title="Só informa quantas unidades há. Não muda o preço.">
+                Quantidade
+                <QuantityStepper
+                  id={`${id}-quantity`}
+                  value={quantityText}
+                  onChange={setQuantityText}
+                  disabled={busy}
+                />
+                <span className="item-inline-hint">
+                  Só informa quantas unidades há. Não muda o preço.
+                </span>
+              </Label>
               <h4 className="item-inline-section item-inline-wide">Valores</h4>
               <Label htmlFor={`${id}-price`} className="item-field-price">
                 Preço
@@ -877,32 +910,18 @@ export const ItemRow = memo(function ItemRow({
                       : "Esta situação não tem compra, então não há desconto."}
                 </span>
               </Label>
-              <Label htmlFor={`${id}-quantity`} className="item-field-qty" title="Só informa quantas unidades há. Não muda o preço.">
-                Quantidade
-                <QuantityStepper
-                  id={`${id}-quantity`}
-                  value={quantityText}
-                  onChange={setQuantityText}
-                  disabled={busy}
-                />
-                <span className="item-inline-hint">
-                  Só informa quantas unidades há. Não muda o preço.
-                </span>
-              </Label>
-              <div className="item-inline-summary item-field-total" aria-live="polite">
+              {status !== "received" && <div className="item-inline-summary item-field-total" aria-live="polite">
                 <span className="item-inline-summary-label">
-                  {status === "received" ? "Valor ganho" : "Valor final"}
+                  Valor final
                 </span>
                 <strong>{draftPrice > 0 ? money.format(draftFinal / 100) : "—"}</strong>
                 <span className="item-inline-hint">
-                  {status === "received"
-                    ? "Vai para Descontos e cashback, não para Já investimos."
-                    : draftDiscount > 0
+                  {draftDiscount > 0
                       ? `${money.format(draftPrice / 100)} menos ${money.format(draftDiscount / 100)} de desconto.`
                       : "Preço menos o desconto ou cashback."}
                 </span>
-              </div>
-              {(
+              </div>}
+              {status !== "received" && (
                 <>
                   <Label htmlFor={`${id}-installments`} className="item-field-installments">
                     Parcelas
@@ -951,20 +970,6 @@ export const ItemRow = memo(function ItemRow({
                       />
                     </Label>
                   )}
-                  {(
-                    <Label htmlFor={`${id}-purchased`} className="item-field-purchased">
-                      Data da compra
-                      <Input
-                        id={`${id}-purchased`}
-                        type="date"
-                        value={purchasedAt}
-                        max={new Date().toISOString().slice(0, 10)}
-                        onChange={(event) => setPurchasedAt(event.target.value)}
-                        disabled={busy || status !== "bought"}
-                      />
-                      {status !== "bought" && <span className="item-inline-hint item-extra-note">Preenche ao marcar como Comprado.</span>}
-                    </Label>
-                  )}
                   {draftInstallments > 1 && (
                     <Label htmlFor={`${id}-first-installment`} className="item-field-first-installment">
                       Primeira parcela
@@ -981,6 +986,19 @@ export const ItemRow = memo(function ItemRow({
                     </Label>
                   )}
                 </>
+              )}
+              {showAcquisitionDetails && (
+                <Label htmlFor={`${id}-purchased`} className="item-field-purchased">
+                  Data da compra
+                  <Input
+                    id={`${id}-purchased`}
+                    type="date"
+                    value={purchasedAt}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(event) => setPurchasedAt(event.target.value)}
+                    disabled={busy}
+                  />
+                </Label>
               )}
               {status === "received" && (
                 <>
@@ -1056,7 +1074,7 @@ export const ItemRow = memo(function ItemRow({
                   </Label>
                 </>
               )}
-              {(
+              {showAcquisitionDetails && (
                 <>
                   <h4 className="item-inline-section item-inline-wide is-visible">
                     Nota e garantia
@@ -1103,7 +1121,11 @@ export const ItemRow = memo(function ItemRow({
                       disabled={busy}
                     />
                   </Label>
-                  {onReplace && <ItemDocumentsSection item={item} disabled={busy} onReplace={onReplace} />}
+                  {onReplace && <ItemDocumentsSection item={item} disabled={busy} onReplace={onReplace} onReceiptApply={fields => {
+                    if (fields.storeName) setStoreName(fields.storeName);
+                    if (fields.purchasedAt && status === 'bought') setPurchasedAt(fields.purchasedAt);
+                    if (fields.priceCents !== undefined) setPriceText(money.format(fields.priceCents / 100));
+                  }} />}
                 </>
               )}
               {onReplace && (

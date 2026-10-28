@@ -17,6 +17,7 @@ import type {
   ItemAssessment,
   ItemDocument,
   ItemDocumentKind,
+  ReceiptPreview,
   ItemExtrasInput,
   ItemPriceHistory,
   ItemStatus,
@@ -25,6 +26,7 @@ import type {
   NextItemRecommendation,
   ScrapedProductPreview,
 } from "./types";
+import type { HousewarmingManagement, HousewarmingSettings, HousewarmingEntry, PublicHousewarming } from './housewarming';
 import { isDoneStatus, isItemStatus, normalizeItemStatus } from "./itemStatus";
 import { SESSION_AUTHENTICATED_EVENT, SESSION_EXPIRED_EVENT } from './sessionActivity';
 import * as analytics from './analytics';
@@ -562,6 +564,10 @@ export function updateItem(
       | "discountCents"
       | "categoryId"
       | "buyWeek"
+      | "leadTimeWeeks"
+      | "researchWeeks"
+      | "hasTemporarySolution"
+      | "dependsOnItemId"
     >
   > &
     ItemTrackingInput &
@@ -592,6 +598,8 @@ export const uploadItemDocument = (itemId: string, file: Blob, kind: ItemDocumen
   );
 export const deleteItemDocument = (documentId: string) =>
   request<EnxovalItem>(`/api/documents/${encodeURIComponent(documentId)}`, { method: "DELETE" });
+export const readItemReceipt = (documentId: string) =>
+  request<{ preview: ReceiptPreview; cached: boolean }>(`/api/documents/${encodeURIComponent(documentId)}/read-receipt`, { method: 'POST' });
 export const fetchEnxovalDocuments = (enxovalId: string) =>
   request<{ documents: ItemDocument[]; usedBytes: number; quotaBytes: number }>(`/api/enxovais/${encodeURIComponent(enxovalId)}/documents`);
 /** Endereço do ZIP com os documentos do enxoval (ou de um ambiente); o navegador baixa direto do servidor. */
@@ -710,6 +718,22 @@ export const prioritizeEnvironment = (enxovalId: string, categoryId: string) =>
 export function deleteItem(id: string) {
   return request<void>(`/api/items/${id}`, { method: "DELETE" });
 }
+
+const housewarmingPath = (id: string) => `/api/enxovais/${encodeURIComponent(id)}/housewarming`;
+export const fetchHousewarming = (id: string) => request<HousewarmingManagement>(housewarmingPath(id));
+export const saveHousewarming = (id: string, input: HousewarmingSettings) =>
+  request<HousewarmingManagement>(housewarmingPath(id), { method: 'PUT', body: JSON.stringify(input) });
+export const fetchHousewarmingNotifications = (id: string) =>
+  request<{ unreadCount: number; latest: HousewarmingEntry | null }>(`${housewarmingPath(id)}/notifications`);
+export const readHousewarmingEntries = (id: string, ids: string[]) =>
+  request<void>(`${housewarmingPath(id)}/read`, { method: 'POST', body: JSON.stringify({ ids }) });
+export const cancelHousewarmingReservation = (id: string, reservationId: string) =>
+  request<void>(`${housewarmingPath(id)}/reservations/${encodeURIComponent(reservationId)}`, { method: 'DELETE' });
+export const fetchPublicHousewarming = (slug: string) =>
+  request<PublicHousewarming>(`/api/public/housewarming/${encodeURIComponent(slug)}`);
+export const sendHousewarmingGuest = (slug: string, kind: 'reservations' | 'messages', input: {
+  requestId: string; name: string; message: string; email?: string; itemId?: string;
+}) => request<{ id: string }>(`/api/public/housewarming/${encodeURIComponent(slug)}/${kind}`, { method: 'POST', body: JSON.stringify(input) });
 
 export type {
   AuthUser,

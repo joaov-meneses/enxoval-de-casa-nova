@@ -56,6 +56,9 @@ type ListWorkspace = Pick<
   | "setWorkspaceView"
   | "showRoomSuggestions"
   | "suggestionsForRoom"
+  | "movesForRoom"
+  | "updateItem"
+  | "showToast"
   | "addItem"
   | "searchScopeLabel"
   | "searchQuery"
@@ -110,6 +113,9 @@ export default function ListRoute({
     setWorkspaceView,
     showRoomSuggestions,
     suggestionsForRoom,
+    movesForRoom,
+    updateItem,
+    showToast,
     addItem,
     searchScopeLabel,
     searchQuery,
@@ -344,7 +350,15 @@ export default function ListRoute({
                 key={activeCategory.id}
                 roomName={activeCategory.name}
                 suggestions={suggestionsForRoom}
+                moves={movesForRoom}
                 onAdd={(name) => addItem(name, activeCategory.id)}
+                onMove={async (move) => {
+                  await updateItem(move.itemId, { categoryId: activeCategory.id });
+                  showToast(
+                    `${move.name} foi para ${activeCategory.name}`,
+                    () => updateItem(move.itemId, { categoryId: move.fromCategoryId }),
+                  );
+                }}
               />
             )}
             {actionsAboveSearch && mobileActions}

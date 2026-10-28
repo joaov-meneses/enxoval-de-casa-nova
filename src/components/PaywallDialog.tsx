@@ -37,7 +37,7 @@ const UNLOCKS = [
   "Cômodos e itens ilimitados",
   "Mais de um enxoval",
   "Lista a dois, com quem mora com você",
-  "Página do Chá de Casa Nova (em breve)",
+  "Página do Chá de Casa Nova",
 ];
 
 /**

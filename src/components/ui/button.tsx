@@ -60,7 +60,7 @@ function Button({
         data-size={size}
         className={cn(
           variant === "brand"
-            ? "outline-none transition-[color,background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            ? "outline-none transition-[color,background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             : buttonVariants({ variant, size }),
           className,
         )}

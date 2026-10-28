@@ -2,6 +2,33 @@
 
 Implementado em 22/10/2026. As alterações de interface desta entrega estão no checkout local e ainda não foram publicadas.
 
+## Animações por pose
+
+O componente `Nino` aplica um gesto curto à arte oficial, sem alterar as imagens:
+
+| Pose | Movimento | Duração |
+| --- | --- | --- |
+| `wave` | Balanço de boas-vindas, diminuindo até parar. | 1,6 s |
+| `think` | Inclinação pensativa com pausa e pequeno sinal de entendimento. | 2,8 s |
+| `happy` | Dois pulinhos leves. | 1,4 s |
+| `celebrate` | Salto maior, balanço e aterrissagem macia. | 1,8 s |
+
+O gesto começa com a imagem carregada e visível, repete ao voltar à área visível ou trocar de pose e termina em repouso. `prefers-reduced-motion: reduce` desativa os movimentos. `animated={false}` mantém uma instância estática. As poses `rest` e `keys` continuam estáticas.
+
+```tsx
+<Nino pose="wave" size={120} />
+<Nino pose="think" size={56} />
+<Nino pose="happy" size={96} />
+<Nino pose="celebrate" size={96} />
+<Nino pose="wave" size={120} animated={false} />
+```
+
+As animações ficam em `src/components/nino.css`. O planejamento e a tela de acesso usam os mesmos gestos do componente, substituindo suas animações anteriores.
+
+Na landing page, `wave` acompanha as boas-vindas e `think` apresenta a ajuda do Nino. O planejamento usa `think`, `celebrate` após uma conquista salva e `rest` quando o ambiente está completo. No convite do Chá de Casa Nova, `wave` recebe os convidados e `happy` aparece após reservar um presente ou enviar um recado. As poses `keys` dos planos continuam estáticas.
+
+Validação: `npm run test:nino` e `npx playwright test tests/nino.spec.ts tests/nino-motion.spec.ts`. Os testes de movimento cobrem 320, 375 e 425 px, carregamento/visibilidade, término do gesto e movimento reduzido.
+
 ## Estados no planejamento
 
 O `NinoAssistant` aparece no planejamento. O balão dentro da lista do ambiente foi removido por feedback de design, junto da variante, dos estilos exclusivos e dos testes dessa interface.

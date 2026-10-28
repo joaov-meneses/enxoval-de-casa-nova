@@ -59,6 +59,7 @@ function initialItems() {
 }
 
 async function mockApp(page: Page) {
+  await page.addInitScript(() => localStorage.setItem('casamia:consent', JSON.stringify({ analytics: false, marketing: false, version: '2026-10', decidedAt: new Date().toISOString() })));
   let items = initialItems();
   const patches: Record<string, unknown>[] = [];
   const posts: Record<string, unknown>[] = [];
@@ -239,11 +240,11 @@ for (const width of [375, 1440]) {
     test("planejamento mostra as parcelas por mês e Meu Lar os presentes", async ({ page }) => {
       await mockApp(page);
       await page.goto("/app/home/plano");
-      const flow = page.getByRole("region", { name: "Parcelas por mês" });
+      const flow = page.getByRole("region", { name: "Orçamento e compras por mês" });
       await expect(flow).toBeVisible();
       await expect(flow.getByText("Comprometido nos próximos 3 meses")).toBeVisible();
       await expect(flow.locator(".flow-month")).not.toHaveCount(0);
-      await expect(flow.getByLabel("Teto mensal para parcelas")).toHaveValue(/R\$\s500,00/);
+      await expect(flow.getByLabel("Quanto você pode destinar à casa por mês?")).toHaveValue(/R\$\s500,00/);
       await flow.locator(".flow-month").first().screenshot({ path: `test-results/fase11-fluxo-mes-${width}.png` });
       await page.screenshot({ path: `test-results/fase11-plano-${width}.png`, fullPage: true });
       await page.goto("/app/home/meu-lar");
@@ -351,10 +352,10 @@ test.describe("Meu enxoval (todos) e ambientes mostram os mesmos campos", () => 
   }
 });
 
-test.describe("Itens riscados e não riscados têm o mesmo formulário", () => {
+test.describe("Campos compartilhados e específicos por situação", () => {
   test.use({ viewport: { width: 1440, height: 1100 } });
 
-  test("pesquisando, comprado e recebido mostram os mesmos campos", async ({ page }) => {
+  test("pesquisando, comprado e recebido preservam os campos comuns e as condições de aquisição", async ({ page }) => {
     await mockApp(page);
     await openList(page);
     const fields = async (id: string) => {
@@ -372,15 +373,25 @@ test.describe("Itens riscados e não riscados têm o mesmo formulário", () => {
     };
     const gift = /^(Presente|De quem foi|Recado que veio|Já agradeci)/;
     const bought = (await fields("fridge")).filter((label) => !gift.test(label));
-    // O campo de link some quando o item chega ao limite de lojas.
-    const dependent = /^(Valor da parcela|Primeira parcela|Acompanhar|Me avise|Avisar|Link do produto|Link de outra loja)/;
+    // Links dependem das lojas; data, nota e garantia só aparecem após a aquisição.
+    const dependent = /^(Parcelas|Meio de pagamento|Valor da parcela|Primeira parcela|Acompanhar|Me avise|Avisar|Link do produto|Link de outra loja|Data da compra|Nota e garantia|Garantia|Onde foi comprado|Documentos|Tipo do documento)/;
     const common = bought.filter((label) => !dependent.test(label));
-    expect(await fields("airfryer")).toEqual(expect.arrayContaining(common));
+    const researching = await fields("airfryer");
+    expect(common.filter(label => !researching.includes(label)), "campos comuns ausentes ao pesquisar").toEqual([]);
     const received = await fields("glasses");
-    expect(received).toEqual(expect.arrayContaining(common));
+    expect(common.filter(label => !received.includes(label)), "campos comuns ausentes ao receber").toEqual([]);
     expect(received.some((label) => gift.test(label))).toBe(true);
     expect((await fields("airfryer")).some((label) => gift.test(label))).toBe(false);
-    expect(common).toEqual(expect.arrayContaining([expect.stringMatching(/^Meio de pagamento/), expect.stringMatching(/^Garantia \(meses\)/)]));
+    for (const purchase of [bought, researching]) {
+      expect(purchase).toEqual(expect.arrayContaining(["Meio de pagamento", "Parcelas"]));
+    }
+    expect(received).not.toContain("Meio de pagamento");
+    for (const acquired of [bought, received]) {
+      expect(acquired).toEqual(expect.arrayContaining([expect.stringMatching(/^Data da compra/), expect.stringMatching(/^Garantia \(meses\)/)]));
+      expect(acquired.some(label => /^Semana para conquistar/.test(label))).toBe(false);
+    }
+    expect(researching.some(label => /^Semana para conquistar/.test(label))).toBe(true);
+    expect(researching.some(label => /^(Data da compra|Garantia \(meses\))/.test(label))).toBe(false);
   });
 });
 

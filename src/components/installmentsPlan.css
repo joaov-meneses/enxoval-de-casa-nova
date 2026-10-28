@@ -124,8 +124,6 @@
   cursor: default;
 }
 .flow-bar-hit:focus-visible {
-  outline: 2px solid var(--cm-primary-dark);
-  outline-offset: 2px;
   border-radius: 6px;
 }
 .flow-bar {
@@ -176,12 +174,16 @@
 }
 .flow-tooltip {
   position: absolute;
-  bottom: calc(100% + 6px);
+  /* Dentro da área do gráfico (e não acima dela), para não ser cortado pelo contêiner rolável. */
+  top: 0;
   left: 50%;
   z-index: 3;
   display: none;
   gap: 2px;
-  min-width: 180px;
+  width: max-content;
+  min-width: 170px;
+  max-width: 220px;
+  pointer-events: none;
   padding: 8px 10px;
   border-radius: 10px;
   background: var(--cm-text);
@@ -190,6 +192,19 @@
   text-align: left;
   transform: translateX(-50%);
   box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+}
+.flow-month:first-child .flow-tooltip {
+  left: 0;
+  transform: none;
+}
+.flow-month:last-child .flow-tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.flow-month:hover,
+.flow-month:focus-within {
+  z-index: 4;
 }
 .flow-bar-hit:hover .flow-tooltip,
 .flow-bar-hit:focus-visible .flow-tooltip {

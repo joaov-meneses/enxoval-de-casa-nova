@@ -72,7 +72,7 @@ async function run<T>(store: "snapshots" | "queue", mode: IDBTransactionMode, ac
 }
 
 export async function saveStoreSnapshot(snapshot: Omit<StoreSnapshot, "savedAt">) {
-  await run("snapshots", "readwrite", (objects) => objects.put({ ...snapshot, savedAt: Date.now() }));
+  return (await run("snapshots", "readwrite", (objects) => objects.put({ ...snapshot, savedAt: Date.now() }))) !== null;
 }
 
 export async function loadStoreSnapshot(enxovalId: string) {

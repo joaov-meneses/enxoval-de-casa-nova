@@ -1,0 +1,7 @@
+simulation: catalog-national-pricing
+routing: path
+mocks:
+  - routeKey: serpapi
+    path: ../mocks/serpapi-pricing/config.yaml
+  - routeKey: jev-pricing
+    path: ../mocks/jev-pricing/config.yaml

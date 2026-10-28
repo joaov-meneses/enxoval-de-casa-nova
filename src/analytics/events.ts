@@ -62,6 +62,7 @@ export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/
 
 export function safeRoute(pathname: string) {
   if (PUBLIC_ROUTES.includes(pathname)) return pathname;
+  if (/^\/cha\/[^/]+\/?$/.test(pathname)) return '/cha/:slug';
   // Sub-rotas do app viram modelos sem identificador: /app/meu-lar, /app/plano, /app/itens/:ambiente.
   return appRouteTemplate(pathname) ?? '/other';
 }

@@ -6,7 +6,14 @@ import { getLogUserId, logger, runWithLogger, serializeError } from './logger.ts
 import { HttpError } from './security.ts';
 
 // Keep the original URL and payloads; serialization happens at completion, after parsers.
-const pathname = (req: Request) => req.originalUrl || req.url;
+const DOCUMENT_ROUTE = /^\/api\/(?:documents\/|items\/[^/]+\/documents(?:$|[/?])|enxovais\/[^/]+\/documents(?:$|[/.?]))/;
+const pathname = (req: Request) => {
+  const value = req.originalUrl || req.url;
+  return DOCUMENT_ROUTE.test(value) ? value.split('?')[0] : value;
+};
+const isDocumentRequest = (req: Request) => DOCUMENT_ROUTE.test(pathname(req));
+const documentHeaders = (headers: Record<string, unknown>) => Object.fromEntries(Object.entries(headers).map(([key, value]) =>
+  [key, ['cookie', 'authorization', 'set-cookie', 'location', 'content-disposition'].includes(key.toLowerCase()) ? '[Redacted]' : value]));
 const route = (req: Request) => req.route?.path ? `${req.baseUrl}${req.route.path}` : undefined;
 // Asset/module loads (including Animate UI), telemetry and keepalives are routine noise.
 // Decide the level again at completion so failures, slow requests and aborts stay visible.
@@ -38,10 +45,10 @@ export function createHttpLogging(baseLogger: Logger = logger): RequestHandler {
     serializers: {
       req: (req: Request) => ({
         id: req.id, method: req.method, url: pathname(req), path: req.path,
-        params: req.res?.locals.logParams ?? req.params, query: req.query, body: payload(req.body),
-        headers: req.headers, ip: req.ip, ips: req.ips,
+        params: req.res?.locals.logParams ?? req.params, query: isDocumentRequest(req) ? { redacted: 'document' } : req.query, body: isDocumentRequest(req) ? { redacted: 'document' } : payload(req.body),
+        headers: isDocumentRequest(req) ? documentHeaders(req.headers) : req.headers, ip: req.ip, ips: req.ips,
       }),
-      res: (res: Response) => ({ statusCode: res.statusCode, headers: res.getHeaders(), body: res.locals.logBody }),
+      res: (res: Response) => ({ statusCode: res.statusCode, headers: isDocumentRequest(res.req) ? documentHeaders(res.getHeaders()) : res.getHeaders(), body: res.locals.logBody }),
       err: serializeError,
     },
     customLogLevel: (req, res, err) => {
@@ -63,6 +70,10 @@ export function createHttpLogging(baseLogger: Logger = logger): RequestHandler {
     res.send = function (body) {
       res.locals.logParams = { ...req.params };
       if (/^\/api(?:\/|$)/.test(req.originalUrl || req.url)) {
+        if (isDocumentRequest(req)) {
+          res.locals.logBody = { redacted: 'document' };
+          return send.call(this, body);
+        }
         res.locals.logBody = payload(body);
         if (typeof body === 'string' && String(res.getHeader('content-type')).includes('application/json')) {
           try { res.locals.logBody = JSON.parse(body); } catch { /* Preserve non-JSON text. */ }

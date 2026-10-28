@@ -1,0 +1,5 @@
+simulation: private-document-storage
+routing: path
+mocks:
+  - routeKey: documents
+    path: ../mocks/documents-s3/config.yaml

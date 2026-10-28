@@ -161,7 +161,10 @@ export function monthlyFlow(
       const entry = plan?.byId.get(item.id);
       if (moveDate && entry) fallback = monthOf(weekRange(moveDate, entry.placement.week).start);
     }
-    const schedule = installmentPlan(item, fallback);
+    if (item.status === "researching" && fallback && fallback < current) fallback = current;
+    const estimatedBand = plan?.byId.get(item.id)?.band;
+    const estimated = item.status === "researching" && netPriceCents(item) <= 0 && estimatedBand;
+    const schedule = installmentPlan(estimated ? { ...item, priceCents: Math.round((estimatedBand.minCents + estimatedBand.maxCents) / 2), discountCents: 0 } : item, fallback);
     if (!schedule) continue;
     if (!schedule.firstMonth) {
       unscheduledCount += 1;

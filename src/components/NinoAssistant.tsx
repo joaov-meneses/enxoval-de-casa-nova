@@ -1,16 +1,18 @@
+import type { PurchasePlan } from '../planning/purchasePlan';
+import { purchaseDateLabel } from './PurchaseTiming';
 import { Label } from "@/src/components/ui/label";
 import { Button } from "@/src/components/ui/button";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { AlertCircle, ListOrdered, Plus, Sparkles } from "@/src/components/icons";
-import { prioritizeEnvironment, recommendNextItem } from "../api";
+import { AlertCircle, ArrowRight, ListOrdered, Plus, Sparkles } from "@/src/components/icons";
+import { prioritizeEnvironment } from "../api";
 import { useJevEnabled } from "../hooks/useJevEnabled";
 import { isDoneStatus } from "../itemStatus";
+import { knowsRoom, pickPage, roomMoves, roomSuggestions, type RoomMove, type RoomSuggestion } from "../listInsights";
 import { URGENCY_LEVELS, urgencyLabel } from "../planning/purchaseUrgency";
 import type {
   EnxovalCategory,
   EnxovalItem,
   ItemUrgencyResult,
-  NextItemRecommendation,
 } from "../types";
 import { ninoState, type NinoCelebration } from "../nino";
 import { NinoMood } from "./NinoMood";
@@ -18,6 +20,8 @@ import { Select } from "./Select";
 
 /** Acima disto o Nino afirma; entre o mínimo do servidor e isto, ele só sugere. */
 const SURE = 0.85;
+/** Quantas sugestões do catálogo o Nino mostra por vez. */
+const NEXT_OPTIONS = 3;
 /** Quantos itens a lista "O que comprar primeiro?" mostra por ambiente. */
 const TOP_URGENT = 8;
 /** Abaixo disto a nota do Jev é só uma estimativa (mesmo corte do servidor). */
@@ -48,12 +52,18 @@ export function NinoAssistant({
   categories,
   items,
   onAddItem,
+  onMoveItem,
   celebration,
+  plan, moveDate = null, onUrgencyScores,
 }: {
+  plan?: PurchasePlan<EnxovalItem>;
+  moveDate?: string | null;
+  onUrgencyScores?: (scores: { id: string; name: string; categoryId: string; urgency: number; confidence: number }[]) => void;
   enxovalId: string;
   categories: EnxovalCategory[];
   items: EnxovalItem[];
   onAddItem: (name: string, categoryId?: string, categoryName?: string) => Promise<void>;
+  onMoveItem: (id: string, categoryId: string) => Promise<void>;
   celebration?: NinoCelebration | null;
 }) {
   const enabled = useJevEnabled();
@@ -63,7 +73,8 @@ export function NinoAssistant({
   const [focusCategoryId, setFocusCategoryId] = useState("");
   const [busy, setBusy] = useState<"next" | "urgency" | "add" | null>(null);
   const [error, setError] = useState("");
-  const [next, setNext] = useState<NextItemRecommendation | null>(null);
+  // Pedido de sugestão para um ambiente. As sugestões vêm do catálogo e da lista de agora (mesma regra do rodapé do ambiente).
+  const [next, setNext] = useState<{ categoryId: string; categoryName: string; round: number } | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   // Notas recebidas do servidor nesta visita. As que já vieram gravadas no item (`aiUrgency`) não passam por aqui.
   const [fetched, setFetched] = useState<Record<string, Score & { key: string }>>({});
@@ -108,7 +119,7 @@ export function NinoAssistant({
   const ranked = shownPending
     .map((item) => ({ item, score: scoreOf(item) }))
     .filter((entry): entry is { item: EnxovalItem; score: Score } => entry.score !== null)
-    .sort((a, b) => b.score.urgency - a.score.urgency)
+    .sort((a, b) => (plan?.byId.get(a.item.id)?.placement.week ?? 104) - (plan?.byId.get(b.item.id)?.placement.week ?? 104) || b.score.urgency - a.score.urgency)
     .slice(0, TOP_URGENT);
 
   const preferredMoodId = focusCategoryId || celebration?.categoryId || selectedId;
@@ -129,34 +140,48 @@ export function NinoAssistant({
 
   if (categories.length === 0) return null;
 
-  async function askNext() {
-    if (!selectedId) return;
-    setFocusCategoryId(selectedId);
-    setBusy("next");
+  const nextCategory = next ? categories.find((category) => category.id === next.categoryId) : undefined;
+  const nextPool = useMemo(() => (nextCategory ? roomSuggestions(nextCategory.name, items) : []), [nextCategory, items]);
+  const nextMoves = useMemo(() => (nextCategory ? roomMoves(nextCategory, items, categories) : []), [nextCategory, items, categories]);
+  const nextOptions: RoomSuggestion[] = next ? pickPage(nextPool, next.round, NEXT_OPTIONS) : [];
+
+  function askNext() {
+    const category = categories.find((candidate) => candidate.id === selectedId);
+    if (!category) return;
+    setFocusCategoryId(category.id);
     setError("");
-    setNext(null);
-    const requestedRevision = revision;
-    try {
-      const result = await recommendNextItem(enxovalId, selectedId);
-      if (currentRevision.current === requestedRevision) setNext(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível consultar o Nino.");
-    } finally {
-      setBusy(null);
-    }
+    // Pedir de novo no mesmo ambiente mostra outras sugestões.
+    setNext((current) => ({
+      categoryId: category.id,
+      categoryName: category.name,
+      round: current?.categoryId === category.id ? current.round + 1 : 0,
+    }));
   }
 
   async function addRecommended(name: string) {
-    const recommendation = next?.recommendation;
-    if (!recommendation) return;
+    if (!next) return;
     setBusy("add");
     setError("");
     setAdding(name);
     try {
-      await onAddItem(name, recommendation.categoryId);
-      setNext(null);
+      await onAddItem(name, next.categoryId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível adicionar o item.");
+    } finally {
+      setBusy(null);
+      setAdding(null);
+    }
+  }
+
+  async function moveRecommended(move: RoomMove) {
+    if (!next) return;
+    setBusy("add");
+    setError("");
+    setAdding(move.itemId);
+    try {
+      await onMoveItem(move.itemId, next.categoryId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível mover o item.");
     } finally {
       setBusy(null);
       setAdding(null);
@@ -186,6 +211,10 @@ export function NinoAssistant({
         }
         return merged;
       });
+      onUrgencyScores?.(result.scores.flatMap(score => {
+        const item = byId.get(score.id);
+        return item ? [{ ...score, name: item.name, categoryId: item.categoryId }] : [];
+      }));
       setLastRun({ inferred: result.inferred, cached: result.cached, unscored: result.unscored });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível consultar o Nino.");
@@ -194,7 +223,8 @@ export function NinoAssistant({
     }
   }
 
-  const recommendation = next?.recommendation ?? null;
+  const nothingToSuggest = next !== null && nextOptions.length === 0 && nextMoves.length === 0;
+  const noSuggestionKey = nextCategory && !knowsRoom(nextCategory.name) ? "unknown_room" : "complete";
   const urgencyPendingCount = pendingOf(selectedUrgencyId).length;
 
   return (
@@ -237,53 +267,53 @@ export function NinoAssistant({
             type="button"
             className="button button-outline button-small"
             disabled={busy !== null}
-            onClick={() => void askNext()}
+            onClick={askNext}
           >
-            {busy === "next" ? "Pensando…" : "Pedir sugestão"}
+            {next && next.categoryId === selectedId && nextPool.length > NEXT_OPTIONS ? "Outras sugestões" : "Pedir sugestão"}
           </Button>
         </div>
-        {next && !recommendation && (
+        {nothingToSuggest && (
           <p className="pp-hint" role="status">
-            {NO_SUGGESTION[next.reason ?? "none"] ?? NO_SUGGESTION.none}
+            {NO_SUGGESTION[noSuggestionKey]}
           </p>
         )}
-        {recommendation && (
-          <>
-            {!recommendation.clear && (
-              <p className="pp-hint" role="status">
-                O Nino não tem um favorito claro para {recommendation.categoryName}. Estas são as
-                melhores opções agora:
-              </p>
-            )}
-            <ul className="pp-nino-options" aria-label="Sugestões do Nino">
-              {(recommendation.clear ? recommendation.options.slice(0, 1) : recommendation.options).map(
-                (option) => (
-                  <li key={option.name} className="pp-nino-result">
-                    <div>
-                      <strong>{option.name}</strong>
-                      <span>
-                        {recommendation.clear
-                          ? recommendation.confidence >= SURE
-                            ? "O Nino recomenda"
-                            : "O Nino acha que pode ser este"
-                          : "Boa opção"}{" "}
-                        · {option.essential ? "essencial" : "opcional"} em {recommendation.categoryName}
-                      </span>
-                    </div>
-                    <Button variant="brand" size="brand"
-                      type="button"
-                      className="button button-outline button-small"
-                      disabled={busy !== null}
-                      onClick={() => void addRecommended(option.name)}
-                    >
-                      <Plus size={14} aria-hidden="true" />
-                      {adding === option.name ? "Adicionando…" : "Adicionar"}
-                    </Button>
-                  </li>
-                ),
-              )}
-            </ul>
-          </>
+        {next && (nextOptions.length > 0 || nextMoves.length > 0) && (
+          <ul className="pp-nino-options" aria-label="Sugestões do Nino">
+            {nextMoves.map((move) => (
+              <li key={move.itemId} className="pp-nino-result">
+                <div>
+                  <strong>{move.name}</strong>
+                  <span>Está em {move.fromCategoryName}, mas combina mais com {next.categoryName}</span>
+                </div>
+                <Button variant="brand" size="brand"
+                  type="button"
+                  className="button button-outline button-small"
+                  disabled={busy !== null}
+                  onClick={() => void moveRecommended(move)}
+                >
+                  <ArrowRight size={14} aria-hidden="true" />
+                  {adding === move.itemId ? "Movendo…" : "Mover"}
+                </Button>
+              </li>
+            ))}
+            {nextOptions.map((option) => (
+              <li key={option.name} className="pp-nino-result">
+                <div>
+                  <strong>{option.name}</strong>
+                  <span>{option.essential ? "Essencial" : "Opcional"} em {next.categoryName}</span>
+                </div>
+                <Button variant="brand" size="brand"
+                  type="button"
+                  className="button button-outline button-small"
+                  disabled={busy !== null}
+                  onClick={() => void addRecommended(option.name)}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  {adding === option.name ? "Adicionando…" : "Adicionar"}
+                </Button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>}
 
@@ -324,11 +354,12 @@ export function NinoAssistant({
                       {shownCategory.name}
                       {score.confidence < UNCERTAIN && " · estimativa incerta"}
                     </span>
+                    {plan?.byId.get(item.id) && <span className="pp-hint">{plan.byId.get(item.id)!.placement.reason}</span>}
                   </div>
                   <span
                     className={`pp-nino-urgency is-${Math.min(URGENCY_LEVELS, Math.max(1, Math.round(score.urgency)))}`}
                   >
-                    {urgencyLabel(score.urgency)}
+                    {plan?.byId.get(item.id) ? purchaseDateLabel(plan.byId.get(item.id)!.placement.week, moveDate) : urgencyLabel(score.urgency)}
                   </span>
                 </li>
               ))}

@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/src/components/ui/button";
 import {
+  ArrowRight,
   CalendarClock,
   CalendarDays,
   Gift,
   LoaderCircle,
   Plus,
   Receipt,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   TrendingDown,
@@ -15,8 +17,10 @@ import {
 } from "@/src/components/icons";
 import {
   QUICK_FILTER_TITLE,
+  pickPage,
   type ListInsightsData,
   type QuickFilter,
+  type RoomMove,
   type RoomSuggestion,
 } from "../listInsights";
 
@@ -175,28 +179,36 @@ export function ListInsights({
 export function RoomSuggestions({
   roomName,
   suggestions,
+  moves,
   onAdd,
+  onMove,
 }: {
   roomName: string;
   suggestions: RoomSuggestion[];
+  moves: RoomMove[];
   onAdd: (name: string) => Promise<void>;
+  onMove: (move: RoomMove) => Promise<void>;
 }) {
   const [adding, setAdding] = useState<string | null>(null);
   const [hidden, setHidden] = useState(false);
+  const [round, setRound] = useState(0);
   const [error, setError] = useState("");
-  if (hidden || suggestions.length === 0) return null;
+  if (hidden || (suggestions.length === 0 && moves.length === 0)) return null;
+  const visible = pickPage(suggestions, round);
 
-  async function add(name: string) {
-    setAdding(name);
+  async function run(key: string, action: () => Promise<void>, failure: string) {
+    setAdding(key);
     setError("");
     try {
-      await onAdd(name);
+      await action();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível adicionar o item.");
+      setError(err instanceof Error ? err.message : failure);
     } finally {
       setAdding(null);
     }
   }
+  const add = (name: string) => run(`add:${name}`, () => onAdd(name), "Não foi possível adicionar o item.");
+  const move = (item: RoomMove) => run(`move:${item.itemId}`, () => onMove(item), "Não foi possível mover o item.");
 
   return (
     <section className="room-suggestions" aria-label={`Sugestões para ${roomName}`}>
@@ -206,19 +218,53 @@ export function RoomSuggestions({
           <strong>Quem monta {roomName.toLowerCase()} também costuma ter</strong>
           <span>Itens comuns que ainda não estão na sua lista.</span>
         </p>
-        <Button
-          variant="brand"
-          size="brand"
-          type="button"
-          className="room-suggestions-close"
-          onClick={() => setHidden(true)}
-          aria-label="Esconder sugestões"
-        >
-          <X size={16} aria-hidden="true" />
-        </Button>
+        <div className="room-suggestions-actions">
+          {suggestions.length > visible.length && (
+            <Button
+              variant="brand"
+              size="brand"
+              type="button"
+              className="room-suggestions-close"
+              onClick={() => setRound((current) => current + 1)}
+              aria-label="Ver outras sugestões"
+            >
+              <RefreshCw size={16} aria-hidden="true" />
+            </Button>
+          )}
+          <Button
+            variant="brand"
+            size="brand"
+            type="button"
+            className="room-suggestions-close"
+            onClick={() => setHidden(true)}
+            aria-label="Esconder sugestões"
+          >
+            <X size={16} aria-hidden="true" />
+          </Button>
+        </div>
       </div>
       <ul>
-        {suggestions.map((suggestion) => (
+        {moves.map((item) => (
+          <li key={item.itemId}>
+            <Button
+              variant="brand"
+              size="brand"
+              type="button"
+              className="room-suggestion is-move"
+              disabled={adding !== null}
+              onClick={() => void move(item)}
+              title={`Hoje está em ${item.fromCategoryName}`}
+            >
+              {adding === `move:${item.itemId}` ? (
+                <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <ArrowRight size={14} aria-hidden="true" />
+              )}
+              Mover {item.name} de {item.fromCategoryName}
+            </Button>
+          </li>
+        ))}
+        {visible.map((suggestion) => (
           <li key={suggestion.name}>
             <Button
               variant="brand"
@@ -228,7 +274,7 @@ export function RoomSuggestions({
               disabled={adding !== null}
               onClick={() => void add(suggestion.name)}
             >
-              {adding === suggestion.name ? (
+              {adding === `add:${suggestion.name}` ? (
                 <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />
               ) : (
                 <Plus size={14} aria-hidden="true" />

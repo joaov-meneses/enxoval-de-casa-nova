@@ -77,9 +77,6 @@
   background: #ae7b4520;
   color: color-mix(in oklab, var(--cm-primary-dark) 73%, var(--cm-text));
 }
-.workspace-app .item-footer .item-expand:focus-visible {
-  outline-offset: -3px;
-}
 
 /* Each environment is one bounded surface, including its drag handle. */
 .workspace-app .environment-row {
@@ -516,8 +513,6 @@
   outline: none;
 }
 .workspace-app .item-row .item-title-button:focus-visible {
-  outline: 2px solid var(--cm-action);
-  outline-offset: 2px;
   box-shadow: none;
 }
 .workspace-app .item-row[data-pointer-focus="true"] .item-title-button:focus {
@@ -840,8 +835,6 @@
     border-color 160ms ease-out;
 }
 .workspace-app .item-row-controls .item-check:focus-visible {
-  outline: 2px solid var(--cm-action);
-  outline-offset: 2px;
   box-shadow: none;
 }
 .workspace-app .item-row-controls .item-check[data-pointer-focus="true"]:focus {
@@ -945,10 +938,6 @@
   border-color: color-mix(in oklab, var(--cm-primary-dark) 45%, var(--cm-sand));
   background: color-mix(in oklab, var(--cm-sand) 28%, var(--cm-bg));
 }
-.workspace-app .next-step-card:focus-visible {
-  outline: 3px solid var(--cm-primary-dark);
-  outline-offset: 2px;
-}
 .workspace-app .next-step-nino {
   display: block;
   height: auto;
@@ -1050,10 +1039,6 @@
 }
 .workspace-app .list-insight:hover {
   border-color: color-mix(in oklab, var(--cm-primary-dark) 45%, var(--cm-sand));
-}
-.workspace-app .list-insight:focus-visible {
-  outline: 3px solid var(--cm-primary-dark);
-  outline-offset: 2px;
 }
 .workspace-app .list-insight strong {
   font-weight: 750;
@@ -1159,13 +1144,18 @@
   font-size: 13px;
   color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
 }
+.workspace-app .room-suggestions-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  margin: -6px -6px 0 0;
+}
 .workspace-app .room-suggestions-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  margin: -6px -6px 0 0;
   border-radius: 10px;
   color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
 }
@@ -1197,9 +1187,9 @@
 .workspace-app .room-suggestion:hover:not(:disabled) {
   background: color-mix(in oklab, var(--cm-primary) 6%, #fff);
 }
-.workspace-app .room-suggestion:focus-visible {
-  outline: 3px solid var(--cm-primary-dark);
-  outline-offset: 2px;
+.workspace-app .room-suggestion.is-move {
+  border-style: dashed;
+  text-align: left;
 }
 .workspace-app .room-suggestion small {
   font-size: 11px;
@@ -1762,10 +1752,6 @@
   border-color: color-mix(in oklab, var(--cm-primary-dark) 35%, #fff);
   background: color-mix(in oklab, var(--cm-primary-dark) 8%, #fff);
 }
-.workspace-menu-content > .profile-entry-mobile:focus-visible {
-  outline: 2px solid var(--cm-primary-dark);
-  outline-offset: 2px;
-}
 .profile-entry-mobile .profile-entry-avatar {
   width: 44px;
   height: 44px;
@@ -1819,10 +1805,6 @@
   box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--cm-primary-dark) 30%, #fff);
   font-family: var(--font-serif);
   font-size: 15px;
-}
-.workspace-app .mobile-header-profile:focus-visible {
-  outline: 2px solid var(--cm-primary-dark);
-  outline-offset: 1px;
 }
 
 /* Celular: "Estou na loja" é a ação principal, com uma linha que explica; importar e exportar ficam em "Planilhas". */
@@ -1890,11 +1872,6 @@
     border-color: color-mix(in oklab, var(--cm-primary-dark) 35%, #fff);
   }
 }
-.workspace-app .list-mobile-actions .store-mode-cta:focus-visible,
-.workspace-app .list-mobile-actions .list-more-trigger:focus-visible {
-  outline: 2px solid var(--cm-primary-dark);
-  outline-offset: 2px;
-}
 .list-more-dialog .export-sheet-actions > button > svg {
   flex: none;
   color: var(--cm-primary-dark);
@@ -1950,4 +1927,94 @@
 }
 .workspace-app .item-row .item-inline-actions .button {
   background: #fffffff2;
+}
+
+/* Barra inferior do celular: quatro destinos de largura igual, ícone sobre rótulo de uma linha e o destino atual
+   marcado por uma pílula atrás do ícone (e não por um cartão inteiro), como nos apps de uso diário. */
+@media (max-width: 1023px) {
+  .workspace-app .mobile-bottom-nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: #fdfcf8;
+    border-top: 1px solid color-mix(in oklab, var(--cm-sand) 45%, var(--cm-bg));
+    box-shadow: 0 -4px 18px #422d240d;
+  }
+  .workspace-app .mobile-bottom-nav button {
+    position: relative;
+    max-width: none;
+    min-height: 52px;
+    padding: 2px 2px 0;
+    gap: 3px;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+    -webkit-tap-highlight-color: transparent;
+  }
+  .workspace-app .mobile-bottom-nav button > span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* A pílula nasce atrás do ícone: é ela que acende no destino atual. */
+  .workspace-app .mobile-bottom-nav button::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    width: 52px;
+    height: 28px;
+    border-radius: 999px;
+    background: transparent;
+    transform: translateX(-50%) scaleX(0.6);
+    transition: background-color 0.18s ease, transform 0.18s ease;
+    z-index: 0;
+  }
+  .workspace-app .mobile-bottom-nav button svg {
+    position: relative;
+    z-index: 1;
+    width: 22px;
+    height: 22px;
+    margin-top: 5px;
+    stroke-width: 1.9;
+  }
+  .workspace-app .mobile-bottom-nav button > span {
+    margin-top: 2px;
+  }
+  .workspace-app .mobile-bottom-nav button.active {
+    background: transparent;
+    box-shadow: none;
+    color: var(--cm-primary-dark);
+    font-weight: 700;
+  }
+  .workspace-app .mobile-bottom-nav button.active::before {
+    background: color-mix(in oklab, var(--cm-primary) 16%, #fff);
+    transform: translateX(-50%) scaleX(1);
+  }
+  .workspace-app .mobile-bottom-nav button.active svg {
+    stroke-width: 2.2;
+  }
+  .workspace-app .mobile-bottom-nav button:active::before {
+    background: color-mix(in oklab, var(--cm-primary) 10%, #fff);
+    transform: translateX(-50%) scaleX(1);
+  }
+  .workspace-app .mobile-bottom-nav button:disabled {
+    opacity: 0.45;
+  }
+}
+@media (max-width: 359px) {
+  .workspace-app .mobile-bottom-nav { padding-inline: 4px; }
+  .workspace-app .mobile-bottom-nav button { font-size: 10.5px; }
+  .workspace-app .mobile-bottom-nav button::before { width: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-app .mobile-bottom-nav button::before { transition: none; }
 }

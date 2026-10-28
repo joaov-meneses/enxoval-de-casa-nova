@@ -155,6 +155,11 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 | R11 | Funil `/comecar` e "Ajuda do Nino" | Cálculo do plano sem estado visual de espera | Nino Pensativo (seção 3 da marca) | Mensagens curtas em sequência com o Nino de pranchetinha, só quando o cálculo demorar, sem movimento para quem pede menos **aplicada em parte** (o funil já tinha "Montando o plano"; adicionado aviso de espera na Ajuda do Nino) |
 | R12 | Home (seção do Nino) | A seção do Nino é só texto | Inteligência prática | Mock com cartões de sugestão do Nino. Não mostrar chat livre: o Jev responde com opções tipadas **aplicada** (cartões de sugestão do Nino na home) |
 | R13 | Rodapé | Não há explicação de como as sugestões são feitas | Honestidade antes do cartão | Página curta "Como o Nino escolhe" no rodapé **aplicada** (página `/como-o-nino-escolhe` e link no rodapé) |
+| R14 | Home (abaixo do hero) | Categorias da lista só em texto | Progresso visual concreto | Cena ilustrada da casa do Nino, com cômodos que acendem conforme os itens são riscados | proposta |
+| R15 | Home (hero) | Pouca transparência de como o plano é montado | Inteligência prática | Chips de contexto (metragem, moradores, orçamento) sobre o mockup, sem loop com movimento reduzido | proposta |
+| R16 | App (Nino) | Registrar presentes e compras exige abrir formulários | Acolhimento; inteligência prática | Registrar por mensagem ao Nino. Recurso novo; depende de decisão técnica sobre o Jev | proposta |
+| R17 | Home | Dores do Primeiro Lar não aparecem lado a lado com a alternativa | Persona "Primeiro Lar" (seção 8 da marca) | Seção comparando planilhas e blogs com o Casa Mia, sem culpar o usuário | proposta |
+| R18 | Lista | Tudo parece igualmente urgente | Regra do Primeiro Dia | Agrupar por "Dia 1", "Primeiro mês" e "Depois" | proposta |
 | P07 | Home (preços) | O título "Comece de graça" convive com teste de 2 dias com cartão e, abaixo, "nenhuma cobrança é realizada" (ver P01) | Honestidade com o usuário | Alinhar título, aviso e FAQ ao modelo real de cobrança **aplicada** (2026-10-20: título, aviso e FAQ alinhados ao teste de 2 dias) |
 
 ## 9. Carrossel de funcionalidades

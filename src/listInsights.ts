@@ -2,7 +2,7 @@
  * Atalhos da lista "Meu enxoval": dados que o app já calcula (plano de compras, acompanhamento de preço,
  * catálogo) resumidos em contagens que viram filtros com um toque.
  */
-import { foldText, itemKey } from "./catalog/normalize";
+import { compactKey, foldText, itemKey, trigramSimilarity, trigrams } from "./catalog/normalize";
 import { CATALOG, type CatalogEntry } from "./onboarding/catalog";
 import type { RoomKey } from "./onboarding/types";
 import {
@@ -15,7 +15,7 @@ import {
 } from "./planning/purchasePlan";
 import { buyOpportunities, hasCheaperOtherOffer } from "./priceTracking";
 import { netPriceCents } from "./itemStatus";
-import type { EnxovalItem } from "./types";
+import type { EnxovalCategory, EnxovalItem } from "./types";
 
 /** Filtros que nascem dos atalhos acima da lista. */
 export type QuickFilter = "week" | "deals" | "boughtUnpriced" | "mine" | "thanks" | "warranty";
@@ -165,30 +165,62 @@ function catalogRoomOf(categoryName: string): RoomKey | null {
   return room;
 }
 
+/** O catálogo conhece o tipo deste ambiente (cozinha, quarto, banheiro...)? */
+export function knowsRoom(categoryName: string) {
+  return catalogRoomOf(categoryName) !== null;
+}
+
 function displayName(entry: CatalogEntry) {
   return entry.name.replace("{cama}", "de casal");
 }
 
+/** Parecidos o bastante para ser o mesmo item com outro nome ("Fogão" x "Fogão 4 bocas" não passa; "Micro-ondas" x "Microondas" sim). */
+const SAME_ITEM_SIMILARITY = 0.8;
+
 /**
- * Itens comuns do cômodo que ainda não estão na lista, essenciais primeiro e do mais barato ao mais caro.
- * Só entram itens que servem a qualquer casa: os que dependem de clima, região ou de quem mora ficam no funil.
+ * Mesmo item com outro nome? Usa a normalização compartilhada com o Jev: "Micro-ondas", "microondas" e
+ * "Micro ondas 30L" são um item só; "Geladeira Frost Free 375L" já cobre "Geladeira". Na dúvida, vale
+ * não sugerir um item repetido.
+ */
+export function isSameItem(have: string, wanted: string) {
+  if (foldText(have) === foldText(wanted)) return true;
+  const haveKey = itemKey(have);
+  const wantedKey = itemKey(wanted);
+  if (!haveKey || !wantedKey) return false;
+  if (haveKey === wantedKey || haveKey.startsWith(`${wantedKey} `)) return true;
+  const haveCompact = compactKey(haveKey);
+  const wantedCompact = compactKey(wantedKey);
+  if (haveCompact === wantedCompact) return true;
+  return trigramSimilarity(trigrams(haveCompact), trigrams(wantedCompact)) >= SAME_ITEM_SIMILARITY;
+}
+
+/** Ambientes que se confundem entre si: um item pode estar num e fazer mais sentido no outro. */
+const SIBLING_ROOMS: RoomKey[][] = [
+  ["cozinha", "eletro"],
+  ["quarto", "quartoExtra"],
+];
+
+function areSiblingRooms(a: RoomKey, b: RoomKey) {
+  return SIBLING_ROOMS.some((group) => group.includes(a) && group.includes(b));
+}
+
+function catalogCandidates(room: RoomKey) {
+  return CATALOG.filter((entry) => entry.room === room && !entry.where && !PROFILE_FLAGS.test(entry.flags));
+}
+
+/**
+ * Itens comuns do cômodo que ainda não estão na lista (de nenhum ambiente), essenciais primeiro e do mais
+ * barato ao mais caro. Só entram itens que servem a qualquer casa: os que dependem de clima, região ou de
+ * quem mora ficam no funil. Devolve o conjunto todo; quem mostra pagina com `pickPage`.
  */
 export function roomSuggestions(
   categoryName: string,
   items: Pick<EnxovalItem, "name">[],
-  limit = 4,
 ): RoomSuggestion[] {
   const room = catalogRoomOf(categoryName);
   if (!room) return [];
-  const names = new Set(items.map((item) => foldText(item.name)));
-  const keys = items.map((item) => itemKey(item.name)).filter(Boolean);
-  // "Geladeira Frost Free 375L" já cobre "Geladeira": na dúvida, melhor não sugerir um item repetido.
-  const covered = (name: string) => {
-    if (names.has(foldText(name))) return true;
-    const key = itemKey(name);
-    return Boolean(key) && keys.some((have) => have === key || have.startsWith(`${key} `));
-  };
-  return CATALOG.filter((entry) => entry.room === room && !entry.where && !PROFILE_FLAGS.test(entry.flags))
+  const covered = (name: string) => items.some((item) => isSameItem(item.name, name));
+  return catalogCandidates(room)
     .map((entry) => ({ entry, name: displayName(entry) }))
     .filter(({ name }) => !covered(name))
     .sort(
@@ -196,8 +228,46 @@ export function roomSuggestions(
         Number(b.entry.flags.includes("E")) - Number(a.entry.flags.includes("E")) ||
         a.entry.tier - b.entry.tier,
     )
-    .slice(0, limit)
     .map(({ entry, name }) => ({ name, essential: entry.flags.includes("E") }));
+}
+
+/** Uma "página" circular do conjunto: cada rodada mostra outros itens e, passando do fim, volta ao começo. */
+export function pickPage<T>(pool: readonly T[], round: number, size = 4): T[] {
+  if (pool.length <= size) return [...pool];
+  const start = (round * size) % pool.length;
+  return Array.from({ length: size }, (_, i) => pool[(start + i) % pool.length]);
+}
+
+export interface RoomMove {
+  itemId: string;
+  name: string;
+  fromCategoryId: string;
+  fromCategoryName: string;
+}
+
+/**
+ * Itens que a pessoa pôs num ambiente irmão (Cozinha) mas que o catálogo guarda no ambiente atual (Eletro
+ * Cozinha). Só sugere mover quando o item não é de nenhum catálogo do ambiente onde está.
+ */
+export function roomMoves(
+  category: Pick<EnxovalCategory, "id" | "name">,
+  items: Pick<EnxovalItem, "id" | "name" | "categoryId">[],
+  categories: Pick<EnxovalCategory, "id" | "name">[],
+): RoomMove[] {
+  const room = catalogRoomOf(category.name);
+  if (!room) return [];
+  const targets = catalogCandidates(room).map(displayName);
+  const moves: RoomMove[] = [];
+  for (const item of items) {
+    if (item.categoryId === category.id) continue;
+    const from = categories.find((candidate) => candidate.id === item.categoryId);
+    const fromRoom = from ? catalogRoomOf(from.name) : null;
+    if (!from || !fromRoom || fromRoom === room || !areSiblingRooms(room, fromRoom)) continue;
+    if (!targets.some((name) => isSameItem(item.name, name))) continue;
+    if (catalogCandidates(fromRoom).some((entry) => isSameItem(item.name, displayName(entry)))) continue;
+    moves.push({ itemId: item.id, name: item.name, fromCategoryId: from.id, fromCategoryName: from.name });
+  }
+  return moves;
 }
 
 /* --------------------------------------------------- lista por semana de compra */
