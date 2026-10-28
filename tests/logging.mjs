@@ -111,7 +111,8 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     assert.equal(missing.response.status, 404);
     assert.equal(logs.find(log => log.reqId === missing.id && log.res).level, 40);
     const page = await call('/');
-    assert.equal(logs.find(log => log.reqId === page.id && log.res).res.statusCode, 200);
+    assert.equal(page.response.status, 200);
+    assert.equal(logs.some(log => log.reqId === page.id), false);
     const request = http.get(`${base}/abort`);
     request.on('error', () => {});
     await abortReady;
@@ -126,6 +127,59 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     assert.equal(completed.res.body.password, 'RESPONSE_BODY_SECRET');
     const malformedLog = logs.find(log => log.reqId === malformed.id && log.res);
     assert.match(malformedLog.err.body, /MALFORMED_PASSWORD_SECRET/);
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('routine HTTP traffic is quiet while API calls and asset failures remain visible', async () => {
+  const logs = [];
+  const logger = createLogger({ write: line => logs.push(JSON.parse(line)) });
+  const app = express();
+  app.use(createHttpLogging(logger));
+  app.use((req, res) => {
+    if (req.path === '/src/broken.tsx') throw new Error('Module failed');
+    res.status(req.query.cached ? 304 : 200).end();
+  });
+  app.use(httpErrorHandler);
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (path, method = 'GET') => {
+    const response = await fetch(`${base}${path}`, { method });
+    await response.text();
+    return response.headers.get('x-request-id');
+  };
+  try {
+    for (const [path, method] of [
+      ['/src/components/animate-ui/icons/house.tsx?t=123'],
+      ['/src/components/animate-ui/icons/check.tsx?cached=1'],
+      ['/node_modules/.vite/deps/motion_react.js?v=123'],
+      ['/@vite/client'], ['/@react-refresh'], ['/assets/app.js'],
+      ['/brand/nino.webp'], ['/favicon.ico'], ['/app'], ['/app', 'HEAD'],
+      ['/ingest/e/', 'POST'], ['/ingest/static/array.js'],
+      ['/api/health?check=1'], ['/api/auth/activity', 'POST'],
+    ]) {
+      const id = await call(path, method);
+      assert.match(id, /^[0-9a-f-]{36}$/);
+      assert.equal(logs.some(log => log.reqId === id), false, `${method || 'GET'} ${path}`);
+    }
+    for (const [path, method] of [
+      ['/api/items'], ['/api/catalog/export.js'], ['/api/health/details'],
+      ['/api/auth/activity', 'GET'], ['/ingestion', 'POST'],
+    ]) {
+      const id = await call(path, method);
+      assert.deepEqual(logs.filter(log => log.reqId === id).map(log => log.event), [
+        'http.request.started', 'http.request.completed',
+      ]);
+    }
+    const id = await call('/src/broken.tsx');
+    const scoped = logs.filter(log => log.reqId === id);
+    assert.equal(scoped.length, 1);
+    assert.equal(scoped[0].event, 'http.request.failed');
+    assert.equal(scoped[0].level, 50);
+    assert.equal(scoped[0].err.message, 'Module failed');
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));

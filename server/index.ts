@@ -3,6 +3,7 @@ import { startErrorTracking, captureServerError, stopErrorTracking } from './err
 import { logger, isProduction, stopPosthogLogs } from './logger.ts';
 import { startTrialNotifications } from './workers/trialNotifications.ts';
 import { startUserIpRetention } from './workers/userIpRetention.ts';
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -12,6 +13,16 @@ import { registerBillingWebhook } from "./billing.ts";
 import { registerApiRoutes } from "./routes.ts";
 import { startPriceTrackerScheduler } from "./workers/priceTrackerWorker.ts";
 import { startCatalogScheduler } from "./workers/catalogWorker.ts";
+import { startCatalogMarketScheduler } from './workers/catalogMarketWorker.ts';
+import { registerIngestProxy } from "./ingestProxy.ts";
+import { registerPreferenceRoutes } from "./lifecycle/routes.ts";
+import { startLifecycleWorker } from "./workers/lifecycleWorker.ts";
+import { stopProductAnalytics } from "./productAnalytics.ts";
+import { startFiscalInvoiceWorker } from "./workers/fiscalInvoices.ts";
+import { startWarrantyReminders } from './workers/warrantyReminders.ts';
+import { registerResendWebhook } from './lifecycle/tracking.ts';
+import { startJobWatchdog } from './jobMonitor.ts';
+import { registerSeoRoutes, renderPageHtml } from './seo.ts';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -21,6 +32,10 @@ app.set("trust proxy", 1);
 app.use(createHttpLogging());
 // O webhook da Stripe confere a assinatura sobre o corpo cru, então vem antes do parser de JSON.
 registerBillingWebhook(app);
+// O proxy do PostHog repassa o corpo cru (às vezes comprimido), então também vem antes do parser de JSON.
+registerIngestProxy(app);
+// O webhook do Resend (entregas, cliques, rejeições) também confere a assinatura sobre o corpo cru.
+registerResendWebhook(app);
 app.use(express.json({ limit: "1mb" }));
 
 logger.info({ event: 'server.starting', port }, 'Iniciando servidor e aplicando migrações do banco.');
@@ -32,16 +47,25 @@ try {
   await Promise.allSettled([stopPosthogLogs(), stopErrorTracking()]);
   process.exit(1);
 }
+registerPreferenceRoutes(app);
 registerApiRoutes(app);
 startTrialNotifications();
+startLifecycleWorker();
 startUserIpRetention();
+startFiscalInvoiceWorker();
+startWarrantyReminders();
+startJobWatchdog();
+// robots.txt, sitemap.xml e X-Robots-Tag das páginas privadas, antes dos arquivos estáticos.
+registerSeoRoutes(app);
 
 if (isProduction) {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const indexHtml = await readFile(path.join(currentDir, "index.html"), "utf8");
 
-  app.use(express.static(currentDir));
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(currentDir, "index.html"));
+  // `index: false`: a página inicial também passa pelo handler abaixo, que coloca os metadados de cada página.
+  app.use(express.static(currentDir, { index: false }));
+  app.get("*", (req, res) => {
+    res.type("html").send(renderPageHtml(indexHtml, req.path));
   });
 } else {
   const vite = await createViteServer({
@@ -85,7 +109,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     deadline.unref();
     httpServer.close(() => {
       clearTimeout(deadline);
-      void Promise.allSettled([stopPosthogLogs(), stopErrorTracking()]).finally(() => process.exit(0));
+      void Promise.allSettled([stopPosthogLogs(), stopErrorTracking(), stopProductAnalytics()]).finally(() => process.exit(0));
     });
   });
 }
@@ -96,8 +120,11 @@ if (process.env.PRICE_TRACKER === "on" || (isProduction && process.env.PRICE_TRA
   startPriceTrackerScheduler();
 }
 
-// Rotina do catálogo (vínculos, faixas de preço, itens vindos das listas) a cada 6 horas. Não chama o Jev.
+// Rotina do catálogo a cada 6 horas; o Jev valida nomes antes de agregá-los nos preços nacionais.
 // CATALOG_WORKER=on liga e CATALOG_WORKER=off desliga em qualquer ambiente.
 if (process.env.CATALOG_WORKER === "on" || (isProduction && process.env.CATALOG_WORKER !== "off")) {
   startCatalogScheduler();
 }
+
+// Opt-in: ligar somente no ambiente que é dono da franquia SerpAPI (normalmente produção).
+if (process.env.CATALOG_MARKET_PRICES === 'on') startCatalogMarketScheduler();

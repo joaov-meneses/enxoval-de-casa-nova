@@ -12,6 +12,8 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     channel: process.platform === "win32" ? "msedge" : "chromium",
     trace: "retain-on-failure",
+    // O service worker do modo loja (só em produção) não pode esconder as rotas simuladas dos testes.
+    serviceWorkers: "block",
     screenshot: "only-on-failure",
   },
   webServer: process.env.PLAYWRIGHT_BASE_URL ? undefined : {

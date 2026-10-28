@@ -66,15 +66,4 @@ export function regionalSuggestions(options: {
   return result;
 }
 
-/** Nome do ambiente em que cada cômodo do catálogo costuma ficar (os mesmos nomes do funil). */
-export const ROOM_CATEGORY_NAME: Record<CatalogEntry["room"], string> = {
-  quarto: "Quarto",
-  quartoExtra: "Quarto Extra",
-  banheiro: "Banheiro",
-  cozinha: "Cozinha",
-  eletro: "Eletrodomésticos",
-  servico: "Área de Serviço",
-  sala: "Sala de Estar",
-  externa: "Varanda",
-  escritorio: "Home Office",
-};
+export { ROOM_CATEGORY_NAME } from "../catalog/rooms";

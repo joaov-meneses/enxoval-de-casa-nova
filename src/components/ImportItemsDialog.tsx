@@ -4,14 +4,15 @@ import { Label } from "@/src/components/ui/label";
 import { Input } from "@/src/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/src/components/ui/table";
 import { Disclosure, DisclosureTrigger } from "@/src/components/ui/disclosure";
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   FileSpreadsheet,
+  Sparkles,
   Upload,
 } from "@/src/components/icons";
-import { ApiError, createItem } from "../api";
+import { ApiError, createItem, matchCatalogNames } from "../api";
 import { capture } from '../analytics';
 import { ITEM_STATUS_META } from "../itemStatus";
 import type { EnxovalCategory, EnxovalItem } from "../types";
@@ -24,12 +25,22 @@ import {
   type ImportParseResult,
   type ImportRow,
 } from "../utils/importItems";
+import {
+  applyCatalogSuggestions,
+  catalogSuggestions,
+  defaultAcceptedSuggestions,
+  remainingIssues,
+  type CatalogSuggestion,
+} from "../utils/importCatalog";
 import { Dialog } from "./Dialog";
 
 const MODEL_CSV = "/modelos/casamia-modelo-importacao.csv";
 const MODEL_XLSX = "/modelos/casamia-modelo-importacao.xlsx";
 const PREVIEW_ROWS = 6;
 const LISTED_ISSUES = 15;
+
+/** loading: consultando o catálogo · ready: sugestões prontas (ou nenhuma) · failed: segue sem o catálogo. */
+type CatalogState = "loading" | "ready" | "failed";
 
 type Phase = "pick" | "review" | "importing" | "done";
 
@@ -57,20 +68,37 @@ const money = (cents: number | null) =>
         currency: "BRL",
       }).format(cents / 100);
 
-export function ImportItemsButton(props: ImportItemsButtonProps) {
-  const [open, setOpen] = useState(false);
+export function ImportItemsButton({
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
+  ...props
+}: ImportItemsButtonProps & {
+  /** Controlado por fora (celular): a janela abre a partir de "Planilhas", sem o botão próprio. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+}) {
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   return (
     <>
-      <Button variant="brand" size="brand"
-        type="button"
-        className="button button-outline button-small export-menu-trigger"
-        aria-label="Importar"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-      >
-        <Upload size={17} aria-hidden="true" />
-        <span>Importar</span>
-      </Button>
+      {!hideTrigger && (
+        <Button variant="brand" size="brand"
+          type="button"
+          className="button button-outline button-small export-menu-trigger"
+          aria-label="Importar"
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+        >
+          <Upload size={17} aria-hidden="true" />
+          <span>Importar</span>
+        </Button>
+      )}
       {/* Remonta ao fechar: cada importação começa do zero. */}
       {open && <ImportItemsDialog {...props} onClose={() => setOpen(false)} />}
     </>
@@ -95,6 +123,40 @@ function ImportItemsDialog({
   const [failures, setFailures] = useState<Failure[]>([]);
   const [stopped, setStopped] = useState(false);
   const stopRef = useRef(false);
+  // Catálogo mestre: corrige a grafia dos itens e sugere o ambiente de cada um (inclusive quando a planilha não diz).
+  const [catalogState, setCatalogState] = useState<CatalogState>("ready");
+  const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([]);
+  const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
+
+  useEffect(() => {
+    setSuggestions([]);
+    setAccepted(new Set());
+    if (!parsed || parsed.rows.length === 0) {
+      setCatalogState("ready");
+      return;
+    }
+    setCatalogState("loading");
+    const controller = new AbortController();
+    matchCatalogNames(parsed.rows.map((row) => row.name), controller.signal)
+      .then(({ results }) => {
+        const found = catalogSuggestions(parsed.rows, results, categories.map((category) => category.name));
+        setSuggestions(found);
+        setAccepted(defaultAcceptedSuggestions(found));
+        setCatalogState("ready");
+      })
+      .catch(() => {
+        // Sem o catálogo a importação continua como antes: só o que está no arquivo.
+        if (!controller.signal.aborted) setCatalogState("failed");
+      });
+    return () => controller.abort();
+    // Uma consulta por arquivo: os ambientes não mudam com o diálogo aberto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed]);
+
+  const rows = useMemo(
+    () => (parsed ? applyCatalogSuggestions(parsed.rows, suggestions, accepted) : []),
+    [parsed, suggestions, accepted],
+  );
 
   // Usa a grafia dos ambientes que já existem ("quarto" na planilha vira "Quarto").
   const plan = useMemo(() => {
@@ -108,7 +170,8 @@ function ImportItemsDialog({
       ),
     );
     const known = new Set(spelling.keys());
-    const rows = parsed.rows.map((row) => {
+    // Linhas ainda sem ambiente são erro e não entram no plano.
+    const planned = rows.filter((row) => row.categoryName).map((row) => {
       const key = normalizeText(row.categoryName);
       if (!spelling.has(key)) spelling.set(key, row.categoryName);
       const categoryName = spelling.get(key)!;
@@ -121,17 +184,17 @@ function ImportItemsDialog({
     });
     const newCategories = [
       ...new Set(
-        rows
+        planned
           .filter(({ row }) => !known.has(normalizeText(row.categoryName)))
           .map(({ row }) => row.categoryName),
       ),
     ];
     return {
-      rows,
+      rows: planned,
       newCategories,
-      duplicates: rows.filter((entry) => entry.duplicate).length,
+      duplicates: planned.filter((entry) => entry.duplicate).length,
     };
-  }, [parsed, categories, items]);
+  }, [parsed, rows, categories, items]);
 
   const toImport = useMemo(
     () =>
@@ -143,8 +206,17 @@ function ImportItemsDialog({
     [plan, skipDuplicates],
   );
 
-  const errors = parsed?.issues.filter((i) => i.level === "error") ?? [];
-  const warnings = parsed?.issues.filter((i) => i.level === "warning") ?? [];
+  const issues = parsed ? remainingIssues(parsed.issues, rows) : [];
+  const errors = issues.filter((i) => i.level === "error");
+  const warnings = issues.filter((i) => i.level === "warning");
+  const catalogLoading = catalogState === "loading";
+  const toggleSuggestion = (key: string, checked: boolean) =>
+    setAccepted((current) => {
+      const next = new Set(current);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
 
   async function pickFile(file: File | undefined) {
     if (!file) return;
@@ -177,7 +249,7 @@ function ImportItemsDialog({
 
   async function runImport() {
     // Qualquer erro no arquivo bloqueia tudo: a importação é "tudo ou nada" no formato.
-    if (errors.length > 0 || toImport.length === 0) return;
+    if (catalogLoading || errors.length > 0 || toImport.length === 0) return;
     stopRef.current = false;
     setStopped(false);
     setPhase("importing");
@@ -224,7 +296,7 @@ function ImportItemsDialog({
     setCreated(ok);
     setFailures(failed);
     setPhase("done");
-    capture('items_imported', { count: ok, failed: failed.length, stopped: stopRef.current });
+    capture('items_imported', { count: ok, failed: failed.length, stopped: stopRef.current, catalog_applied: accepted.size });
     if (ok > 0) await onImported();
   }
 
@@ -282,9 +354,10 @@ function ImportItemsDialog({
             <ul className="import-rules">
               <li>
                 Colunas obrigatórias: <strong>Item</strong> e{" "}
-                <strong>Ambiente</strong>, preenchidas em todas as linhas.
-                Opcionais: Situação, Quantidade, Preço, Desconto/cashback, Link
-                e Observações.
+                <strong>Ambiente</strong>. O Ambiente pode ficar vazio nos itens
+                que o catálogo conhece: ele sugere onde cada um fica. Opcionais:
+                Situação, Quantidade, Preço, Desconto/cashback, Link e
+                Observações.
               </li>
               <li>
                 Se o arquivo tiver qualquer erro de formato, nada é importado.
@@ -314,7 +387,7 @@ function ImportItemsDialog({
 
             <ul className="import-summary" aria-label="Resumo da leitura">
               <li>
-                <strong>{errors.length > 0 ? 0 : toImport.length}</strong>
+                <strong>{errors.length > 0 || catalogLoading ? 0 : toImport.length}</strong>
                 <span>
                   {errors.length === 0 && toImport.length === 1
                     ? "item será importado"
@@ -341,9 +414,62 @@ function ImportItemsDialog({
               <div role="alert" className="form-error">
                 O arquivo não está no formato correto, então nada será
                 importado. Corrija os erros abaixo (Item e Ambiente são
-                obrigatórios em todas as linhas), salve e envie o arquivo de
-                novo.
+                obrigatórios em todas as linhas, a não ser que o catálogo sugira
+                o ambiente), salve e envie o arquivo de novo.
               </div>
+            )}
+
+            {catalogLoading && (
+              <p className="import-note" role="status">
+                Consultando o catálogo…
+              </p>
+            )}
+            {catalogState === "failed" && (
+              <p className="import-note" role="status">
+                Não consegui consultar o catálogo agora: os itens entram como
+                estão no arquivo.
+              </p>
+            )}
+            {suggestions.length > 0 && (
+              <section className="import-catalog" aria-labelledby="import-catalog-title">
+                <div className="import-catalog-head">
+                  <Sparkles size={16} aria-hidden="true" />
+                  <strong id="import-catalog-title">
+                    {plural(suggestions.length, "sugestão do catálogo", "sugestões do catálogo")}
+                  </strong>
+                  {suggestions.length > 1 && (
+                    <Button variant="brand" size="brand"
+                      type="button"
+                      className="import-link-button"
+                      onClick={() =>
+                        setAccepted(
+                          accepted.size === suggestions.length
+                            ? new Set()
+                            : new Set(suggestions.map((suggestion) => suggestion.key)),
+                        )
+                      }
+                    >
+                      {accepted.size === suggestions.length ? "Desmarcar todas" : "Aceitar todas"}
+                    </Button>
+                  )}
+                </div>
+                <ul>
+                  {suggestions.map((suggestion) => (
+                    <li key={suggestion.key}>
+                      <Label className="import-check">
+                        <Checkbox
+                          checked={accepted.has(suggestion.key)}
+                          onCheckedChange={(checked) => toggleSuggestion(suggestion.key, checked === true)}
+                        />
+                        <span>
+                          <strong>Linha {suggestion.line}:</strong>{" "}
+                          <SuggestionText suggestion={suggestion} />
+                        </span>
+                      </Label>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
 
             {plan.newCategories.length > 0 && (
@@ -455,10 +581,12 @@ function ImportItemsDialog({
               <Button variant="brand" size="brand"
                 type="button"
                 className="button button-dark"
-                disabled={errors.length > 0 || toImport.length === 0}
+                disabled={catalogLoading || errors.length > 0 || toImport.length === 0}
                 onClick={() => void runImport()}
               >
-                {errors.length > 0
+                {catalogLoading
+                  ? "Consultando o catálogo…"
+                  : errors.length > 0
                   ? "Corrija o arquivo para importar"
                   : toImport.length === 0
                     ? "Nada para importar"
@@ -544,5 +672,25 @@ function ImportItemsDialog({
         )}
       </div>
     </Dialog>
+  );
+}
+
+function SuggestionText({ suggestion }: { suggestion: CatalogSuggestion }) {
+  if (suggestion.kind === "name")
+    return (
+      <>
+        “{suggestion.from}” vira <b>{suggestion.to}</b>
+      </>
+    );
+  if (suggestion.kind === "fill")
+    return (
+      <>
+        {suggestion.itemName} vai para <b>{suggestion.to}</b> (Ambiente vazio na planilha)
+      </>
+    );
+  return (
+    <>
+      {suggestion.itemName} vai para <b>{suggestion.to}</b>, em vez de {suggestion.from}
+    </>
   );
 }

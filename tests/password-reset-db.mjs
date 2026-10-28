@@ -1,8 +1,8 @@
-// Teste de integração com PostgreSQL real: "Esqueci minha senha" (link por e-mail, uso único, validade, anti-enumeração,
 // revogação de sessões). O e-mail vai para a caixa em memória (MAIL_DRIVER=memory): nada é enviado de verdade.
 // Usa um schema descartável. Rodar: npm run test:password-reset-db
 import assert from "node:assert/strict";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 
@@ -13,6 +13,7 @@ const { getPool } = await import("../server/database.ts");
 const { migrateDatabase } = await import("../server/migrations.ts");
 const { registerApiRoutes } = await import("../server/routes.ts");
 const { mailOutbox } = await import("../server/mailer.ts");
+const { hashPassword } = await import("../server/security.ts");
 
 if (!process.env.DATABASE_URL)
   throw new Error("Configure DATABASE_URL para o teste PostgreSQL.");
@@ -78,8 +79,8 @@ try {
     (await getPool().query(sql, params)).rows;
 
   const email = "reset@example.invalid";
-  const oldPassword = randomBytes(12).toString("base64url");
-  const newPassword = randomBytes(12).toString("base64url");
+  const oldPassword = strongPassword();
+  const newPassword = strongPassword();
   const person = agent();
   const registered = await person.call("/auth/register", "POST", {
     name: "Ana <b>Reset</b>",
@@ -172,6 +173,22 @@ try {
   assert.deepEqual((await caller.call("/auth/reset-password/check", "POST", { token: firstToken })).data, { valid: false }, "o link antigo foi substituído");
   assert.deepEqual((await caller.call("/auth/reset-password/check", "POST", { token: secondToken })).data, { valid: true });
   console.log("PASS: link expirado é recusado e um novo pedido invalida o anterior.");
+
+  // 8b. Senha nova segue a regra (letra, número, caractere especial, sem números em sequência);
+  // senha já cadastrada antes da regra continua entrando.
+  for (const weak of ["senhasegura", "senha-segura", "senha12345", "Senha#123", "Senha#987", "Ab#4"]) {
+    const signup = await agent().call("/auth/register", "POST", { email: `fraca-${randomUUID().slice(0, 8)}@example.invalid`, password: weak });
+    assert.equal(signup.status, 400, `cadastro com "${weak}" deveria ser recusado`);
+  }
+  // Uma tentativa só: a redefinição tem limite de 10 chamadas por IP e o teste já usou quase todas.
+  assert.equal((await reset({ token: secondToken, password: "Senha#123", confirmation: "Senha#123" })).status, 400, "redefinição com sequência é recusada");
+  assert.match((await agent().call("/auth/register", "POST", { email: "seq@example.invalid", password: "Casa#2024-123" })).data.error, /sequência/);
+  assert.deepEqual((await caller.call("/auth/reset-password/check", "POST", { token: secondToken })).data, { valid: true }, "senha recusada não gasta o link");
+  const legacyEmail = "antiga@example.invalid";
+  await query("INSERT INTO users (id, name, email, password_hash, email_verified_at) VALUES ($1, 'Antiga', $2, $3, now())",
+    [randomUUID(), legacyEmail, await hashPassword("abc123")]);
+  assert.equal((await agent().call("/auth/login", "POST", { email: legacyEmail, password: "abc123" })).status, 200, "senha antiga fora da regra continua valendo");
+  console.log("PASS: senha nova precisa seguir a regra e senhas já cadastradas continuam entrando.");
 
   // 9. Conta inativa não recebe link; link de conta desativada depois do envio também deixa de valer.
   await query("UPDATE users SET is_active = false WHERE email = $1", [email]);

@@ -1,7 +1,7 @@
-// Teste de integração com PostgreSQL real: situação do item (preciso, ganhei, comprei...), compatibilidade com o
 // marcador antigo `checked` e backfill da migração. Usa um schema descartável. Rodar: npm run test:item-status-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -69,7 +69,7 @@ try {
   const registered = await call("/auth/register", "POST", {
     name: "Cliente Situação",
     email: "situacao@example.invalid",
-    password: randomBytes(16).toString("base64url"),
+    password: strongPassword(),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
   // Conta paga: este teste cobre a situação dos itens, não as travas do plano gratuito (tests/freemium-db.mjs).

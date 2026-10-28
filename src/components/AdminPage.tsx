@@ -32,6 +32,7 @@ import {
   adminSession,
   ApiError,
   fetchAdminUsers,
+  markUserEmailVerified,
   resetUserPassword,
   setUserActive,
 } from "../api";
@@ -40,6 +41,8 @@ import { Brand } from "./Brand";
 import { Dialog } from "./Dialog";
 import { AdminCatalog } from "./AdminCatalog";
 import { AdminFeedbackList } from "./AdminFeedback";
+import { AdminOperations } from "./AdminOperations";
+import { AdminBanDialog, AdminBanList, BAN_REASON_LABEL, describeDevice } from "./AdminBans";
 
 const date = (value: string | null) =>
   value
@@ -71,6 +74,9 @@ export function AdminPage() {
     expiresAt: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [banUser, setBanUser] = useState<AdminUser | null>(null);
+  const [bansKey, setBansKey] = useState(0);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
   const temporaryRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (temporary) temporaryRef.current?.focus();
@@ -165,6 +171,24 @@ export function AdminPage() {
     } finally {
       setRefreshing(false);
     }
+  }
+  async function confirmEmail(user: AdminUser) {
+    setVerifyingId(user.id);
+    setError("");
+    try {
+      const { emailVerifiedAt } = await markUserEmailVerified(user.id);
+      setUsers((current) =>
+        current.map((entry) => (entry.id === user.id ? { ...entry, emailVerifiedAt } : entry)),
+      );
+    } catch (err) {
+      setError(handleError(err));
+    } finally {
+      setVerifyingId(null);
+    }
+  }
+  function bansChanged() {
+    setBansKey((key) => key + 1);
+    void refresh();
   }
   function openAction(user: AdminUser, kind: Action["kind"]) {
     setDialogError("");
@@ -319,7 +343,7 @@ export function AdminPage() {
         (filter === "active" && user.isActive) ||
         (filter === "inactive" && !user.isActive) ||
         (filter === "reset" && user.mustChangePassword)) &&
-      `${user.name} ${user.email} ${(user.ipAddresses ?? []).join(" ")}`
+      `${user.name} ${user.email} ${(user.ipAddresses ?? []).join(" ")} ${(user.devices ?? []).map((device) => device.deviceId).join(" ")}`
         .toLocaleLowerCase("pt-BR")
         .includes(normalized),
   );
@@ -390,7 +414,7 @@ export function AdminPage() {
               <Input
                 aria-label="Buscar usuários"
                 type="search"
-                placeholder="Busque por nome, e-mail ou IP"
+                placeholder="Busque por nome, e-mail, IP ou aparelho"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -456,6 +480,14 @@ export function AdminPage() {
                         : "Troca de senha pendente"}
                     </span></Badge>
                   )}
+                  {user.emailVerifiedAt === null && (
+                    <Badge asChild variant="outline"><span className="admin-badge pending">E-mail não confirmado</span></Badge>
+                  )}
+                  {user.activeBan && (
+                    <Badge asChild variant="outline"><span className="admin-badge inactive" title={user.activeBan.expiresAt ? `Até ${date(user.activeBan.expiresAt)}` : "Sem prazo"}>
+                      Bloqueada · {BAN_REASON_LABEL[user.activeBan.reasonCode] ?? user.activeBan.reasonCode}
+                    </span></Badge>
+                  )}
                 </div>
                 <div className="admin-user-activity">
                   <span>
@@ -467,6 +499,16 @@ export function AdminPage() {
                   </small>
                   <small>
                     IPs (6 meses): {user.ipAddresses?.length ? user.ipAddresses.join(", ") : "Nenhum registrado"}
+                  </small>
+                  <small>
+                    Aparelhos:{" "}
+                    {user.devices?.length
+                      ? user.devices.map((device) => (
+                          <span key={device.deviceId} className="admin-device" title={`${device.deviceId} · visto em ${date(device.lastSeenAt)}`}>
+                            {describeDevice(device)}
+                          </span>
+                        ))
+                      : "Nenhum registrado"}
                   </small>
                 </div>
                 <div className="admin-user-actions">
@@ -485,6 +527,24 @@ export function AdminPage() {
                     aria-label={`${user.isActive ? "Desativar" : "Reativar"} ${user.email}`}
                   >
                     {user.isActive ? "Desativar conta" : "Reativar conta"}
+                  </Button>
+                  {user.emailVerifiedAt === null && (
+                    <Button variant="brand" size="brand"
+                      className="admin-status-action"
+                      disabled={busy || verifyingId === user.id}
+                      onClick={() => void confirmEmail(user)}
+                      aria-label={`Confirmar o e-mail de ${user.email}`}
+                    >
+                      Confirmar e-mail
+                    </Button>
+                  )}
+                  <Button variant="brand" size="brand"
+                    className="admin-status-action"
+                    disabled={busy}
+                    onClick={() => setBanUser(user)}
+                    aria-label={`Bloquear ${user.email}`}
+                  >
+                    Bloquear…
                   </Button>
                 </div>
               </article>
@@ -510,8 +570,10 @@ export function AdminPage() {
             mantêm seus itens e listas.
           </p>
         </section>
+        <AdminBanList refreshKey={bansKey} onChanged={bansChanged} onError={(err) => setError(handleError(err))} />
         <AdminCatalog onError={(err) => setError(handleError(err))} />
         <AdminFeedbackList onError={(err) => setError(handleError(err))} />
+        <AdminOperations onError={(err) => setError(handleError(err))} />
       </main>
       <Dialog
         isOpen={Boolean(action)}
@@ -633,6 +695,14 @@ export function AdminPage() {
           </div>
         )}
       </Dialog>
+      <AdminBanDialog
+        user={banUser}
+        onClose={() => setBanUser(null)}
+        onCreated={() => {
+          setBanUser(null);
+          bansChanged();
+        }}
+      />
     </div>
   );
 }

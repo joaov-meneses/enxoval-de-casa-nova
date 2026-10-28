@@ -1,8 +1,14 @@
+import { migratePlanning } from './planningSchema.ts';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import { DEFAULT_ENXOVAL_TEMPLATE_NAME, DEFAULT_TEMPLATE_CATEGORIES, DEFAULT_TEMPLATE_ITEMS } from '../src/data.ts';
 import { seedCatalog } from './catalog/store.ts';
+import { migrateGrowth } from './growthSchema.ts';
+import { migrateFiscal } from './fiscal/schema.ts';
+import { migrateEnxovalValue } from './enxovalValueSchema.ts';
+import { migrateHousewarming } from './housewarmingSchema.ts';
 import { getPool } from './database.ts';
+import { migrateCatalogPricing } from './catalog/pricingSchema.ts';
 
 interface UserRow {
   id: string;
@@ -579,6 +585,64 @@ export async function migrateDatabase() {
 
     ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_user_name_unique;
 
+    -- Fase 9: aparelho, verificação de e-mail e bloqueios.
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'email_verified_at'
+      ) THEN
+        -- Uma única vez: contas que já existiam (e já usavam o e-mail para recuperar a senha) contam como verificadas.
+        ALTER TABLE users ADD COLUMN email_verified_at timestamptz;
+        UPDATE users SET email_verified_at = created_at;
+      END IF;
+    END $$;
+    CREATE TABLE IF NOT EXISTS email_verification_tokens (
+      id uuid PRIMARY KEY,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash text NOT NULL UNIQUE,
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS email_verification_tokens_user_idx ON email_verification_tokens(user_id, created_at DESC);
+
+    ALTER TABLE user_ip_events ADD COLUMN IF NOT EXISTS device_id uuid;
+    ALTER TABLE user_ip_events ADD COLUMN IF NOT EXISTS user_agent text;
+    ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_id uuid;
+    CREATE INDEX IF NOT EXISTS sessions_device_id_idx ON sessions(device_id) WHERE device_id IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS user_devices (
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      device_id uuid NOT NULL,
+      first_seen_at timestamptz NOT NULL DEFAULT now(),
+      last_seen_at timestamptz NOT NULL DEFAULT now(),
+      ua_browser text,
+      ua_os text,
+      ua_device text,
+      PRIMARY KEY (user_id, device_id)
+    );
+    CREATE INDEX IF NOT EXISTS user_devices_device_idx ON user_devices(device_id);
+
+    CREATE TABLE IF NOT EXISTS bans (
+      id uuid PRIMARY KEY,
+      target_type text NOT NULL CHECK (target_type IN ('user', 'ip', 'cidr', 'device')),
+      target_value text NOT NULL,
+      scope text NOT NULL DEFAULT 'block_all' CHECK (scope IN ('block_all', 'block_auth')),
+      reason_code text NOT NULL,
+      notes text,
+      created_by text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz,
+      revoked_at timestamptz,
+      revoked_by text
+    );
+    CREATE INDEX IF NOT EXISTS bans_active_target_idx ON bans(target_type, target_value) WHERE revoked_at IS NULL;
+
+    CREATE TABLE IF NOT EXISTS auth_failures (
+      ip inet NOT NULL,
+      occurred_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS auth_failures_ip_time_idx ON auth_failures(ip, occurred_at DESC);
+
     CREATE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions(token_hash);
     CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
     CREATE INDEX IF NOT EXISTS enxovais_owner_id_idx ON enxovais(owner_id);
@@ -596,7 +660,13 @@ export async function migrateDatabase() {
   `);
 
   await seedDefaultTemplate(pool);
+  await migrateCatalogPricing(pool);
+  await migratePlanning(pool);
   await seedCatalog(pool);
+  await migrateGrowth(pool);
+  await migrateFiscal(pool);
+  await migrateEnxovalValue(pool);
+  await migrateHousewarming(pool);
 
   const usersResult = await pool.query<UserRow>(`
     SELECT DISTINCT u.id, u.name

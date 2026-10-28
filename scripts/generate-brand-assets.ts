@@ -7,6 +7,8 @@
  *   brand/nino-logo.{webp,png}   logo leve, usado no cabeçalho e no funil
  *   brand/nino.webp              Nino acenando em tamanho cheio (landing)
  *   brand/nino-plan.webp         Nino com a prancheta em tamanho cheio (landing)
+ *   brand/nino-happy.webp        Nino andando feliz e acenando
+ *   brand/nino-celebrate.webp    Nino celebrando com uma plantinha
  *   favicon.ico, favicon-{32x32,192x192,512x512}.png
  *   apple-touch-icon.png         180 x 180, sobre o creme (o iOS não aceita transparência)
  *   icon-maskable-512x512.png    512 x 512, com a margem de segurança dos ícones adaptativos
@@ -81,7 +83,7 @@ async function main() {
   await (await square(512, 0.62, CREAM)).toFile(path.join(publicDir, "icon-maskable-512x512.png"));
 
   // Versões WebP do Nino em tamanho cheio (landing e funil).
-  for (const name of ["nino", "nino-plan"]) {
+  for (const name of ["nino", "nino-plan", "nino-happy", "nino-celebrate"]) {
     await sharp(path.join(brandDir, `${name}.png`))
       .webp({ quality: 92, effort: 6 })
       .toFile(path.join(brandDir, `${name}.webp`));

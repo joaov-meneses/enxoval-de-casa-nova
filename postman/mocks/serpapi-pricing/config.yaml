@@ -1,0 +1,9 @@
+version: 1
+name: SerpApi catalog pricing contract
+slug: serpapi-pricing
+protocol: http
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

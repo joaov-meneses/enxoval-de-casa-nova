@@ -22,6 +22,12 @@ test('event schemas strip personal data and unknown properties', () => {
   assert.deepEqual(allowedProperties('plan_ready', { items: Infinity, rooms: 2 }), { rooms: 2 });
   assert.equal(safeRoute('/reset/secret'), '/other');
   assert.equal(safeRoute('/app'), '/app');
+  assert.equal(safeRoute('/app/meu-lar'), '/app/meu-lar');
+  assert.equal(safeRoute('/app/plano'), '/app/plano');
+  assert.equal(safeRoute('/app/itens/3f2a9c1e-room'), '/app/itens/:ambiente');
+  assert.equal(safeRoute('/app/desconhecida'), '/app/:enxoval');
+  assert.equal(safeRoute('/app/private-home/itens/private-room'), '/app/:enxoval/itens/:ambiente');
+  assert.equal(safeRoute('/application'), '/other');
 });
 
 test('SDK metadata scrubber removes tokens, query strings, referrers and document titles recursively', () => {
@@ -61,7 +67,34 @@ test('Nino unavailable, unrelated APIs and admin traffic produce no product even
   recordApiSuccess(s, '/api/catalog/search?q=private', 'GET', {}, {});
   assert.deepEqual(s.calls, []);
   recordApiSuccess(s, '/api/ai/recommend', 'POST', {}, { available: true });
-  assert.deepEqual(s.calls, [['nino_used', { feature: 'recommend' }]]);
+  assert.deepEqual(s.calls, [['nino_used', { feature: 'recommend', outcome: 'none' }]]);
+});
+
+test('Nino outcomes use fixed vocabularies, never names from the answer', () => {
+  const s = sink();
+  recordApiSuccess(s, '/api/ai/assess-item', 'POST', { name: 'Private' }, { available: true, source: 'catalog', catalogItem: { name: 'Private' }, environment: null, redundancy: { overlapsWith: 'Private' } });
+  recordApiSuccess(s, '/api/ai/assess-item', 'POST', {}, { available: true, source: 'jev', catalogItem: null, environment: { name: 'Private' }, redundancy: null });
+  recordApiSuccess(s, '/api/ai/recommend', 'POST', {}, { available: true, recommendation: { name: 'Private' } });
+  recordApiSuccess(s, '/api/ai/recommend', 'POST', {}, { available: true, recommendation: null, reason: 'complete' });
+  recordApiSuccess(s, '/api/ai/prioritize', 'POST', {}, { available: true, scores: [{ urgency: 3 }] });
+  assert.deepEqual(s.calls, [
+    ['nino_used', { feature: 'assess_item', outcome: 'redundancy', source: 'catalog' }],
+    ['nino_used', { feature: 'assess_item', outcome: 'environment', source: 'jev' }],
+    ['nino_used', { feature: 'recommend', outcome: 'recommended' }],
+    ['nino_used', { feature: 'recommend', outcome: 'complete' }],
+    ['nino_used', { feature: 'prioritize', outcome: 'scored' }],
+  ]);
+  assert.equal(JSON.stringify(s.calls).includes('Private'), false);
+});
+
+test('deleting an item, room or enxoval emits a bare event', () => {
+  const s = sink();
+  recordApiSuccess(s, '/api/items/i1', 'DELETE', {}, undefined);
+  recordApiSuccess(s, '/api/categories/c1?enxovalId=e1', 'DELETE', {}, undefined);
+  recordApiSuccess(s, '/api/enxovais/e1', 'DELETE', {}, undefined);
+  recordApiSuccess(s, '/api/enxovais/e1/members/u2', 'DELETE', {}, undefined);
+  assert.deepEqual(s.calls, [['item_deleted', {}], ['environment_deleted', {}], ['workspace_deleted', {}]]);
+  assert.deepEqual(allowedProperties('item_edited', { changed_name: true, changed_price: false, name: 'Private' }), { changed_name: true, changed_price: false });
 });
 
 test('subscription conversion requires confirmed paid access and deduplicates the checkout', () => {
@@ -80,11 +113,12 @@ async function client(env = {}, pathname = '/app', storage = new Map(), options 
   let config;
   const sdk = {
     session: 's1', optedOut: false,
-    init: (key, options) => { config = options; calls.push(['init', key]); },
+    init: (key, options) => { config = options; sdk.optedOut = Boolean(options.opt_out_capturing_by_default); calls.push(['init', key]); },
+    set_config: (next) => { sdk.persistence = next.persistence; },
     capture: (event, properties) => { if (!sdk.optedOut) calls.push([event, properties]); },
     captureException: (error, properties) => { if (!sdk.optedOut) calls.push(['$exception', properties]); },
-    identify: (id, properties) => calls.push(['identify', id, properties]),
-    reset: () => calls.push(['reset']),
+    identify: (id, properties, setOnce) => calls.push(['identify', id, properties, setOnce]),
+    reset: () => { calls.push(['reset']); sdk.optedOut = Boolean(config?.opt_out_capturing_by_default); },
     get_session_id: () => sdk.session,
     has_opted_out_capturing: () => sdk.optedOut,
     opt_out_capturing: () => { sdk.optedOut = true; },
@@ -105,7 +139,8 @@ async function client(env = {}, pathname = '/app', storage = new Map(), options 
     setItem: (key, value) => storage.set(key, value),
     removeItem: key => storage.delete(key),
   };
-  const local = options.local || new Map();
+  // Por padrão a pessoa já aceitou a análise; os testes de consentimento passam `local` sem escolha.
+  const local = options.local || new Map([['casamia:consent', JSON.stringify({ analytics: true, marketing: false, version: '2026-10', decidedAt: '2026-10-01T00:00:00Z' })]]);
   globalThis.localStorage = { getItem: key => local.get(key) ?? null, setItem: (key, value) => local.set(key, value), removeItem: key => local.delete(key) };
   const result = await build({
     entryPoints: ['src/analytics.ts'], bundle: true, write: false, format: 'esm',
@@ -292,4 +327,69 @@ test('blocked browser storage and SDK capture errors do not break product action
   c.sdk.capture = () => { throw new Error('offline'); };
   assert.doesNotThrow(() => c.api.capture('item_created'));
   assert.doesNotThrow(() => c.api.resetAnalytics());
+});
+
+test('PostHog only captures after analytics consent and stops when it is withdrawn', async () => {
+  const local = new Map();
+  const c = await client({}, '/login', new Map(), { local });
+  c.api.startAnalytics();
+  assert.equal(c.config().opt_out_capturing_by_default, true);
+  assert.equal(c.config().persistence, 'memory');
+  c.api.capture('signup_submit');
+  assert.equal(c.calls.some(([name]) => name === 'signup_submit' || name === '$pageview'), false);
+  c.api.setAnalyticsOptOut(false);
+  assert.equal(c.sdk.persistence, 'localStorage+cookie');
+  assert.deepEqual(c.calls.filter(([name]) => name === '$pageview'), [['$pageview', { route: '/login' }]]);
+  c.api.capture('signup_submit');
+  assert.equal(c.calls.filter(([name]) => name === 'signup_submit').length, 1);
+  assert.equal(JSON.parse(local.get('casamia:consent')).analytics, true);
+  // Logout ou sessão expirada chamam reset(), que volta o SDK ao opt-out padrão: o consentimento é reaplicado.
+  c.api.resetAnalytics();
+  c.api.capture('signup_submit');
+  assert.equal(c.calls.filter(([name]) => name === 'signup_submit').length, 2);
+  c.api.setAnalyticsOptOut(true);
+  assert.equal(c.sdk.persistence, 'memory');
+  c.api.capture('signup_submit');
+  assert.equal(c.calls.filter(([name]) => name === 'signup_submit').length, 2);
+  assert.equal(c.api.analyticsOptedOut(), true);
+});
+
+test('identify stores the first-touch channel once and never forwards raw referrers', async () => {
+  const local = new Map([
+    ['casamia:consent', JSON.stringify({ analytics: true, marketing: false, version: '2026-10', decidedAt: '2026-10-01T00:00:00Z' })],
+    ['cm_first_touch', JSON.stringify({ source: 'google', medium: 'cpc', campaign: 'enxoval-casal-sp-2026q4', referrerHost: 'private.example', firstSeenAt: new Date().toISOString() })],
+  ]);
+  const c = await client({}, '/app', new Map(), { local });
+  c.api.startAnalytics();
+  c.api.identifyAnalytics({ id: 'u1' });
+  const identify = c.calls.find(([name]) => name === 'identify');
+  assert.deepEqual(identify[3], { initial_channel_group: 'paid_search', initial_source: 'google', initial_medium: 'cpc', initial_campaign: 'enxoval-casal-sp-2026q4' });
+  assert.equal(JSON.stringify(c.calls).includes('private.example'), false);
+});
+
+test('Google Tag Manager waits for consent, starts denied and forwards mapped events only', async () => {
+  const local = new Map();
+  const c = await client({ VITE_POSTHOG_KEY: '', VITE_GTM_ID: 'GTM-TEST123' }, '/cadastro', new Map(), { local });
+  const appended = [];
+  c.doc.createElement = () => ({});
+  c.doc.head = { appendChild: node => appended.push(node) };
+  c.api.startAnalytics();
+  const layer = () => c.win.dataLayer.map(entry => (entry && typeof entry.length === 'number' && !Array.isArray(entry) ? Array.from(entry) : entry));
+  assert.deepEqual(layer()[0].slice(0, 2), ['consent', 'default']);
+  assert.equal(layer()[0][2].analytics_storage, 'denied');
+  assert.equal(layer()[0][2].ad_user_data, 'denied');
+  assert.equal(appended.length, 0);
+  c.api.capture('signup_success');
+  assert.equal(layer().some(entry => entry?.event === 'sign_up'), false);
+  c.api.setAnalyticsOptOut(false);
+  assert.equal(appended.length, 1);
+  assert.match(appended[0].src, /gtm\.js\?id=GTM-TEST123$/);
+  const update = layer().filter(entry => Array.isArray(entry) && entry[1] === 'update').at(-1);
+  assert.equal(update[2].analytics_storage, 'granted');
+  assert.equal(update[2].ad_storage, 'denied');
+  c.api.capture('signup_success');
+  c.api.capture('item_created', { source: 'manual', status: 'researching' });
+  assert.deepEqual(layer().filter(entry => entry?.event === 'sign_up'), [{ event: 'sign_up', method: 'email' }]);
+  assert.equal(layer().some(entry => entry?.event === 'item_created'), false);
+  assert.deepEqual(layer().filter(entry => entry?.event === 'page_view').map(entry => entry.page_path), ['/cadastro']);
 });

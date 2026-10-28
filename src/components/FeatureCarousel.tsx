@@ -50,8 +50,8 @@ export const SLIDES = [
   },
   {
     kicker: "Lista a dois",
-    title: "Montem juntos, em tempo real.",
-    text: "Convide quem mora com você por e-mail. Vocês editam a mesma lista e cada conquista aparece para todo mundo.",
+    title: "Montem juntos, na mesma lista.",
+    text: "Convide quem mora com você por e-mail. Vocês editam a mesma lista: o que um risca, o outro vê ao abrir o app.",
     image: "/images/carrossel/carrossel-07-lista-a-dois.webp",
     alt: "Janela Convidar pessoa do Casa Mia, com o campo de e-mail e a explicação de que a pessoa convidada edita a lista junto.",
   },

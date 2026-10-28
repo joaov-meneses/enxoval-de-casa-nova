@@ -57,6 +57,9 @@ export interface PriceRange {
   p90: number;
   samples: number;
   region: string;
+  meanCents?: number;
+  source?: 'customers' | 'serpapi';
+  updatedAt?: string;
 }
 
 /** Limiares da cascata. Conservadores: na dúvida, quem decide é o Jev (e depois a revisão humana). */
@@ -132,8 +135,8 @@ async function loadIndex(queryable: Queryable): Promise<CatalogIndex> {
   const [itemsResult, aliasesResult, pricesResult] = await Promise.all([
     queryable.query<ItemRow>(`SELECT ${CATALOG_ITEM_COLUMNS} FROM catalog_items`),
     queryable.query<{ alias_normalized: string; item_id: string }>('SELECT alias_normalized, item_id FROM catalog_item_aliases'),
-    queryable.query<{ item_id: string; region: string; p10: number; p50: number; p90: number; samples: number }>(
-      'SELECT item_id, region, p10, p50, p90, samples FROM catalog_price_stats'
+    queryable.query<{ item_id: string; region: string; p10: number; p50: number; p90: number; samples: number; mean_cents: number | null; source: 'customers' | 'serpapi'; updated_at: Date }>(
+      "SELECT item_id, region, p10, p50, p90, samples, mean_cents, source, updated_at FROM catalog_price_stats WHERE region=''"
     )
   ]);
   const next: CatalogIndex = { items: new Map(), byKey: new Map(), keys: [], groups: new Map(), prices: new Map(), loadedAt: Date.now() };
@@ -152,7 +155,9 @@ async function loadIndex(queryable: Queryable): Promise<CatalogIndex> {
   }
   for (const row of aliasesResult.rows) if (next.items.has(row.item_id)) addKey(row.item_id, row.alias_normalized);
   for (const row of pricesResult.rows) {
-    const range = { p10: row.p10, p50: row.p50, p90: row.p90, samples: row.samples, region: row.region };
+    const range: PriceRange = { p10: row.p10, p50: row.p50, p90: row.p90, samples: row.samples, region: '',
+      ...(row.mean_cents !== null ? { meanCents: Number(row.mean_cents) } : {}),
+      source: row.source, updatedAt: new Date(row.updated_at).toISOString() };
     next.prices.set(row.item_id, [...(next.prices.get(row.item_id) ?? []), range]);
   }
   return next;
@@ -481,10 +486,10 @@ export interface CatalogSearchResult {
   priceRange: PriceRange | null;
 }
 
-/** Faixa de preço comum do item: a da região, se tiver amostra, senão a do Brasil todo. */
+/** Referência nacional compartilhada; o parâmetro regional fica só por compatibilidade dos chamadores. */
 export function priceRangeOf(catalog: CatalogIndex, itemId: string, region?: string | null): PriceRange | null {
   const ranges = catalog.prices.get(itemId) ?? [];
-  return (region ? ranges.find(range => range.region === region) : undefined) ?? ranges.find(range => range.region === '') ?? null;
+  return ranges.find(range => range.region === '') ?? null;
 }
 
 /**
@@ -528,8 +533,10 @@ export async function searchCatalog(query: string, options: { limit?: number; re
  * o nome ou apelido mais longo que aparece inteiro no título.
  */
 export async function findItemInTitle(title: string): Promise<CatalogItem | null> {
-  const catalog = await getCatalogIndex();
-  const key = itemKey(title);
+  return itemInText(await getCatalogIndex(), itemKey(title));
+}
+
+function itemInText(catalog: CatalogIndex, key: string): CatalogItem | null {
   if (!key) return null;
   const padded = ` ${key} `;
   const compact = compactKey(key);
@@ -539,6 +546,34 @@ export async function findItemInTitle(title: string): Promise<CatalogItem | null
     if (contained && (!best || entry.key.length > best.key.length)) best = entry;
   }
   return best ? catalog.items.get(best.itemId) ?? null : null;
+}
+
+/* ------------------------------------------- importação por planilha */
+
+export interface CatalogNameMatch {
+  /**
+   * exact: o próprio item (escrito de outro jeito ou não) · similar: quase igual, provável erro de digitação ·
+   * contained: o nome é uma variação de um item conhecido ("Jogo de cama casal 4 peças"), e só o cômodo vale.
+   */
+  match: 'exact' | 'similar' | 'contained';
+  id: string;
+  name: string;
+  room: RoomKey | null;
+}
+
+/**
+ * Revisão da importação: para cada nome da planilha, o item do catálogo que ele é (ou contém), na mesma ordem. Só
+ * itens aprovados e só o índice em memória: sem Jev, sem gravar apelidos e sem métricas, porque a pessoa ainda pode
+ * desistir do arquivo.
+ */
+export async function matchCatalogNames(names: string[]): Promise<(CatalogNameMatch | null)[]> {
+  const catalog = await getCatalogIndex();
+  return names.map(name => {
+    const found = matchName(catalog, name);
+    const item = found.item ?? itemInText(catalog, found.key);
+    if (!item || item.status !== 'approved') return null;
+    return { match: found.match ?? 'contained', id: item.id, name: item.name, room: item.room };
+  });
 }
 
 /* ------------------------------------------------ compras redundantes */

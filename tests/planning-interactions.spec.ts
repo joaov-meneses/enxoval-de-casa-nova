@@ -1,6 +1,7 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 
-async function planning(page: Page) {
+async function planning(page: Page, priceSource?: 'customers' | 'serpapi') {
+  await page.addInitScript(() => localStorage.setItem('casamia:consent', JSON.stringify({ analytics: false, marketing: false, version: '2026-10', decidedAt: new Date().toISOString() })));
   const home = {
     id: "home",
     name: "Nossa casa nova",
@@ -52,6 +53,10 @@ async function planning(page: Page) {
     priceCategory: null,
     priority: null,
     timing: null,
+    catalog: priceSource ? {
+      priceCategory: 2 as const, priority: null, timing: null, leadTimeWeeks: 0,
+      priceRange: { p10: 10000, p50: 12500, p90: 15000, meanCents: 12500, samples: 2, region: '', source: priceSource }
+    } : undefined,
     updatedAt: "2026-10-19T12:00:00Z",
   }));
   await page.route("**/api/**", (route) => {
@@ -98,6 +103,28 @@ async function planning(page: Page) {
     .getByRole("button", { name: /Planejamento/ })
     .click();
   await expect(page.locator(".pp")).toBeVisible();
+}
+
+for (const source of ['customers', 'serpapi'] as const) {
+  test(`national price estimate identifies ${source} and a small sample`, async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await planning(page, source);
+    const period = page.locator('.pp-period').first();
+    await period.locator('.pp-period-toggle').click();
+    const room = period.locator('.pp-room-group').first();
+    const roomTrigger = room.locator(':scope > [data-slot=collapsible-trigger]');
+    if (await roomTrigger.getAttribute('aria-expanded') === 'false') await roomTrigger.click();
+    const estimate = room.locator('.pp-price-estimate').first();
+    await expect(estimate).toBeVisible();
+    await expect(estimate).toContainText('Estimativa nacional');
+    await expect(estimate).toHaveAttribute('title', new RegExp(source === 'serpapi' ? '2 lojas pesquisadas' : '2 clientes'));
+    await expect(estimate).toHaveAttribute('title', /amostra inicial/);
+    await expect(estimate.locator('.pp-price-range > span').first()).toHaveText(/^R\$\s*100$/);
+    await expect(estimate.locator('.pp-price-range > span').last()).toHaveText(/^R\$\s*150$/);
+    await estimate.evaluate(node => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await estimate.screenshot({ path: `tmp/validation/national-price-${source}.png` });
+  });
 }
 
 async function checkHeightAnimation(
@@ -187,10 +214,15 @@ for (const width of [320, 375, 768, 1440]) {
       await expect(list).toHaveClass(/casamia-select-grouped/);
       const labels = list.locator("[data-slot=select-label]");
       await expect(labels).toHaveCount(6);
-      await expect(labels.first()).toHaveCSS(
-        "background-color",
-        "rgb(243, 228, 209)",
-      );
+      // O título do período tem fundo próprio, diferente do menu (a cor exata vem da paleta).
+      const [labelBackground, listBackground] = await labels
+        .first()
+        .evaluate((label) => [
+          getComputedStyle(label).backgroundColor,
+          getComputedStyle(label.closest("[role=listbox]")!).backgroundColor,
+        ]);
+      expect(labelBackground).not.toBe("rgba(0, 0, 0, 0)");
+      expect(labelBackground).not.toBe(listBackground);
       await expect(labels.first()).toHaveCSS("border-left-width", "3px");
       await expect(labels.first()).toHaveCSS("font-weight", "700");
       await expect(

@@ -11,7 +11,8 @@ import {
   X,
   ListChecks,
   MessageCircleHeart,
-  UserRound,
+  ChevronRight,
+  ShoppingBag,
 } from "@/src/components/icons";
 import type {
   AuthUser,
@@ -23,7 +24,7 @@ import type {
 import { Sheet, SheetContent, SheetTitle } from "./ui/sheet";
 import { Select } from "./Select";
 import { EnvironmentList } from "./EnvironmentList";
-import { activeItems } from "../itemStatus";
+import { activeItems, doneItems } from "../itemStatus";
 import { enxovalSelectOptions } from "../enxovais";
 import { UserAvatar } from './UserAvatar';
 
@@ -55,6 +56,8 @@ interface WorkspaceMenuProps {
   /** Abre a central de ajuda (relatar problema ou sugerir melhoria). */
   onHelp: () => void;
   onProfile: () => void;
+  /** Modo loja: só o que falta, com letra grande, para riscar rápido na loja física. */
+  onStoreMode?: () => void;
 }
 
 export function WorkspaceMenu(props: WorkspaceMenuProps) {
@@ -71,7 +74,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
         onCloseAutoFocus={event => { event.preventDefault(); props.triggerRef.current?.focus(); }}>
         <div className="workspace-menu-heading">
           <div>
-            <span className="workspace-menu-eyebrow">SEU CANTINHO</span>
             <SheetTitle id="workspace-menu-title">Menu do enxoval</SheetTitle>
           </div>
           <Button variant="brand" size="brand"
@@ -84,6 +86,16 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
           </Button>
         </div>
         <div className="workspace-menu-content">
+          {/* O perfil abre o menu: quem é a pessoa vem antes do que ela organiza. */}
+          <Button variant="brand" size="brand" type="button" className="profile-entry-mobile" aria-label="Meu perfil"
+            onClick={() => run(props.onProfile)}>
+            <UserAvatar name={props.user.name} src={props.user.avatarUrl} className="profile-entry-avatar" />
+            <span className="profile-entry-text">
+              <strong>Meu perfil</strong>
+              <small>{props.user.name}</small>
+            </span>
+            <ChevronRight size={18} className="profile-entry-chevron" aria-hidden="true" />
+          </Button>
           <section
             className="workspace-menu-switcher"
             aria-label="Seus enxovais"
@@ -114,6 +126,16 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               </Button>
             )}
           </section>
+          {hasEnxoval && props.onStoreMode && (
+            <Button variant="brand" size="brand"
+              type="button"
+              className="workspace-menu-create workspace-menu-store"
+              disabled={props.busy}
+              onClick={() => run(props.onStoreMode!)}
+            >
+              <ShoppingBag size={17} /> Estou na loja
+            </Button>
+          )}
           {hasEnxoval && !isOwner && (
             <section
               className="workspace-menu-invite workspace-menu-guest"
@@ -203,7 +225,14 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
                 >
                   <ListChecks size={18} strokeWidth={1.6} aria-hidden="true" />
                   <span>Todos</span>
-                  <small>{activeItems(props.items).length}</small>
+                  <small className="environment-progress">
+                    <span className="environment-count" aria-hidden="true">
+                      {doneItems(props.items).length}/{activeItems(props.items).length}
+                    </span>
+                    <span className="sr-only">
+                      , {doneItems(props.items).length} de {activeItems(props.items).length} conquistados
+                    </span>
+                  </small>
                 </Button>
               </div>
               <EnvironmentList
@@ -233,9 +262,6 @@ export function WorkspaceMenu(props: WorkspaceMenuProps) {
               </Button>
             </div>
           )}
-          <div className="workspace-menu-subscription">
-            <Button variant="brand" size="brand" className="button button-outline button-small profile-entry-mobile" type="button" onClick={() => run(props.onProfile)}><UserRound size={18} /> Meu perfil</Button>
-          </div>
           <div className="workspace-menu-help">
             <Button variant="brand" size="brand" type="button" onClick={() => run(props.onHelp)}>
               <span className="workspace-menu-help-icon" aria-hidden="true">

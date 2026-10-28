@@ -1,0 +1,9 @@
+version: 1
+name: S3 document storage contract
+slug: documents-s3
+protocol: http
+interceptRequests: false
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

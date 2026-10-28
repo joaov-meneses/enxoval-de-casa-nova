@@ -11,18 +11,29 @@ Cada item tem uma **semana de compra** contada a partir da semana da mudança: `
 - **Sugerida pelo algoritmo** (`planPurchases`): vale quando `items.buy_week` é nulo. Nada disso é gravado; é recalculado a partir dos itens.
 - **Escolhida pela pessoa**: grava `items.buy_week`. Vale mais que a sugestão e nunca é mexida pelo algoritmo. Escolher "Voltar para a sugestão" grava `null`. Dá para escolher na tela Planejamento e dentro do item (campo "Quando comprar").
 
-### Algoritmo (`src/planning/purchasePlan.ts`)
+### Algoritmo (`src/planning/purchasePlan.ts` e `scheduling.ts`)
 
-1. **Semana-base** por necessidade e prazo de entrega:
-   - primeira noite (`timing = first_night`): semana -1;
-   - essencial: categoria de preço 4 → -8 (entrega e montagem), 3 → -5, 1 e 2 → -2 (essencial que também é `first_week` vai para no máximo a semana 0);
-   - opcional com `first_week` (por exemplo antimofo em clima úmido): semana 0;
-   - opcional comum: semana 4 (cat. 1), 5, 9 ou 16 (cat. 4), mais um atraso por cômodo (quarto, banheiro e cozinha 0; eletro e serviço 1; sala 2; escritório 3; quarto extra 4; varanda 6).
-2. **Semanas manuais** ficam como estão e já contam no gasto da semana.
-3. **Essenciais e itens com prazo** não se mexem.
-4. **Opcionais são distribuídos**: do mais urgente ao menos, cada um vai para a primeira semana a partir da sua semana-base em que o gasto de referência ainda cabe num teto semanal (total dos opcionais ÷ 16 semanas, nunca menor que o maior item). Limite: semana 40.
+1. **Necessidade:** uma nota válida do Nino com confiança >= 0,5 define quando o item deve estar em casa. Os níveis 1 a 8 correspondem às semanas de uso 26, 12, 4, 1, 0, 0, 0 e 0. Sem avaliação confiável, usamos o catálogo: primeira noite/semana e essenciais na mudança; opcionais recebem a distribuição de referência por categoria e cômodo.
+2. **Antecedência:** da semana de uso são descontados `leadTimeWeeks` (entrega, montagem e instalação; 0–52) e `researchWeeks` (pesquisa; 0–12). Os ajustes do item prevalecem. Sem ajuste, o prazo vem do catálogo ou de uma estimativa de quatro semanas para móveis/eletros grandes, zero para os demais, mais uma semana para pesquisa. O texto identifica a estimativa. O preço do essencial não determina sua antecedência.
+3. **Solução temporária:** `hasTemporarySolution` permite que a substituição esteja pronta a partir da semana 4. A antecedência ainda é descontada. Uma semana manual permite escolher outro prazo.
+4. **Dependências:** `dependsOnItemId` faz uma compra automática acontecer junto ou depois do item de que depende, para confirmar medidas/compatibilidade. Itens já conquistados não bloqueiam. Datas manuais são preservadas e conflitos são explicados. A API recusa dependências de outro enxoval, de si mesmo e ciclos, inclusive em pedidos concorrentes.
+5. **Orçamento:** com data da mudança e `monthlyBudgetCents`, os opcionais procuram o primeiro mês em que suas parcelas ou pagamento à vista cabem junto das compras fixas e parcelas assumidas. Valores ausentes usam a faixa estimada do perfil. Essenciais e semanas manuais não são adiados para esconder um estouro: aparecem conflitos com mês, excesso e itens. A busca termina na semana 104, com conflito quando não há solução. Sem data ou orçamento, permanece a distribuição de referência.
+6. **Escolha manual:** `buyWeek` sempre prevalece; `null` restaura a sugestão. Nino, Planejamento, lista e resumo do Meu Lar consomem o mesmo resultado. Novas notas retornadas pelo Nino atualizam o calendário imediatamente.
 
-O resultado só depende dos itens, dos ambientes, das semanas manuais e do perfil de gasto. **Preço e situação não entram**: comprar um item ou informar um preço nunca remaneja o resto da lista.
+As semanas sugeridas continuam calculadas, sem gravar datas automáticas. Os ajustes individuais são persistidos no banco. Preços e parcelas podem redistribuir opcionais quando há orçamento mensal; semanas manuais permanecem intactas.
+
+### Oportunidades de preço
+
+`priceOpportunity.ts` compara o preço informado ou acompanhado com a mediana nacional de produtos comparáveis. Só publica um destaque com pelo menos cinco amostras, referência e preço observados há no máximo 14 dias, quantidade 1 e valor pelo menos 5% abaixo da mediana. Produtos indisponíveis ou com leitura falha ficam de fora. Mostra fonte, amostras e atualização; não prevê promoções nem antecipa uma compra por causa do preço.
+
+### Onde ajustar
+
+- **Planejamento:** orçamento mensal, alertas e “Por que esta semana? Ajustar” em cada item. O diálogo mostra uma prévia da data antes de salvar.
+- **Lista:** o botão “Comprar até…” abre os detalhes do item com semana, prazos, dependência e solução temporária.
+- **Nino:** ordem e data do calendário, com o motivo da sugestão.
+- **Meu Lar:** próximas compras, referências favoráveis de preço e acesso ao Planejamento.
+
+Contrato incremental: `postman/contracts/purchase-scheduling.openapi.yaml`. Validação: `npm run test:purchase-plan`, `npm run test:planning-db` (schema descartável) e `npx playwright test tests/purchase-scheduling.spec.ts` (320×568, 375×667 e 425×800).
 
 ## Períodos e verificador de faixa
 
@@ -58,7 +69,7 @@ No funil, o perfil sugerido é o mais confortável cujo total máximo cabe no or
 
 ## Catálogo por cidade
 
-O **estado** decide o clima geral (`quente`, `ameno`, `frio`). A **cidade** (opcional) acrescenta características locais (`regions.ts`): `umido`, `maresia`, `seco`, `chuvoso`. São generalizações do clima típico, não previsão do tempo. Hoje são 27 capitais e algumas grandes cidades; quem mora em outra escolhe "Outra cidade" e recebe o catálogo do estado.
+O **estado** decide o clima geral (`quente`, `ameno`, `frio`). A **cidade** (opcional) acrescenta características locais (`regions.ts`): `umido`, `maresia`, `seco`, `chuvoso`. São generalizações do clima típico, não previsão do tempo. Hoje são as 27 capitais e as maiores cidades de cada estado (capital primeiro na lista); quem mora em outra escolhe "Outra cidade" e recebe o catálogo do estado.
 
 No catálogo (`catalog.ts`), um item pode ter `where` (`ufs`, `cities` ou `trait`) e `note` (o porquê, que vai na descrição do item). Exemplos: sachê antimofo e desumidificador em cidade úmida (Salvador, Recife, Rio), umidificador na estação seca (São Paulo, Belo Horizonte, Brasília), spray anticorrosão no litoral, panela de barro na Bahia e no Espírito Santo, panela de pedra-sabão em Minas, kit tereré em MS e MT. A flag `U` marca o que é melhor já na primeira semana.
 

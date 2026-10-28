@@ -1,6 +1,8 @@
+import type { PurchasePlan } from '../planning/purchasePlan';
+import { purchaseDateLabel } from './PurchaseTiming';
 import { Label } from "@/src/components/ui/label";
 import { Button } from "@/src/components/ui/button";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AlertCircle, ListOrdered, Plus, Sparkles } from "@/src/components/icons";
 import { prioritizeEnvironment, recommendNextItem } from "../api";
 import { useJevEnabled } from "../hooks/useJevEnabled";
@@ -12,7 +14,8 @@ import type {
   ItemUrgencyResult,
   NextItemRecommendation,
 } from "../types";
-import { Nino } from "./Nino";
+import { ninoState, type NinoCelebration } from "../nino";
+import { NinoMood } from "./NinoMood";
 import { Select } from "./Select";
 
 /** Acima disto o Nino afirma; entre o mínimo do servidor e isto, ele só sugere. */
@@ -39,24 +42,31 @@ interface Score {
 const scoreKey = (item: EnxovalItem) => `${item.id}|${item.name}|${item.categoryId}`;
 
 /**
- * Ajuda do Nino (Jev) no planejamento: sugere o próximo item de um ambiente e mostra os itens que mais urgem em
- * cada ambiente. Só aparece quando o servidor tem o Jev ligado, e só consulta quando a pessoa pede.
+ * Nino no planejamento: acompanha as conquistas mesmo sem Jev.
+ * Quando o servidor tem o Jev ligado, oferece consultas apenas por escolha da pessoa.
  */
 export function NinoAssistant({
   enxovalId,
   categories,
   items,
   onAddItem,
+  celebration,
+  plan, moveDate = null, onUrgencyScores,
 }: {
+  plan?: PurchasePlan<EnxovalItem>;
+  moveDate?: string | null;
+  onUrgencyScores?: (scores: { id: string; name: string; categoryId: string; urgency: number; confidence: number }[]) => void;
   enxovalId: string;
   categories: EnxovalCategory[];
   items: EnxovalItem[];
   onAddItem: (name: string, categoryId?: string, categoryName?: string) => Promise<void>;
+  celebration?: NinoCelebration | null;
 }) {
   const enabled = useJevEnabled();
   const baseId = useId();
   const [categoryId, setCategoryId] = useState("");
   const [urgencyCategoryId, setUrgencyCategoryId] = useState("");
+  const [focusCategoryId, setFocusCategoryId] = useState("");
   const [busy, setBusy] = useState<"next" | "urgency" | "add" | null>(null);
   const [error, setError] = useState("");
   const [next, setNext] = useState<NextItemRecommendation | null>(null);
@@ -66,6 +76,12 @@ export function NinoAssistant({
   // Ambiente cuja lista está na tela, e o que a última consulta fez.
   const [shownId, setShownId] = useState("");
   const [lastRun, setLastRun] = useState<Pick<ItemUrgencyResult, "inferred" | "cached" | "unscored"> | null>(null);
+
+  // Uma sugestão antiga não pode reaparecer depois de trocar de ambiente ou alterar a lista.
+  const revision = JSON.stringify([enxovalId, categoryId, categories.map(category => [category.id, category.name]), items.map(item => [item.id, item.name, item.categoryId, item.status])]);
+  const currentRevision = useRef(revision);
+  currentRevision.current = revision;
+  useEffect(() => setNext(null), [revision]);
 
   const selectedId = categories.some((category) => category.id === categoryId)
     ? categoryId
@@ -98,18 +114,37 @@ export function NinoAssistant({
   const ranked = shownPending
     .map((item) => ({ item, score: scoreOf(item) }))
     .filter((entry): entry is { item: EnxovalItem; score: Score } => entry.score !== null)
-    .sort((a, b) => b.score.urgency - a.score.urgency)
+    .sort((a, b) => (plan?.byId.get(a.item.id)?.placement.week ?? 104) - (plan?.byId.get(b.item.id)?.placement.week ?? 104) || b.score.urgency - a.score.urgency)
     .slice(0, TOP_URGENT);
 
-  if (!enabled || categories.length === 0) return null;
+  const preferredMoodId = focusCategoryId || celebration?.categoryId || selectedId;
+  const moodId = categories.some(category => category.id === preferredMoodId) ? preferredMoodId : selectedId;
+  const mood = ninoState(items, moodId, celebration, busy !== null);
+  const selectedCategory = categories.find(category => category.id === moodId);
+  const scopedItems = items.filter(item => item.categoryId === moodId);
+  const pendingCount = pendingOf(moodId).length;
+  const moodMessage = mood === "celebrating"
+    ? `Mais uma conquista: ${celebration!.name}! Um passo a mais para a casa pronta.`
+    : mood === "resting"
+      ? `Tudo da sua lista em ${selectedCategory?.name} está conquistado. Vou descansar no arco!`
+      : busy !== null
+        ? "Estou conferindo a sua casa…"
+        : scopedItems.length === 0
+          ? "Seu ambiente está começando. Vamos montar este cantinho?"
+          : `${pendingCount === 1 ? "Falta 1 item" : `Faltam ${pendingCount} itens`} da sua lista em ${selectedCategory?.name}. Um passo de cada vez.`;
+
+  if (categories.length === 0) return null;
 
   async function askNext() {
     if (!selectedId) return;
+    setFocusCategoryId(selectedId);
     setBusy("next");
     setError("");
     setNext(null);
+    const requestedRevision = revision;
     try {
-      setNext(await recommendNextItem(enxovalId, selectedId));
+      const result = await recommendNextItem(enxovalId, selectedId);
+      if (currentRevision.current === requestedRevision) setNext(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível consultar o Nino.");
     } finally {
@@ -136,6 +171,7 @@ export function NinoAssistant({
 
   async function askUrgency() {
     if (!selectedUrgencyId) return;
+    setFocusCategoryId(selectedUrgencyId);
     setError("");
     setShownId(selectedUrgencyId);
     const pending = pendingOf(selectedUrgencyId);
@@ -156,6 +192,10 @@ export function NinoAssistant({
         }
         return merged;
       });
+      onUrgencyScores?.(result.scores.flatMap(score => {
+        const item = byId.get(score.id);
+        return item ? [{ ...score, name: item.name, categoryId: item.categoryId }] : [];
+      }));
       setLastRun({ inferred: result.inferred, cached: result.cached, unscored: result.unscored });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível consultar o Nino.");
@@ -168,17 +208,18 @@ export function NinoAssistant({
   const urgencyPendingCount = pendingOf(selectedUrgencyId).length;
 
   return (
-    <section className="pp-card pp-nino" aria-labelledby={`${baseId}-title`}>
+    <section className="pp-card pp-nino" aria-labelledby={`${baseId}-title`} data-nino-state={mood}>
       <div className="pp-nino-head">
-        <Nino pose="think" size={56} />
+        <NinoMood state={mood} />
         <div>
           <h3 id={`${baseId}-title`}>
             <Sparkles size={15} aria-hidden="true" /> Ajuda do Nino
           </h3>
-          <p className="pp-hint">
+          {enabled && <p className="pp-hint">
             O Nino olha a sua casa, quem mora nela e o prazo da mudança para dizer o que
             comprar primeiro. Ele só sugere: a decisão é sua.
-          </p>
+          </p>}
+          <p className="pp-hint pp-nino-mood-message" role="status" aria-live="polite" aria-atomic="true">{moodMessage}</p>
         </div>
       </div>
 
@@ -188,9 +229,9 @@ export function NinoAssistant({
         </div>
       )}
 
-      <div className="pp-nino-block">
+      {enabled && <div className="pp-nino-block">
         <Label htmlFor={`${baseId}-room`}>Qual o próximo item de um ambiente?</Label>
-        <div className="pp-nino-row">
+        <div className="pp-nino-row" onFocusCapture={() => setFocusCategoryId(selectedId)}>
           <Select
             id={`${baseId}-room`}
             value={selectedId}
@@ -198,6 +239,7 @@ export function NinoAssistant({
             options={categories.map((category) => ({ value: category.id, label: category.name }))}
             onChange={(value) => {
               setCategoryId(value);
+              setFocusCategoryId(value);
               setNext(null);
             }}
           />
@@ -253,17 +295,20 @@ export function NinoAssistant({
             </ul>
           </>
         )}
-      </div>
+      </div>}
 
-      <div className="pp-nino-block">
+      {enabled && <div className="pp-nino-block">
         <Label htmlFor={`${baseId}-urgency`}>O que comprar primeiro?</Label>
-        <div className="pp-nino-row">
+        <div className="pp-nino-row" onFocusCapture={() => setFocusCategoryId(selectedUrgencyId)}>
           <Select
             id={`${baseId}-urgency`}
             value={selectedUrgencyId}
             disabled={busy !== null}
             options={categories.map((category) => ({ value: category.id, label: category.name }))}
-            onChange={(value) => setUrgencyCategoryId(value)}
+            onChange={(value) => {
+              setUrgencyCategoryId(value);
+              setFocusCategoryId(value);
+            }}
           />
           <Button variant="brand" size="brand"
             type="button"
@@ -276,7 +321,7 @@ export function NinoAssistant({
           </Button>
         </div>
         {urgencyPendingCount === 0 && (
-          <p className="pp-hint">Este ambiente não tem itens pendentes para priorizar.</p>
+          <p className="pp-hint">Este ambiente não tem itens na fila para priorizar.</p>
         )}
         {shownCategory && ranked.length > 0 && (
           <>
@@ -289,11 +334,12 @@ export function NinoAssistant({
                       {shownCategory.name}
                       {score.confidence < UNCERTAIN && " · estimativa incerta"}
                     </span>
+                    {plan?.byId.get(item.id) && <span className="pp-hint">{plan.byId.get(item.id)!.placement.reason}</span>}
                   </div>
                   <span
                     className={`pp-nino-urgency is-${Math.min(URGENCY_LEVELS, Math.max(1, Math.round(score.urgency)))}`}
                   >
-                    {urgencyLabel(score.urgency)}
+                    {plan?.byId.get(item.id) ? purchaseDateLabel(plan.byId.get(item.id)!.placement.week, moveDate) : urgencyLabel(score.urgency)}
                   </span>
                 </li>
               ))}
@@ -314,7 +360,7 @@ export function NinoAssistant({
             O Nino não conseguiu avaliar os itens de {shownCategory.name} agora. Tente de novo mais tarde.
           </p>
         )}
-      </div>
+      </div>}
     </section>
   );
 }

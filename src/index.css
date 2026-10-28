@@ -1,45 +1,65 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap");
+/* As fontes (Fraunces com SOFT 100 e Nunito) são carregadas uma vez só, pelo <link> em index.html. */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./shadcn.css";
 @import "./product.css";
 @import "./onboarding.css";
+@import "./onboarding-polish.css";
 @import "./privacy.css";
 @import "./landing.css";
 @import "./auth.css";
 @import "./planning.css";
 @import "./feedback.css";
 @import "./catalog-admin.css";
+@import "./growth.css";
 @import "./workspace-interactions.css";
+@import "./focus.css";
+@import "./housewarming.css";
+
+/* O app não tem tema escuro: as classes dark: só valem dentro de .dark, nunca pela preferência do sistema. */
+@custom-variant dark (&:is(.dark *));
+
+/* No Tailwind 4 a borda padrão usa a cor do texto; os componentes shadcn esperam --border. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+}
 
 @theme {
   --font-sans: "Nunito Variable", "Nunito", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
   --font-display: "Fraunces Variable", "Fraunces", ui-serif, Georgia, serif;
 
-  --color-brand-cream: #fbf3e6;
-  --color-brand-coffee: #3b2a20;
+  --color-brand-cream: #f8f3eb;
+  --color-brand-coffee: #2f2a26;
   --color-brand-terracotta: #c2603f;
-  --color-brand-olive: #5c6643;
+  --color-brand-olive: #5b6e50;
   --color-brand-tile: #244b66;
 
   --color-brand-beige: #e7c9a4;
   --color-brand-wood: #a34c30;
   --color-brand-gray: #9a8c80;
-  --color-brand-dark: #3b2a20;
+  --color-brand-dark: #2f2a26;
 }
 
-/* Tokens oficiais do Casa Mia (docs/branding-casa-mia.md). As variáveis antigas do CSS apontam para eles. */
+/* Tokens oficiais do Casa Mia, paleta Linho Terracota (docs/branding-casa-mia.md).
+   Os outros CSS do app escrevem seus tons como color-mix destas cores-base:
+   trocar um valor aqui recolore todas as telas de uma vez. */
 :root {
-  --cm-bg: #fbf3e6; /* Creme Acolhedor */
-  --cm-text: #3b2a20; /* Café Tostado */
-  --cm-primary: #c2603f; /* Terracota Artesanal */
-  --cm-primary-dark: #a34c30; /* Terracota para texto e hover (contraste AA sobre o creme) */
-  --cm-success: #5c6643; /* Oliva Natural */
-  --cm-accent: #244b66; /* Azulejo Noturno */
-  /* Terracota calibrado para texto branco sobre botões (4,9:1 — AA); #c2603f dá 4,2:1 com branco */
-  --cm-action: #b5532f;
-  --cm-action-hover: #9a4529;
+  --cm-bg: #f8f3eb; /* Linho */
+  --cm-text: #2f2a26; /* Café Tostado */
+  --cm-primary: #c2603f; /* Terracota Artesanal: marca, Nino, áreas grandes */
+  --cm-primary-dark: #a34c30; /* Terracota para texto, links e foco (5,2:1 sobre o linho) */
+  --cm-success: #5b6e50; /* Sálvia: conquistas e status concluído (5,0:1 sobre o linho) */
+  --cm-accent: #244b66; /* Azulejo Noturno: informação */
+  --cm-olive-soft: #93a386; /* Sálvia clara: círculo de conquista e barras de progresso */
+  --cm-sand: #d8c9b3; /* Areia: superfícies e bordas quentes */
+  /* Botão principal: texto branco a 5,8:1; hover a 7,4:1 */
+  --cm-action: #a34c30;
+  --cm-action-hover: #8a3f27;
 }
 
 /* Regra base: Nunito como padrão de todo o projeto */
@@ -47,8 +67,30 @@
 html,
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-brand-cream, #fbf3e6);
-  color: var(--color-brand-coffee, #3b2a20);
+  background-color: var(--color-brand-cream, #f8f3eb);
+  color: var(--color-brand-coffee, #2f2a26);
+}
+
+/* Barra de rolagem da página no tom do linho: sem isso o Windows desenha um trilho branco na lateral. */
+html {
+  scrollbar-color: color-mix(in oklab, var(--cm-sand) 84%, var(--cm-text)) var(--cm-bg);
+}
+
+/* Azulejos do cadastro, compartilhados por todas as rotas. A camada fixa
+   mantém a escala e o degradê em páginas longas, sem interceptar cliques. */
+body {
+  min-height: 100dvh;
+  isolation: isolate;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='56' viewBox='0 0 48 56'%3E%3Cpath d='M10 56V26a14 14 0 0 1 28 0v30' fill='none' stroke='%23ecdcc3' stroke-width='1.5'/%3E%3C/svg%3E");
+  -webkit-mask-image: radial-gradient(ellipse 62% 78% at 50% 62%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 62% 78% at 50% 62%, #000 0%, transparent 78%);
+  pointer-events: none;
 }
 
 /* Destaques e marca usam Fraunces */

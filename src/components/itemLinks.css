@@ -1,28 +1,28 @@
-.copyable-link-field { min-width: 0; width: 100%; }
-.copyable-link-control { display: flex; position: relative; min-width: 0; width: 100%; }
-.copyable-link-control > input { width: 100%; min-width: 0; padding-right: 48px !important; min-height: 44px; }
-.copyable-link-button { position: absolute; right: 1px; top: 1px; bottom: 1px; width: 44px; display: grid; place-items: center; color: #a34c30; border-radius: 9px; }
-.copyable-link-button:hover:not(:disabled) { background: #f5edde; }
-.copyable-link-button:disabled { opacity: .4; cursor: default; }
-.copyable-link-button:focus-visible { outline: 2px solid #a34c30; outline-offset: -3px; }
-.copyable-link-feedback { display: block; margin-top: 6px; font-size: 12px; line-height: 1.5; color: #6b604f; }
-.item-link-import { display: grid; gap: 12px; padding: 16px; border: 1px solid #e5d4bb; background: #fbf3e6; border-radius: 12px; }
+.add-link-field { min-width: 0; width: 100%; }
+.add-link-control { display: flex; gap: 8px; align-items: stretch; min-width: 0; width: 100%; }
+.add-link-control > input { flex: 1 1 auto; width: auto; min-width: 0; }
+.add-link-control > .add-link-button { flex: 0 0 44px; width: 44px; height: auto; min-height: 0; align-self: stretch; display: grid; place-items: center; padding: 0; color: #fff; background: var(--cm-primary-dark); border-radius: 10px; }
+.add-link-button:hover:not(:disabled) { background: color-mix(in oklab, var(--cm-primary-dark) 88%, #000); }
+.add-link-button:disabled { opacity: .4; cursor: default; }
+.add-link-button:focus-visible { outline: 2px solid var(--cm-primary-dark); outline-offset: 2px; }
+.add-link-feedback { display: block; margin-top: 6px; font-size: 12px; line-height: 1.5; color: color-mix(in oklab, var(--cm-primary-dark) 84%, var(--cm-text)); }
+.item-link-import { display: grid; gap: 12px; padding: 16px; border: 1px solid color-mix(in oklab, var(--cm-sand) 53%, var(--cm-bg)); background: var(--cm-bg); border-radius: 12px; }
 .item-field-link { display: grid; gap: 8px; min-width: 0; }
-.item-field-link > label { font-size: 13px; font-weight: 500; color: #555d3b; }
-.item-link-import h5 { margin: 0; font-size: 15px; font-weight: 800; color: #4a3228; }
-.item-link-import p { margin: 0; font-size: 14px; line-height: 1.6; color: #796354; }
+.item-field-link > label { font-size: 13px; font-weight: 500; color: color-mix(in oklab, var(--cm-success) 94%, #000); }
+.item-link-import h5 { margin: 0; font-size: 15px; font-weight: 800; color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text)); }
+.item-link-import p { margin: 0; font-size: 14px; line-height: 1.6; color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text)); }
 .item-link-import-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .item-link-import-actions > .button { flex: 1 1 170px; min-height: 44px; padding: 10px 12px; }
-.item-link-import .button, .copyable-link-control input { scroll-margin-block: 110px; }
+.item-link-import .button, .add-link-control input { scroll-margin-block: 110px; }
 .item-link-import-preview { display: flex; gap: 12px; align-items: center; min-width: 0; }
-.item-link-import-preview img { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: #fffdf8; border-radius: 10px; }
+.item-link-import-preview img { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: color-mix(in oklab, var(--cm-bg) 22%, #fff); border-radius: 10px; }
 .item-link-import-preview > div { min-width: 0; overflow-wrap: anywhere; }
 .item-link-import-preview strong { display: block; font-size: 14px; line-height: 1.5; }
 .item-link-import-preview span { display: block; font-size: 13px; margin-top: 4px; }
 .item-link-import-loading { display: flex; align-items: center; gap: 10px; }
-.item-image-layout { display: grid; grid-template-columns: 80px minmax(0,1fr); gap: 12px; padding: 12px; border: 1px solid #eaddc9; border-radius: 14px; background: #fffdf8; }
+.item-image-layout { display: grid; grid-template-columns: 80px minmax(0,1fr); gap: 12px; padding: 12px; border: 1px solid color-mix(in oklab, var(--cm-sand) 38%, var(--cm-bg)); border-radius: 14px; background: color-mix(in oklab, var(--cm-bg) 22%, #fff); }
 .item-image-upload-actions { min-width: 0; display: flex; align-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
 .item-image-link { grid-column: 1 / -1; display: grid; gap: 6px; min-width: 0; }
-.item-image-link > label { font-size: 13px; color: #796354; }
+.item-image-link > label { font-size: 13px; color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text)); }
 .workspace-app .item-image-link > .item-inline-hint, .item-image-link > .item-inline-hint { display: block; font-size: 12px; line-height: 1.5; }
-.item-image-link .copyable-link-control > input { font-size: 16px; }
+.item-image-link .add-link-control > input { font-size: 16px; }

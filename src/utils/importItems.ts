@@ -36,6 +36,8 @@ export interface ImportIssue {
   /** "error": a linha não será importada · "warning": será importada com um ajuste. */
   level: "error" | "warning";
   message: string;
+  /** Só o Ambiente está vazio: a linha fica em `rows` e o catálogo ainda pode sugerir o ambiente na revisão. */
+  code?: "missing-category";
 }
 
 export interface ImportParseResult {
@@ -374,7 +376,7 @@ export function parseImportRows(grid: unknown[][]): ImportParseResult {
       !name && REQUIRED_LABELS.name,
       !categoryName && REQUIRED_LABELS.category,
     ].filter(Boolean);
-    if (missing.length > 0) {
+    if (!name) {
       issues.push({
         line,
         level: "error",
@@ -382,6 +384,13 @@ export function parseImportRows(grid: unknown[][]): ImportParseResult {
       });
       continue;
     }
+    if (!categoryName)
+      issues.push({
+        line,
+        level: "error",
+        message: `Campo obrigatório vazio: ${REQUIRED_LABELS.category}.`,
+        code: "missing-category",
+      });
     if (name.length > IMPORT_LIMITS.maxNameLength) {
       issues.push({
         line,

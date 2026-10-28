@@ -49,7 +49,7 @@ try {
     await handle.focus();await handle.press('ArrowDown');
     await page.getByText('Ordem salva.',{exact:true}).waitFor();
     assert.equal(reordered,1,'alça mantém reordenação pelo teclado');
-    await nav.getByRole('button',{name:'Visão geral',exact:true}).click();
+    await nav.getByRole('button',{name:'Meu Lar',exact:true}).click();
     const toolbar=page.locator('.rooms-toolbar');await toolbar.waitFor();
     if(width<768){
       const layout=await toolbar.evaluate(element=>{

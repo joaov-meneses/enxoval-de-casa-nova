@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: Catalog national price research dependencies
+  version: 1.0.0
+  description: >-
+    Subset consumed by the shared catalog worker. Sources:
+    https://serpapi.com/account-api and https://serpapi.com/google-shopping-api.
+    One successful search request consumes one search, regardless of result count.
+    The account request is free. This client does not paginate, fetch details or retry searches.
+servers:
+  - url: https://serpapi.com
+security:
+  - SerpApiKey: []
+paths:
+  /account.json:
+    get:
+      operationId: getSearchAllowance
+      responses:
+        '200':
+          description: Current account allowance. Extra credits are intentionally not used.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [plan_searches_left]
+                properties:
+                  plan_searches_left: {type: integer, minimum: 0}
+              example: {plan_searches_left: 250}
+        '401': {$ref: '#/components/responses/ProviderError'}
+        '429': {$ref: '#/components/responses/ProviderError'}
+        '500': {$ref: '#/components/responses/ProviderError'}
+  /search.json:
+    get:
+      operationId: searchBrazilShopping
+      parameters:
+        - {name: engine, in: query, required: true, schema: {type: string, const: google_shopping}}
+        - {name: q, in: query, required: true, schema: {type: string, minLength: 1}}
+        - {name: gl, in: query, required: true, schema: {type: string, const: br}}
+        - {name: hl, in: query, required: true, schema: {type: string, const: pt}}
+        - {name: no_cache, in: query, required: true, schema: {type: boolean, const: true}}
+      responses:
+        '200':
+          description: >-
+            Shopping results, possibly empty. Only full positive BRL prices, new products,
+            identified merchants and HTTPS links are candidates. Jev validates semantic comparability;
+            at least two distinct merchants are required to publish a market range.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  search_metadata:
+                    type: object
+                    properties: {status: {type: string}}
+                  shopping_results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title: {type: string}
+                        source: {type: string}
+                        product_link: {type: string, format: uri}
+                        price: {type: string}
+                        extracted_price: {type: number}
+                        second_hand_condition: {type: string}
+                        installment: {type: object}
+                        alternative_price: {type: object}
+              examples:
+                offers:
+                  value:
+                    search_metadata: {status: Success}
+                    shopping_results:
+                      - {title: Geladeira, source: Loja A, product_link: 'https://loja-a.example.invalid/geladeira', price: 'R$ 2.000,00', extracted_price: 2000}
+                      - {title: Geladeira, source: Loja B, product_link: 'https://loja-b.example.invalid/geladeira', price: 'R$ 2.200,00', extracted_price: 2200}
+                empty:
+                  value: {search_metadata: {status: Success}, shopping_results: []}
+        '401': {$ref: '#/components/responses/ProviderError'}
+        '429': {$ref: '#/components/responses/ProviderError'}
+        '500': {$ref: '#/components/responses/ProviderError'}
+components:
+  securitySchemes:
+    SerpApiKey: {type: apiKey, in: query, name: api_key}
+  responses:
+    ProviderError:
+      description: Stop or retain customer fallback; never expose upstream bodies or repeat a reserved search.
+      content:
+        application/json:
+          schema: {type: object, properties: {error: {type: string}}}
+  schemas:
+    NationalPriceRange:
+      description: >-
+        Returned by catalog search/assessment and bootstrap item catalog.priceRange.
+        Null when there is no sufficient validated sample. Customer samples count distinct
+        account owners (not lists); default minimum 2. Market samples count distinct merchants.
+        Sources are never blended. A market range is preferred while its offers are at most
+        45 days old. With fewer than five samples p10/p90 are observed min/max, not percentiles.
+        All values are cents. Existing fields are unchanged; metadata is additive.
+      type: object
+      required: [p10, p50, p90, samples, region]
+      properties:
+        p10: {type: integer, minimum: 1}
+        p50: {type: integer, minimum: 1, description: Median, not arithmetic mean.}
+        p90: {type: integer, minimum: 1}
+        meanCents: {type: integer, minimum: 1, description: Arithmetic mean after outlier filtering.}
+        samples: {type: integer, minimum: 2}
+        region: {type: string, const: ''}
+        source: {type: string, enum: [customers, serpapi]}
+        updatedAt: {type: string, format: date-time, description: Calculation time; not the age of every input price.}

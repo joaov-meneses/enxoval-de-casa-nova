@@ -2,7 +2,10 @@ import type {
   AdminCatalogItem,
   AdminCatalogOverview,
   AuthUser,
+  AdminBan,
+  AdminBanTarget,
   AdminUser,
+  CatalogNameMatch,
   CatalogSearchResult,
   BootstrapData,
   EnxovalCategory,
@@ -12,6 +15,10 @@ import type {
   EnxovalWorkspace,
   InvitationPreview,
   ItemAssessment,
+  ItemDocument,
+  ItemDocumentKind,
+  ReceiptPreview,
+  ItemExtrasInput,
   ItemPriceHistory,
   ItemStatus,
   ItemTrackingInput,
@@ -19,10 +26,12 @@ import type {
   NextItemRecommendation,
   ScrapedProductPreview,
 } from "./types";
+import type { HousewarmingManagement, HousewarmingSettings, HousewarmingEntry, PublicHousewarming } from './housewarming';
 import { isDoneStatus, isItemStatus, normalizeItemStatus } from "./itemStatus";
 import { SESSION_AUTHENTICATED_EVENT, SESSION_EXPIRED_EVENT } from './sessionActivity';
 import * as analytics from './analytics';
 import { recordApiSuccess } from './analytics/apiEvents';
+import { acquisitionPayload } from './analytics/firstTouch';
 import type { Answers, PlanPayload } from "./onboarding/types";
 import type { AdminFeedback, FeedbackInput, FeedbackStatus } from "./feedback";
 import {
@@ -46,6 +55,12 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
+
+/** Mensagens de erro na voz da marca ("Ops, tropeçamos aqui"), sempre com o caminho de volta. */
+export const NETWORK_ERROR_MESSAGE =
+  "Ops, tropeçamos aqui: parece que a conexão caiu. Confira a internet e tente de novo; nada do que você já salvou se perdeu.";
+export const GENERIC_ERROR_MESSAGE =
+  "Ops, tropeçamos aqui e não deu para concluir agora. Tente de novo em instantes.";
 
 /** Disparado quando o servidor recusa algo pelo limite do plano gratuito: o app abre o convite para os planos. */
 export const LIMIT_REACHED_EVENT = "casamia:limit-reached";
@@ -91,8 +106,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
   } catch (error) {
     analytics.captureOperational('application.api.failed', { ...input, duration_ms: performance.now() - started, error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error });
-    if (!(error instanceof Error && error.name === 'AbortError')) analytics.captureError(error, { ...input, error_source: 'api' });
-    throw error;
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    analytics.captureError(error, { ...input, error_source: 'api' });
+    // Sem resposta do servidor (sem internet, servidor fora): a mensagem do navegador vem crua e em inglês.
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0, 'NETWORK');
   }
 
   const context = { ...input, request_id: response.headers.get('x-request-id'), http_status: response.status,
@@ -123,7 +140,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const error = new ApiError(
       body?.error ??
         staleServerHint ??
-        "Não foi possível concluir a operação.",
+        GENERIC_ERROR_MESSAGE,
       response.status,
       body?.code,
     );
@@ -180,10 +197,11 @@ export function login(email: string, password: string) {
 }
 
 /** Cria só a conta (sem enxoval, e sem nome: o funil /comecar pergunta o nome e monta o primeiro enxoval depois, já autenticado). */
-export function register(email: string, password: string) {
+/** `emailMarketing`: caixa "quero lembretes e dicas por e-mail" do cadastro (desmarcada por padrão). */
+export function register(email: string, password: string, options: { emailMarketing?: boolean } = {}) {
   return request<BootstrapData>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, emailMarketing: Boolean(options.emailMarketing), acquisition: acquisitionPayload() }),
   });
 }
 
@@ -245,6 +263,38 @@ export const setUserActive = (id: string, isActive: boolean) =>
     method: "PATCH",
     body: JSON.stringify({ isActive }),
   });
+export const markUserEmailVerified = (id: string) =>
+  request<{ emailVerifiedAt: string }>(
+    `/api/admin/users/${encodeURIComponent(id)}/verify-email`,
+    { method: "POST" },
+  );
+export const fetchAdminBans = () => request<{ bans: AdminBan[] }>("/api/admin/bans");
+export const createAdminBan = (input: {
+  targetType: AdminBanTarget;
+  targetValue: string;
+  reasonCode: string;
+  notes: string;
+  /** null = sem prazo. */
+  durationHours: number | null;
+}) =>
+  request<{ id: string }>("/api/admin/bans", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+export const revokeAdminBan = (id: string) =>
+  request<void>(`/api/admin/bans/${encodeURIComponent(id)}/revoke`, { method: "POST" });
+
+/** Confirma o e-mail com o token do link (vale mesmo sem sessão aberta neste navegador). */
+export function verifyEmail(token: string) {
+  return request<{ ok: true }>("/api/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function resendEmailVerification() {
+  return request<{ ok: true; alreadyVerified: boolean }>("/api/auth/verify-email/resend", { method: "POST" });
+}
 
 export function fetchEnxoval(enxovalId: string) {
   return request<EnxovalWorkspace>(`/api/enxovais/${enxovalId}`);
@@ -273,6 +323,89 @@ export function completeOnboarding(name: string, plan: PlanPayload, profile: Ans
 }
 export interface ProfileData { id: string; name: string; email: string; avatarUrl: string | null; createdAt: string; }
 export const fetchProfile = () => request<ProfileData>('/api/profile');
+export const fetchMarketingPreference = () => request<{ subscribed: boolean }>('/api/profile/marketing');
+export const updateMarketingPreference = (subscribed: boolean) =>
+  request<{ subscribed: boolean }>('/api/profile/marketing', { method: 'PATCH', body: JSON.stringify({ subscribed }) });
+
+export interface EmailPreferences {
+  email: string;
+  subscribed: boolean;
+  reminders: boolean;
+  tips: boolean;
+  pausedUntil: string | null;
+}
+export const fetchEmailPreferences = (token: string) =>
+  request<EmailPreferences>(`/api/preferences?token=${encodeURIComponent(token)}`);
+export const updateEmailPreferences = (token: string, changes: { subscribed?: boolean; reminders?: boolean; tips?: boolean; pause?: boolean }) =>
+  request<EmailPreferences>('/api/preferences', { method: 'POST', body: JSON.stringify({ token, ...changes }) });
+export interface SurveyAnswer { email: string; score: number | null; comment: string }
+export const fetchSurvey = (token: string) => request<SurveyAnswer>(`/api/survey?token=${encodeURIComponent(token)}`);
+export const answerSurvey = (token: string, answer: { score: number; comment?: string; messageId?: string | null }) =>
+  request<SurveyAnswer>('/api/survey', { method: 'POST', body: JSON.stringify({ token, ...answer }) });
+
+export interface AdminJob {
+  job: string;
+  interval_ms: number;
+  app_version: string | null;
+  last_started_at: string | null;
+  last_succeeded_at: string | null;
+  last_failed_at: string | null;
+  last_error: string | null;
+  last_duration_ms: number | null;
+  stale: boolean;
+}
+export interface AdminFlowReport {
+  flow: string;
+  sent: number;
+  holdout: number;
+  simulated: number;
+  failed: number;
+  delivered: number;
+  clicked: number;
+  returned: number;
+  bounced: number;
+  complained: number;
+  unsubscribed: number;
+  sentActive7d: number;
+  holdoutActive7d: number;
+  liftPoints: number | null;
+}
+export interface AdminCampaign {
+  id: string;
+  name: string;
+  segment: string;
+  subject: string;
+  status: 'sending' | 'sent' | 'failed';
+  audienceCount: number;
+  createdAt: string;
+  sent: number;
+  holdout: number;
+  simulated: number;
+  clicked: number;
+  returned: number;
+  unsubscribed: number;
+}
+export interface AdminOperations {
+  mode: 'off' | 'simulate' | 'send';
+  jobs: AdminJob[];
+  lifecycle: {
+    days: number;
+    flows: AdminFlowReport[];
+    survey: { responses: number; nps: number | null };
+    suppressions: { reason: string; count: number }[];
+  };
+  campaigns: AdminCampaign[];
+  segments: { key: string; label: string }[];
+}
+export interface CampaignDraft { name: string; segment: string; subject: string; body: string; ctaLabel: string; ctaPath: string }
+export const fetchAdminOperations = () => request<AdminOperations>('/api/admin/operations');
+export const estimateCampaign = (segment: string) =>
+  request<{ eligible: number; holdout: number; limited: number }>('/api/admin/campaigns/estimate', { method: 'POST', body: JSON.stringify({ segment }) });
+export const testCampaign = (draft: CampaignDraft, testEmail: string) =>
+  request<void>('/api/admin/campaigns/test', { method: 'POST', body: JSON.stringify({ ...draft, testEmail }) });
+export const sendAdminCampaign = (draft: CampaignDraft) =>
+  request<{ id: string; audience: number; sent: number; holdout: number; deferred: number; simulated: number; failed: number }>(
+    '/api/admin/campaigns', { method: 'POST', body: JSON.stringify(draft) });
 export const updateProfile = (name: string) => request<ProfileData>('/api/profile', { method: 'PATCH', body: JSON.stringify({ name }) });
 export const uploadProfileAvatar = (image: Blob) => request<ProfileData>('/api/profile/avatar', { method: 'POST', headers: { 'Content-Type': image.type || 'image/jpeg' }, body: image });
 export const removeProfileAvatar = () => request<ProfileData>('/api/profile/avatar', { method: 'DELETE' });
@@ -289,6 +422,7 @@ export function updateEnxoval(
           | "spendingTier"
           | "state"
           | "city"
+          | "monthlyBudgetCents"
         >
       >,
 ) {
@@ -343,7 +477,7 @@ export function acceptInvitation(
 ) {
   return request<BootstrapData>("/api/invitations/accept", {
     method: "POST",
-    body: JSON.stringify({ token, ...account }),
+    body: JSON.stringify({ token, ...account, ...(account ? { acquisition: acquisitionPayload() } : {}) }),
   });
 }
 
@@ -430,15 +564,51 @@ export function updateItem(
       | "discountCents"
       | "categoryId"
       | "buyWeek"
+      | "leadTimeWeeks"
+      | "researchWeeks"
+      | "hasTemporarySolution"
+      | "dependsOnItemId"
     >
   > &
-    ItemTrackingInput,
+    ItemTrackingInput &
+    ItemExtrasInput,
 ) {
   return request<EnxovalItem>(`/api/items/${id}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
   });
 }
+
+/* ---------------------------------------------- Fase 11: lojas e documentos */
+
+/** Adiciona outra loja ao item. Leia o link antes com `extractProduct`, para o preço já vir preenchido. */
+export const addItemOffer = (itemId: string, url: string) =>
+  request<EnxovalItem>(`/api/items/${encodeURIComponent(itemId)}/offers`, { method: "POST", body: JSON.stringify({ url }) });
+export const promoteItemOffer = (itemId: string, offerId: string) =>
+  request<EnxovalItem>(`/api/items/${encodeURIComponent(itemId)}/offers/${encodeURIComponent(offerId)}`, { method: "PATCH", body: JSON.stringify({ isPrimary: true }) });
+export const removeItemOffer = (itemId: string, offerId: string) =>
+  request<EnxovalItem>(`/api/items/${encodeURIComponent(itemId)}/offers/${encodeURIComponent(offerId)}`, { method: "DELETE" });
+
+export const fetchItemDocuments = (itemId: string) =>
+  request<{ documents: ItemDocument[] }>(`/api/items/${encodeURIComponent(itemId)}/documents`);
+export const uploadItemDocument = (itemId: string, file: Blob, kind: ItemDocumentKind, name: string) =>
+  request<{ document: ItemDocument; item: EnxovalItem }>(
+    `/api/items/${encodeURIComponent(itemId)}/documents?kind=${kind}&name=${encodeURIComponent(name)}`,
+    { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file },
+  );
+export const deleteItemDocument = (documentId: string) =>
+  request<EnxovalItem>(`/api/documents/${encodeURIComponent(documentId)}`, { method: "DELETE" });
+export const readItemReceipt = (documentId: string) =>
+  request<{ preview: ReceiptPreview; cached: boolean }>(`/api/documents/${encodeURIComponent(documentId)}/read-receipt`, { method: 'POST' });
+export const fetchEnxovalDocuments = (enxovalId: string) =>
+  request<{ documents: ItemDocument[]; usedBytes: number; quotaBytes: number }>(`/api/enxovais/${encodeURIComponent(enxovalId)}/documents`);
+/** Endereço do ZIP com os documentos do enxoval (ou de um ambiente); o navegador baixa direto do servidor. */
+export const enxovalDocumentsZipUrl = (enxovalId: string, categoryId?: string) =>
+  `/api/enxovais/${encodeURIComponent(enxovalId)}/documents.zip${categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : ""}`;
+
+export const fetchWarrantyReminders = () => request<{ enabled: boolean }>("/api/profile/warranty-reminders");
+export const updateWarrantyReminders = (enabled: boolean) =>
+  request<{ enabled: boolean }>("/api/profile/warranty-reminders", { method: "PUT", body: JSON.stringify({ enabled }) });
 
 /** Lê o link de um produto de loja (nome, foto, preço, variações) para preencher o formulário. */
 export function extractProduct(url: string) {
@@ -475,6 +645,14 @@ export const updateAdminFeedbackStatus = (id: string, status: FeedbackStatus) =>
 export const searchCatalog = (query: string, signal?: AbortSignal) =>
   request<{ results: CatalogSearchResult[] }>(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=6`, { signal });
 
+/** Revisão da importação: o item do catálogo de cada nome da planilha, na mesma ordem (null quando não conhece). */
+export const matchCatalogNames = (names: string[], signal?: AbortSignal) =>
+  request<{ results: (CatalogNameMatch | null)[] }>("/api/catalog/match", {
+    method: "POST",
+    body: JSON.stringify({ names }),
+    signal,
+  });
+
 export const fetchAdminCatalogOverview = () =>
   request<AdminCatalogOverview>("/api/admin/catalog/overview");
 
@@ -510,7 +688,7 @@ export const completeAdminCatalogItem = (id: string) =>
 export const deleteAdminCatalogAlias = (key: string) =>
   request<void>(`/api/admin/catalog/aliases/${encodeURIComponent(key)}`, { method: "DELETE" });
 
-/** O servidor tem a chave do Jev? Sem ela, a ajuda do Nino não aparece. */
+/** O servidor tem a chave do Jev? Sem ela, o Nino acompanha o progresso sem oferecer consultas. */
 export const fetchAiStatus = () => request<{ enabled: boolean }>("/api/ai/status");
 
 /** Ambiente provável e aviso de compra redundante para um item que ainda está sendo preenchido. */
@@ -541,6 +719,22 @@ export function deleteItem(id: string) {
   return request<void>(`/api/items/${id}`, { method: "DELETE" });
 }
 
+const housewarmingPath = (id: string) => `/api/enxovais/${encodeURIComponent(id)}/housewarming`;
+export const fetchHousewarming = (id: string) => request<HousewarmingManagement>(housewarmingPath(id));
+export const saveHousewarming = (id: string, input: HousewarmingSettings) =>
+  request<HousewarmingManagement>(housewarmingPath(id), { method: 'PUT', body: JSON.stringify(input) });
+export const fetchHousewarmingNotifications = (id: string) =>
+  request<{ unreadCount: number; latest: HousewarmingEntry | null }>(`${housewarmingPath(id)}/notifications`);
+export const readHousewarmingEntries = (id: string, ids: string[]) =>
+  request<void>(`${housewarmingPath(id)}/read`, { method: 'POST', body: JSON.stringify({ ids }) });
+export const cancelHousewarmingReservation = (id: string, reservationId: string) =>
+  request<void>(`${housewarmingPath(id)}/reservations/${encodeURIComponent(reservationId)}`, { method: 'DELETE' });
+export const fetchPublicHousewarming = (slug: string) =>
+  request<PublicHousewarming>(`/api/public/housewarming/${encodeURIComponent(slug)}`);
+export const sendHousewarmingGuest = (slug: string, kind: 'reservations' | 'messages', input: {
+  requestId: string; name: string; message: string; email?: string; itemId?: string;
+}) => request<{ id: string }>(`/api/public/housewarming/${encodeURIComponent(slug)}/${kind}`, { method: 'POST', body: JSON.stringify(input) });
+
 export type {
   AuthUser,
   BootstrapData,
@@ -552,6 +746,8 @@ export type {
 };
 
 export interface BillingStatus {
+  fiscalEnabled?: boolean;
+  fiscalNeedsData?: boolean;
   monthlyPrice?: { amount: number; currency: string } | null;
   passPayment?: { amount: number | null; currency: string | null; sessionId: string } | null;
   passNotice?: string | null;
@@ -573,15 +769,26 @@ export interface BillingStatus {
   canManage: boolean;
 }
 
-export function fetchBillingStatus(enxovalId?: string) {
-  return request<BillingStatus>(`/api/billing/status${enxovalId ? `?enxovalId=${encodeURIComponent(enxovalId)}` : ""}`);
+export function fetchBillingStatus(enxovalId?: string, signal?: AbortSignal) {
+  return request<BillingStatus>(`/api/billing/status${enxovalId ? `?enxovalId=${encodeURIComponent(enxovalId)}` : ""}`, { signal });
 }
 export interface BillingOffer {
   id: PaidPlanId;
   name: string;
   amount: number;
   currency: string;
+  paymentMethods?: ('card' | 'pix')[];
 }
+export interface FiscalBilling {
+  enabled: boolean;
+  requireAddress: boolean;
+  profile: { name: string; document: string; address?: import('../shared/fiscal').FiscalAddress | null };
+  invoices: { id: string; status: 'pending' | 'processing' | 'authorized' | 'cancelled' | 'needs_data' | 'rejected' | 'failed';
+    environment: 'homologacao' | 'producao'; amountCents: number; currency: string; number: string | null;
+    pdfUrl: string | null; xmlUrl: string | null; errorCode: string | null; createdAt: string }[];
+}
+export const fetchFiscalBilling = () => request<FiscalBilling>('/api/billing/fiscal');
+export const updateFiscalProfile = (profile: FiscalBilling['profile']) => request<FiscalBilling['profile']>('/api/billing/fiscal/profile', { method: 'PUT', body: JSON.stringify(profile) });
 export function fetchBillingOffers() {
   return request<{ offers: BillingOffer[] }>('/api/billing/plans');
 }
@@ -598,7 +805,7 @@ export function acknowledgeTrialNotice(kind: 'started' | 'ending', subscriptionI
 }
 
 /** Devolve o endereço do checkout da Stripe para o plano escolhido. */
-export function startCheckout(plan: PaidPlanId, returnTo = "/app") {
+export function startCheckout(plan: PaidPlanId, returnTo = window.location.pathname) {
   return request<{ url: string }>("/api/billing/checkout", {
     method: "POST",
     body: JSON.stringify({ plan, returnTo }),

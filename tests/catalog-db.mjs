@@ -1,7 +1,8 @@
 // Teste de integração do catálogo mestre (Fase 6) com PostgreSQL real e o SDK real do Jev falando com um servidor
 // HTTP falso. Usa um schema descartável. Rodar: npm run test:catalog-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import { createServer } from "node:http";
 import zlib from "node:zlib";
 import express from "express";
@@ -99,6 +100,7 @@ try {
   // 0. Transição: a primeira versão do catálogo (sem slug), publicada em homologação, é trocada pela atual.
   await db.query(`
     ALTER TABLE items DROP COLUMN catalog_item_id;
+    DROP TABLE catalog_market_offers, catalog_market_searches, catalog_market_rotation, catalog_price_name_checks;
     DROP TABLE catalog_item_urgency, catalog_price_stats, catalog_item_aliases, catalog_metrics_daily, catalog_seed_state, catalog_negative_cache, catalog_items;
     CREATE TABLE catalog_items (id uuid PRIMARY KEY, canonical_name text NOT NULL, normalized_name text NOT NULL UNIQUE, priority text NOT NULL DEFAULT 'optional');
     CREATE TABLE catalog_metrics (day date NOT NULL, kind text NOT NULL, total integer NOT NULL DEFAULT 0, PRIMARY KEY (day, kind));
@@ -158,7 +160,7 @@ try {
   };
   const register = async (email) => {
     jar.delete("enxoval_session");
-    const result = await call("/auth/register", "POST", { email, password: randomBytes(16).toString("base64url") });
+    const result = await call("/auth/register", "POST", { email, password: strongPassword() });
     assert.equal(result.status, 201, JSON.stringify(result.data));
     // Conta paga: este teste cobre o catálogo, não as travas do plano gratuito (tests/freemium-db.mjs).
     await db.query("UPDATE users SET plan = 'monthly' WHERE id = $1", [result.data.user.id]);
@@ -179,8 +181,16 @@ try {
   assert.equal((await search("jogo de ca"))[0].name, "Jogo de cama", "prefixo do nome, mesmo com palavras vazias");
   assert.ok((await search("liquidificadr")).some((result) => result.name === "Liquidificador"), "tolera erro de digitação");
   assert.deepEqual(await search("a"), []);
+  const matched = await call("/catalog/match", "POST", { names: ["Geladeiras", "Liquidificadorr", "Air fryer Mondial preta", "Liquidificador com filtro", "Coisa desconhecida"] });
+  assert.equal(matched.status, 200, JSON.stringify(matched.data));
+  assert.deepEqual(
+    matched.data.results.map((result) => result && [result.match, result.name]),
+    [["exact", "Geladeira"], ["similar", "Liquidificador"], ["exact", "Air fryer"], ["contained", "Liquidificador"], null],
+    "importação: um nome por linha, na mesma ordem (marca e cor não mudam o item)",
+  );
+  assert.equal((await call("/catalog/match", "POST", { names: Array(501).fill("x") })).status, 400);
   assert.equal(received.length, 0, "a busca nunca consulta o Jev");
-  console.log("PASS: busca por prefixo, apelido e similaridade.");
+  console.log("PASS: busca por prefixo, apelido e similaridade; nomes da planilha em lote.");
 
   // 3. Itens do funil nascem ligados ao catálogo.
   const items = async () => Object.fromEntries((await call(`/items?enxovalId=${enxovalId}`)).data.map((item) => [item.name, item]));
@@ -274,12 +284,13 @@ try {
   assert.deepEqual([secondUrgency.data.shared, secondUrgency.data.inferred], [2, 0]);
   console.log("PASS: a nota da Geladeira vale para todos os enxovais da mesma faixa de perfil.");
 
-  // 6. Rotina: faixas de preço reais (k ≥ 5 enxovais, sem extremos), itens das listas e vínculos antigos.
-  const owner = (await db.query("SELECT id FROM users LIMIT 1")).rows[0].id;
+  // 6. Rotina: faixa nacional de clientes distintos, sem extremos, itens das listas e vínculos antigos.
   const geladeiraId = await catalogIdOf("Geladeira");
   const sofaId = await catalogIdOf("Sofá");
   const prices = [250_000, 260_000, 270_000, 280_000, 300_000, 310_000, 99_000_000];
   for (const [index, price] of prices.entries()) {
+    const owner = randomUUID();
+    await db.query("INSERT INTO users (id,name,email,password_hash) VALUES ($1,'Cliente da amostra',$2,'not-a-login-hash')", [owner, `${owner}@example.invalid`]);
     const enxoval = randomUUID();
     const category = randomUUID();
     await db.query("INSERT INTO enxovais (id, name, owner_id, state) VALUES ($1, 'Teste', $2, 'MG')", [enxoval, owner]);
@@ -290,8 +301,8 @@ try {
          ($7, $2, $3, $4, 'Luminária de aquário', NULL, NULL)`,
       [randomUUID(), owner, enxoval, category, price, geladeiraId, randomUUID()],
     );
-    // Só 3 enxovais com preço de sofá: amostra pequena demais para publicar.
-    if (index < 3) await db.query("INSERT INTO items (id, user_id, enxoval_id, category_id, name, price_cents, catalog_item_id) VALUES ($1, $2, $3, $4, 'Sofá', 300000, $5)", [randomUUID(), owner, enxoval, category, sofaId]);
+    // Só um cliente com preço de sofá: amostra pequena demais para publicar.
+    if (index < 1) await db.query("INSERT INTO items (id, user_id, enxoval_id, category_id, name, price_cents, catalog_item_id) VALUES ($1, $2, $3, $4, 'Sofá', 300000, $5)", [randomUUID(), owner, enxoval, category, sofaId]);
   }
   await db.query("UPDATE items SET catalog_item_id = NULL WHERE name = 'Liquidificadorr'");
   const summary = await runCatalogRefresh();
@@ -299,7 +310,7 @@ try {
   assert.ok(summary.linked >= 1, "itens antigos sem vínculo são ligados");
   assert.equal(summary.promoted, 1, "Luminária de aquário apareceu em 7 enxovais");
   const stats = (await db.query("SELECT region, p10, p50, p90, samples FROM catalog_price_stats WHERE item_id = $1 ORDER BY region", [geladeiraId])).rows;
-  assert.deepEqual(stats.map((row) => [row.region, row.samples]), [["", 6], ["MG", 6]], "o valor absurdo sai pela regra do IQR");
+  assert.deepEqual(stats.map((row) => [row.region, row.samples]), [["", 6]], "uma faixa nacional; o valor absurdo sai pela regra do IQR");
   assert.ok(stats[0].p90 < 1_000_000);
   assert.equal((await db.query("SELECT COUNT(*)::int AS n FROM catalog_price_stats WHERE item_id = $1", [sofaId])).rows[0].n, 0, "sem amostra mínima, sem faixa");
   const columns = (await db.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'catalog_price_stats' AND table_schema = $1", [schema])).rows.map((row) => row.column_name);
@@ -309,6 +320,8 @@ try {
   invalidateCatalogIndex();
   const withRange = await call(`/catalog/search?q=geladeira&uf=MG`);
   assert.equal(withRange.data.results[0].priceRange.samples, 6);
+  assert.equal(withRange.data.results[0].priceRange.source, 'customers');
+  assert.equal(withRange.data.results[0].priceRange.meanCents, 278333);
   // (A sessão agora é da segunda pessoa, que mora em SP: sem amostra lá, vale a faixa do Brasil todo.)
   const assessed = await call("/ai/assess-item", "POST", { enxovalId: second.enxoval.id, name: "Geladeira", classify: true });
   assert.equal(assessed.status, 200, JSON.stringify(assessed.data));
@@ -320,8 +333,10 @@ try {
   assert.deepEqual(
     [withPlan["Geladeira"].catalog.priceRange.p50, withPlan["Geladeira"].catalog.priceRange.region],
     [stats[0].p50, ""],
-    "o item leva a faixa do Brasil quando a UF dele não tem amostra",
+    "o item sempre recebe a faixa nacional",
   );
+  assert.equal(withPlan['Geladeira'].catalog.priceRange.meanCents, 278333);
+  assert.equal(withPlan['Geladeira'].catalog.priceRange.source, 'customers');
   const product = randomUUID();
   await db.query(
     `INSERT INTO tracked_products (id, url, domain, title, current_price_cents, lowest_price_cents, last_scrape_status)

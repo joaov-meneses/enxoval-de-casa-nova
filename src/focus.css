@@ -1,0 +1,26 @@
+/* One focus treatment for fields, including forms loaded in lazy routes.
+   Keep the existing border as the indicator instead of stacking outlines and rings.
+   These overrides also take precedence over component-specific focus styles. */
+:is(input, textarea, select, [data-slot="select-trigger"], [data-slot="native-select"]):is(:focus, :focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+}
+
+:is(input, textarea, select, [data-slot="select-trigger"], [data-slot="native-select"]):focus-visible:not([aria-invalid="true"]) {
+  border-color: var(--cm-primary-dark);
+}
+
+.admin-search:focus-within {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Preserve a visible indicator when the OS requests high-contrast colors. */
+@media (forced-colors: active) {
+  :is(input, textarea, select, [data-slot="select-trigger"], [data-slot="native-select"]):focus-visible {
+    outline: 1px solid Highlight !important;
+    outline-offset: 2px;
+  }
+}

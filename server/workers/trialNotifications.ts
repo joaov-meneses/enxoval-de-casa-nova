@@ -1,5 +1,6 @@
 import { getPool, withTransaction } from '../database.ts';
 import { logger } from '../logger.ts';
+import { registerJob, trackJob } from '../jobMonitor.ts';
 import { canDeliverMail, sendMail, trialEmail } from '../mailer.ts';
 
 /** Durable deduplication and row locks also coordinate multiple server instances. */
@@ -32,12 +33,13 @@ export async function sendTrialNotifications() {
 }
 
 export function startTrialNotifications() {
+  registerJob('trial_notifications', 60_000);
   let running = false;
   const run = async () => {
     if (running) return;
     running = true;
     logger.info({ event: 'trial.worker.started' }, 'Trial notification run started.');
-    try { await sendTrialNotifications(); logger.info({ event: 'trial.worker.completed' }, 'Trial notification run completed.'); }
+    try { await trackJob('trial_notifications', sendTrialNotifications); logger.info({ event: 'trial.worker.completed' }, 'Trial notification run completed.'); }
     catch (err) { logger.error({ event: 'trial.worker.failed', err }, 'Falha na rotina de avisos do trial.'); }
     finally { running = false; }
   };

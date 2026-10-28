@@ -1,5 +1,17 @@
 import { test, expect, type Page } from "@playwright/test";
 
+/** Cor computada de uma expressão CSS da paleta, para comparar sem fixar o hex do tema. */
+async function cssColor(page: Page, expression: string) {
+  return page.evaluate((value) => {
+    const probe = document.createElement("span");
+    probe.style.color = value;
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, expression);
+}
+
 async function workspace(page: Page, longEnvironment = false) {
   const home = {
     id: "home",
@@ -50,11 +62,12 @@ async function workspace(page: Page, longEnvironment = false) {
     createdAt: "2026-10-18T12:00:00Z",
     updatedAt: "2026-10-18T12:00:00Z",
   };
-  const state = { fail: false, updates: 0, errors: [] as string[] };
+  const state = { fail: false, updates: 0, bootstraps: 0, errors: [] as string[] };
   page.on("pageerror", (error) => state.errors.push(error.message));
   await page.route("**/api/**", (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path === "/api/bootstrap")
+    if (path === "/api/bootstrap") {
+      state.bootstraps++;
       return route.fulfill({
         json: {
           user,
@@ -74,6 +87,7 @@ async function workspace(page: Page, longEnvironment = false) {
           ],
         },
       });
+    }
     if (path === "/api/categories/order")
       return route.fulfill({ json: categories });
     if (path === "/api/billing/status")
@@ -123,6 +137,56 @@ async function workspace(page: Page, longEnvironment = false) {
   return state;
 }
 
+test("mobile scroll keeps header height and refresh only follows an uninterrupted pull from the top", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 640 });
+  const state = await workspace(page);
+  const header = page.locator(".mobile-workspace-header");
+  const height = await header.evaluate(node => node.getBoundingClientRect().height);
+  const bootstraps = state.bootstraps;
+  const gesture = async (phase: string, positions: number[], inDialog = false) => page.evaluate(({ phase, positions, inDialog }) => {
+    const target = document.querySelector(inDialog ? ".item-inline-panel" : "#workspace-main")!;
+    const touches = positions.map((clientY, identifier) => new Touch({ identifier, target, clientX: 200, clientY }));
+    const changedTouches = touches.length ? touches : [new Touch({ identifier: 0, target, clientX: 200, clientY: 360 })];
+    const event = new TouchEvent(phase, { bubbles: true, cancelable: true, touches, targetTouches: touches, changedTouches });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  }, { phase, positions, inDialog });
+
+  await page.evaluate(() => window.scrollTo(0, 100));
+  await expect.poll(() => header.evaluate(node => node.getBoundingClientRect().height)).toBe(height);
+  await gesture("touchstart", [200]);
+  expect(await gesture("touchmove", [360])).toBe(false);
+  await gesture("touchend", []);
+  expect(state.bootstraps).toBe(bootstraps);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await gesture("touchstart", [200]);
+  await gesture("touchmove", [360, 370]);
+  await gesture("touchend", []);
+  expect(state.bootstraps).toBe(bootstraps);
+
+  await gesture("touchstart", [200]);
+  expect(await gesture("touchmove", [360])).toBe(true);
+  await gesture("touchcancel", []);
+  await gesture("touchend", []);
+  expect(state.bootstraps).toBe(bootstraps);
+
+  await gesture("touchstart", [200]);
+  await gesture("touchmove", [360]);
+  await gesture("touchend", []);
+  await expect.poll(() => state.bootstraps).toBe(bootstraps + 1);
+  await expect(page.locator(".pull-refresh-indicator")).toHaveAttribute("data-refreshing", "false");
+
+  await page.locator('.item-row .item-title-button').first().click();
+  await page.getByRole("dialog").waitFor();
+  await gesture("touchstart", [200], true);
+  // A janela pode bloquear a rolagem pelo próprio scroll-lock; não deve iniciar atualização do workspace.
+  await gesture("touchmove", [360], true);
+  await gesture("touchend", [], true);
+  expect(state.bootstraps).toBe(bootstraps + 1);
+  expect(state.errors).toEqual([]);
+});
+
 for (const width of [
   320, 360, 375, 390, 414, 430, 540, 767, 768, 1023, 1024, 1440, 1920,
 ]) {
@@ -138,35 +202,19 @@ for (const width of [
       const state = await workspace(page);
       const row = page.locator('[data-item-id="towels"]');
       await expect(page.locator(".is-completing")).toHaveCount(0);
-      const footer = row.locator(".item-footer .item-expand");
-      const geometry = await row.evaluate((node) => {
-        const row = node.getBoundingClientRect();
-        const button = node
-          .querySelector(".item-expand")!
-          .getBoundingClientRect();
-        const icon = node
-          .querySelector(".item-expand svg")!
-          .getBoundingClientRect();
-        return {
-          centered: Math.abs(
-            icon.left + icon.width / 2 - (row.left + row.width / 2),
-          ),
-          edge: row.bottom - icon.bottom,
-          target: button.height,
-        };
-      });
-      expect(geometry.centered).toBeLessThan(1);
-      expect(geometry.edge).toBeLessThanOrEqual(6);
-      expect(geometry.target).toBe(24);
-      await footer.click();
-      await expect(row.getByRole("form")).toBeVisible();
-      await expect(footer).toHaveAttribute("aria-expanded", "true");
+      // A edição abre numa janela: o card inteiro é o gatilho e a lixeira fica na lateral.
+      const title = row.locator(".item-title-button");
+      const editor = page.getByRole("dialog", { name: "Toalhas" });
+      await expect(row.getByRole("button", { name: /^Tirar .* da lista$/ })).toBeVisible();
+      await title.click();
+      await expect(editor.getByRole("form")).toBeVisible();
+      await expect(title).toHaveAttribute("aria-expanded", "true");
       if (width === 375)
         await page.screenshot({
-          path: "tmp/validation/item-edit-glass-375.png",
+          path: "tmp/validation/item-edit-dialog-375.png",
         });
-      await footer.click();
-      await expect(row.getByRole("form")).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      await expect(editor).toHaveCount(0);
       if (width < 1024)
         await expect(row.locator(".item-name")).toHaveCSS("font-size", "16px");
       const infoPoint = await row.evaluate((node) => {
@@ -177,8 +225,9 @@ for (const width of [
         return { x: meta.left - inner.left + 4, y: meta.top - inner.top + 4 };
       });
       await row.locator(".item-row-inner").click({ position: infoPoint });
-      await expect(row.getByRole("form")).toBeVisible();
-      await footer.click();
+      await expect(editor.getByRole("form")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(editor).toHaveCount(0);
       const check = row.getByRole("checkbox");
       await check.click();
       const dialog = page.getByRole("dialog", {
@@ -217,7 +266,7 @@ for (const width of [
       }
       const pencil = row.locator(".item-name-scribble");
       await expect(pencil).toBeVisible();
-      await expect(pencil).toHaveCSS("stroke", "rgb(181, 83, 47)");
+      await expect(pencil).toHaveCSS("stroke", await cssColor(page, "var(--cm-action)"));
       await expect(pencil).toHaveCSS("opacity", "0.45");
       await expect(pencil).toHaveCSS("stroke-width", "1.35px");
       await expect(pencil).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -284,12 +333,24 @@ for (const width of [
       );
       const room = environments.locator(".environment-row").first();
       const select = room.locator(".environment-select");
-      await expect(room).toHaveCSS("border-top-style", "solid");
-      await expect(room).toHaveCSS("background-color", width < 1024 ? "rgb(237, 224, 203)" : "rgb(253, 252, 248)");
-      if (width >= 1024) {
+      if (width < 1024) {
+        await expect(room).toHaveCSS("border-top-style", "solid");
+        await expect(room).toHaveCSS(
+          "background-color",
+          await cssColor(page, "color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg))"),
+        );
+      } else {
+        // Na barra lateral, o ambiente é uma linha de navegação lisa; alça e "⋯" só aparecem ao passar o mouse.
+        await expect(room).toHaveCSS("border-top-style", "none");
+        await expect(room).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+        await expect(room.locator(".environment-menu-trigger")).toHaveCSS("opacity", "0");
         await select.hover();
-        await expect(room).toHaveCSS("background-color", "rgb(246, 238, 227)");
-        await expect(select.locator("span")).not.toHaveCSS("transform", "none");
+        await expect(room).toHaveCSS(
+          "background-color",
+          await cssColor(page, "color-mix(in oklab, var(--cm-sand) 23%, #fff)"),
+        );
+        await expect(room.locator(".environment-menu-trigger")).toHaveCSS("opacity", "1");
+        await expect(select.locator("> span").first()).not.toHaveCSS("transform", "none");
       }
       await page.evaluate(() => {
         document.addEventListener("animationstart", (event) => {
@@ -435,7 +496,8 @@ test("mobile chips keep intrinsic widths, centered labels and reachable handles 
       .evaluateAll((nodes) =>
         nodes.map((node) => node.getBoundingClientRect().width),
       );
-    expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(1);
+    // Com a contagem "conquistados/total", o chip cresce com o conteúdo a partir da largura base.
+    expect(Math.min(...widths)).toBeGreaterThanOrEqual(131);
     expect(
       await scroller.locator(".environment-select").evaluateAll((nodes) =>
         nodes.every((node) => {
@@ -451,13 +513,11 @@ test("mobile chips keep intrinsic widths, centered labels and reachable handles 
     const all = scroller.locator(".environment-all");
     const centered = await all.evaluate((node) => {
       const pill = node.getBoundingClientRect();
-      const text = node.querySelector("span")!;
-      const range = document.createRange();
-      range.selectNodeContents(text);
-      const label = range.getBoundingClientRect();
-      return (
-        Math.abs(label.left + label.width / 2 - pill.left - pill.width / 2) < 1
-      );
+      // Nome e contagem juntos ficam no centro do chip.
+      const content = node.querySelector(".environment-select")!;
+      const left = content.firstElementChild!.getBoundingClientRect().left;
+      const right = content.lastElementChild!.getBoundingClientRect().right;
+      return Math.abs((left + right) / 2 - pill.left - pill.width / 2) < 1;
     });
     expect(centered).toBe(true);
     await scroller
@@ -551,14 +611,19 @@ for (const reduced of [false, true]) {
     await page.getByRole("button", { name: "Editar nome do enxoval" }).click();
     await checkPanel("Editar enxoval");
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: "Importar", exact: true }).click();
-    await checkPanel("Importar itens");
-    await page.keyboard.press("Escape");
-    const exportTrigger = page.getByRole("button", {
-      name: "Exportar",
+    // No celular, importar e exportar ficam em "Planilhas", com nomes por extenso.
+    const moreTrigger = page.getByRole("button", {
+      name: "Planilhas",
       exact: true,
     });
-    await exportTrigger.click();
+    await moreTrigger.click();
+    await checkPanel("Planilhas");
+    await page.getByRole("button", { name: /^Trazer itens de uma planilha/ }).click();
+    await checkPanel("Importar itens");
+    await page.keyboard.press("Escape");
+    await expect(moreTrigger).toBeFocused();
+    await moreTrigger.click();
+    await page.getByRole("button", { name: /^Baixar minha lista/ }).click();
     dialog = await checkPanel("Exportar lista");
     if (!reduced)
       await dialog.screenshot({
@@ -572,10 +637,10 @@ for (const reduced of [false, true]) {
       .click();
     expect((await download).suggestedFilename()).toMatch(/\.xlsx$/);
     await expect(dialog).toBeHidden();
-    await expect(exportTrigger).toBeFocused();
+    await expect(moreTrigger).toBeFocused();
     await page
       .locator(".mobile-bottom-nav")
-      .getByRole("button", { name: /Visão geral/ })
+      .getByRole("button", { name: /Meu Lar/ })
       .click();
     await page
       .getByRole("button", { name: "Novo ambiente", exact: true })

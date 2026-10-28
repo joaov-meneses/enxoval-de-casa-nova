@@ -20,6 +20,10 @@ interface ExportMenuProps {
   items: EnxovalItem[];
   enxovalName: string;
   activeCategoryId?: string;
+  /** Controlado por fora (celular): a janela abre a partir de "Planilhas", sem o botão próprio. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
 const FORMATS: { id: ExportFormat; label: string; hint: string }[] = [
@@ -35,9 +39,17 @@ export function ExportMenu({
   items,
   enxovalName,
   activeCategoryId,
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
 }: ExportMenuProps) {
   const checkAccess = useSubscriptionCheck();
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const [mobile, setMobile] = useState(
     () => window.matchMedia("(max-width: 767px)").matches,
   );
@@ -69,18 +81,20 @@ export function ExportMenu({
   if (mobile)
     return (
       <div className="export-menu">
-        <Button
-          variant="brand"
-          size="brand"
-          type="button"
-          className="button button-outline button-small export-menu-trigger"
-          aria-label="Exportar"
-          aria-haspopup="dialog"
-          onClick={() => setOpen(true)}
-        >
-          <Download size={17} aria-hidden="true" />
-          <span>Exportar</span>
-        </Button>
+        {!hideTrigger && (
+          <Button
+            variant="brand"
+            size="brand"
+            type="button"
+            className="button button-outline button-small export-menu-trigger"
+            aria-label="Exportar"
+            aria-haspopup="dialog"
+            onClick={() => setOpen(true)}
+          >
+            <Download size={17} aria-hidden="true" />
+            <span>Exportar</span>
+          </Button>
+        )}
         <Dialog
           title="Exportar lista"
           isOpen={open}

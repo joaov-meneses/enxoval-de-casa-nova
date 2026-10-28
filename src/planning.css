@@ -10,8 +10,8 @@
 }
 
 .pp-card {
-  border: 1px solid #eee3d3;
-  background: #fdfcf8;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 40%, #fff);
+  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
   border-radius: 11px;
   padding: 20px 21px;
   min-width: 0;
@@ -20,13 +20,13 @@
   margin: 0;
   font-size: 17px;
   font-weight: 500;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-hint {
   margin: 6px 0 0;
   font-size: 13px;
   line-height: 1.55;
-  color: #615349;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
 }
 .pp-error {
   display: flex;
@@ -34,9 +34,9 @@
   gap: 8px;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid #efc5b6;
-  background: #fbece6;
-  color: #8a3d24;
+  border: 1px solid color-mix(in oklab, var(--cm-primary) 36%, #fff);
+  background: color-mix(in oklab, var(--cm-primary) 12%, #fff);
+  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
   font-size: 14px;
 }
 
@@ -59,12 +59,12 @@
   gap: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #4a3a2f;
+  color: color-mix(in oklab, var(--cm-bg) 9%, var(--cm-text));
 }
 .pp-field small {
   font-size: 12px;
   line-height: 1.5;
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 .pp-date {
   display: flex;
@@ -75,15 +75,15 @@
 .pp-date input[type="date"] {
   min-height: 44px;
   padding: 8px 12px;
-  border: 1px solid #e0d3c0;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 62%, #fff);
   border-radius: 10px;
   background: #fff;
   font: inherit;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-date input[type="date"]:disabled {
-  background: #f6efe4;
-  color: #6a5b50;
+  background: color-mix(in oklab, var(--cm-accent) 2%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 .pp-link {
   background: none;
@@ -92,7 +92,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: #a34c30;
+  color: var(--cm-primary-dark);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
@@ -113,7 +113,7 @@
   padding: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #4a3a2f;
+  color: color-mix(in oklab, var(--cm-bg) 9%, var(--cm-text));
 }
 .pp-tier-grid {
   display: grid;
@@ -127,7 +127,7 @@
   gap: 3px;
   align-content: start;
   padding: 14px 14px 14px 40px;
-  border: 1px solid #e6dac7;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 53%, #fff);
   border-radius: 11px;
   background: #fff;
   cursor: pointer;
@@ -137,7 +137,7 @@
     box-shadow 0.15s ease;
 }
 .pp-tier:hover {
-  border-color: #cfb995;
+  border-color: color-mix(in oklab, var(--cm-sand) 99%, var(--cm-text));
 }
 .pp-tier input {
   position: absolute;
@@ -146,31 +146,31 @@
   width: 18px;
   height: 18px;
   margin: 0;
-  accent-color: #a34c30;
+  accent-color: var(--cm-primary-dark);
 }
 .pp-tier strong {
   font-size: 15px;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-tier span {
   font-size: 12px;
   line-height: 1.4;
-  color: #615349;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
 }
 .pp-tier small {
   margin-top: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #4d5335;
+  color: color-mix(in oklab, var(--cm-success) 87%, #000);
 }
 .pp-tier.is-selected {
-  border-color: #a34c30;
-  background: #fbf3e6;
-  box-shadow: 0 0 0 1px #a34c30;
+  border-color: var(--cm-primary-dark);
+  background: var(--cm-bg);
+  box-shadow: 0 0 0 1px var(--cm-primary-dark);
 }
 .pp-tier:has(input:focus-visible) {
-  outline: 2px solid #244b66;
+  outline: 2px solid var(--cm-accent);
   outline-offset: 2px;
 }
 .pp-tiers:disabled .pp-tier {
@@ -192,10 +192,10 @@
     margin-top: 10px;
     padding: 10px 14px;
     text-align: left;
-    border: 1px solid #a34c30;
+    border: 1px solid var(--cm-primary-dark);
     border-radius: 11px;
-    background: #fbf3e6;
-    color: #3b2a20;
+    background: var(--cm-bg);
+    color: var(--cm-text);
     font: inherit;
     cursor: pointer;
   }
@@ -210,7 +210,7 @@
   }
   .pp-tier-toggle small {
     font-size: 12px;
-    color: #4d5335;
+    color: color-mix(in oklab, var(--cm-success) 87%, #000);
     font-weight: 600;
   }
   .pp-tier-toggle svg {
@@ -236,9 +236,9 @@
   display: grid;
   gap: 2px;
   padding: 14px 16px;
-  border: 1px solid #eee3d3;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 40%, #fff);
   border-radius: 11px;
-  background: #fdfcf8;
+  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
   min-width: 0;
 }
 .pp-summary span {
@@ -249,23 +249,23 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #6a5648;
+  color: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text));
 }
 .pp-summary strong {
   font-size: 22px;
   font-weight: 500;
-  color: #3b2a20;
+  color: var(--cm-text);
   overflow-wrap: anywhere;
 }
 .pp-summary small {
   font-size: 12px;
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 
 /* Período */
 .pp-period.is-current {
-  border-color: #c2603f;
-  box-shadow: 0 0 0 1px #c2603f;
+  border-color: var(--cm-primary);
+  box-shadow: 0 0 0 1px var(--cm-primary);
 }
 .pp-period-title {
   margin: 0;
@@ -288,7 +288,7 @@
   border-radius: 8px;
 }
 .pp-period-toggle:focus-visible {
-  outline: 2px solid #244b66;
+  outline: 2px solid var(--cm-accent);
   outline-offset: 4px;
 }
 .pp-period-text {
@@ -304,20 +304,20 @@
   flex-wrap: wrap;
   font-size: 17px;
   font-weight: 500;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-period-sub {
   font-size: 13px;
-  color: #615349;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
 }
 .pp-period-band {
   font-size: 12.5px;
   font-weight: 600;
-  color: #4d5335;
+  color: color-mix(in oklab, var(--cm-success) 87%, #000);
 }
 .pp-period-chevron {
   flex-shrink: 0;
-  color: #a34c30;
+  color: var(--cm-primary-dark);
   transition: transform 0.15s ease;
 }
 .pp-period.is-open .pp-period-chevron {
@@ -326,17 +326,17 @@
 .pp-period-body {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid #f0e6d6;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
 }
 .pp-now {
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #c2603f;
+  background: var(--cm-primary);
   color: #fff;
 }
 .pp-badges {
@@ -354,28 +354,29 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
-  background: #f1e8db;
-  color: #5a4a3f;
+  background: color-mix(in oklab, var(--cm-bg) 95%, var(--cm-text));
+  color: color-mix(in oklab, var(--cm-bg) 18%, var(--cm-text));
 }
 .pp-badge.is-done {
-  background: #e7edd6;
-  color: #3f4a28;
+  background: color-mix(in oklab, var(--cm-olive-soft) 12%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
+/* "Passou da semana sugerida" é informação para reagendar, nunca alarme (Acolhimento antes da cobrança). */
 .pp-badge.is-late {
-  background: #f8e1d6;
-  color: #8a3d24;
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-verdict.is-within {
-  background: #e7edd6;
-  color: #3f4a28;
+  background: color-mix(in oklab, var(--cm-olive-soft) 12%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
 .pp-verdict.is-below {
-  background: #e1ebf1;
-  color: #1c4058;
+  background: color-mix(in oklab, var(--cm-accent) 11%, #fff);
+  color: color-mix(in oklab, var(--cm-accent) 90%, #000);
 }
 .pp-verdict.is-above {
-  background: #f8e1d6;
-  color: #8a3d24;
+  background: color-mix(in oklab, var(--cm-primary) 19%, #fff);
+  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
 }
 
 /* Números e medidor */
@@ -392,13 +393,13 @@
 }
 .pp-figures dt {
   font-size: 12px;
-  color: #6a5648;
+  color: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text));
 }
 .pp-figures dd {
   margin: 2px 0 0;
   font-size: 15px;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
   overflow-wrap: anywhere;
 }
 .pp-figures dd small {
@@ -406,21 +407,21 @@
   align-items: center;
   gap: 3px;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  color: #3f4a28;
+  color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
 .pp-figures-note {
   margin: 0;
   font-size: 12.5px;
   line-height: 1.55;
-  color: #615349;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
 }
 .pp-meter {
   position: relative;
   height: 12px;
   border-radius: 999px;
-  background: #f1e8db;
+  background: color-mix(in oklab, var(--cm-bg) 95%, var(--cm-text));
   overflow: hidden;
 }
 .pp-meter-band {
@@ -441,7 +442,7 @@
   top: 3px;
   bottom: 3px;
   border-radius: 999px;
-  background: #5c6643;
+  background: var(--cm-success);
 }
 .pp-meter-planned {
   position: absolute;
@@ -449,7 +450,7 @@
   bottom: 0;
   width: 3px;
   margin-left: -1px;
-  background: #a34c30;
+  background: var(--cm-primary-dark);
 }
 
 /* Itens do período */
@@ -465,12 +466,12 @@
   gap: 8px 16px;
   align-items: center;
   padding: 12px 0;
-  border-top: 1px solid #f0e6d6;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
 }
 .pp-row.is-done .pp-row-name {
-  color: #7d6e63;
+  color: color-mix(in oklab, var(--cm-bg) 37%, var(--cm-text));
   text-decoration: line-through;
-  text-decoration-color: #cbb9a3;
+  text-decoration-color: color-mix(in oklab, var(--cm-bg) 74%, var(--cm-text));
 }
 .pp-row-main {
   display: grid;
@@ -480,15 +481,16 @@
 .pp-row-name {
   font-size: 14.5px;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
   overflow-wrap: anywhere;
 }
 .pp-row-meta {
   font-size: 12px;
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 .pp-late {
-  color: #8a3d24;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-row-reason {
   display: inline-flex;
@@ -496,18 +498,18 @@
   gap: 4px;
   font-size: 12px;
   line-height: 1.45;
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 .pp-row-price {
   text-align: right;
   font-size: 13px;
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
   white-space: nowrap;
 }
 .pp-row-price strong {
   font-size: 14px;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 /* O preço registrado passa da faixa real do item (o que outras listas pagaram). */
 .pp-row-above {
@@ -531,7 +533,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: #a34c30;
+  color: var(--cm-primary-dark);
   cursor: pointer;
 }
 
@@ -543,7 +545,7 @@
   gap: 10px;
   cursor: pointer;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
   list-style: none;
 }
 .pp-suggestions [data-slot="collapsible-trigger"]::-webkit-details-marker,
@@ -568,7 +570,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-top: 1px solid #f0e6d6;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
 }
 .pp-suggest-list li > div {
   display: grid;
@@ -578,11 +580,11 @@
 .pp-suggest-list strong {
   font-size: 14px;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-suggest-list span {
   font-size: 12px;
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 .pp-how {
   padding: 4px 2px;
@@ -594,12 +596,12 @@
   gap: 8px;
   font-size: 13px;
   line-height: 1.55;
-  color: #4a3a2f;
+  color: color-mix(in oklab, var(--cm-bg) 9%, var(--cm-text));
 }
 .pp-empty {
   padding: 28px 12px;
   text-align: center;
-  color: #615349;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
 }
 
 /* Semana na linha do item (lista de ambientes) */
@@ -611,15 +613,15 @@
   font-weight: 500;
   border-radius: 4px;
   padding: 1px 6px;
-  background: #e8eef2;
-  color: #1c4058;
+  background: color-mix(in oklab, var(--cm-accent) 9%, #fff);
+  color: color-mix(in oklab, var(--cm-accent) 90%, #000);
 }
 .item-week-tag.is-manual {
-  box-shadow: inset 0 0 0 1px #9db6c6;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cm-accent) 40%, #fff);
 }
 .item-week-tag.is-late {
-  background: #f8e1d6;
-  color: #8a3d24;
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 
 @media (max-width: 980px) {
@@ -644,9 +646,9 @@
   .pp-summary {
     grid-template-columns: 1fr;
     gap: 0;
-    border: 1px solid #eee3d3;
+    border: 1px solid color-mix(in oklab, var(--cm-sand) 40%, #fff);
     border-radius: 11px;
-    background: #fdfcf8;
+    background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
   }
   .pp-summary > div {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -658,11 +660,11 @@
     background: none;
   }
   .pp-summary > div + div {
-    border-top: 1px solid #f0e6d6;
+    border-top: 1px solid color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
   }
   .pp-summary span {
     grid-column: 1;
-    font-size: 11px;
+    font-size: 12px;
   }
   .pp-summary strong {
     grid-column: 2;
@@ -714,7 +716,7 @@
   }
   .pp-badge {
     padding: 2px 8px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .pp-figures {
     margin-top: 10px;
@@ -725,7 +727,7 @@
     gap: 8px;
   }
   .pp-figures dt {
-    font-size: 11px;
+    font-size: 12px;
   }
   .pp-figures dd {
     font-size: 12.5px;
@@ -752,7 +754,7 @@
   }
   .pp-row-price {
     grid-area: price;
-    font-size: 11.5px;
+    font-size: 12px;
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
@@ -768,7 +770,7 @@
     line-height: 1.3;
   }
   .pp-row-meta {
-    font-size: 11.5px;
+    font-size: 12px;
   }
   .pp-row-reason {
     display: none;
@@ -808,7 +810,7 @@
    ------------------------------------------------------------------------------------------------ */
 .pp-card {
   background: #fff;
-  border-color: #e6d9c4;
+  border-color: color-mix(in oklab, var(--cm-sand) 54%, #fff);
   box-shadow: 0 1px 2px #422d240d;
 }
 .pp-card > h3,
@@ -818,14 +820,14 @@
 }
 .pp-field > label,
 .pp-tiers legend {
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-hint,
 .pp-period-sub,
 .pp-row-meta,
 .pp-row-reason,
 .pp-figures-note {
-  color: #5b4d43;
+  color: color-mix(in oklab, var(--cm-bg) 19%, var(--cm-text));
 }
 
 /* Título da seção de etapas */
@@ -837,12 +839,12 @@
   font-size: 21px;
   font-weight: 500;
   letter-spacing: -0.3px;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-section-head p {
   margin: 4px 0 0;
   font-size: 13.5px;
-  color: #5b4d43;
+  color: color-mix(in oklab, var(--cm-bg) 19%, var(--cm-text));
 }
 
 /* Resumo: cada número com a sua cor */
@@ -851,31 +853,31 @@
   border-style: solid;
 }
 .pp-summary > div.is-band {
-  background: #f6ead6;
-  border-color: #e8d5b5;
+  background: color-mix(in oklab, var(--cm-sand) 16%, var(--cm-bg));
+  border-color: color-mix(in oklab, var(--cm-sand) 52%, var(--cm-bg));
 }
 .pp-summary > div.is-planned {
-  background: #e4eef5;
-  border-color: #c4d9e8;
+  background: color-mix(in oklab, var(--cm-accent) 9%, #fff);
+  border-color: color-mix(in oklab, var(--cm-accent) 22%, #fff);
 }
 .pp-summary > div.is-spent {
-  background: #e5eed8;
-  border-color: #cbdcb4;
+  background: color-mix(in oklab, var(--cm-olive-soft) 22%, #fff);
+  border-color: color-mix(in oklab, var(--cm-olive-soft) 45%, #fff);
 }
 .pp-summary > div.is-band span {
-  color: #6b4a1f;
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-summary > div.is-planned span {
-  color: #17415c;
+  color: color-mix(in oklab, var(--cm-accent) 91%, #000);
 }
 .pp-summary > div.is-spent span {
-  color: #33471f;
+  color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
 .pp-summary strong {
   font-weight: 600;
 }
 .pp-summary small {
-  color: #4a3e34;
+  color: color-mix(in oklab, var(--cm-bg) 11%, var(--cm-text));
 }
 
 /* Número da etapa */
@@ -886,69 +888,69 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: #f6e2d6;
-  color: #8a3d24;
+  background: color-mix(in oklab, var(--cm-primary) 11%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
   font-size: 15px;
   font-weight: 700;
 }
 .pp-period.is-current .pp-step {
-  background: #c2603f;
+  background: var(--cm-primary);
   color: #fff;
 }
 .pp-step.is-done {
-  background: #5c6643;
+  background: var(--cm-success);
   color: #fff;
 }
 .pp-period.is-current {
-  background: #fffaf4;
+  background: color-mix(in oklab, var(--cm-bg) 41%, #fff);
   border-width: 2px;
   padding: 19px 20px;
-  box-shadow: 0 2px 8px #c2603f1f;
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--cm-primary) 12%, transparent);
 }
 .pp-period-toggle {
   align-items: center;
 }
 .pp-period-toggle:hover .pp-period-name {
-  color: #a34c30;
+  color: var(--cm-primary-dark);
 }
 .pp-period-name {
   font-size: 18px;
   font-weight: 600;
 }
 .pp-period-band {
-  color: #3f4a28;
+  color: color-mix(in oklab, var(--cm-success) 80%, #000);
 }
 
 /* Selos: mais fortes e com ícone */
 .pp-badge {
   padding: 4px 11px;
   font-weight: 700;
-  background: #ebe4d8;
-  color: #4a3e34;
+  background: color-mix(in oklab, var(--cm-bg) 93%, var(--cm-text));
+  color: color-mix(in oklab, var(--cm-bg) 11%, var(--cm-text));
 }
 .pp-badge.is-done {
-  background: #dcebc8;
-  color: #26401a;
+  background: color-mix(in oklab, var(--cm-olive-soft) 30%, #fff);
+  color: color-mix(in oklab, var(--cm-success) 75%, #000);
 }
 .pp-badge.is-late {
-  background: #a8421f;
-  color: #fff;
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-verdict.is-no_prices {
-  background: #ebe4d8;
-  color: #4a3e34;
+  background: color-mix(in oklab, var(--cm-bg) 93%, var(--cm-text));
+  color: color-mix(in oklab, var(--cm-bg) 11%, var(--cm-text));
 }
 .pp-verdict.is-within {
-  background: #dcebc8;
-  color: #26401a;
+  background: color-mix(in oklab, var(--cm-olive-soft) 30%, #fff);
+  color: color-mix(in oklab, var(--cm-success) 75%, #000);
 }
 .pp-verdict.is-below {
-  background: #d4e5f1;
-  color: #12384f;
+  background: color-mix(in oklab, var(--cm-accent) 15%, #fff);
+  color: color-mix(in oklab, var(--cm-accent) 82%, #000);
 }
 .pp-verdict.is-above {
-  background: #fbd8c6;
-  color: #7a2a12;
+  background: color-mix(in oklab, var(--cm-primary) 17%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 80%, #000);
 }
 
 /* Corpo da etapa: números num painel próprio, itens em branco */
@@ -961,10 +963,10 @@
   margin-top: 0;
   padding: 14px 16px;
   border-radius: 10px;
-  background: #f7f1e6;
+  background: color-mix(in oklab, var(--cm-accent) 1%, var(--cm-bg));
 }
 .pp-figures dt {
-  color: #5b4d43;
+  color: color-mix(in oklab, var(--cm-bg) 19%, var(--cm-text));
   font-weight: 600;
 }
 .pp-figures dd {
@@ -972,7 +974,7 @@
   font-weight: 700;
 }
 .pp-meter {
-  background: #e9dfce;
+  background: color-mix(in oklab, var(--cm-sand) 46%, #fff);
 }
 .pp-rows {
   margin-top: 6px;
@@ -980,42 +982,42 @@
 .pp-row {
   padding: 14px 8px;
   margin: 0 -8px;
-  border-top-color: #efe6d6;
+  border-top-color: color-mix(in oklab, var(--cm-success) 8%, var(--cm-bg));
   border-radius: 8px;
 }
 .pp-row:first-child {
   border-top-color: transparent;
 }
 .pp-row:hover {
-  background: #fbf7ef;
+  background: color-mix(in oklab, var(--cm-bg) 67%, #fff);
 }
 .pp-row-name {
   font-size: 15px;
-  color: #2f2019;
+  color: color-mix(in oklab, var(--cm-text) 86%, #000);
 }
 .pp-row-meta {
   font-weight: 600;
 }
 .pp-row-price {
-  color: #5b4d43;
+  color: color-mix(in oklab, var(--cm-bg) 19%, var(--cm-text));
 }
 .pp-row-price strong {
   font-size: 15px;
 }
 .pp-row-week button.casamia-select-trigger {
-  background: #eef4f8;
-  border-color: #b9d0e0;
-  color: #12384f;
+  background: color-mix(in oklab, var(--cm-accent) 6%, #fff);
+  border-color: color-mix(in oklab, var(--cm-accent) 28%, #fff);
+  color: color-mix(in oklab, var(--cm-accent) 82%, #000);
   font-weight: 600;
 }
 .pp-row-week button.casamia-select-trigger > svg {
-  color: #17415c;
+  color: color-mix(in oklab, var(--cm-accent) 91%, #000);
 }
 .pp-more {
-  color: #8a3d24;
+  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
 }
 .pp-late {
-  color: #a8421f;
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 
 @media (max-width: 720px) {
@@ -1079,11 +1081,13 @@
 /* Mini FAQ: "Como a semana é sugerida?" */
 .pp-how {
   padding: 0;
-  border: 1px solid #b9d0e0;
+  border: 1px solid color-mix(in oklab, var(--cm-accent) 28%, #fff);
   border-radius: 11px;
-  background: #eef4f8;
+  background: color-mix(in oklab, var(--cm-accent) 6%, #fff);
 }
 .pp-how [data-slot="collapsible-trigger"] {
+  width: 100%;
+  text-align: left;
   gap: 12px;
   padding: 12px 14px;
   min-height: 56px;
@@ -1091,10 +1095,10 @@
   font-weight: 400;
 }
 .pp-how [data-slot="collapsible-trigger"]:hover {
-  background: #e4eef5;
+  background: color-mix(in oklab, var(--cm-accent) 9%, #fff);
 }
 .pp-how [data-slot="collapsible-trigger"]:focus-visible {
-  outline: 2px solid #244b66;
+  outline: 2px solid var(--cm-accent);
   outline-offset: 2px;
 }
 .pp-how-icon {
@@ -1104,7 +1108,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #17415c;
+  background: color-mix(in oklab, var(--cm-accent) 91%, #000);
   color: #fff;
 }
 .pp-how-text {
@@ -1116,15 +1120,15 @@
 .pp-how-text strong {
   font-size: 15px;
   font-weight: 700;
-  color: #12384f;
+  color: color-mix(in oklab, var(--cm-accent) 82%, #000);
 }
 .pp-how-text small {
   font-size: 12.5px;
-  color: #3f5b6e;
+  color: color-mix(in oklab, var(--cm-accent) 89%, var(--cm-bg));
 }
 .pp-how-chevron {
   flex-shrink: 0;
-  color: #17415c;
+  color: color-mix(in oklab, var(--cm-accent) 91%, #000);
   transition: transform 0.15s ease;
 }
 .pp-how[data-state="open"] .pp-how-chevron {
@@ -1136,7 +1140,7 @@
   color: #26323b;
 }
 .pp-how[data-state="open"] [data-slot="collapsible-trigger"] {
-  border-bottom: 1px solid #c9dbe8;
+  border-bottom: 1px solid color-mix(in oklab, var(--cm-accent) 20%, #fff);
   border-radius: 11px 11px 0 0;
 }
 
@@ -1189,7 +1193,7 @@
   }
   /* A descrição da cidade (clima) vira uma linha de apoio para as duas colunas. */
   .pp-field small {
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.4;
   }
   .pp-tiers {
@@ -1244,17 +1248,17 @@
   margin: 10px 0 0;
   font-size: 12.5px;
   line-height: 1.5;
-  color: #5b4d43;
+  color: color-mix(in oklab, var(--cm-bg) 19%, var(--cm-text));
 }
 .pp-city-note svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: #a34c30;
+  color: var(--cm-primary-dark);
 }
 @media (max-width: 720px) {
   .pp-city-note {
     margin-top: 8px;
-    font-size: 11.5px;
+    font-size: 12px;
   }
 }
 
@@ -1281,13 +1285,13 @@
   display: grid;
   gap: 8px;
   padding-top: 14px;
-  border-top: 1px solid #f0e6d6;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
 }
 .pp-nino-block label,
 .pp-nino-label {
   font-size: 14px;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-nino-row {
   display: flex;
@@ -1316,7 +1320,7 @@
 .pp-nino-result {
   padding: 12px 14px;
   border-radius: 10px;
-  background: #f6efe1;
+  background: color-mix(in oklab, var(--cm-olive-soft) 5%, var(--cm-bg));
 }
 .pp-nino-result > div,
 .pp-nino-ranking li > div {
@@ -1328,12 +1332,12 @@
 .pp-nino-ranking strong {
   font-size: 14px;
   font-weight: 600;
-  color: #3b2a20;
+  color: var(--cm-text);
 }
 .pp-nino-result span,
 .pp-nino-ranking li span {
   font-size: 12px;
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
 }
 .pp-nino-ranking {
   list-style: decimal inside;
@@ -1343,38 +1347,38 @@
 }
 .pp-nino-ranking li {
   padding: 9px 0;
-  border-top: 1px solid #f0e6d6;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
 }
 .pp-nino-ranking li::marker {
-  color: #6a5b50;
+  color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text));
   font-size: 12px;
 }
 .pp-nino-urgency {
   flex: none;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #f1e9db;
+  background: color-mix(in oklab, var(--cm-success) 6%, var(--cm-bg));
   font-size: 12px;
   font-weight: 600;
-  color: #4a3a2f;
+  color: color-mix(in oklab, var(--cm-bg) 9%, var(--cm-text));
   white-space: nowrap;
 }
 /* Do mais calmo (1) ao mais urgente (8): o tom esquenta a partir de "Na primeira semana". */
 .pp-nino-urgency.is-5 {
-  background: #f7ead8;
-  color: #6b4a1f;
+  background: color-mix(in oklab, var(--cm-sand) 15%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
 }
 .pp-nino-urgency.is-6 {
-  background: #f8e3d3;
-  color: #8a3d24;
+  background: color-mix(in oklab, var(--cm-primary) 11%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 88%, #000);
 }
 .pp-nino-urgency.is-7 {
-  background: #f3d3c6;
-  color: #7a301a;
+  background: color-mix(in oklab, var(--cm-primary) 28%, #fff);
+  color: color-mix(in oklab, var(--cm-primary-dark) 79%, #000);
 }
 .pp-nino-urgency.is-8 {
-  background: #eec0ae;
-  color: #6a2713;
+  background: color-mix(in oklab, var(--cm-primary) 34%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 71%, #000);
 }
 @media (max-width: 520px) {
   .pp-nino-row:not(.pp-nino-row-between) {
@@ -1398,34 +1402,40 @@
 }
 .pp-room-group {
   min-width: 0;
-  border: 1px solid #e9dfce;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 46%, #fff);
   border-radius: 10px;
-  background: #fffdf9;
-  padding: 0 12px;
+  background: color-mix(in oklab, var(--cm-bg) 20%, #fff);
+  --pp-room-pad: 12px;
+  padding: 0 var(--pp-room-pad);
 }
+/* A faixa inteira abre o ambiente: o gatilho cobre o cartão de ponta a ponta, inclusive o recuo. */
 .pp-room-group > [data-slot="collapsible-trigger"] {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: calc(100% + 2 * var(--pp-room-pad));
+  margin: 0 calc(-1 * var(--pp-room-pad));
+  padding: 0 var(--pp-room-pad);
+  border-radius: 10px;
+  text-align: left;
   min-height: 48px;
   cursor: pointer;
   list-style: none;
-  color: #4f362b;
+  color: color-mix(in oklab, var(--cm-sand) 11%, var(--cm-text));
 }
 .pp-room-group > [data-slot="collapsible-trigger"]::-webkit-details-marker { display: none; }
 .pp-room-group > [data-slot="collapsible-trigger"]:focus-visible {
-  outline: 2px solid #c2603f;
-  outline-offset: 3px;
-  border-radius: 6px;
+  outline: 2px solid var(--cm-primary);
+  outline-offset: 2px;
 }
 .pp-room-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
-.pp-room-count { font-size: 12px; color: #6a5b50; }
+.pp-room-count { font-size: 12px; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); }
 .pp-room-group > [data-slot="collapsible-trigger"] > svg { flex-shrink: 0; }
 .pp-room-group[data-state="open"] > [data-slot="collapsible-trigger"] > svg { transform: rotate(180deg); }
 .pp-room-group .pp-rows { margin-top: 0; }
-.pp-room-group .pp-row:first-child { border-top-color: #efe6d6; }
+.pp-room-group .pp-row:first-child { border-top-color: color-mix(in oklab, var(--cm-success) 8%, var(--cm-bg)); }
 .pp-price-estimate { display: grid; gap: 3px; }
-.pp-price-label { font-size: 11px; color: #6a5b50; font-weight: 400; }
+.pp-price-label { font-size: 12px; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); font-weight: 400; }
 .pp-price-range {
   display: flex;
   justify-content: flex-end;
@@ -1434,12 +1444,12 @@
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #4f362b;
+  color: color-mix(in oklab, var(--cm-sand) 11%, var(--cm-text));
 }
 .pp-price-range > span { white-space: nowrap; }
-.pp-price-to { font-weight: 400; color: #6a5b50; }
+.pp-price-to { font-weight: 400; color: color-mix(in oklab, var(--cm-bg) 27%, var(--cm-text)); }
 @media (max-width: 720px) {
-  .pp-room-group { padding: 0 10px; }
+  .pp-room-group { --pp-room-pad: 10px; }
   .pp-row {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "main" "price" "week";
@@ -1481,17 +1491,17 @@
   .pp-step { width: 24px; height: 24px; font-size: 12px; }
   .pp-period-name { font-size: 15px; line-height: 1.3; }
   .pp-period-band { display: none; }
-  .pp-now { font-size: 10px; }
+  .pp-now { font-size: 12px; }
   .pp-figures { padding: 10px; }
   .pp-figures dl { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .pp-figures dl > div { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 3px 8px; }
-  .pp-figures dt { font-size: 11px; }
+  .pp-figures dt { font-size: 12px; }
   .pp-figures dd { margin: 0; font-size: 12px; overflow-wrap: normal; }
   .pp-room-groups { gap: 8px; }
-  .pp-room-group { padding: 0 8px; }
+  .pp-room-group { --pp-room-pad: 8px; }
   .pp-room-group > [data-slot="collapsible-trigger"] { gap: 6px; }
   .pp-room-name { font-size: 13px; }
-  .pp-room-count { font-size: 11px; }
+  .pp-room-count { font-size: 12px; }
   .pp-row { padding: 10px 0; margin: 0; }
   .pp-row-main { gap: 0; }
   .pp-row-meta:empty { display: none; }
@@ -1534,3 +1544,58 @@
 }
 
 .pp .pp-period-body { --pp-content-gap: 14px; }
+
+/* "Ver referência": a faixa do perfil só aparece quando a pessoa pede. */
+.pp-band-reveal {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 2px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--cm-primary-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.pp-band-reveal:hover {
+  color: var(--cm-action-hover);
+}
+/* Scheduling uses the same cards, fields and dialog controls as nearby planning sections. */
+.purchase-timing-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-width: 0; }
+.purchase-timing-fields .pp-field { min-width: 0; }
+.purchase-timing-fields input { width: 100%; min-width: 0; min-height: 44px; }
+.purchase-timing-wide { grid-column: 1 / -1; }
+.purchase-timing-check { display: flex; gap: 10px; align-items: center; min-height: 44px; line-height: 1.45; }
+.purchase-timing-check [role="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; max-height: 20px; }
+.casamia-dialog.purchase-timing-dialog { display: flex; flex-direction: column; width: 100%; height: min(760px, calc(100dvh - 16px)); overflow: clip; }
+.casamia-dialog.purchase-timing-dialog > form { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: clip; padding: 0; }
+.purchase-timing-dialog .dialog-heading { flex-shrink: 0; }
+.purchase-timing-body { padding: 18px 20px; overflow-y: auto; display: grid; gap: 16px; min-height: 0; }
+.purchase-timing-body .pp-hint, .purchase-timing-fields .pp-hint { margin: 0; line-height: 1.5; }
+.purchase-timing-date { margin: 0; color: var(--cm-primary-dark); font-weight: 800; }
+.purchase-timing-footer { padding: 12px 20px; display: flex; gap: 10px; border-top: 1px solid var(--cm-sand); flex-shrink: 0; }
+.purchase-timing-footer .button { flex: 1; min-height: 44px; white-space: normal; }
+.purchase-timing-open { min-height: 44px; white-space: normal; text-align: left; justify-content: flex-start; }
+.purchase-price-opportunity { display: grid; gap: 4px; margin: 8px 0; line-height: 1.45; font-size: 12px; }
+.purchase-price-opportunity strong { color: var(--cm-success); }
+.purchase-price-opportunity span { color: var(--cm-text); font-weight: 400; }
+.purchase-budget-alert h3 { display: flex; gap: 8px; align-items: flex-start; }
+.purchase-budget-alert ul { padding: 0; margin: 12px 0; list-style: none; display: grid; gap: 12px; }
+.purchase-budget-alert li { display: grid; gap: 4px; font-size: 14px; overflow-wrap: anywhere; }
+.purchase-budget-alert li strong { color: var(--cm-primary-dark); }
+.purchase-next-actions { margin-block: 16px; display: grid; gap: 10px; }
+.purchase-next-actions p { margin: 0; font-size: 14px; line-height: 1.5; }
+.pp-row-week { min-width: 0; }
+.pp-nino-ranking > li { align-items: flex-start; flex-wrap: wrap; }
+.pp-nino-ranking > li > div { min-width: 0; flex: 1 1 180px; }
+.pp-nino-ranking .pp-nino-urgency { white-space: normal; max-width: 100%; }
+@media (max-width: 480px) {
+  .purchase-timing-fields { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .purchase-timing-body { padding: 14px; }
+  .purchase-timing-footer { padding: 12px 14px; }
+  .purchase-timing-footer .button { font-size: 13px; padding-inline: 8px; }
+  .purchase-timing-fields input { font-size: 16px; }
+}
+@media (min-width: 768px) {
+  .casamia-dialog.purchase-timing-dialog { width: min(600px, calc(100vw - 48px)); }
+}

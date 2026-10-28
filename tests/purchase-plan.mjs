@@ -59,9 +59,9 @@ test('semana sugerida: prazo de entrega, primeira noite e opcionais depois da mu
   const quadros = item('Quadros e decoração', 'Sala de Estar');
   const placements = planPurchases([geladeira, toalhas, sofa, quadros], 'equilibrado');
 
-  assert.equal(placements.get(geladeira.id).week, -8, 'compra grande e essencial vem antes');
+  assert.equal(placements.get(geladeira.id).week, -5, 'compra grande e essencial vem antes');
   assert.equal(placements.get(toalhas.id).week, -1, 'primeira noite: semana anterior');
-  assert.equal(placements.get(sofa.id).week, -8);
+  assert.equal(placements.get(sofa.id).week, -5);
   assert.ok(placements.get(quadros.id).week >= 4, 'opcional só depois que a casa assentou');
   assert.ok(placements.get(quadros.id).reason.length > 0);
 });
@@ -245,7 +245,10 @@ test('uma cidade que não pertence ao estado é ignorada', () => {
   assert.ok(!errada.includes('Umidificador de ar'));
   assert.equal(cityMatchesState('salvador', 'BA'), true);
   assert.equal(cityMatchesState('salvador', 'SP'), false);
-  assert.deepEqual(citiesOfState('BA').map((city) => city.name), ['Salvador']);
+  const baianas = citiesOfState('BA').map((city) => city.name);
+  assert.equal(baianas[0], 'Salvador', 'a capital vem primeiro');
+  assert.ok(baianas.includes('Feira de Santana'));
+  assert.ok(citiesOfState('BA').every((city) => city.uf === 'BA'));
 });
 
 test('a nota regional vai na descrição e o plano carrega os dados do planejamento', () => {

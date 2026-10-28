@@ -29,7 +29,7 @@ export const FEEDBACK_KIND_INFO: Record<
 };
 
 export const FEEDBACK_AREAS = [
-  { id: "overview", label: "Visão geral" },
+  { id: "overview", label: "Meu Lar" },
   { id: "plan", label: "Planejamento de compras" },
   { id: "list", label: "Lista do enxoval e ambientes" },
   { id: "items", label: "Itens, preços e acompanhamento de preço" },

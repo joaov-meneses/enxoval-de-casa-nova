@@ -1,3 +1,4 @@
+import { refineSchedule, planningBudget, type SchedulingInput, type SchedulingOptions, type BudgetConflict } from './scheduling';
 /**
  * Planejamento de compras em torno da data da mudança.
  *
@@ -44,7 +45,7 @@ export function isBuyWeek(value: unknown): value is number {
 }
 
 /** O que o planejamento precisa saber de um item (um `EnxovalItem` já serve). */
-export interface PlannableItem {
+export interface PlannableItem extends SchedulingInput {
   id: string;
   name: string;
   /** Nome do ambiente: dá a urgência de cada cômodo. */
@@ -69,10 +70,10 @@ export interface CatalogItemMeta {
   /** Semanas entre comprar e ter o item pronto em casa (entrega, montagem, instalação). */
   leadTimeWeeks: number;
   /**
-   * Faixa real de preço do item: o que outras listas registraram (p10, mediana e p90, em centavos), só com amostra
-   * mínima de enxovais distintos. `region` é a UF da amostra, ou vazio para o Brasil todo.
+   * Faixa nacional estimada em centavos: ofertas comparáveis ou valores informados por clientes distintos.
+   * `region` é vazio; com menos de cinco amostras p10/p90 são os extremos observados.
    */
-  priceRange?: { p10: number; p50: number; p90: number; samples: number; region: string } | null;
+  priceRange?: { p10: number; p50: number; p90: number; samples: number; region: string; meanCents?: number; source?: 'customers' | 'serpapi'; updatedAt?: string } | null;
 }
 
 export type BandSource = "real" | "reference";
@@ -367,12 +368,14 @@ function referenceMidCents(item: PlannableItem, tier: SpendingTier, meta: ItemMe
  *    partir da sua semana-base em que o gasto de referência ainda cabe no teto semanal, que é o total
  *    dos opcionais dividido em cerca de 16 semanas. Assim o gasto não fica todo no mesmo mês.
  *
- * O resultado só depende dos itens, dos ambientes, das semanas manuais e do perfil de gasto. Preços e
- * situação (comprado, pesquisando...) não entram: marcar uma compra nunca remaneja o resto da lista.
+ * refineSchedule combina esta distribuição de referência com a necessidade avaliada, os prazos editáveis,
+ * as dependências e, quando data e orçamento existem, o fluxo mensal de compras e parcelas.
+ * As semanas manuais prevalecem em todos os casos.
  */
 export function planPurchases(
   items: readonly PlannableItem[],
   tier: SpendingTier,
+  options: SchedulingOptions = {},
 ): Map<string, Placement> {
   const placements = new Map<string, Placement>();
   const flexible: { item: PlannableItem; base: number; cost: number; order: number; reason: string; category: PriceCategory }[] = [];
@@ -425,7 +428,7 @@ export function planPurchases(
         : entry.reason,
     });
   }
-  return placements;
+  return refineSchedule(items, placements, tier, options);
 }
 
 /* ---------------------------------------------------------- faixas e verificador */
@@ -493,6 +496,7 @@ export function verdictFor(plannedCents: number, pricedBand: Band, pricedCount: 
 }
 
 export interface PurchasePlan<T extends PlannableItem = PlannableItem> {
+  budgetConflicts: BudgetConflict[];
   periods: PeriodSummary<T>[];
   byId: Map<string, PlannedItem<T>>;
   totals: {
@@ -506,10 +510,10 @@ export interface PurchasePlan<T extends PlannableItem = PlannableItem> {
 
 export function buildPurchasePlan<T extends PlannableItem>(
   items: readonly T[],
-  options: { tier: SpendingTier; moveDate?: string | null; now?: Date },
+  options: { tier: SpendingTier } & SchedulingOptions,
 ): PurchasePlan<T> {
   const { tier, moveDate = null, now = new Date() } = options;
-  const placements = planPurchases(items, tier);
+  const placements = planPurchases(items, tier, options);
   const today = startOfDay(now);
   const nowWeek = moveDate ? currentWeek(moveDate, now) : null;
   const byId = new Map<string, PlannedItem<T>>();
@@ -570,6 +574,7 @@ export function buildPurchasePlan<T extends PlannableItem>(
   });
 
   return {
+    budgetConflicts: planningBudget(items, placements, tier, options),
     periods,
     byId,
     totals: {

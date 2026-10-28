@@ -1,7 +1,7 @@
-// Teste de integração com PostgreSQL real: nome do ambiente (até 100 caracteres contando os espaços, sempre em
 // uma linha). Usa um schema descartável. Rodar: npm run test:environment-name-db
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { strongPassword } from "./strongPassword.mjs";
 import express from "express";
 import pg from "pg";
 import { getPool } from "../server/database.ts";
@@ -66,7 +66,7 @@ try {
 
   const registered = await call("/auth/register", "POST", {
     email: "ambiente@example.invalid",
-    password: randomBytes(16).toString("base64url"),
+    password: strongPassword(),
   });
   assert.equal(registered.status, 201, JSON.stringify(registered.data));
   // Conta paga: este teste cobre nomes de ambiente, não as travas do plano gratuito (tests/freemium-db.mjs).

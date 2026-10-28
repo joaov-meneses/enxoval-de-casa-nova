@@ -9,3 +9,6 @@ interface ImportMetaEnv {
   readonly VITE_POSTHOG_TRAFFIC_TYPE?: 'external' | 'internal' | 'test';
   readonly VITE_POSTHOG_CAMPAIGNS?: string;
 }
+
+/** Versão do build (commit publicado), definida em vite.config.ts. */
+declare const __APP_VERSION__: string;

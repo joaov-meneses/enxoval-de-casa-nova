@@ -13,6 +13,9 @@ import {
   ShieldCheck,
 } from "@/src/components/icons";
 import { login, register } from "../api";
+import { isAppPath } from "../appRoute";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordPolicyError } from "../../shared/passwordPolicy";
+import { PasswordRules } from "./PasswordRules";
 import type { BootstrapData } from "../types";
 import { Brand } from "./Brand";
 import { FORGOT_EMAIL_KEY } from "./ForgotPasswordPage";
@@ -138,7 +141,7 @@ function LoginPanel({
     try {
       const data = await login(email.trim(), password);
       if (data.user.mustChangePassword) {
-        window.history.replaceState({}, "", "/change-password");
+        if (!isAppPath(window.location.pathname)) window.history.replaceState({}, "", "/change-password");
         onAuthenticated(data);
         return;
       }
@@ -147,7 +150,7 @@ function LoginPanel({
         window.location.assign("/comecar");
         return;
       }
-      window.history.replaceState({}, "", "/app");
+      if (!isAppPath(window.location.pathname)) window.history.replaceState({}, "", "/app");
       onAuthenticated(data);
     } catch (err) {
       setError(
@@ -255,10 +258,17 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Consentimento de marketing por e-mail: separado da política e desmarcado por padrão (LGPD).
+  const [emailMarketing, setEmailMarketing] = useState(false);
   const mismatch = confirmation !== "" && confirmation !== password;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const weak = passwordPolicyError(password);
+    if (weak) {
+      setError(weak);
+      return;
+    }
     if (password !== confirmation) {
       setError("As senhas não coincidem.");
       return;
@@ -266,9 +276,10 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
     setSubmitting(true);
     setError("");
     try {
-      await register(email.trim(), password);
-      // Conta criada: o funil de perguntas monta o plano e o primeiro enxoval a seguir.
-      window.location.assign("/comecar");
+      const data = await register(email.trim(), password, { emailMarketing });
+      // Conta criada: o funil de perguntas monta o plano e o primeiro enxoval a seguir. Quando o e-mail
+      // ainda precisa ser confirmado, o app mostra antes a tela de confirmação.
+      window.location.assign(data.user.emailVerified === false ? "/app" : "/comecar");
     } catch (err) {
       setError(
         err instanceof Error
@@ -315,17 +326,16 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 setPassword(e.target.value);
                 setError("");
               }}
-              placeholder="6 ou mais caracteres"
+              placeholder={`${PASSWORD_MIN_LENGTH} ou mais caracteres`}
               autoComplete="new-password"
               aria-describedby="register-password-hint"
-              minLength={6}
+              minLength={PASSWORD_MIN_LENGTH}
+              maxLength={PASSWORD_MAX_LENGTH}
               required
             />
             <PasswordToggle visible={visible} onToggle={() => setVisible(!visible)} />
           </span>
-          <p className="auth-hint" id="register-password-hint">
-            Use 6 caracteres ou mais.
-          </p>
+          <PasswordRules password={password} id="register-password-hint" />
         </div>
         <div className="auth-field">
           <Label htmlFor="register-password-confirmation">Confirme a senha</Label>
@@ -351,6 +361,17 @@ function RegisterPanel({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             </p>
           )}
         </div>
+        <label className="auth-optin">
+          <input
+            type="checkbox"
+            checked={emailMarketing}
+            onChange={(e) => setEmailMarketing(e.target.checked)}
+          />
+          <span>
+            Quero receber por e-mail lembretes da mudança e dicas para montar a casa. Dá para cancelar a qualquer
+            momento.
+          </span>
+        </label>
         {error && (
           <div className="form-error" role="alert">
             {error}

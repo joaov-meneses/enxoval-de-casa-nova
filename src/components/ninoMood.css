@@ -1,0 +1,6 @@
+.nino-mood { display: flex; flex: 0 0 70px; align-items: flex-end; justify-content: center; align-self: flex-start; min-height: 82px; }
+.nino-mood .nino { width: 56px; height: auto; }
+.nino-mood.is-celebrating .nino { animation: nino-conquest 650ms ease-out 2; }
+@keyframes nino-conquest { 0%, 100% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-5px) rotate(-5deg); } 70% { transform: translateY(-2px) rotate(4deg); } }
+.pp-nino .pp-nino-mood-message { margin: 6px 0 0; color: var(--cm-text, #2f2a26); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .nino-mood.is-celebrating .nino { animation: none; } }

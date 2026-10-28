@@ -4,12 +4,15 @@ import { Button } from "@/src/components/ui/button";
 import { Label } from "@/src/components/ui/label";
 import { Textarea } from "@/src/components/ui/textarea";
 import React, { useEffect, useRef, useState } from "react";
-import { Sparkles, LoaderCircle, PackageCheck, PackageX, X } from "@/src/components/icons";
+import { ChevronDown, Sparkles, LoaderCircle, PackageCheck, PackageX, X } from "@/src/components/icons";
 import type {
   CatalogSearchResult,
   EnxovalCategory,
   EnxovalItem,
+  EnxovalMember,
+  ItemExtrasInput,
   ItemStatus,
+  PaymentMethod,
   ItemTrackingInput,
   ItemAssessment,
   PriceBasis,
@@ -27,11 +30,22 @@ import {
 import { MAX_ENVIRONMENT_NAME_LENGTH, normalizeEnvironmentName, sanitizeEnvironmentNameInput } from "../data";
 import { DEFAULT_ITEM_QUANTITY, MAX_ITEM_QUANTITY } from "../itemQuantity";
 import { MAX_ITEM_NAME_LENGTH } from "../data";
+import { MAX_INSTALLMENTS, PAYMENT_METHOD_LABEL } from "../planning/installments";
 import { Dialog } from "./Dialog";
 import { QuantityStepper } from "./QuantityStepper";
 import { Select } from "./Select";
 
 const NEW_CATEGORY_VALUE = "__new_category__";
+const PAYMENT_OPTIONS = [
+  { value: "", label: "Não informado" },
+  ...(Object.keys(PAYMENT_METHOD_LABEL) as PaymentMethod[]).map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] })),
+];
+const INSTALLMENT_OPTIONS = Array.from({ length: MAX_INSTALLMENTS }, (_, index) => ({
+  value: String(index + 1),
+  label: index === 0 ? "À vista" : `${index + 1}x`,
+}));
+const FIELD_CLASS =
+  "w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood";
 const money = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -48,10 +62,14 @@ interface AddItemModalProps {
       EnxovalItem,
       "priceCents" | "quantity" | "discountCents" | "link" | "description" | "status"
     > &
-      ItemTrackingInput,
+      ItemTrackingInput &
+      ItemExtrasInput,
   ) => Promise<void> | void;
   defaultCategoryId: string;
   categories: EnxovalCategory[];
+  /** Quem participa do enxoval: "Quem vai comprar" só aparece com mais de uma pessoa. */
+  members?: EnxovalMember[];
+  currentUserId?: string;
   /** Enxoval em que o item será criado; com ele (e o Jev ligado) o Nino ajuda a escolher o ambiente e avisa de repetições. */
   enxovalId?: string;
 }
@@ -106,8 +124,17 @@ export function AddItemModal({
   onAdd,
   defaultCategoryId,
   categories,
+  members = [],
+  currentUserId,
   enxovalId,
 }: AddItemModalProps) {
+  const [installmentsText, setInstallmentsText] = useState("1");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [purchasedAt, setPurchasedAt] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [warrantyMonthsText, setWarrantyMonthsText] = useState("");
+  const [storeName, setStoreName] = useState("");
+  const [giftFrom, setGiftFrom] = useState("");
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -118,6 +145,8 @@ export function AddItemModal({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ItemStatus>(DEFAULT_ITEM_STATUS);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [error, setError] = useState("");
   // Importação por link: a leitura é só uma ajuda; falhar não impede preencher tudo à mão.
   const [importUrl, setImportUrl] = useState("");
@@ -275,7 +304,16 @@ export function AddItemModal({
     setLink("");
     setDescription("");
     setStatus(DEFAULT_ITEM_STATUS);
+    setInstallmentsText("1");
+    setPaymentMethod("");
+    setPurchasedAt("");
+    setAssigneeId("");
+    setWarrantyMonthsText("");
+    setStoreName("");
+    setGiftFrom("");
     setError("");
+    setLinkOpen(false);
+    setMoreOpen(false);
   }, [categories, defaultCategoryId, isOpen]);
 
   const draftPrice = Number(priceText.replace(/\D/g, "")) || 0;
@@ -283,7 +321,7 @@ export function AddItemModal({
     ? Math.min(Number(discountText.replace(/\D/g, "")) || 0, draftPrice)
     : 0;
   const draftFinal = draftPrice - draftDiscount;
-  // Faixa comum de preço do item, vinda do que outras listas registraram (só agregados, com amostra mínima).
+  // Faixa nacional estimada do item, baseada em lojas ou em clientes distintos; nunca vira preço preenchido.
   const priceRange =
     (pickedItem && plain(pickedItem.name) === plain(name.trim()) ? pickedItem.priceRange : null) ??
     ninoTip?.catalogItem?.priceRange ??
@@ -408,6 +446,25 @@ export function AddItemModal({
     setIsSubmitting(true);
     setError("");
 
+    const installments = Number(installmentsText) || 1;
+    const warrantyMonths = Number(warrantyMonthsText) || null;
+    const todayBr = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const extras: ItemExtrasInput = {
+      installments: installments > 1 ? installments : undefined,
+      ...(status === "bought"
+        ? {
+            purchasedAt: purchasedAt || todayBr,
+            paymentMethod: (paymentMethod || null) as PaymentMethod | null,
+          }
+        : {}),
+      warrantyMonths: warrantyMonths ?? undefined,
+      storeName: storeName.trim() || undefined,
+      ...(status === "received" && giftFrom.trim() ? { giftFrom: giftFrom.trim() } : {}),
+      ...(members.length > 1 && assigneeId ? { assigneeId } : {}),
+    };
+    // Só manda o que a pessoa preencheu; o resto continua com o padrão do servidor.
+    if (extras.paymentMethod === null) delete extras.paymentMethod;
+
     try {
       await onAdd(
         trimmedName,
@@ -420,6 +477,7 @@ export function AddItemModal({
           link: link.trim(),
           description: description.trim(),
           status,
+          ...extras,
           ...(preview && importStatus === "done"
             ? {
                 trackedProductUrl: preview.url,
@@ -455,8 +513,216 @@ export function AddItemModal({
     >
       <form onSubmit={handleSubmit} className="add-item-form">
         <div className="add-item-form-body">
+
+
+        <div>
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <Label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700">
+              Nome do produto
+            </Label>
+            <span className={`name-counter${name.length >= MAX_ITEM_NAME_LENGTH ? " is-full" : ""}`} aria-hidden="true">
+              {name.length}/{MAX_ITEM_NAME_LENGTH}
+            </span>
+          </div>
+          <div className="relative">
+            <Input
+              type="text"
+              id="new-item-name"
+              data-dialog-autofocus
+              required
+              maxLength={MAX_ITEM_NAME_LENGTH}
+              value={name}
+              onChange={(e) => {
+                nameTyped.current = true;
+                setName(e.target.value);
+              }}
+              onKeyDown={handleNameKeyDown}
+              onBlur={() => setSuggestionsOpen(false)}
+              placeholder="Ex: Jogo de Taças"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={suggestionsOpen}
+              aria-controls="new-item-suggestions"
+              aria-activedescendant={activeSuggestion >= 0 ? `new-item-suggestion-${activeSuggestion}` : undefined}
+              autoComplete="off"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+            {suggestionsOpen && suggestions.length > 0 && (
+              <ul
+                id="new-item-suggestions"
+                role="listbox"
+                aria-label="Itens do catálogo"
+                className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
+              >
+                {suggestions.map((result, index) => (
+                  <li
+                    key={result.id}
+                    id={`new-item-suggestion-${index}`}
+                    role="option"
+                    aria-selected={index === activeSuggestion}
+                    // mousedown, e não click: o campo perderia o foco (e a lista fecharia) antes do clique.
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      pickSuggestion(result);
+                    }}
+                    className={`flex cursor-pointer items-baseline justify-between gap-3 px-4 py-2 text-sm ${index === activeSuggestion ? "bg-stone-100" : "hover:bg-stone-50"}`}
+                  >
+                    <span className="text-stone-800">{result.name}</span>
+                    {result.priceRange && (
+                      <span className="shrink-0 text-xs text-stone-500">
+                        ~{moneyText(result.priceRange.p50)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {ninoTip?.redundancy && (
+            <p
+              role="status"
+              className="nino-tip mt-2 flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-snug"
+            >
+              <Sparkles size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <span>
+                <strong className="font-semibold">Nino:</strong>{" "}
+                {ninoTip.redundancy.overlapsWith ? (
+                  <>
+                    você já tem <b>{ninoTip.redundancy.overlapsWith}</b> na lista. Este item
+                    pode fazer o mesmo trabalho, e dá para economizar.
+                  </>
+                ) : (
+                  <>este item parece repetir algo que você já tem. Vale conferir a lista antes de comprar.</>
+                )}
+              </span>
+            </p>
+          )}
+        </div>
+
+        <div className="add-item-row grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="new-item-category" className="block text-sm font-medium text-stone-700 mb-1">
+              Ambiente
+            </Label>
+            <Select
+              id="new-item-category"
+              value={categoryId}
+              onChange={(value) => {
+                categoryTouched.current = true;
+                setCategoryId(value);
+              }}
+              disabled={isSubmitting}
+              options={[
+                ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
+                { value: NEW_CATEGORY_VALUE, label: "+ Novo ambiente" },
+              ]}
+            />
+            {ninoTip?.environmentName && !categoryTouched.current && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-stone-500">
+                <Sparkles size={12} aria-hidden="true" /> Ambiente sugerido pelo Nino
+              </p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="new-item-status" className="block text-sm font-medium text-stone-700 mb-1">
+              Situação
+            </Label>
+            <Select
+              id="new-item-status"
+              value={status}
+              onChange={(value) => {
+                setStatus(value as ItemStatus);
+                if (!discountApplies(value as ItemStatus)) setDiscountText("");
+              }}
+              disabled={isSubmitting}
+              options={ITEM_STATUSES.map((value) => ({
+                value,
+                label: ITEM_STATUS_META[value].label,
+              }))}
+            />
+            <p className="mt-1 text-xs text-stone-500">
+              {ITEM_STATUS_META[status].hint}
+            </p>
+          </div>
+        </div>
+
+        {categoryId === NEW_CATEGORY_VALUE && (
+          <div>
+            <Label htmlFor="new-item-category-name" className="block text-sm font-medium text-stone-700 mb-1">
+              Nome do ambiente
+            </Label>
+            <Input
+              id="new-item-category-name"
+              required
+              maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(sanitizeEnvironmentNameInput(e.target.value))}
+              aria-describedby="new-item-category-name-count"
+              placeholder="Ex: Escritório"
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+            <span
+              id="new-item-category-name-count"
+              className={`env-name-counter${newCategoryName.length >= MAX_ENVIRONMENT_NAME_LENGTH ? " is-full" : ""}`}
+            >
+              {newCategoryName.length}/{MAX_ENVIRONMENT_NAME_LENGTH} caracteres
+            </span>
+          </div>
+        )}
+
+        <div className="add-item-row grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="new-item-price" className="block text-sm font-medium text-stone-700 mb-1">
+              Preço
+            </Label>
+            <Input
+              id="new-item-price"
+              type="text"
+              inputMode="numeric"
+              value={priceText}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
+                setPriceText(digits ? money.format(Number(digits) / 100) : "");
+              }}
+              placeholder="R$ 0,00"
+              disabled={isSubmitting}
+              aria-describedby={priceRange ? "new-item-price-range" : undefined}
+              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
+            />
+            {priceRange && (
+              <p id="new-item-price-range" className="mt-1 text-xs text-stone-500">
+                Faixa estimada nacional: {moneyText(priceRange.p10)} a {moneyText(priceRange.p90)}.
+                {priceRange.meanCents != null && <> Média: {moneyText(priceRange.meanCents)}.</>}
+                {" "}{priceRange.samples} {priceRange.source === 'serpapi' ? 'lojas pesquisadas' : 'clientes'}.
+                {priceRange.samples < 5 && <> Amostra inicial.</>}
+                {draftPrice > priceRange.p90 && (
+                  <span className="price-above-hint block font-medium">Este preço está acima da faixa estimada.</span>
+                )}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* O link é um atalho opcional: fica recolhido para o formulário começar pelo nome. */}
+        {!linkOpen ? (
+          <Button variant="brand" size="brand"
+            type="button"
+            className="add-item-disclosure"
+            aria-expanded={false}
+            aria-controls="add-item-import"
+            onClick={() => {
+              setLinkOpen(true);
+              requestAnimationFrame(() => document.getElementById("import-link-url")?.focus());
+            }}
+          >
+            <Sparkles size={16} aria-hidden="true" />
+            Tem o link da loja? Preencher pelo link
+          </Button>
+        ) : (
         <section
           aria-labelledby="import-link-title"
+          id="add-item-import"
           className="add-item-import rounded-2xl border border-brand-wood/20 bg-brand-wood/5 p-3.5 space-y-3"
         >
           <div>
@@ -521,12 +787,12 @@ export function AddItemModal({
               </div>
             )}
             {importStatus === "error" && (
-              <p role="alert" className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <p role="alert" className="form-error">
                 {importError}
               </p>
             )}
             {importStatus === "partial" && preview && (
-              <div role="status" className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <div role="status" className="nino-tip flex items-start gap-2 rounded-lg px-3 py-2 text-sm">
                 <p className="min-w-0 flex-1">
                   Essa loja não deixou ler o preço. Preenchemos o nome pelo link: confira o nome e informe o preço abaixo.
                 </p>
@@ -535,7 +801,7 @@ export function AddItemModal({
                   onClick={clearImport}
                   aria-label="Remover importação"
                   title="Remover importação"
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-amber-800 hover:bg-amber-100"
+                  className="nino-tip-close grid h-11 w-11 -my-2 -mr-2 shrink-0 place-items-center rounded-md"
                 >
                   <X size={14} aria-hidden="true" />
                 </Button>
@@ -546,11 +812,11 @@ export function AddItemModal({
                 <div className="flex gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-semibold text-stone-700">
+                      <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs font-semibold text-stone-700">
                         {storeLabel(preview.domain)}
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${preview.inStock ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}
+                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold ${preview.inStock ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}
                       >
                         {preview.inStock ? <PackageCheck size={11} aria-hidden="true" /> : <PackageX size={11} aria-hidden="true" />}
                         {preview.inStock ? "Em estoque" : "Indisponível"}
@@ -651,195 +917,22 @@ export function AddItemModal({
             )}
           </div>
         </section>
-
-        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500">Sobre o item</h3>
-
-        <div>
-          <div className="flex items-baseline justify-between gap-3 mb-1">
-            <Label htmlFor="new-item-name" className="block text-sm font-medium text-stone-700">
-              Nome do produto
-            </Label>
-            <span className={`name-counter${name.length >= MAX_ITEM_NAME_LENGTH ? " is-full" : ""}`} aria-hidden="true">
-              {name.length}/{MAX_ITEM_NAME_LENGTH}
-            </span>
-          </div>
-          <div className="relative">
-            <Input
-              type="text"
-              id="new-item-name"
-              required
-              maxLength={MAX_ITEM_NAME_LENGTH}
-              value={name}
-              onChange={(e) => {
-                nameTyped.current = true;
-                setName(e.target.value);
-              }}
-              onKeyDown={handleNameKeyDown}
-              onBlur={() => setSuggestionsOpen(false)}
-              placeholder="Ex: Jogo de Taças"
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={suggestionsOpen}
-              aria-controls="new-item-suggestions"
-              aria-activedescendant={activeSuggestion >= 0 ? `new-item-suggestion-${activeSuggestion}` : undefined}
-              autoComplete="off"
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-            />
-            {suggestionsOpen && suggestions.length > 0 && (
-              <ul
-                id="new-item-suggestions"
-                role="listbox"
-                aria-label="Itens do catálogo"
-                className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-auto rounded-xl border border-stone-200 bg-white py-1 shadow-lg"
-              >
-                {suggestions.map((result, index) => (
-                  <li
-                    key={result.id}
-                    id={`new-item-suggestion-${index}`}
-                    role="option"
-                    aria-selected={index === activeSuggestion}
-                    // mousedown, e não click: o campo perderia o foco (e a lista fecharia) antes do clique.
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      pickSuggestion(result);
-                    }}
-                    className={`flex cursor-pointer items-baseline justify-between gap-3 px-4 py-2 text-sm ${index === activeSuggestion ? "bg-stone-100" : "hover:bg-stone-50"}`}
-                  >
-                    <span className="text-stone-800">{result.name}</span>
-                    {result.priceRange && (
-                      <span className="shrink-0 text-xs text-stone-500">
-                        ~{moneyText(result.priceRange.p50)}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          {ninoTip?.redundancy && (
-            <p
-              role="status"
-              className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-snug text-amber-900"
-            >
-              <Sparkles size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <span>
-                <strong className="font-semibold">Nino:</strong>{" "}
-                {ninoTip.redundancy.overlapsWith ? (
-                  <>
-                    você já tem <b>{ninoTip.redundancy.overlapsWith}</b> na lista. Este item
-                    pode fazer o mesmo trabalho, e dá para economizar.
-                  </>
-                ) : (
-                  <>este item parece repetir algo que você já tem. Vale conferir a lista antes de comprar.</>
-                )}
-              </span>
-            </p>
-          )}
-        </div>
-
-        <div className="add-item-row grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="new-item-category" className="block text-sm font-medium text-stone-700 mb-1">
-              Ambiente
-            </Label>
-            <Select
-              id="new-item-category"
-              value={categoryId}
-              onChange={(value) => {
-                categoryTouched.current = true;
-                setCategoryId(value);
-              }}
-              disabled={isSubmitting}
-              options={[
-                ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
-                { value: NEW_CATEGORY_VALUE, label: "+ Novo ambiente" },
-              ]}
-            />
-            {ninoTip?.environmentName && !categoryTouched.current && (
-              <p className="mt-1 flex items-center gap-1 text-xs text-stone-500">
-                <Sparkles size={12} aria-hidden="true" /> Ambiente sugerido pelo Nino
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="new-item-status" className="block text-sm font-medium text-stone-700 mb-1">
-              Situação
-            </Label>
-            <Select
-              id="new-item-status"
-              value={status}
-              onChange={(value) => {
-                setStatus(value as ItemStatus);
-                if (!discountApplies(value as ItemStatus)) setDiscountText("");
-              }}
-              disabled={isSubmitting}
-              options={ITEM_STATUSES.map((value) => ({
-                value,
-                label: ITEM_STATUS_META[value].label,
-              }))}
-            />
-            <p className="mt-1 text-xs text-stone-500">
-              {ITEM_STATUS_META[status].hint}
-            </p>
-          </div>
-        </div>
-
-        {categoryId === NEW_CATEGORY_VALUE && (
-          <div>
-            <Label htmlFor="new-item-category-name" className="block text-sm font-medium text-stone-700 mb-1">
-              Nome do ambiente
-            </Label>
-            <Input
-              id="new-item-category-name"
-              required
-              maxLength={MAX_ENVIRONMENT_NAME_LENGTH}
-              type="text"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(sanitizeEnvironmentNameInput(e.target.value))}
-              aria-describedby="new-item-category-name-count"
-              placeholder="Ex: Escritório"
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-            />
-            <span
-              id="new-item-category-name-count"
-              className={`env-name-counter${newCategoryName.length >= MAX_ENVIRONMENT_NAME_LENGTH ? " is-full" : ""}`}
-            >
-              {newCategoryName.length}/{MAX_ENVIRONMENT_NAME_LENGTH} caracteres
-            </span>
-          </div>
         )}
 
-        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Valores</h3>
+        <Button variant="brand" size="brand"
+          type="button"
+          className="add-item-disclosure"
+          aria-expanded={moreOpen}
+          aria-controls="add-item-more"
+          onClick={() => setMoreOpen((open) => !open)}
+        >
+          <ChevronDown size={16} aria-hidden="true" className="add-item-disclosure-chevron" />
+          {moreOpen ? "Menos detalhes" : "Mais detalhes"}
+        </Button>
+
+        <div id="add-item-more" hidden={!moreOpen} className="add-item-more space-y-4">
 
         <div className="add-item-row add-item-row-values grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="new-item-price" className="block text-sm font-medium text-stone-700 mb-1">
-              Preço
-            </Label>
-            <Input
-              id="new-item-price"
-              type="text"
-              inputMode="numeric"
-              value={priceText}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
-                setPriceText(digits ? money.format(Number(digits) / 100) : "");
-              }}
-              placeholder="R$ 0,00"
-              disabled={isSubmitting}
-              aria-describedby={priceRange ? "new-item-price-range" : undefined}
-              className="w-full px-4 py-3 text-base border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-wood/50 focus:border-brand-wood"
-            />
-            {priceRange && (
-              <p id="new-item-price-range" className="mt-1 text-xs text-stone-500">
-                Faixa comum: {moneyText(priceRange.p10)} a {moneyText(priceRange.p90)}
-                {priceRange.region ? ` em ${priceRange.region}` : ""}.
-                {draftPrice > priceRange.p90 && (
-                  <span className="block font-medium text-amber-800">Este preço está acima do comum.</span>
-                )}
-              </p>
-            )}
-          </div>
           <div>
             <Label htmlFor="new-item-discount" className="block text-sm font-medium text-stone-700 mb-1">
               Desconto ou cashback
@@ -900,7 +993,137 @@ export function AddItemModal({
           </div>
         </div>
 
-        <h3 className="add-item-heading text-xs font-semibold uppercase tracking-wide text-stone-500 pt-1">Detalhes</h3>
+        {(
+          <div className="add-item-row grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="new-item-installments" className="block text-sm font-medium text-stone-700 mb-1">
+                Parcelas
+              </Label>
+              <Select
+                id="new-item-installments"
+                ariaLabel="Parcelas"
+                value={installmentsText}
+                options={INSTALLMENT_OPTIONS}
+                onChange={setInstallmentsText}
+                disabled={isSubmitting}
+              />
+              <p className="mt-1 text-xs text-stone-500">
+                {status === "bought" ? "Entra no fluxo mensal do Planejamento." : "Ajusta a previsão de parcelas do Planejamento."}
+              </p>
+            </div>
+            {(
+              <div>
+                <Label htmlFor="new-item-payment" className="block text-sm font-medium text-stone-700 mb-1">
+                  Meio de pagamento
+                </Label>
+                <Select
+                  id="new-item-payment"
+                  ariaLabel="Meio de pagamento"
+                  value={paymentMethod}
+                  options={PAYMENT_OPTIONS}
+                  onChange={setPaymentMethod}
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
+            {(
+              <div>
+                <Label htmlFor="new-item-purchased" className="block text-sm font-medium text-stone-700 mb-1">
+                  Data da compra
+                </Label>
+                <Input
+                  id="new-item-purchased"
+                  type="date"
+                  value={purchasedAt}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setPurchasedAt(e.target.value)}
+                  disabled={isSubmitting || status !== "bought"}
+                  className={FIELD_CLASS}
+                />
+                <p className="mt-1 text-xs text-stone-500">
+                  {status === "bought" ? "Em branco: hoje." : "Preenche ao marcar como Comprado."}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status === "received" && (
+          <div>
+            <Label htmlFor="new-item-gift-from" className="block text-sm font-medium text-stone-700 mb-1">
+              De quem foi o presente?
+            </Label>
+            <Input
+              id="new-item-gift-from"
+              value={giftFrom}
+              maxLength={120}
+              placeholder="Ex.: Tia Rosa"
+              onChange={(e) => setGiftFrom(e.target.value)}
+              disabled={isSubmitting}
+              className={FIELD_CLASS}
+            />
+          </div>
+        )}
+
+        {members.length > 1 && (
+          <div>
+            <Label htmlFor="new-item-assignee" className="block text-sm font-medium text-stone-700 mb-1">
+              Quem vai comprar
+            </Label>
+            <Select
+              id="new-item-assignee"
+              ariaLabel="Quem vai comprar"
+              value={assigneeId}
+              options={[
+                { value: "", label: "Ninguém ainda" },
+                ...members.map((member) => ({
+                  value: member.id,
+                  label: member.id === currentUserId ? `${member.name || member.email} (você)` : member.name || member.email,
+                })),
+              ]}
+              onChange={setAssigneeId}
+              disabled={isSubmitting}
+            />
+            <p className="mt-1 text-xs text-stone-500">Evita compra repetida entre quem divide a lista.</p>
+          </div>
+        )}
+
+        {(
+          <div className="add-item-row grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="new-item-warranty" className="block text-sm font-medium text-stone-700 mb-1">
+                Garantia (meses)
+              </Label>
+              <Input
+                id="new-item-warranty"
+                inputMode="numeric"
+                value={warrantyMonthsText}
+                placeholder="Ex.: 12"
+                onChange={(e) => setWarrantyMonthsText(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                disabled={isSubmitting}
+                className={FIELD_CLASS}
+              />
+              <p className="mt-1 text-xs text-stone-500">Avisamos 30 e 7 dias antes de vencer.</p>
+            </div>
+            <div>
+              <Label htmlFor="new-item-store" className="block text-sm font-medium text-stone-700 mb-1">
+                Onde foi comprado
+              </Label>
+              <Input
+                id="new-item-store"
+                value={storeName}
+                maxLength={80}
+                placeholder="Ex.: Loja do bairro"
+                onChange={(e) => setStoreName(e.target.value)}
+                disabled={isSubmitting}
+                className={FIELD_CLASS}
+              />
+            </div>
+            <p className="text-xs text-stone-500 sm:col-span-2">
+              Nota fiscal, garantia em foto e outras lojas ficam no item, depois de adicionar.
+            </p>
+          </div>
+        )}
 
         <div className="add-item-pair">
         <div>
@@ -953,12 +1176,13 @@ export function AddItemModal({
         </div>
         </div>
         </div>
+        </div>
 
         <div className="add-item-form-footer">
           {error && (
             <p
               role="alert"
-              className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"
+              className="form-error"
             >
               {error}
             </p>

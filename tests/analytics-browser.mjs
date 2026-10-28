@@ -63,7 +63,14 @@ try {
     return route.abort();
   });
   await page.goto(`${origin}/privacidade?utm_source=instagram&utm_medium=social&utm_campaign=launch&utm_term=PRIVATE_TERM&token=PRIVATE_TOKEN#PRIVATE_FRAGMENT`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Desativar análise de uso' }).waitFor();
+  // Sem escolha no aviso de consentimento, nada vai para o PostHog.
+  const banner = page.getByRole('region', { name: 'Sua privacidade' });
+  await banner.waitFor();
+  await page.waitForTimeout(3500);
+  assert.equal(batches.length, 0, 'nenhum evento antes do consentimento');
+  assert.equal(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('ph_'))), false, 'nada gravado pelo SDK antes do consentimento');
+  await banner.getByRole('button', { name: 'Aceitar tudo' }).click();
+  await page.getByRole('button', { name: 'Mudar preferências' }).waitFor();
   await page.waitForFunction(() => window.__PosthogExtensions__?.errorWrappingFunctions && window.onerror);
   await page.locator('h1').click();
   await page.evaluate(() => {
@@ -131,8 +138,9 @@ try {
     assert.ok(batches.some(event => event.event === 'application.ui.action' && event.properties.action === action && event.properties.fields?.some(field => field.value === 'RAW_FORM_VALUE')));
   }
   assert.deepEqual(errors, []);
-  await page.getByRole('button', { name: 'Desativar análise de uso' }).click();
-  await page.getByRole('button', { name: 'Ativar análise de uso' }).waitFor();
+  await page.getByRole('button', { name: 'Mudar preferências' }).click();
+  await banner.getByRole('button', { name: 'Recusar' }).click();
+  await page.getByText('Análise de uso e medição de anúncios estão desativadas neste navegador.').waitFor();
   await page.waitForTimeout(3500); // Drain events queued before the opt-out click.
   const count = batches.length;
   await page.evaluate(async () => {
@@ -143,19 +151,22 @@ try {
   await page.waitForTimeout(3500);
   assert.equal(batches.length, count);
   await page.reload();
-  await page.getByRole('button', { name: 'Ativar análise de uso' }).waitFor();
-  await page.getByRole('button', { name: 'Ativar análise de uso' }).click();
+  await page.getByText('Análise de uso e medição de anúncios estão desativadas neste navegador.').waitFor();
+  assert.equal(await banner.count(), 0, 'a recusa fica guardada e o aviso não volta sozinho');
+  await page.getByRole('button', { name: 'Mudar preferências' }).click();
+  await banner.getByRole('button', { name: 'Aceitar tudo' }).click();
   await page.goto(`${origin}/`);
   await page.locator('.cm-hero-actions a').first().waitFor();
   // Prevent navigation only in this test, while still exercising React's real click handler.
   await page.locator('.cm-hero-actions a').first().evaluate(element => element.addEventListener('click', event => event.preventDefault()));
   await page.locator('.cm-hero-actions a').first().dispatchEvent('click');
+
   await page.waitForTimeout(3500);
   assert.ok(batches.some(event => event.event === 'landing_cta_clicked' && event.properties.action === 'start_trial' && event.properties.position === 'hero'));
   assert.ok(batches.some(event => event.event === '$pageleave' && event.properties.$pathname === '/privacidade'));
   assert.deepEqual(findPrivate(batches.filter(event => event.event !== '$exception' && !event.event.startsWith('application.'))), []);
   assert.equal(exception.properties.$exception_list[0].value, 'PRIVATE_EXCEPTION PRIVATE_EMAIL');
-  console.log('Browser smoke passed: real SDK, complete exceptions, raw API diagnostics, UI actions, product events, Web Vitals and persistent opt-out.');
+  console.log('Browser smoke passed: real SDK, complete exceptions, raw API diagnostics, UI actions, product events, Web Vitals and consent before capture and persistent refusal.');
 } finally {
   await browser?.close();
   await server.close();

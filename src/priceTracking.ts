@@ -1,5 +1,5 @@
 import { isPendingStatus } from "./itemStatus";
-import type { EnxovalItem, ItemPriceTracking, SavingsSummary } from "./types";
+import type { EnxovalItem, ItemOffer, ItemPriceTracking, SavingsSummary } from "./types";
 
 /** Lojas conhecidas, para mostrar um selo curto no lugar do endereço. */
 const STORE_LABELS: [RegExp, string][] = [
@@ -14,8 +14,13 @@ const STORE_LABELS: [RegExp, string][] = [
 ];
 
 export function storeLabel(domain: string) {
+  return knownStoreLabel(domain) ?? domain.toLowerCase().replace(/^www\./, "");
+}
+
+/** Nome da loja quando ela é conhecida; `null` para endereços que não reconhecemos. */
+export function knownStoreLabel(domain: string) {
   const host = domain.toLowerCase().replace(/^www\./, "");
-  return STORE_LABELS.find(([pattern]) => pattern.test(host))?.[1] ?? host;
+  return STORE_LABELS.find(([pattern]) => pattern.test(host))?.[1] ?? null;
 }
 
 export interface PriceChange {
@@ -129,4 +134,30 @@ export function savingsEquivalent(items: EnxovalItem[], savingsCents: number) {
     remaining -= price;
   }
   return picked;
+}
+
+/** Oferta em estoque mais barata do item, entre todas as lojas que ele acompanha (Fase 11.5). */
+export function cheapestOffer(item: EnxovalItem): ItemOffer | null {
+  return (item.offers ?? [])
+    .filter((offer) => offer.inStock && offer.currentPriceCents !== null && offer.currentPriceCents > 0)
+    .reduce<ItemOffer | null>((best, offer) => (!best || offer.currentPriceCents! < best.currentPriceCents! ? offer : best), null);
+}
+
+/**
+ * Outra loja (que não a principal) já vende mais barato que o preço de referência do item, ou no preço-alvo: o
+ * atalho "baixou de preço" passa a considerar qualquer oferta.
+ */
+export function hasCheaperOtherOffer(item: EnxovalItem) {
+  if (!isPendingStatus(item.status)) return false;
+  const tracking = item.priceTracking;
+  const reference = tracking?.initialPriceCents ?? tracking?.currentPriceCents ?? item.priceCents;
+  return (item.offers ?? []).some(
+    (offer) =>
+      !offer.isPrimary &&
+      offer.inStock &&
+      offer.currentPriceCents !== null &&
+      offer.currentPriceCents > 0 &&
+      ((reference !== null && reference !== undefined && offer.currentPriceCents < reference) ||
+        (tracking?.targetPriceCents != null && offer.currentPriceCents <= tracking.targetPriceCents)),
+  );
 }

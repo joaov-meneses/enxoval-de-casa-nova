@@ -1,0 +1,5 @@
+simulation: workspace-routes
+routing: path
+mocks:
+  - routeKey: app
+    path: ../mocks/workspace-routes/config.yaml

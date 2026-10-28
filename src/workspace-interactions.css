@@ -1,4 +1,16 @@
 /* Completion effects keep surrounding rows stable and controls available. */
+.workspace-app .item-row.checked.is-completion-exiting {
+  animation: item-completion-exit 280ms ease-in both;
+  pointer-events: none;
+}
+@keyframes item-completion-exit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(24px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-app .item-row.checked.is-completion-exiting { animation: none; }
+}
+
 .workspace-app .item-row > .item-row-inner {
   position: relative;
   isolation: isolate;
@@ -58,12 +70,12 @@
   width: 100%;
   min-height: 24px;
   padding: 0 12px 3px;
-  color: #756455;
+  color: color-mix(in oklab, var(--cm-bg) 32%, var(--cm-text));
   border-radius: 0 0 8px 8px;
 }
 .workspace-app .item-footer .item-expand:hover {
   background: #ae7b4520;
-  color: #87412c;
+  color: color-mix(in oklab, var(--cm-primary-dark) 73%, var(--cm-text));
 }
 .workspace-app .item-footer .item-expand:focus-visible {
   outline-offset: -3px;
@@ -72,8 +84,8 @@
 /* Each environment is one bounded surface, including its drag handle. */
 .workspace-app .environment-row {
   position: relative;
-  border: 1px solid #cdb89a;
-  background: #ede0cb;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 99%, var(--cm-text));
+  background: color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg));
   box-shadow: 0 1px 2px #6246300c;
   transition:
     background-color 180ms ease,
@@ -81,16 +93,16 @@
     box-shadow 180ms ease;
 }
 .workspace-app .environment-row.active {
-  border-color: #a34c30;
-  background: #e4cfb3;
+  border-color: var(--cm-primary-dark);
+  background: color-mix(in oklab, var(--cm-sand) 61%, var(--cm-bg));
 }
 .workspace-app .environment-chips .environment-row,
 .workspace-app .environment-chips-row > .environment-row.environment-all {
   overflow: hidden;
   padding: 0 2px 0 12px;
   min-height: 46px;
-  background: #ede0cb;
-  border-color: #c4aa86;
+  background: color-mix(in oklab, var(--cm-sand) 33%, var(--cm-bg));
+  border-color: color-mix(in oklab, var(--cm-sand) 91%, var(--cm-text));
 }
 .workspace-app .environment-chips .environment-row.active,
 .workspace-app
@@ -101,7 +113,7 @@
 }
 .workspace-app .environment-row button.environment-select {
   min-height: 44px;
-  color: #53452f;
+  color: color-mix(in oklab, var(--cm-success) 50%, var(--cm-text));
 }
 .workspace-app .environment-chips .environment-row.active .environment-select {
   color: #fff;
@@ -147,7 +159,7 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .workspace-app .environment-row:not(.active):hover {
-    background: #e3cfb0;
+    background: color-mix(in oklab, var(--cm-sand) 62%, var(--cm-bg));
     border-color: #a7855d;
     box-shadow: 0 2px 6px #60452b20;
   }
@@ -164,71 +176,11 @@
     transform: none;
   }
 }
-/* Desktop navigation uses a filled current room and quiet, neutral alternatives. */
-.workspace-app .sidebar-rooms .environment-row {
-  --environment-ink: #53452f;
-  --environment-control: #79685c;
-  --environment-delete: #c4766d;
-  --environment-delete-hover: #f0c7bf;
-  background: #fdfcf8;
-  border-color: #ded3c3;
-  box-shadow: none;
-  overflow: hidden;
-}
-.workspace-app .sidebar-rooms .environment-row.active {
-  --environment-ink: #fff;
-  --environment-control: #fff;
-  --environment-delete: #fff;
-  --environment-delete-hover: #ffffff40;
-  background: var(--cm-action);
-  border-color: #873c25;
-}
-.workspace-app .sidebar-rooms .environment-row .environment-select,
-.workspace-app .sidebar-rooms .environment-row .environment-select > small {
-  color: var(--environment-ink);
-}
-.workspace-app .sidebar-rooms .environment-row .environment-select > svg {
-  color: inherit;
-}
-.workspace-app .sidebar-rooms .environment-row .environment-rename,
-.workspace-app .sidebar-rooms .environment-row .reorder-handle {
-  color: var(--environment-control);
-}
-.workspace-app .sidebar-rooms .environment-row button.environment-delete {
-  color: var(--environment-delete);
-}
-.workspace-app .sidebar-rooms .environment-row button.environment-rename {
-  transform: none;
-}
-.workspace-app .sidebar-rooms .environment-row.active .environment-select > span {
-  font-weight: 700;
-}
-.workspace-app .sidebar-rooms .environment-row.active .reorder-handle:focus-visible {
-  outline-color: #fff;
-  background: #ffffff20;
-}
-@media (hover: hover) and (pointer: fine) {
-  .workspace-app .sidebar-rooms .environment-row:not(.active):hover {
-    background: #f6eee3;
-    box-shadow: none;
-  }
-  .workspace-app .sidebar-rooms .environment-row.active:hover {
-    background: #9b4529;
-  }
-  .workspace-app .sidebar-rooms .environment-row.active .environment-rename:hover,
-  .workspace-app .sidebar-rooms .environment-row.active .reorder-handle:hover {
-    background: #ffffff20;
-  }
-  .workspace-app .sidebar-rooms .environment-row button.environment-delete:is(:hover, :focus-visible):not(:disabled) {
-    background: var(--environment-delete-hover);
-  }
-}
-
 /* A quiet breadcrumb surface identifies the home currently open. */
 .workspace-app .desktop-app-header h1 {
   padding: 5px 10px;
   border-radius: 8px;
-  background: #f3ebe0;
+  background: color-mix(in oklab, var(--cm-sand) 28%, #fff);
   line-height: 1.4;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -250,11 +202,11 @@
 
 /* Intrinsic-width mobile chips never squeeze labels or detach their handles. */
 .workspace-app .environment-tabs-scroll {
-  width: 100%;
-  max-width: 100%;
+  width: calc(100% + 2 * var(--mobile-header-inset, 14px));
+  max-width: none;
   min-width: 0;
-  margin: 8px 0 0;
-  padding: 2px 0 4px;
+  margin: 8px calc(-1 * var(--mobile-header-inset, 14px)) 0;
+  padding: 2px var(--mobile-header-inset, 14px) 4px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-padding-inline: 2px;
@@ -376,24 +328,42 @@
   }
 }
 
-/* Expand the summary smoothly and reveal its cards in a short sequence. */
+/* Expand the summary smoothly and reveal its cards in a short sequence. The box only opens and closes; the fade and
+   the rise belong to the cards themselves, as transitions, so both cards move the same way when opening and closing
+   (before, the box's own fade hid the first card's rise and only the second one seemed to move). */
 .workspace-app .stats-insights-reveal {
   display: grid;
   grid-template-rows: 0fr;
-  opacity: 0;
   visibility: hidden;
   margin-top: 0;
   transition:
     grid-template-rows 280ms ease,
-    opacity 180ms ease,
     margin-top 280ms ease,
     visibility 280ms;
 }
 .workspace-app .stats-insights-reveal[data-open="true"] {
   grid-template-rows: 1fr;
-  opacity: 1;
   visibility: visible;
   margin-top: 12px;
+}
+.workspace-app .stats-insights-reveal .stats-insight {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 160ms ease-in,
+    transform 200ms ease-in;
+}
+.workspace-app .stats-insights-reveal[data-open="true"] .stats-insight {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 260ms ease-out 60ms,
+    transform 300ms ease-out 60ms;
+}
+.workspace-app
+  .stats-insights-reveal[data-open="true"]
+  .stats-insight:nth-child(2) {
+  transition-delay: 120ms;
 }
 .workspace-app .stats-insights-reveal > .stats-insights-clip {
   min-height: 0;
@@ -401,24 +371,6 @@
   margin: 0;
   padding: 0;
   border: 0;
-}
-.workspace-app .stats-insights-reveal[data-open="true"] .stats-insight {
-  animation: stats-card-reveal 300ms ease-out both;
-}
-.workspace-app
-  .stats-insights-reveal[data-open="true"]
-  .stats-insight:nth-child(2) {
-  animation-delay: 65ms;
-}
-@keyframes stats-card-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* The same rising surface for Add, Import, Export and the editing forms. */
@@ -443,7 +395,7 @@
     height: 4px;
     margin: 10px auto -4px;
     border-radius: 4px;
-    background: #cbbda8;
+    background: color-mix(in oklab, var(--cm-bg) 76%, var(--cm-text));
   }
 }
 @media (min-width: 768px) {
@@ -472,11 +424,11 @@
   width: 100%;
   min-height: 52px;
   padding: 10px 12px;
-  border: 1px solid #e9dfce;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 46%, #fff);
   border-radius: 10px;
   text-align: left;
-  color: #4a3228;
-  background: #fbf7ef;
+  color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text));
+  background: color-mix(in oklab, var(--cm-bg) 67%, #fff);
 }
 .export-sheet-actions > button > span {
   display: grid;
@@ -484,7 +436,7 @@
 }
 .export-sheet-actions small {
   font-size: 12px;
-  color: #756455;
+  color: color-mix(in oklab, var(--cm-bg) 32%, var(--cm-text));
 }
 .export-sheet-formats {
   display: flex;
@@ -495,26 +447,29 @@
   flex: 1;
   min-height: 44px;
   padding: 8px;
-  border: 1px solid #cdb89a;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 99%, var(--cm-text));
   border-radius: 10px;
 }
 .export-sheet-formats > button[aria-checked="true"] {
-  border-color: #a34c30;
-  background: #f2e2ce;
+  border-color: var(--cm-primary-dark);
+  background: color-mix(in oklab, var(--cm-sand) 28%, var(--cm-bg));
 }
 .export-sheet-caption {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #756455;
+  color: color-mix(in oklab, var(--cm-bg) 32%, var(--cm-text));
 }
 @media (prefers-reduced-motion: reduce) {
   .workspace-app .item-row.is-completing,
-  .workspace-app .stats-insights-reveal[data-open="true"] .stats-insight,
   .casamia-dialog[data-state="open"] {
     animation: none;
   }
-  .workspace-app .stats-insights-reveal {
+  .workspace-app .stats-insights-reveal,
+  .workspace-app .stats-insights-reveal .stats-insight {
     transition: none;
+  }
+  .workspace-app .stats-insights-reveal .stats-insight {
+    transform: none;
   }
 }
 
@@ -549,7 +504,7 @@
   border-color: #b18b60;
 }
 .workspace-app .environment-chips-row > .environment-row.environment-all.active {
-  border-color: #873c25;
+  border-color: color-mix(in oklab, var(--cm-primary-dark) 87%, #000);
 }
 .workspace-app .item-row {
   position: relative;
@@ -640,36 +595,35 @@
 
 /* Pending purchases lead the visual hierarchy; completed items stay readable and quieter. */
 .workspace-app .item-row:not(.checked):not(.inactive) {
-  --item-surface: #fff1db;
+  --item-surface: color-mix(in oklab, var(--cm-sand) 4%, var(--cm-bg));
   background: var(--item-surface);
-  border-color: #cda477;
-  box-shadow:
-    inset 3px 0 0 #b5532f,
-    0 2px 7px #6b442414;
+  border-color: color-mix(in oklab, var(--cm-primary) 32%, var(--cm-sand));
+  /* Sem faixa lateral: a fila se distingue pela borda quente e pelo peso do nome, não por uma tarja em cada item. */
+  box-shadow: 0 2px 7px color-mix(in oklab, var(--cm-primary-dark) 8%, transparent);
 }
 .workspace-app .item-row:not(.checked):not(.inactive) .item-name {
   color: var(--cm-text);
   font-weight: 650;
 }
 .workspace-app .item-row.checked {
-  --item-surface: #eceee7;
+  --item-surface: color-mix(in oklab, var(--cm-olive-soft) 18%, #fff);
   background: var(--item-surface);
-  border-color: #c8cebc;
+  border-color: color-mix(in oklab, var(--cm-success) 31%, #fff);
   box-shadow: none;
 }
 .workspace-app .item-row.checked .item-name {
-  color: #5c6151;
+  color: color-mix(in oklab, var(--cm-success) 70%, var(--cm-text));
   font-weight: 500;
 }
 .workspace-app .item-row.inactive {
-  --item-surface: #efebe5;
+  --item-surface: color-mix(in oklab, var(--cm-success) 12%, #fff);
   background: var(--item-surface);
-  border-color: #d7cebf;
+  border-color: color-mix(in oklab, var(--cm-bg) 83%, var(--cm-text));
   box-shadow: none;
 }
 /* Light metadata surfaces remain distinct from the warm and completed cards. */
 .workspace-app .item-row .item-meta {
-  color: #5f493a;
+  color: color-mix(in oklab, var(--cm-sand) 25%, var(--cm-text));
 }
 .workspace-app .item-row .item-category-tag,
 .workspace-app .item-row .item-quantity-tag,
@@ -680,11 +634,11 @@
   justify-content: center;
   min-height: 26px;
   font-size: 12px;
-  background: #fffdf8;
-  border: 1px solid #cbb396;
+  background: color-mix(in oklab, var(--cm-bg) 22%, #fff);
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 96%, var(--cm-text));
   border-radius: 6px;
   padding: 2px 6px;
-  color: #513d2d;
+  color: color-mix(in oklab, var(--cm-sand) 15%, var(--cm-text));
   font-weight: 650;
   line-height: 1.4;
   text-align: center;
@@ -703,19 +657,19 @@
   line-height: 1.4;
 }
 .workspace-app .item-row .status-needed {
-  background: #fbe1cc;
-  color: #8b3f25;
-  border-color: #cb9776;
+  background: color-mix(in oklab, var(--cm-primary) 12%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 89%, #000);
+  border-color: color-mix(in oklab, var(--cm-primary) 45%, #fff);
 }
 .workspace-app .item-row .item-added {
-  color: #675344;
+  color: color-mix(in oklab, var(--cm-sand) 31%, var(--cm-text));
 }
 @media (hover: hover) and (pointer: fine) {
   .workspace-app .item-row:not(.checked):not(.inactive):hover {
-    border-color: #b5532f;
+    border-color: var(--cm-action);
   }
   .workspace-app .item-row.checked:hover {
-    border-color: #adb795;
+    border-color: color-mix(in oklab, var(--cm-olive-soft) 78%, #fff);
   }
 }
 
@@ -731,7 +685,7 @@
 .workspace-app .stats-compact-detail {
   font-size: 13px;
   font-weight: 600;
-  color: #514132;
+  color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
   line-height: 1.4;
 }
 .workspace-app .stats-compact-toggle {
@@ -743,7 +697,7 @@
   font-size: 12px;
   font-weight: 650;
   line-height: 1.35;
-  color: #514132;
+  color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
 }
 .workspace-app .stats-compact-grid dd {
   margin-top: 4px;
@@ -762,14 +716,14 @@
 .workspace-app .stats-scope {
   font-size: 13px;
   font-weight: 600;
-  color: #594839;
+  color: color-mix(in oklab, var(--cm-sand) 23%, var(--cm-text));
 }
 .workspace-app .stats-insight-label,
 .workspace-app .workspace-stats .stat-label,
 .workspace-app .workspace-stats .stat-next-label {
   font-size: 13px;
   font-weight: 700;
-  color: #4c3b2f;
+  color: color-mix(in oklab, var(--cm-bg) 10%, var(--cm-text));
 }
 .workspace-app .stats-insight > strong {
   font-size: 22px;
@@ -784,13 +738,13 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 1.5;
-  color: #594839;
+  color: color-mix(in oklab, var(--cm-sand) 23%, var(--cm-text));
 }
 .workspace-app .workspace-stats .stat-sublabel,
 .workspace-app .workspace-stats .stat-receipt dt {
   font-size: 13px;
   font-weight: 650;
-  color: #514132;
+  color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
 }
 .workspace-app .workspace-stats .stat-receipt dd {
   font-weight: 600;
@@ -807,7 +761,7 @@
 .workspace-app .overview-room-meta {
   font-size: 13px;
   font-weight: 500;
-  color: #594839;
+  color: color-mix(in oklab, var(--cm-sand) 23%, var(--cm-text));
 }
 @media (max-width: 359px) {
   .workspace-app .stats-compact-percent {
@@ -827,12 +781,8 @@
 
 /* The edit surface is a lighter continuation of each item's current state. */
 .workspace-app .item-row .item-inline-panel {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--item-surface) 75%, white),
-    color-mix(in srgb, var(--item-surface) 20%, white)
-  );
-  border-top-color: color-mix(in srgb, var(--item-surface) 75%, #82735e);
+  background: color-mix(in srgb, var(--item-surface) 55%, white);
+  border-top-color: color-mix(in srgb, var(--item-surface) 75%, color-mix(in oklab, var(--cm-sand) 53%, var(--cm-text)));
   border-radius: 0;
 }
 .workspace-app .item-row.expanded .item-footer {
@@ -857,14 +807,14 @@
   border: 1px solid #9d7756;
   border-radius: 12px;
   background: #ffffff80;
-  color: #4a3228;
+  color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text));
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
   box-shadow: 0 5px 16px #5b3b2514;
 }
 .workspace-app .item-row .item-inline-actions .button-dark {
   background: linear-gradient(135deg, #b5532fe6, #9a4529eb);
-  border: 2px solid #873c25;
+  border: 2px solid color-mix(in oklab, var(--cm-primary-dark) 87%, #000);
   color: #fff;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -881,9 +831,9 @@
   width: 24px;
   min-width: 24px;
   height: 24px;
-  border: 1.5px solid #a77c50;
+  border: 1.5px solid color-mix(in oklab, var(--cm-primary-dark) 55%, var(--cm-sand));
   border-radius: 6px;
-  background: #fffdf7;
+  background: color-mix(in oklab, var(--cm-bg) 24%, #fff);
   transition:
     transform 160ms ease-out,
     background-color 160ms ease-out,
@@ -901,22 +851,23 @@
 .workspace-app .item-row-controls .item-check::after {
   content: "";
   position: absolute;
-  inset: -8px;
+  /* 24px visíveis, 44px de toque. */
+  inset: -10px;
   border-radius: 10px;
 }
 .workspace-app .item-row-controls .item-check[data-state="checked"] {
-  background: #758151;
-  border-color: #5f6b45;
+  background: color-mix(in oklab, var(--cm-olive-soft) 44%, var(--cm-success));
+  border-color: color-mix(in oklab, var(--cm-olive-soft) 8%, var(--cm-success));
   color: #fff;
 }
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
   .workspace-app .item-row-controls .item-check:not(:disabled):hover {
-    background: #f8e4c8;
+    background: color-mix(in oklab, var(--cm-sand) 25%, var(--cm-bg));
     border-color: var(--cm-action);
   }
   .workspace-app .item-row-controls .item-check[data-state="checked"]:not(:disabled):hover {
-    background: #647143;
-    border-color: #536039;
+    background: color-mix(in oklab, var(--cm-olive-soft) 17%, var(--cm-success));
+    border-color: color-mix(in oklab, var(--cm-success) 95%, #000);
   }
 }
 @media (min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
@@ -928,4 +879,1084 @@
   .workspace-app .item-row-controls .item-check {
     transition: none;
   }
+}
+
+/* Alça de arrastar com área de toque inteira (44px de altura e respiro do quadrado de riscar). */
+.workspace-app .item-row-inner .reorder-handle {
+  width: 36px;
+  min-width: 36px;
+  min-height: 44px;
+}
+
+/* "Tirar da lista" dentro do item aberto: ação discreta à esquerda, com a nota de data ao lado. */
+.workspace-app .item-inline-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin-top: 4px;
+}
+.workspace-app .item-inline-footnote .item-inline-note {
+  margin: 0;
+}
+.workspace-app .item-remove-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  margin-inline: -12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 650;
+  color: color-mix(in oklab, var(--cm-primary-dark) 80%, var(--cm-text));
+}
+.workspace-app .item-remove-button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--cm-sand) 28%, #fff);
+  color: var(--cm-action-hover);
+}
+
+/* O último item da lista rola para cima do botão de adicionar, em vez de ficar escondido atrás dele. */
+@media (max-width: 1023px) {
+  .workspace-app .workspace-main {
+    padding-bottom: 88px;
+  }
+}
+
+/* Próximo passo do Nino: um cartão só, acima da lista, em areia suave (a superfície do Nino no sistema).
+   O cartão inteiro é tocável e leva até o item. */
+.workspace-app .next-step-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px 14px 12px 12px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, var(--cm-bg));
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.workspace-app .next-step-card:hover {
+  border-color: color-mix(in oklab, var(--cm-primary-dark) 45%, var(--cm-sand));
+  background: color-mix(in oklab, var(--cm-sand) 28%, var(--cm-bg));
+}
+.workspace-app .next-step-card:focus-visible {
+  outline: 3px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.workspace-app .next-step-nino {
+  display: block;
+  height: auto;
+}
+.workspace-app .next-step-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.workspace-app .next-step-title {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cm-text);
+  text-wrap: balance;
+}
+.workspace-app .next-step-countdown {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--cm-primary-dark);
+}
+.workspace-app .next-step-name {
+  color: var(--cm-primary-dark);
+}
+.workspace-app .next-step-reason {
+  font-size: 14px;
+  line-height: 1.45;
+  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
+}
+.workspace-app .next-step-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 12px 0 16px;
+  border-radius: 12px;
+  border: 1.5px solid color-mix(in oklab, var(--cm-primary-dark) 70%, var(--cm-sand));
+  background: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--cm-primary-dark);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .workspace-app .next-step-card {
+    gap: 10px;
+    padding: 8px 6px 8px 8px;
+  }
+  .workspace-app .next-step-nino {
+    width: 36px;
+  }
+  .workspace-app .next-step-title {
+    font-size: 15px;
+  }
+  .workspace-app .next-step-reason {
+    font-size: 13px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .workspace-app .next-step-queue,
+  .workspace-app .next-step-open-label {
+    display: none;
+  }
+  .workspace-app .next-step-open {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+}
+
+/* Atalhos acima da lista: cada um é um filtro de um toque. Rolam de lado no celular para não empurrar a lista. */
+.workspace-app .list-insights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 16px;
+}
+.workspace-app .list-insight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 70%, var(--cm-bg));
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cm-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.workspace-app .list-insight:hover {
+  border-color: color-mix(in oklab, var(--cm-primary-dark) 45%, var(--cm-sand));
+}
+.workspace-app .list-insight:focus-visible {
+  outline: 3px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.workspace-app .list-insight strong {
+  font-weight: 750;
+}
+.workspace-app .list-insight-muted {
+  font-weight: 500;
+  color: color-mix(in oklab, var(--cm-bg) 35%, var(--cm-text));
+}
+.workspace-app .list-insight.is-week > svg {
+  color: var(--cm-primary-dark);
+}
+.workspace-app .list-insight.is-deal {
+  background: #eef4e6;
+  border-color: #c9d9b5;
+  color: #3f5a1f;
+}
+.workspace-app .list-insight.is-warning {
+  background: #fdf1df;
+  border-color: #efd2a6;
+  color: #7a4309;
+}
+.workspace-app .list-insight.is-hint {
+  border-style: dashed;
+  font-weight: 500;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.workspace-app .list-insight.is-active {
+  background: var(--cm-primary-dark);
+  border-color: var(--cm-primary-dark);
+  color: #fff;
+}
+@media (max-width: 640px) {
+  .workspace-app .list-insights {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: -4px;
+    padding: 0 4px 2px;
+    scrollbar-width: none;
+  }
+  .workspace-app .list-insights::-webkit-scrollbar {
+    display: none;
+  }
+  .workspace-app .list-insight {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/* Lista ordenada pela semana de compra: um título por bloco. */
+.workspace-app .list-week-group + .list-week-group {
+  margin-top: 20px;
+}
+.workspace-app .list-week-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 8px;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cm-text);
+}
+.workspace-app .list-week-group-title span {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--cm-sand) 35%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-bg) 20%, var(--cm-text));
+}
+
+/* Sugestões do catálogo do ambiente, logo acima dos itens. */
+.workspace-app .room-suggestions {
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px dashed color-mix(in oklab, var(--cm-sand) 80%, var(--cm-bg));
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--cm-sand) 12%, var(--cm-bg));
+}
+.workspace-app .room-suggestions-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+.workspace-app .room-suggestions-head > svg {
+  margin-top: 3px;
+  color: var(--cm-primary-dark);
+}
+.workspace-app .room-suggestions-head p {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+.workspace-app .room-suggestions-head strong {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cm-text);
+}
+.workspace-app .room-suggestions-head span {
+  font-size: 13px;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.workspace-app .room-suggestions-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  margin: -6px -6px 0 0;
+}
+.workspace-app .room-suggestions-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+}
+.workspace-app .room-suggestions-close:hover {
+  background: color-mix(in oklab, var(--cm-sand) 30%, var(--cm-bg));
+}
+.workspace-app .room-suggestions ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.workspace-app .room-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 14px 6px 10px;
+  border-radius: 999px;
+  border: 1.5px solid color-mix(in oklab, var(--cm-primary-dark) 55%, var(--cm-sand));
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cm-primary-dark);
+  cursor: pointer;
+}
+.workspace-app .room-suggestion:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--cm-primary) 6%, #fff);
+}
+.workspace-app .room-suggestion:focus-visible {
+  outline: 3px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.workspace-app .room-suggestion.is-move {
+  border-style: dashed;
+  text-align: left;
+}
+.workspace-app .room-suggestion small {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cm-success);
+}
+.workspace-app .room-suggestions-error {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--cm-primary-dark);
+}
+
+/* Coluna da esquerda só com o quadrado de riscar: a linha fica da altura do conteúdo. */
+.workspace-app .item-row .item-row-controls {
+  min-height: 44px;
+  justify-content: flex-start;
+  padding-top: 0;
+}
+.workspace-app .item-row .item-row-inner > .item-actions .reorder-handle {
+  height: 44px;
+  color: color-mix(in oklab, var(--cm-sand) 55%, var(--cm-text));
+}
+@media (max-width: 1023px) {
+  .workspace-app .item-row .item-row-controls {
+    min-height: 44px;
+  }
+}
+@media (max-width: 767px) {
+  .workspace-app .item-row > .item-row-inner {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+  .workspace-app .item-row > .item-row-inner:has(> .item-thumb) {
+    grid-template-columns: 28px 38px minmax(0, 1fr) auto;
+  }
+  .workspace-app .item-row .item-row-inner > .item-actions {
+    align-self: center;
+    margin-right: -8px;
+  }
+}
+@media (max-width: 767px) {
+  .workspace-app .item-row > .item-row-inner {
+    padding-bottom: 2px;
+  }
+}
+
+/* O nome do enxoval no topo do desktop é título, não etiqueta: sem a caixa de fundo. */
+.workspace-app .desktop-app-header h1 {
+  padding: 0;
+  background: none;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+/* Barra lateral do desktop: uma só linguagem de navegação. Os ambientes ficam recuados sob "Meu enxoval",
+   sem cartão próprio; alça e menu de opções aparecem ao passar o mouse ou com o foco, e o número diz quanto falta. */
+.workspace-app .workspace-sidebar {
+  padding: 28px 16px 12px;
+}
+.workspace-app .workspace-sidebar > .brand-link {
+  margin: 0 12px 28px;
+}
+.workspace-app .workspace-navigation {
+  gap: 2px;
+}
+.workspace-app .workspace-navigation > button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+.workspace-app .workspace-navigation > button.is-parent {
+  color: var(--cm-text);
+  font-weight: 600;
+}
+.workspace-app .workspace-navigation > button > span[aria-hidden="true"] {
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.workspace-app .workspace-navigation > button > .workspace-nav-note {
+  background: color-mix(in oklab, var(--cm-sand) 40%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 40%, var(--cm-text));
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.workspace-app .sidebar-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0 0 6px 21px;
+  padding-left: 1px;
+  border-left: 1px solid color-mix(in oklab, var(--cm-sand) 55%, var(--cm-bg));
+}
+.workspace-app .sidebar-rooms .environment-list {
+  gap: 1px;
+}
+.workspace-app .sidebar-rooms .environment-row {
+  gap: 0;
+  padding: 0 2px 0 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.workspace-app .sidebar-rooms .environment-row.active {
+  background: color-mix(in oklab, var(--cm-success) 5%, var(--cm-bg));
+}
+.workspace-app .sidebar-rooms .environment-row button.environment-select {
+  min-height: 40px;
+  padding: 8px 4px;
+  gap: 8px;
+  font-size: 13px;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
+}
+.workspace-app .sidebar-rooms .environment-row.active button.environment-select {
+  color: color-mix(in oklab, var(--cm-success) 95%, var(--cm-text));
+  font-weight: 600;
+}
+.workspace-app .sidebar-rooms .environment-row .reorder-handle {
+  width: 20px;
+  min-width: 20px;
+  height: 40px;
+  min-height: 40px;
+  color: color-mix(in oklab, var(--cm-bg) 34%, var(--cm-text));
+}
+.workspace-app .sidebar-rooms .sortable-entry.is-dragging .environment-row {
+  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
+}
+.environment-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.environment-meter {
+  display: block;
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--cm-sand) 45%, #fff);
+  overflow: hidden;
+}
+.environment-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cm-olive-soft);
+}
+.workspace-app .environment-row button.environment-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-width: 36px;
+  height: 44px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+}
+.workspace-app .sidebar-rooms .environment-row button.environment-menu-trigger {
+  width: 28px;
+  min-width: 28px;
+  height: 32px;
+}
+.workspace-app .environment-row button.environment-menu-trigger:hover:not(:disabled),
+.workspace-app .environment-row button.environment-menu-trigger[aria-expanded="true"] {
+  background: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-bg));
+  color: var(--cm-text);
+}
+[data-slot="dropdown-menu-content"].environment-menu-popup {
+  width: 220px;
+}
+.workspace-app .sidebar-add-room {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 4px 8px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.workspace-app .sidebar-bottom {
+  margin-top: auto;
+  padding-top: 16px;
+}
+/* Seus enxovais: lista curta abaixo da navegação, o atual com o ponto cheio. */
+.workspace-app .sidebar-enxovais {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 45%, var(--cm-bg));
+}
+.workspace-app .sidebar-enxovais h2 {
+  margin: 0 12px 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+}
+.workspace-app .sidebar-enxovais ul {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.workspace-app .sidebar-enxovais-group {
+  display: block;
+  margin: 8px 12px 2px;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+}
+.workspace-app .sidebar-enxoval,
+.workspace-app .sidebar-add-enxoval {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: left;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
+}
+.workspace-app .sidebar-enxoval.is-current {
+  color: var(--cm-text);
+  font-weight: 600;
+}
+.workspace-app .sidebar-enxoval-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin: 0 3px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklab, var(--cm-sand) 75%, var(--cm-text));
+}
+.workspace-app .sidebar-enxoval.is-current .sidebar-enxoval-dot {
+  border-color: var(--cm-primary);
+  background: var(--cm-primary);
+}
+.workspace-app .sidebar-enxoval-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-app .sidebar-add-enxoval {
+  font-size: 13px;
+}
+@media (hover: hover) {
+  .workspace-app .sidebar-enxoval:hover:not(:disabled),
+  .workspace-app .sidebar-add-enxoval:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--cm-sand) 23%, #fff);
+  }
+  .workspace-app .sidebar-add-enxoval:hover:not(:disabled) {
+    color: var(--cm-primary-dark);
+  }
+}
+.workspace-app .sidebar-help {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 15px;
+  color: color-mix(in oklab, var(--cm-bg) 23%, var(--cm-text));
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .sidebar-rooms .environment-row:not(.active):hover,
+  .workspace-app .sidebar-add-room:hover:not(:disabled),
+  .workspace-app .sidebar-help:hover {
+    background: color-mix(in oklab, var(--cm-sand) 23%, #fff);
+    box-shadow: none;
+  }
+  .workspace-app .sidebar-add-room:hover:not(:disabled) {
+    color: var(--cm-primary-dark);
+  }
+  .workspace-app .sidebar-rooms .environment-row .reorder-handle,
+  .workspace-app .sidebar-rooms .environment-row .environment-menu-trigger {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+  }
+  .workspace-app .sidebar-rooms .environment-row:is(:hover, :focus-within) .reorder-handle,
+  .workspace-app .sidebar-rooms .environment-row:is(:hover, :focus-within) .environment-menu-trigger,
+  .workspace-app .sidebar-rooms .environment-row .environment-menu-trigger[aria-expanded="true"],
+  .workspace-app .sidebar-rooms .sortable-entry.is-dragging .reorder-handle {
+    opacity: 1;
+  }
+}
+
+/* Cabeçalho do desktop: o nome do enxoval é o seletor, e tudo começa na mesma coluna do conteúdo. */
+.workspace-app .desktop-app-header {
+  padding-inline: max(36px, calc((100% - 1230px) / 2 + 36px));
+}
+@media (min-width: 1024px) and (max-width: 1190px) {
+  .workspace-app .desktop-app-header {
+    padding-inline: 24px;
+  }
+}
+.workspace-app .desktop-app-header h1 {
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+}
+.workspace-app .enxoval-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(48vw, 560px);
+  min-height: 40px;
+  margin-left: -8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.workspace-app .enxoval-switcher-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-app .enxoval-switcher-trigger > svg {
+  flex-shrink: 0;
+  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
+  transition: transform 150ms ease-out;
+}
+.workspace-app .enxoval-switcher-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .enxoval-switcher-trigger:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--cm-sand) 23%, #fff);
+  }
+}
+[data-slot="dropdown-menu-content"].enxoval-switcher-popup {
+  width: 300px;
+}
+.enxoval-switcher-group {
+  padding: 10px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+.enxoval-switcher-option {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.enxoval-switcher-popup button[aria-current="true"] {
+  font-weight: 700;
+  color: var(--cm-text);
+}
+.enxoval-switcher-popup button[aria-current="true"] > svg {
+  color: var(--cm-success);
+}
+.workspace-app .desktop-app-header .member-avatars {
+  margin-inline: 8px 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-app .sidebar-rooms .environment-row .reorder-handle,
+  .workspace-app .sidebar-rooms .environment-row .environment-menu-trigger,
+  .workspace-app .enxoval-switcher-trigger > svg {
+    transition: none;
+  }
+}
+
+
+/* Ações do cabeçalho da lista quebram de linha no celular em vez de estourar a largura. */
+@media (max-width: 640px) {
+  .workspace-app .list-heading-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+
+/* Formulário do item: rótulos à esquerda, alinhados ao campo, e dicas sempre abaixo sem empurrar o vizinho.
+   O Label base usa items-center, que centralizava o texto numa coluna; aqui a coluna estica e o texto começa na borda. */
+.workspace-app .item-inline-grid > label,
+.workspace-app .item-inline-grid > .item-field-link > label {
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  line-height: 1.3;
+}
+.workspace-app .item-inline-grid > label.item-inline-check {
+  align-items: center;
+  flex-direction: row;
+}
+.workspace-app .item-inline-grid .item-inline-hint {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.workspace-app .item-inline-grid > .item-field-link {
+  gap: 8px;
+}
+.workspace-app .item-inline-grid .item-inline-section {
+  text-align: left;
+}
+@media (min-width: 1360px) {
+  /* "end" alinhava a base dos campos e subia o rótulo de quem tinha dica; "start" alinha rótulo com rótulo. */
+  .workspace-app .item-inline-grid {
+    align-items: start;
+  }
+  .workspace-app .item-inline-grid > .item-field-link {
+    gap: 4px;
+  }
+  .workspace-app .item-inline-grid > .item-field-link > label {
+    font-size: 12px;
+  }
+  .workspace-app .item-inline-grid > .item-field-total {
+    align-self: end;
+    min-height: 46px;
+  }
+}
+@media (max-width: 1359px) {
+  .workspace-app .item-inline-grid {
+    align-items: start;
+  }
+}
+
+/* Legenda ao lado do título da seção: menor e mais discreta que o título. */
+.workspace-app .item-inline-section .item-inline-caption {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
+}
+
+/* Chips de ambiente no celular: "conquistados/total" ao lado do nome, no tom do chip, sem a pílula de fundo. */
+.workspace-app .environment-chips .environment-select > small.environment-chip-count,
+.workspace-app .environment-chips-row > .environment-row.environment-all small.environment-chip-count {
+  padding: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
+}
+.workspace-app .environment-chips .environment-row.active small.environment-chip-count,
+.workspace-app .environment-chips-row > .environment-row.environment-all.active small.environment-chip-count {
+  background: none;
+  color: color-mix(in oklab, #fff 92%, var(--cm-action));
+}
+
+/* Cabeçalho da lista no celular: o título fica inteiro na primeira linha (sem partir a palavra) e as ações descem. */
+@media (max-width: 767px) {
+  .workspace-app .list-section-heading {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .workspace-app .list-section-heading > div:first-child {
+    flex: 1 1 100%;
+  }
+  .workspace-app .list-section-heading h2 {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  .workspace-app .list-heading-actions {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+  .workspace-app .list-heading-actions .store-mode-entry {
+    margin-left: auto;
+  }
+}
+/* Com a contagem, a largura fixa cortava o nome: o chip cresce com o conteúdo, a partir da largura base. */
+.workspace-app .environment-chips .sortable-entry,
+.workspace-app .environment-chips-row > .environment-row.environment-all {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: var(--environment-chip-width);
+}
+.workspace-app .environment-chips .environment-row {
+  width: auto;
+  min-width: var(--environment-chip-width);
+  max-width: 220px;
+}
+.workspace-app .environment-chips .environment-select > small.environment-chip-count,
+.workspace-app .environment-chips-row > .environment-row.environment-all small.environment-chip-count {
+  flex: none;
+}
+.workspace-app .environment-chips .environment-select > span,
+.workspace-app .environment-chips-row > .environment-row.environment-all .environment-select > span {
+  flex: 0 1 auto;
+}
+.workspace-app .environment-chips .environment-row .environment-select,
+.workspace-app .environment-chips-row > .environment-row.environment-all .environment-select {
+  gap: 6px;
+}
+
+/* "Ver na loja" e o ícone da observação andam juntos na linha de detalhes do item. */
+.item-meta .item-meta-tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* No celular as ações da lista ficam logo acima da busca: um respiro antes dela. */
+.workspace-app .category-list-swipe > .list-heading-actions {
+  margin-bottom: 12px;
+}
+
+/* "Ver na loja - Leroy Merlin": o nome da loja não empurra a linha; nomes longos ganham reticências. */
+.item-meta .item-meta-tail .item-link-store {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Perfil no topo do menu: avatar, nome e uma seta, no mesmo cartão claro do seletor de enxoval. */
+.workspace-app .workspace-menu-content > .profile-entry-mobile,
+.workspace-menu-content > .profile-entry-mobile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 44%, #fff);
+  border-radius: 15px;
+  background: color-mix(in oklab, var(--cm-primary-dark) 5%, #fff);
+  color: var(--cm-text);
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.workspace-menu-content > .profile-entry-mobile:hover {
+  border-color: color-mix(in oklab, var(--cm-primary-dark) 35%, #fff);
+  background: color-mix(in oklab, var(--cm-primary-dark) 8%, #fff);
+}
+.workspace-menu-content > .profile-entry-mobile:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.profile-entry-mobile .profile-entry-avatar {
+  width: 44px;
+  height: 44px;
+  background: color-mix(in oklab, var(--cm-sand) 40%, #fff);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px color-mix(in oklab, var(--cm-primary-dark) 30%, #fff);
+  font-family: var(--font-serif);
+  font-size: 19px;
+}
+.profile-entry-mobile .profile-entry-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.profile-entry-mobile .profile-entry-text strong {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.profile-entry-mobile .profile-entry-text small {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: color-mix(in oklab, var(--cm-text) 60%, #fff);
+}
+.profile-entry-mobile .profile-entry-chevron {
+  flex: none;
+  color: var(--cm-primary-dark);
+}
+
+/* Atalho para o perfil ao lado do menu, no topo do celular. */
+.workspace-app .mobile-header-title-row .mobile-header-profile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  margin-right: -12px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+.workspace-app .mobile-header-profile .user-avatar {
+  width: 30px;
+  height: 30px;
+  background: color-mix(in oklab, var(--cm-sand) 40%, #fff);
+  box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--cm-primary-dark) 30%, #fff);
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+.workspace-app .mobile-header-profile:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 1px;
+}
+
+/* Celular: "Estou na loja" é a ação principal, com uma linha que explica; importar e exportar ficam em "Planilhas". */
+.workspace-app .list-heading-actions.list-mobile-actions {
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+}
+.workspace-app .list-mobile-actions .store-mode-cta {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, #fff);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--cm-text);
+  text-align: left;
+}
+.workspace-app .list-mobile-actions .store-mode-cta > svg {
+  flex: none;
+  color: var(--cm-primary-dark);
+}
+.workspace-app .list-mobile-actions .store-mode-cta > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+.workspace-app .list-mobile-actions .store-mode-cta strong {
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.workspace-app .list-mobile-actions .store-mode-cta small {
+  font-size: 12px;
+  line-height: 1.3;
+  color: color-mix(in oklab, var(--cm-bg) 22%, var(--cm-text));
+}
+.workspace-app .list-mobile-actions .list-more-trigger {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 128px;
+  min-height: 56px;
+  padding: 0 18px;
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 60%, #fff);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--cm-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.workspace-app .list-mobile-actions .list-more-trigger > svg {
+  color: var(--cm-primary-dark);
+}
+@media (hover: hover) and (pointer: fine) {
+  .workspace-app .list-mobile-actions .store-mode-cta:hover,
+  .workspace-app .list-mobile-actions .list-more-trigger:hover {
+    border-color: color-mix(in oklab, var(--cm-primary-dark) 35%, #fff);
+  }
+}
+.workspace-app .list-mobile-actions .store-mode-cta:focus-visible,
+.workspace-app .list-mobile-actions .list-more-trigger:focus-visible {
+  outline: 2px solid var(--cm-primary-dark);
+  outline-offset: 2px;
+}
+.list-more-dialog .export-sheet-actions > button > svg {
+  flex: none;
+  color: var(--cm-primary-dark);
+}
+.list-more-dialog .export-sheet-actions > button strong {
+  font-size: 15px;
+}
+.list-more-dialog .export-sheet-actions > button {
+  min-height: 64px;
+}
+/* Com o avatar ao lado do menu sobra menos largura: o nome do enxoval fica numa linha só (com reticências),
+   senão um nome longo quebraria e o cabeçalho mudaria de altura. */
+.workspace-app .mobile-header-title-row .mobile-title-with-edit h1 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* "Puxar para atualizar": o gesto escreve --pull (0 a 96) direto no elemento; nada disso passa pelo React. */
+.pull-refresh-indicator {
+  opacity: min(1, var(--pull, 0));
+  transform: translate(-50%, max(0px, calc(var(--pull, 0) * 1px - 34px)));
+  transition: opacity 0.15s;
+}
+.pull-refresh-indicator[data-refreshing="true"] {
+  opacity: 1;
+}
+.pull-refresh-icon {
+  transform: rotate(calc(var(--pull, 0) * 3deg));
+}
+/* A linha "Compartilhado com" esmaece com --header-progress; quase sumida, deixa de receber toques. */
+.mobile-workspace-header[data-header-scrolled] .mobile-header-shared {
+  pointer-events: none;
+}
+
+/* Desempenho no celular: desfoque de fundo (backdrop-filter) em barras fixas e em camadas que cobrem a tela obriga o
+   navegador a redesenhar o que está atrás a cada quadro de rolagem e de animação. Fundo quase opaco no lugar. */
+.mobile-bottom-nav {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: #fdfcf8;
+}
+.dialog-backdrop,
+.workspace-menu-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: #33221b80;
+}
+.workspace-app .item-inline-actions,
+.workspace-app .item-row .item-inline-actions .button {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.workspace-app .item-row .item-inline-actions .button {
+  background: #fffffff2;
 }

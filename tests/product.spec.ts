@@ -33,7 +33,7 @@ test("landing navigation, FAQ and entry routes work", async ({ page }) => {
     .click();
   await expect(page.locator("#planos")).toBeInViewport();
   const question = page.getByRole("button", {
-    name: "Os planos já estão disponíveis para compra?",
+    name: "Já posso assinar um plano?",
   });
   await question.click();
   await expect(question).toHaveAttribute("aria-expanded", "true");
@@ -59,6 +59,7 @@ test("login handles API errors and loads the authenticated workspace (mock API)"
     discountCents: 0,
   };
   const workspace = { enxoval, members: [], categories: [], items: [] };
+  await page.addInitScript(() => localStorage.setItem("casamia:consent", JSON.stringify({ analytics: false, marketing: false, version: "2026-10", decidedAt: new Date().toISOString() })));
   const bootstrap = {
     user: { id: "test", name: "Pessoa Teste", email: "teste@example.com", plan: "monthly", onboardingCompleted: true },
     enxovais: [workspace.enxoval],
@@ -67,6 +68,7 @@ test("login handles API errors and loads the authenticated workspace (mock API)"
     categories: workspace.categories,
     items: workspace.items,
   };
+  await page.route("**/api/bootstrap**", route => route.fulfill({ status: 401, json: { error: "Faça login." } }));
   await page.route("**/api/billing/status**", route => route.fulfill({ json: {
     available: true, accessAllowed: true, isOwner: true, trialUsed: true,
     plan: "monthly", status: "active", trialNotice: null,
@@ -90,9 +92,9 @@ test("login handles API errors and loads the authenticated workspace (mock API)"
     route.fulfill({ json: bootstrap }),
   );
   await page.getByRole("button", { name: "Entrar no meu enxoval" }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(/\/app\/enxoval-teste$/);
   await expect(page.locator(".workspace-sidebar")).toContainText(
-    "Pessoa Teste",
+    "Enxoval de teste",
   );
 });
 

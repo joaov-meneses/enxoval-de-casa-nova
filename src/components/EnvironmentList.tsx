@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { Button } from "@/src/components/ui/button";
-import { Pencil, Trash2 } from "@/src/components/icons";
+import { Ellipsis, Pencil, Trash2 } from "@/src/components/icons";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/src/components/ui/dropdown-menu";
+import { isDoneStatus } from "../itemStatus";
 import type { EnxovalCategory, EnxovalItem } from "../types";
 import { SortableList } from "./SortableList";
-import { RoomIcon } from "./WorkspaceOverview";
+import { RoomIcon } from "./RoomIcon";
 
 export function EnvironmentList({
   categories,
@@ -68,39 +75,18 @@ export function EnvironmentList({
           >
             {!horizontal && <RoomIcon name={category.name} />}
             <span>{category.name}</span>
-            {!horizontal && (
-              <small>
-                {
-                  items.filter(
-                    (item) =>
-                      item.categoryId === category.id,
-                  ).length
-                }
-              </small>
-            )}
+            {horizontal
+              ? <ChipCount {...countOf(items.filter((item) => item.categoryId === category.id))} />
+              : <RoomProgress items={items.filter((item) => item.categoryId === category.id)} />}
           </Button>
           {horizontal && handle}
           {!horizontal && (
-            <Button variant="brand" size="brand"
-              type="button"
-              className="environment-rename"
-              aria-label={`Editar ambiente ${category.name}`}
-              onClick={() => onRename(category)}
+            <RoomActions
+              category={category}
               disabled={disabled}
-            >
-              <Pencil size={14} />
-            </Button>
-          )}
-          {!horizontal && onDelete && (
-            <Button variant="brand" size="brand"
-              type="button"
-              className="environment-rename environment-delete"
-              aria-label={`Excluir ambiente ${category.name}`}
-              onClick={() => onDelete(category)}
-              disabled={disabled}
-            >
-              <Trash2 size={14} />
-            </Button>
+              onRename={onRename}
+              onDelete={onDelete}
+            />
           )}
         </div>
       )}
@@ -121,9 +107,97 @@ export function EnvironmentList({
           aria-current={allOption.active ? "true" : undefined}
         >
           <span>Todos</span>
+          <ChipCount done={allOption.done} total={allOption.total} />
         </Button>
       </div>
       {list}
     </div>
+  );
+}
+
+function countOf(items: EnxovalItem[]) {
+  return { done: items.filter((item) => isDoneStatus(item.status)).length, total: items.length };
+}
+
+/** Nos chips do celular, só o "conquistados/total" ao lado do nome, sem barra. */
+function ChipCount({ done, total }: { done: number; total: number }) {
+  return (
+    <small className="environment-chip-count">
+      <span aria-hidden="true">{done}/{total}</span>
+      <span className="sr-only">, {done} de {total} conquistados</span>
+    </small>
+  );
+}
+
+/** Conquistados de quantos, com uma barra fina: na lista de ambientes, o que importa é quanto falta. */
+function RoomProgress({ items }: { items: EnxovalItem[] }) {
+  const { done, total } = countOf(items);
+  return (
+    <small className="environment-progress">
+      <span className="environment-count" aria-hidden="true">
+        {done}/{total}
+      </span>
+      <span className="sr-only">, {done} de {total} conquistados</span>
+      {total > 0 && (
+        <span className="environment-meter" aria-hidden="true">
+          <span style={{ width: `${Math.round((done / total) * 100)}%` }} />
+        </span>
+      )}
+    </small>
+  );
+}
+
+/**
+ * Renomear e excluir ficam num menu "⋯" por ambiente: são ações raras, e a lista serve para navegar.
+ * Na barra lateral do desktop, o botão aparece ao passar o mouse ou com o foco no ambiente.
+ */
+function RoomActions({
+  category,
+  disabled,
+  onRename,
+  onDelete,
+}: {
+  category: EnxovalCategory;
+  disabled: boolean;
+  onRename: (category: EnxovalCategory) => void;
+  onDelete?: (category: EnxovalCategory) => void;
+}) {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="brand" size="brand"
+          type="button"
+          className="environment-menu-trigger"
+          aria-label={`Opções do ambiente ${category.name}`}
+          disabled={disabled}
+        >
+          <Ellipsis size={18} aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="right"
+        sideOffset={6}
+        collisionPadding={12}
+        className="desktop-actions-popup environment-menu-popup"
+      >
+        <DropdownMenuItem asChild>
+          <Button variant="brand" size="brand" type="button" onClick={() => onRename(category)}>
+            <Pencil size={16} aria-hidden="true" /> Renomear ambiente
+          </Button>
+        </DropdownMenuItem>
+        {onDelete && (
+          <DropdownMenuItem asChild>
+            <Button variant="brand" size="brand"
+              type="button"
+              className="desktop-menu-item-danger"
+              onClick={() => onDelete(category)}
+            >
+              <Trash2 size={16} aria-hidden="true" /> Excluir ambiente
+            </Button>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

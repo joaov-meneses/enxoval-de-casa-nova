@@ -1,22 +1,22 @@
-/* shadcn/ui semantic tokens mapped to the Casa Mia palette. */
+/* shadcn/ui semantic tokens mapped to the Casa Mia palette (Linho Terracota). */
 :root {
-  --background: #fbf3e6;
-  --foreground: #3b2a20;
-  --card: #fffdf8;
-  --card-foreground: #3b2a20;
-  --popover: #fffdf8;
-  --popover-foreground: #3b2a20;
-  --primary: #b5532f;
+  --background: var(--cm-bg);
+  --foreground: var(--cm-text);
+  --card: #ffffff;
+  --card-foreground: var(--cm-text);
+  --popover: #ffffff;
+  --popover-foreground: var(--cm-text);
+  --primary: var(--cm-action);
   --primary-foreground: #ffffff;
-  --secondary: #efe7da;
-  --secondary-foreground: #3b2a20;
-  --muted-foreground: #78695e;
-  --accent: #f3ebe0;
+  --secondary: #e3e9da; /* sálvia: chips de cômodo e semana; texto #3f4d38 a 7,3:1 */
+  --secondary-foreground: #3f4d38;
+  --muted-foreground: #6f6358; /* 5,3:1 sobre o linho */
+  --accent: #f2e8dc;
   --accent-foreground: #8b4329;
   --destructive: #b42318;
-  --border: #e8dccb;
-  --input: #d7c7b5;
-  --ring: #a34c30;
+  --border: #e7ded1;
+  --input: #958571; /* borda de campo a 3,2:1 sobre o linho */
+  --ring: var(--cm-primary-dark);
   --radius: 0.75rem;
 }
 
@@ -139,7 +139,7 @@ label:has(> .choice-control:focus-visible) {
 
 /* Period headings stay distinct from selectable weeks in the portaled menu. */
 .casamia-select-grouped [data-slot="select-group"] + [data-slot="select-group"] {
-  border-top: 1px solid #d8c3a8;
+  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 85%, #fff);
   margin-top: 8px;
   padding-top: 6px;
 }
@@ -151,12 +151,12 @@ label:has(> .choice-control:focus-visible) {
   padding: 8px 10px;
   border-left: 3px solid var(--cm-action);
   border-radius: 5px;
-  background: #f3e4d1;
-  color: #783b28;
+  background: color-mix(in oklab, var(--cm-sand) 25%, var(--cm-bg));
+  color: color-mix(in oklab, var(--cm-primary-dark) 58%, var(--cm-text));
   font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
 }
 .casamia-select-grouped [data-slot="select-item"] + [data-slot="select-item"] {
-  border-top: 1px solid #f0e8dc;
+  border-top: 1px solid color-mix(in oklab, var(--cm-bg) 95%, var(--cm-text));
 }

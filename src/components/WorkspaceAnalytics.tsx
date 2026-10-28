@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { capture } from '../analytics';
+import type { WorkspaceView } from '../appRoute';
 
 /** Mount inside SubscriptionAccess so blocked screens never count as workspace views. */
 export function WorkspaceAnalytics({ userId, enxovalId, view }: {
-  userId: string; enxovalId?: string; view: 'list' | 'overview' | 'plan';
+  userId: string; enxovalId?: string; view: WorkspaceView;
 }) {
   const previous = useRef('');
   useEffect(() => {
