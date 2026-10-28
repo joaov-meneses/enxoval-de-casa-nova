@@ -92,6 +92,47 @@
 - **Filtro da marca:** passa. A ideia é o tom, não a frase. Usar o glossário da marca (seção 5), sem copiar o texto.
 - **Status:** proposta.
 
+### Rodada de 2026-10-20 (complemento)
+
+Releitura da página pública em desktop (1536 px), com texto, estilos computados e `document.getAnimations()`. Duas capturas de tela foram vistas, mas não salvas em disco. Layout em celular continua não verificado.
+
+### R08: Cena ilustrada do ambiente com título sobreposto na rolagem
+- **Tipo:** layout
+- **Observação:** abaixo do hero há uma cena isométrica do quarto do bebê (berço, armário, poltrona, bolsa, carrinho) em um cartão largo de cantos arredondados. O título "O que você precisa para o quartinho" fica sobre a cena enquanto a página rola, e a navegação é uma pílula translúcida fixa no topo. A cena mostra as categorias da lista como objetos, em vez de uma lista de texto.
+- **Princípio:** progresso visual concreto (seção 6 da marca). A casa do Nino poderia ser essa cena: cômodos que se acendem conforme os itens são riscados.
+- **Filtro da marca:** passa. Exige ilustração própria, no estilo do Nino, não a arte do site.
+- **Status:** proposta.
+
+### R09: Chips flutuantes de contexto sobre o mockup
+- **Tipo:** design
+- **Observação:** o hero tem cartões pequenos sobrepostos ao celular ("Verão", "RN — 12 meses") que mostram as variáveis usadas para montar a lista. Animação de 9 s, linear, em repetição (`hero-personalization-feed`), e barras de progresso que crescem em 1,4 s (`phone-bar-grow`).
+- **Princípio:** transparência de como a lista foi montada reforça confiança na inteligência prática (seção 2). No Casa Mia, os chips seriam metragem, moradores e orçamento.
+- **Filtro da marca:** passa. O movimento em loop de 9 s deve parar com `prefers-reduced-motion`.
+- **Status:** proposta.
+
+### R10: Assistente de conversa que registra o que chegou
+- **Tipo:** fluxo
+- **Observação:** a assistente (Lia) aceita texto ou foto ("ganhei 3 bodies tamanho P"), cadastra a peça e mostra um cartão de confirmação com o que foi adicionado. Também lembra o que falta ("faltam só 2 itens") e oferece adicionar à lista com um toque.
+- **Princípio:** acolhimento e inteligência prática. O Nino já é a voz do app; registrar presentes por mensagem encaixa com a matriz de mensagens ("Ao receber presentes de amigos").
+- **Filtro da marca:** passa, mas é recurso novo e não cabe no modelo tipado do Jev (`Choice`, `Score`, `Noul`) sem decisão técnica.
+- **Status:** proposta.
+
+### R11: Tabela "antes e depois" na página de vendas
+- **Tipo:** copy
+- **Observação:** seção "Da bagunça à calma" compara lado a lado a lista genérica da internet com a lista própria: "caçar dica em mil abas" vs. "tudo por categoria", "será que falta algo?" vs. "progresso em tempo real". Cada dor vira um benefício em uma linha.
+- **Princípio:** as dores da persona "Primeiro Lar" (seção 8 da marca) já estão descritas e podem virar a comparação com planilhas e blogs.
+- **Filtro da marca:** passa, desde que o tom compare sem culpar o usuário.
+- **Status:** proposta.
+
+### R12: Seção "o que serve agora e o que espera"
+- **Tipo:** design
+- **Observação:** o armário agrupa por tamanho com rótulos "serve agora", "logo logo", "na gaveta". Transforma estoque em um calendário implícito.
+- **Princípio:** Regra do Primeiro Dia (seção 6 da marca): separar o que é para a primeira semana do que pode esperar.
+- **Filtro da marca:** passa. Equivalente no Casa Mia: "Dia 1", "Primeiro mês", "Depois".
+- **Status:** proposta.
+
+**Dados lidos nesta rodada:** `--ease-out-strong: cubic-bezier(.23, 1, .32, 1)` e `--ease-in-out-strong: cubic-bezier(.77, 0, .175, 1)` como variáveis CSS; botão com raio de 12 px; Fraunces 60 px (h1) e 42 px (h2), peso 600; 14 seções; uma regra `prefers-reduced-motion`.
+
 ## Descartado
 
 Nenhuma ideia foi descartada por conflitar com a marca. Não foram encontrados padrões de escassez artificial, alertas vermelhos ou banners invasivos na página pública.

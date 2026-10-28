@@ -149,6 +149,11 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 | R05 | Armário / cadastro | Cadastro manual de cada peça | Inteligência prática (seção 2 da marca) | Cadastro por foto com revisão antes de salvar. Recurso novo; não aplicado. O "Importar por link" já cobre parte da dor e entrou no carrossel | proposta |
 | R06 | Planejamento | Compra excessiva por insegurança | Respeito ao bolso (seção 6 da marca) | O slide "Um plano do tamanho da sua casa" destaca as quantidades ajustadas e o que não precisa ser comprado, já presentes no funil | **aplicada em parte** (copy do carrossel) |
 | R07 | Chamada final | Oportunidade de tom acolhedor no fechamento da página | Acolhimento antes da cobrança (seção 2 da marca) | A chamada final da home já usa "Sem pressa. Sem cartão. Do seu jeito." O mesmo tom foi usado no carrossel. Nada alterado na chamada final | já atendida |
+| R08 | Home (abaixo do hero) | Categorias da lista só em texto | Progresso visual concreto | Cena ilustrada da casa do Nino, com cômodos que acendem conforme os itens são riscados | proposta |
+| R09 | Home (hero) | Pouca transparência de como o plano é montado | Inteligência prática | Chips de contexto (metragem, moradores, orçamento) sobre o mockup, sem loop com movimento reduzido | proposta |
+| R10 | App (Nino) | Registrar presentes e compras exige abrir formulários | Acolhimento; inteligência prática | Registrar por mensagem ao Nino. Recurso novo; depende de decisão técnica sobre o Jev | proposta |
+| R11 | Home | Dores do Primeiro Lar não aparecem lado a lado com a alternativa | Persona "Primeiro Lar" (seção 8 da marca) | Seção comparando planilhas e blogs com o Casa Mia, sem culpar o usuário | proposta |
+| R12 | Lista | Tudo parece igualmente urgente | Regra do Primeiro Dia | Agrupar por "Dia 1", "Primeiro mês" e "Depois" | proposta |
 
 ## 9. Carrossel de funcionalidades
 

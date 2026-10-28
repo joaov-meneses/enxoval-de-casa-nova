@@ -282,6 +282,32 @@ O app grava IP de cadastros, logins bem-sucedidos e contas criadas por convite e
 
 ---
 
+### Ajustes planejados para 2026-10-21
+
+#### A1. Trial de 3 dias (72 horas) no lugar de 2 dias (48 horas)
+
+Hoje o teste dura 48 horas, com cartão cadastrado e cobrança automática do Mensal ao final. A mudança é de duração; o modelo (cartão no início, cancelamento no app, bloqueio dos convidados ao cancelar) continua o mesmo.
+
+* **Cobrança:** `server/billing.ts` (linha ~393) usa `trial_period_days: 2`; passar para `3`. Trocar também o texto de `custom_text.submit.message` ("Teste completo por 2 dias (48 horas)").
+* **Textos de interface com "48 horas" ou "2 dias":** `src/components/LandingPage.tsx` (9 ocorrências, incluindo o selo do hero e o FAQ), `PlanSelection.tsx` (8), `SubscriptionAccess.tsx` (2, inclusive "São 48 horas completas"), `AuthPage.tsx` (2), `ProfileDialog.tsx`, `OnboardingFlow.tsx`, `AdminPage.tsx`, e e-mails em `server/mailer.ts` (2). Procurar por `48 horas|48h|2 dias|dois dias`; algumas ocorrências de `24 horas` são do lembrete e não mudam.
+* **Lembrete das últimas 24 horas:** `server/workers/trialNotifications.ts` continua válido; confirmar que ele usa `trial_ends_at` e não uma duração fixa.
+* **Testes:** `tests/billing-db.mjs` (`trial_period_days, 2`, `48 * 3600`, `23 hours`) e `tests/freemium-db.mjs` (`interval '48 hours'`) passam para 72 horas. Rodar `npm run test:billing-db`, `npm run lint`, `npm run build` e `node tests/trial-ui.mjs`.
+* **Documentação:** atualizar a seção "Trial e cobrança" do `README.md` e `docs/analytics.md` se citar a duração.
+* **Contas em teste:** quem já está em trial mantém o `trial_end` gravado na Stripe, então continua com 48 horas. Não há migração de dados. Só novos checkouts recebem 72 horas.
+* **Atenção:** `routes.ts` tem `interval '48 hours'` para expiração de sessão por inatividade. Não tem relação com o trial e não deve mudar.
+
+#### A2. Manter os preços visíveis na tela principal (decisão)
+
+Decisão: não esconder valores para revelá-los só no paywall. Motivos: contradiz "acolhimento antes da cobrança" e "respeito ao bolso" (seções 2 e 6 de `docs/branding-casa-mia.md`); o público é sensível a custo; e como o trial exige cartão, o preço escondido aumenta a chance de a pessoa se sentir surpreendida na cobrança.
+
+* **O que mudar na home:** manter a seção de preços, mas deixar claro, perto do botão, que são **3 dias com cartão cadastrado, cancelamento no app antes do fim e cobrança do Mensal depois**. Isso já aparece em parte e passa a falar em 3 dias (A1).
+* **Não usar** a frase "Grátis até 2 cômodos": o app hoje não tem plano gratuito para criar enxoval (a criação sem assinatura retorna `SUBSCRIPTION_REQUIRED`). A seção 1 deste documento ainda descreve limites gratuitos e está desatualizada; revisar junto.
+* **No checkout e no paywall:** repetir preço e equivalência mensal, para não haver surpresa.
+* **Teste opcional:** se houver dados suficientes, comparar cadastro com e sem preço na home antes de mudar a decisão (eventos `landing_viewed` → `account_created` em `docs/analytics-funil-e-reengajamento.md`, F1).
+* **Relacionado:** P01 de `design/inventario/inventario.md` (a FAQ ainda diz que os planos não estão à venda).
+
+---
+
 ## 3. Matriz de Prioridade e Sequência de Execução
 
 | Ordem | Entregável | Impacto Principal | Complexidade |
