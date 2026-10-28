@@ -151,8 +151,8 @@ test("planejamento usa o catálogo mestre e antecipa a compra pelo prazo de entr
   );
   assert.equal(plan.get("a").week, -1);
   assert.equal(plan.get("b").week, -4);
-  assert.match(plan.get("b").reason, /3 semanas/);
-  assert.equal(plan.get("c").week, -2, "essencial de valor baixo: perto da mudança");
+  assert.match(plan.get("b").reason, /3 para entrega/);
+  assert.equal(plan.get("c").week, -1, "essencial de valor baixo: perto da mudança, com a semana de pesquisa");
 });
 
 test("importação por planilha: o catálogo corrige a grafia e sugere o ambiente", () => {
