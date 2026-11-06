@@ -58,7 +58,7 @@ export function allowedProperties(event: AnalyticsEvent, properties: AnalyticsPr
   }));
 }
 
-export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/preferencias', '/pesquisa', '/como-o-nino-escolhe', '/esqueci-senha', '/redefinir-senha', '/verificar-email'];
+export const PUBLIC_ROUTES = ['/', '/app', '/login', '/cadastro', '/comecar', '/convite', '/privacidade', '/termos', '/reembolso', '/preferencias', '/pesquisa', '/como-o-nino-escolhe', '/esqueci-senha', '/redefinir-senha', '/verificar-email'];
 
 export function safeRoute(pathname: string) {
   if (PUBLIC_ROUTES.includes(pathname)) return pathname;
