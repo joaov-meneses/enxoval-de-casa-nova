@@ -144,6 +144,12 @@ Adotada em outubro de 2026, depois de um estudo com nove marcas de casa, enxoval
 
 ---
 
+**Regras de uso de cor e tipografia (mobile):**
+
+- Barras de progresso e de rolagem ficam sempre em sálvia (`--cm-olive-soft`/`--cm-success`); terracota é só para ação. Ambiente 100% conquistado usa sálvia cheia com check.
+- O prazo "Comprar até dd/mm" é o único chip com cor (Terracota Queimado `--cm-action-hover` sobre terracota a 10% do cartão, contraste medido acima de 6:1). Ambiente, situação e quantidade ficam neutros.
+- Rótulos de interface têm no mínimo 13px (barra inferior, rótulos do resumo).
+
 ## 8. Pesquisa com Usuários Reais (Jobs To Be Done)
 
 Para alimentar a evolução da marca e da IA, a base de clientes do Casa Mia se divide em 3 personas fundamentais:

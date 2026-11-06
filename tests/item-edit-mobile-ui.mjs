@@ -22,6 +22,9 @@ try {
     await page.locator('.mobile-bottom-nav').getByRole('button',{name:'Meu enxoval',exact:true}).click();
     const fab=page.getByRole('button',{name:'Adicionar item ou ambiente',exact:true});
     const first=page.locator('[data-item-id=item-0]');const second=page.locator('[data-item-id=item-1]');
+    // No topo da página o botão cede quando cobriria um controle (useFabYield); rola para o fim antes de checar.
+    await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+    await fab.waitFor({state:'visible'});
     assert.equal(await fab.isVisible(),true);
     // A edição abre numa janela por cima da lista; só um item fica aberto por vez.
     const editor=page.getByRole('dialog');
