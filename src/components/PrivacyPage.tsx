@@ -3,14 +3,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { consentRequired, onConsentChange, openConsentPreferences, readConsent } from '../analytics/consent';
 import { ArrowLeft } from "@/src/components/icons";
 import { Brand } from "./Brand";
+import { SUPPORT_EMAIL, LEGAL_UPDATED } from '../../shared/legal';
 
-const UPDATED = "22 de outubro de 2026";
+const UPDATED = LEGAL_UPDATED;
 
 /**
- * Contato do responsável pelo tratamento dos dados. Preencher antes do lançamento
- * (e-mail ou formulário); enquanto estiver vazio, a página avisa que ele será informado.
+ * Canal oficial informado pelo responsável pelo serviço.
  */
-const PRIVACY_CONTACT: string | null = null;
+const PRIVACY_CONTACT = SUPPORT_EMAIL;
 
 const SECTIONS: { title: string; body: ReactNode }[] = [
   {
@@ -273,15 +273,10 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
   },
   {
     title: "Contato",
-    body: PRIVACY_CONTACT ? (
+    body: (
       <p>
         Para exercer os seus direitos ou tirar dúvidas, escreva para{" "}
         <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a>.
-      </p>
-    ) : (
-      <p>
-        O Casa Mia ainda não foi lançado. O canal de contato do responsável pelo
-        tratamento dos dados será informado aqui antes do lançamento.
       </p>
     ),
   },
@@ -337,6 +332,9 @@ export function PrivacyPage() {
             {section.body}
           </section>
         ))}
+        <nav className="legal-links" aria-label="Políticas do Casa Mia">
+          <a href="/termos">Termos de Uso</a><a href="/reembolso">Cancelamento e reembolso</a>
+        </nav>
       </article>
     </main>
   );

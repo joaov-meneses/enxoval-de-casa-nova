@@ -26,6 +26,7 @@ const OnboardingFlow = lazy(() => import('./components/onboarding/OnboardingFlow
 const EmailPreferencesPage = lazy(() => import('./components/EmailPreferencesPage').then((m) => ({ default: m.EmailPreferencesPage })));
 const SurveyPage = lazy(() => import('./components/SurveyPage').then((m) => ({ default: m.SurveyPage })));
 const PrivacyPage = lazy(() => import('./components/PrivacyPage').then((m) => ({ default: m.PrivacyPage })));
+const LegalPage = lazy(() => import('./components/LegalPage').then((m) => ({ default: m.LegalPage })));
 const ResetPasswordPage = lazy(() => import('./components/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })));
 const VerifyEmailPage = lazy(() => import('./components/EmailVerificationPage').then((m) => ({ default: m.VerifyEmailPage })));
 
@@ -71,6 +72,10 @@ createRoot(document.getElementById('root')!, {
       <NinoMethodPage />
     ) : window.location.pathname === '/privacidade' ? (
       <PrivacyPage />
+    ) : /^\/termos\/?$/.test(window.location.pathname) ? (
+      <LegalPage kind="terms" />
+    ) : /^\/reembolso\/?$/.test(window.location.pathname) ? (
+      <LegalPage kind="refunds" />
     ) : window.location.pathname === '/preferencias' ? (
       <EmailPreferencesPage />
     ) : window.location.pathname === '/pesquisa' ? (
