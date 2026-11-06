@@ -1969,6 +1969,18 @@
     color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
     -webkit-tap-highlight-color: transparent;
   }
+  /* Telas muito estreitas: as colunas podem encolher e o rótulo ganha reticência. */
+  @media (max-width: 300px) {
+    .workspace-app .mobile-bottom-nav {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      padding-inline: 4px;
+      column-gap: 0;
+    }
+    .workspace-app .mobile-bottom-nav button {
+      min-width: 0;
+      overflow: hidden;
+    }
+  }
   .workspace-app .mobile-bottom-nav button > span {
     display: block;
     max-width: 100%;

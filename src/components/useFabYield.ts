@@ -27,12 +27,21 @@ export function useFabYield(
       if (!fab) return;
       let shouldYield = false;
       if (mq.matches && window.scrollY <= TOP_THRESHOLD) {
-        // visibility e opacity não alteram o rect do botão, então ele pode ser medido cedido ou não.
+        // Um botão focado nunca cede: o foco não pode ficar num elemento invisível.
+        if (document.activeElement === fab) {
+          fab.removeAttribute("data-yield");
+          return;
+        }
+        /* Mede o botão em repouso: descarta o `translate` do quique (e de qualquer transição), senão a posição medida
+           depende do estado atual e o resultado alterna a cada recálculo. */
         const r = fab.getBoundingClientRect();
-        const left = r.left - BOUNCE_MARGIN;
-        const right = r.right + BOUNCE_MARGIN;
-        const top = r.top - BOUNCE_MARGIN;
-        const bottom = r.bottom + BOUNCE_MARGIN;
+        const t = getComputedStyle(fab).translate.split(" ");
+        const dx = parseFloat(t[0]) || 0;
+        const dy = parseFloat(t[1]) || 0;
+        const left = r.left - dx - BOUNCE_MARGIN;
+        const right = r.right - dx + BOUNCE_MARGIN;
+        const top = r.top - dy - BOUNCE_MARGIN;
+        const bottom = r.bottom - dy + BOUNCE_MARGIN;
         shouldYield = Array.from(document.querySelectorAll(FAB_AVOID)).some(
           (el) => {
             const b = el.getBoundingClientRect();
@@ -57,6 +66,8 @@ export function useFabYield(
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     mq.addEventListener("change", schedule);
+    ref.current?.addEventListener("focus", schedule);
+    const fabEl = ref.current;
     const main = document.getElementById("workspace-main");
     const observer =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
@@ -79,6 +90,7 @@ export function useFabYield(
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
       mq.removeEventListener("change", schedule);
+      fabEl?.removeEventListener("focus", schedule);
       observer?.disconnect();
       mutations.disconnect();
     };

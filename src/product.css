@@ -4310,11 +4310,12 @@ button.reorder-handle:disabled {
     display: none;
   }
   /* Cede o lugar no topo da página quando cobriria um controle (ver useFabYield). */
-  .mobile-fab-add[data-yield] {
+  /* Sem deslocamento (translate): o rect do botão não muda ao ceder, o que mantém a medição estável. Foco visível
+     nunca esconde o botão. */
+  .mobile-fab-add[data-yield]:not(:focus-visible):not(:focus-within) {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    translate: 0 12px;
     animation: none;
   }
 }
