@@ -3,7 +3,7 @@ import { useEffect, type RefObject } from "react";
 /* Controles que o botão flutuante não deve cobrir quando a página está no topo. As lixeiras dos itens ficam de fora
    de propósito, para o botão não sumir sempre na lista. */
 const FAB_AVOID =
-  "#workspace-main :is(.overview-room > small, .overview-room > svg, .list-search > button, .list-mobile-actions button, .stats-compact-toggle)";
+  "#workspace-main :is(.overview-room > small, .overview-room > svg, .list-search > button, .list-mobile-actions button, .stats-compact-toggle, .rooms-toolbar button, .overview-order button)";
 const TOP_THRESHOLD = 8;
 /* O botão quica até 8px para cima. */
 const BOUNCE_MARGIN = 8;
@@ -61,12 +61,26 @@ export function useFabYield(
     const observer =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
     if (main) observer?.observe(main);
+    /* A lista monta depois do primeiro cálculo e o botão volta de display:none (item aberto, aviso de desfazer): recalcula
+       em mudanças de DOM no conteúdo e nos atributos do próprio botão. O rAF junta várias mudanças num único cálculo, e
+       o filtro de atributos evita reagir ao próprio data-yield. */
+    const mutations = new MutationObserver(schedule);
+    /* Observa o contêiner do app (e não só #workspace-main), que pode ser remontado durante o carregamento. */
+    const root = ref.current?.closest(".workspace-app") ?? main ?? document.body;
+    mutations.observe(root, { childList: true, subtree: true });
+    if (ref.current)
+      mutations.observe(ref.current, {
+        attributes: true,
+        attributeFilter: ["data-item-expanded", "class"],
+      });
+    void document.fonts?.ready.then(schedule);
     return () => {
       if (frame) cancelAnimationFrame(frame);
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
       mq.removeEventListener("change", schedule);
       observer?.disconnect();
+      mutations.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
