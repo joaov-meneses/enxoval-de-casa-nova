@@ -1,7 +1,7 @@
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { motion,MotionConfig } from "motion/react";
-import React,{ lazy,Suspense } from "react";
+import React,{ lazy,Suspense,useRef } from "react";
 import { DesktopActionsMenu } from "./components/DesktopActionsMenu";
 import { ProfileDialog } from "./components/ProfileDialog";
 import { SubscriptionAccess } from "./components/SubscriptionAccess";
@@ -54,6 +54,7 @@ import { activeItems,doneItems } from "./itemStatus";
 import { parseAppRoute } from "./appRoute";
 
 import { useWorkspace } from "./hooks/useWorkspace";
+import { useFabYield } from "./components/useFabYield";
 
 const OverviewRoute = lazy(() => import("./routes/OverviewRoute"));
 const ListRoute = lazy(() => import("./routes/ListRoute"));
@@ -137,6 +138,8 @@ export default function App() {
     replaceItem,
     showToast,
   } = workspace;
+  const fabRef = useRef<HTMLButtonElement>(null);
+  useFabYield(fabRef, [workspaceView, items.length, isLoading, activeEnxoval?.id]);
   const overview = activeEnxoval ? (
     <OverviewRoute
       items={items}
@@ -890,6 +893,7 @@ export default function App() {
               variant="brand"
               size="brand"
               type="button"
+              ref={fabRef}
               className={`mobile-fab-add${toast ? " has-undo-toast" : ""}`}
               aria-label="Adicionar item ou ambiente"
               aria-haspopup="dialog"

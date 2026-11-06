@@ -768,6 +768,9 @@ export function WorkspaceOverview({
                   {room.total > 0 && (
                     <>
                       <small aria-hidden="true">
+                        {room.done && (
+                          <Check size={12} strokeWidth={2.5} aria-hidden="true" />
+                        )}
                         {room.checked}/{room.total}
                       </small>
                       <span className="sr-only">

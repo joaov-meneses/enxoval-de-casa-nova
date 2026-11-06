@@ -590,7 +590,7 @@
 
 /* Pending purchases lead the visual hierarchy; completed items stay readable and quieter. */
 .workspace-app .item-row:not(.checked):not(.inactive) {
-  --item-surface: color-mix(in oklab, var(--cm-sand) 4%, var(--cm-bg));
+  --item-surface: color-mix(in oklab, var(--cm-bg) 55%, #fff);
   background: var(--item-surface);
   border-color: color-mix(in oklab, var(--cm-primary) 32%, var(--cm-sand));
   /* Sem faixa lateral: a fila se distingue pela borda quente e pelo peso do nome, não por uma tarja em cada item. */
@@ -677,6 +677,17 @@
 .workspace-app .stats-compact-percent small {
   font-size: 15px;
 }
+/* Meu Lar (visão geral): o percentual é o número-herói; a lista mantém o compacto. */
+.workspace-app.workspace-view-overview .stats-compact-percent {
+  font-family: var(--font-serif);
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.workspace-app.workspace-view-overview .stats-compact-percent small {
+  font-size: 20px;
+}
 .workspace-app .stats-compact-detail {
   font-size: 13px;
   font-weight: 600;
@@ -689,7 +700,7 @@
   color: var(--cm-action-hover);
 }
 .workspace-app .stats-compact-grid dt {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.35;
   color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
@@ -913,7 +924,7 @@
 /* O último item da lista rola para cima do botão de adicionar, em vez de ficar escondido atrás dele. */
 @media (max-width: 1023px) {
   .workspace-app .workspace-main {
-    padding-bottom: 88px;
+    padding-bottom: 0;
   }
 }
 
@@ -1934,8 +1945,9 @@
 @media (max-width: 1023px) {
   .workspace-app .mobile-bottom-nav {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(max-content, 1fr));
     gap: 0;
+    column-gap: 2px;
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     background: #fdfcf8;
     border-top: 1px solid color-mix(in oklab, var(--cm-sand) 45%, var(--cm-bg));
@@ -1945,15 +1957,15 @@
     position: relative;
     max-width: none;
     min-height: 52px;
-    padding: 2px 2px 0;
+    padding: 2px 0 0;
     gap: 3px;
     background: transparent;
     box-shadow: none;
     border-radius: 12px;
-    font-size: 11.5px;
+    font-size: 13px;
     font-weight: 600;
     line-height: 1.1;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
     -webkit-tap-highlight-color: transparent;
   }
@@ -2012,7 +2024,7 @@
 }
 @media (max-width: 359px) {
   .workspace-app .mobile-bottom-nav { padding-inline: 4px; }
-  .workspace-app .mobile-bottom-nav button { font-size: 10.5px; }
+  .workspace-app .mobile-bottom-nav button { font-size: 13px; }
   .workspace-app .mobile-bottom-nav button::before { width: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {

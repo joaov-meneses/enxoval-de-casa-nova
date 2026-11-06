@@ -8,6 +8,7 @@
 - Ícones frequentes das linhas e alças usam a geometria SVG existente sem controles de animação. As animações de confirmação permanecem.
 - Desfoques das barras e sobreposições foram substituídos por fundos sólidos ou semitransparentes.
 - Os estados que escondem o botão flutuante ficam no próprio botão, sem seletores `:has()` no workspace nem atributos no `body`.
+- O botão flutuante cede (`data-yield`, no próprio botão) só no topo da página e só quando cobriria um controle da lista curta; o cálculo roda em scroll (rAF), resize e ResizeObserver, sem setState (`useFabYield`). `--mobile-nav-h`, `--fab-size` e `--fab-gap` são a fonte única da folga inferior.
 
 ## Medição inicial
 

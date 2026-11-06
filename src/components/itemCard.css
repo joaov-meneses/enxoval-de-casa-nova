@@ -102,6 +102,18 @@
 .workspace-app .item-row .item-meta .item-week-tag.is-late {
   color: color-mix(in oklab, var(--cm-primary-dark) 82%, var(--cm-text));
 }
+/* Só o prazo "Comprar até" tem destaque; ambiente, situação e quantidade ficam neutros. */
+.workspace-app .item-row .item-meta .item-week-tag:not(.is-late) {
+  background: color-mix(in oklab, var(--cm-primary) 10%, var(--item-surface));
+  color: var(--cm-action-hover);
+  font-weight: 700;
+}
+.workspace-app .item-row .item-meta .item-week-tag:not(.is-late) svg {
+  color: currentColor;
+}
+.workspace-app .item-row .item-meta .item-week-tag.is-manual {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--cm-primary-dark) 35%, var(--item-surface));
+}
 .workspace-app .item-row .item-meta .item-status-tag::before {
   content: "";
   width: 6px;
