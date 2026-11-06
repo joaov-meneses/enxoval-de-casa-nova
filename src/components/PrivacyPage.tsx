@@ -33,6 +33,12 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           texto: só uma versão protegida (hash).
         </li>
         <li>
+          <strong>Atendimento:</strong> nome e e-mail da conta, texto e protocolo
+          das solicitações enviadas pelo app, incluindo pedidos de cancelamento
+          e reembolso. Usamos esses registros para responder, acompanhar a demanda
+          e comprovar seu recebimento, sem vinculá-los a consentimento de marketing.
+        </li>
+        <li>
           <strong>Segurança:</strong> o endereço IP e a identificação do
           navegador (user-agent) registrados em cadastros e logins
           bem-sucedidos, inclusive em contas criadas por convite; um
