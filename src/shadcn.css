@@ -120,10 +120,6 @@ label:has(> .choice-control:focus-visible) {
   text-align: left;
 }
 
-.auth-tabs[data-slot="tabs-list"] {
-  width: 100%;
-  height: auto;
-}
 .profile-tabs[data-slot="tabs-list"] {
   width: 100%;
   height: auto;
