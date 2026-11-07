@@ -2,12 +2,13 @@ import type Stripe from 'stripe';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 import { getPool, type Queryable } from './database.ts';
-import { fiscalConfig, fiscalEnabled, queryNationalInvoice } from './fiscal/provider.ts';
+import { fiscalConfig, fiscalEnabled, fiscalEnvironment, queryNationalInvoice } from './fiscal/provider.ts';
 import { materializeFiscalEvent, saveFiscalAuthorization } from './fiscal/service.ts';
 
 export const REQUIRED_BILLING_EVENTS = ['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted',
   'checkout.session.completed', 'checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed',
-  'invoice.paid', 'charge.refunded', 'refund.created', 'refund.updated', 'refund.failed'] as const;
+  'invoice.paid', 'invoice.payment_failed', 'charge.dispute.created', 'radar.early_fraud_warning.created',
+  'charge.refunded', 'refund.created', 'refund.updated', 'refund.failed'] as const;
 export const REFUND_EVENTS = new Set(['charge.refunded', 'refund.created', 'refund.updated', 'refund.failed']);
 const idOf = (value: string | { id: string } | null | undefined) => typeof value === 'string' ? value : value?.id;
 const environmentOf = (live: boolean) => live ? 'producao' : 'homologacao';
@@ -31,6 +32,14 @@ export async function recordRefundEvent(db: Queryable, event: Stripe.Event) {
 export async function checkBilling(stripe: Stripe, webhookUrl?: string) {
   const account = await stripe.accounts.retrieve(null);
   const configurations = await stripe.paymentMethodConfigurations.list({ limit: 100 });
+  const portalId = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+  const portal = portalId ? await stripe.billingPortal.configurations.retrieve(portalId)
+    : (await stripe.billingPortal.configurations.list({ active: true, is_default: true, limit: 1 })).data[0];
+  const keyMode = /^(?:sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY || '') ? 'live'
+    : /^(?:sk|rk)_test_/.test(process.env.STRIPE_SECRET_KEY || '') ? 'test' : 'unknown';
+  const deployment = process.env.RAILWAY_ENVIRONMENT_NAME || '';
+  const expectedMode = deployment === 'production' ? 'live' : deployment === 'staging' ? 'test' : null;
+  const modeMatches = keyMode !== 'unknown' && (!expectedMode || keyMode === expectedMode);
   const endpoints = [];
   for await (const endpoint of stripe.webhookEndpoints.list({ limit: 100 })) endpoints.push(endpoint);
   const expectedUrl = webhookUrl || (process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/api/billing/webhook` : null);
@@ -40,17 +49,34 @@ export async function checkBilling(stripe: Stripe, webhookUrl?: string) {
     const id = process.env[`STRIPE_PRICE_${plan}`];
     if (!id) { prices.push({ plan: plan.toLowerCase(), valid: false }); continue; }
     const price = await stripe.prices.retrieve(id);
-    prices.push({ plan: plan.toLowerCase(), valid: price.active && price.currency === 'brl' &&
+    prices.push({ plan: plan.toLowerCase(), valid: price.active && price.currency === 'brl' && modeMatches && price.livemode === (keyMode === 'live') &&
       (plan === 'PASS' ? price.type === 'one_time' : price.recurring?.interval === 'month' && price.recurring.interval_count === 1), livemode: price.livemode });
   }
   let fiscalConfigurationValid = false;
   try { fiscalConfig(); fiscalConfigurationValid = true; } catch { /* Somente presença/validade; nunca revelar template/token. */ }
-  return { account: { id: account.id, country: account.country, chargesEnabled: account.charges_enabled, detailsSubmitted: account.details_submitted },
+  return { account: { id: account.id, country: account.country, chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled, detailsSubmitted: account.details_submitted,
+      requirementsDue: (account.requirements?.currently_due || []).length, verificationPending: (account.requirements?.pending_verification || []).length },
+    environment: { deployment: deployment || 'unspecified', expectedMode, keyMode, modeMatches },
+    portal: { found: !!portal, active: portal?.active === true, livemode: portal?.livemode,
+      modeMatches: !!portal && modeMatches && portal.livemode === (keyMode === 'live'),
+      cancellationEnabled: portal?.features.subscription_cancel.enabled === true,
+      cancellationMode: portal?.features.subscription_cancel.mode || null,
+      invoiceHistoryEnabled: portal?.features.invoice_history.enabled === true,
+      paymentMethodUpdateEnabled: portal?.features.payment_method_update.enabled === true },
     prices, pix: configurations.data.filter(c => c.active).map(c => ({ configurationId: c.id, livemode: c.livemode,
       available: c.pix?.available === true, enabled: c.pix?.display_preference.value === 'on' })),
+    pixOfferedByApp: process.env.STRIPE_PIX_ENABLED !== 'false',
     monthly: 'card', webhook: { found: !!endpoint, enabled: endpoint?.status === 'enabled',
       missingEvents: REQUIRED_BILLING_EVENTS.filter(type => !endpoint?.enabled_events.includes('*') && !endpoint?.enabled_events.includes(type)) },
-    fiscal: { enabled: fiscalEnabled(), configurationValid: fiscalConfigurationValid } };
+    fiscal: { enabled: fiscalEnabled(), environment: fiscalEnvironment(),
+      environmentMatches: keyMode !== 'unknown' && fiscalEnvironment() === environmentOf(keyMode === 'live'),
+      issuerEnabled: process.env.NFSE_NACIONAL_ISSUER_ENABLED === 'true',
+      certificatePathConfigured: !!process.env.NFSE_NACIONAL_CERT_PATH?.trim(),
+      keyPathConfigured: !!process.env.NFSE_NACIONAL_KEY_PATH?.trim(),
+      taxConfigurationPresent: !!process.env.NFSE_NACIONAL_TAX_CONFIG?.trim(),
+      accountingReferencePresent: !!process.env.NFSE_NACIONAL_ACCOUNTING_REFERENCE?.trim(),
+      configurationValid: fiscalConfigurationValid } };
 }
 
 /** Cria somente objetos de teste, usando os cenários Pix documentados pela Stripe. */
@@ -154,12 +180,51 @@ export async function reviewRefund(environment: string, chargeId: string, eventI
   try {
     await client.query('BEGIN');
     const result = await client.query(`UPDATE billing_refund_cases SET review_status = 'reviewed', review_note = $4, reviewed_at = now(), updated_at = now()
-      WHERE environment = $1 AND charge_id = $2 AND last_event_id = $3 RETURNING charge_id`, [environment, chargeId, eventId, note.trim()]);
+      WHERE environment = $1 AND charge_id = $2 AND last_event_id = $3 AND review_status = 'pending' RETURNING charge_id`, [environment, chargeId, eventId, note.trim()]);
     if (!result.rowCount) throw new Error('Pendência não encontrada ou atualizada por outro evento. Execute novamente a conciliação.');
     await client.query('INSERT INTO billing_operation_audit (id, action, environment, source_id, note) VALUES ($1, $2, $3, $4, $5)',
       [randomUUID(), 'review_refund', environment, chargeId, note.trim()]);
     await client.query('COMMIT');
     return { reviewed: chargeId };
+  } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }
+}
+
+const CASE_KINDS = ['invoice.payment_failed', 'charge.dispute.created', 'radar.early_fraud_warning.created',
+  'checkout.session.async_payment_failed'] as const;
+const validEnvironment = (environment: string) => ['homologacao', 'producao'].includes(environment);
+
+/** Fila operacional somente leitura. Não expõe nomes, e-mails, payloads Stripe ou notas de atendimento. */
+export async function listBillingCases(environment: string, kind?: string) {
+  if (!validEnvironment(environment) || kind && kind !== 'refund' && !CASE_KINDS.includes(kind as typeof CASE_KINDS[number]))
+    throw new Error('Informe ambiente homologacao/producao e um tipo de pendência válido.');
+  const result = await getPool().query(`SELECT environment, kind, source_id, last_event_id, updated_at FROM (
+      SELECT environment, 'refund'::text AS kind, charge_id AS source_id, last_event_id, updated_at
+      FROM billing_refund_cases WHERE environment=$1 AND review_status='pending'
+      UNION ALL
+      SELECT environment, kind, source_id, last_event_id, updated_at
+      FROM billing_risk_cases WHERE environment=$1 AND review_status='pending'
+    ) cases WHERE ($2::text IS NULL OR kind=$2) ORDER BY updated_at, kind, source_id LIMIT 101`, [environment, kind || null]);
+  return { environment, readOnly: true, cases: result.rows.slice(0, 100), hasMore: result.rows.length > 100 };
+}
+
+/** Atesta revisão humana do evento atual; não cancela assinatura, acesso, pagamento ou documento fiscal. */
+export async function reviewBillingCase(environment: string, kind: string, sourceId: string, eventId: string, note: string) {
+  if (kind === 'refund') return reviewRefund(environment, sourceId, eventId, note);
+  if (!validEnvironment(environment) || !CASE_KINDS.includes(kind as typeof CASE_KINDS[number]) ||
+      !/^[a-z]+_[a-zA-Z0-9_]{1,250}$/.test(sourceId) || !/^evt_[a-zA-Z0-9_]{1,250}$/.test(eventId) ||
+      note.trim().length < 15 || note.length > 1000)
+    throw new Error('Informe ambiente, tipo, origem, último evento e nota operacional de 15 a 1000 caracteres.');
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`UPDATE billing_risk_cases SET review_status='reviewed', review_note=$5,
+      reviewed_at=now(), updated_at=now() WHERE environment=$1 AND kind=$2 AND source_id=$3 AND last_event_id=$4
+      AND review_status='pending' RETURNING source_id`, [environment, kind, sourceId, eventId, note.trim()]);
+    if (!result.rowCount) throw new Error('Pendência ausente, já revisada ou alterada. Consulte a fila e confira o evento atual antes de repetir.');
+    await client.query('INSERT INTO billing_operation_audit (id, action, environment, source_id, note) VALUES ($1,$2,$3,$4,$5)',
+      [randomUUID(), 'review_billing_case', environment, `${kind}:${sourceId}`, note.trim()]);
+    await client.query('COMMIT');
+    return { environment, kind, reviewed: sourceId, eventId };
   } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }
 }
 
