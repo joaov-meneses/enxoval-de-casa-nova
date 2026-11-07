@@ -27,14 +27,14 @@ A entrega acrescenta fila de falhas de cobrança, contestação, alerta de fraud
 
 O diagnóstico encontrou todas as variáveis fiscais ausentes nos dois ambientes. A configuração manual segura usa ambiente `producao` em production e `homologacao` em staging, com transmissão e habilitação desligadas. Isso permite processar a fila correta, sem emitir notas. Faltam A1 real, habilitação e parâmetros aprovados pela contabilidade; os certificados no repositório são apenas sintéticos. A decisão versionada pela SEFIN não equivale a um procedimento fiscal operacional já aprovado. Não foi concluída compra nem emissão fiscal real nesta auditoria.
 
-Staging continua na conta de teste `acct_1UQcAPIzzRKYM0sE`, URL `https://larume-staging.up.railway.app`, preços e webhook de teste, com cartão/Pix para o Passe. Os dois deployments concluíram com sucesso, a saúde HTTP retornou 200 e os webhooks aceitaram o evento sintético assinado com o segredo do respectivo ambiente e rejeitaram a requisição sem assinatura.
+Na configuração anterior de [Black Friday](black-friday-2026.md), staging permaneceu na conta de teste `acct_1UQcAPIzzRKYM0sE`, URL `https://larume-staging.up.railway.app`, preços e webhook de teste, com cartão/Pix para o Passe. Aqueles dois deployments concluíram com sucesso, a saúde HTTP retornou 200 e os webhooks aceitaram o evento sintético assinado com o segredo do respectivo ambiente e rejeitaram a requisição sem assinatura. Isso não representa publicação da entrega atual de riscos operacionais.
 
 O código `BLACKFRIDAY` oferece 30% nos dois planos, apenas na primeira cobrança, até 30/11/2026 inclusive. Existe uma promoção independente em cada conta. Sessões Stripe LIVE e de teste confirmaram Mensal por R$ 20,93 e Passe por R$ 69,30 e foram expiradas sem pagamento. Detalhes, IDs e limites da validação em [Black Friday 2026](black-friday-2026.md).
 
 ### Histórico: situação verificada em 22/10/2026
 
 - Pix ativado na configuração padrão **de teste** da conta Stripe `acct_1UQcAPIzzRKYM0sE`; consulta posterior retornou `available=true` e preferência `on`.
-- O webhook de teste `https://larume-staging.up.railway.app/api/billing/webhook` foi configurado para receber todos os eventos listados acima, preservando as inscrições anteriores.
+- O webhook de teste `https://larume-staging.up.railway.app/api/billing/webhook` foi configurado para os eventos vigentes naquele diagnóstico, preservando as inscrições anteriores. Os três eventos adicionais de falha de fatura, disputa e fraude pertencem à entrega posterior de prontidão.
 - Checkout de teste com o preço real do Passe aceitou Pix/cartão e foi expirado após a verificação. Os cenários oficiais `succeed_immediately` e `expire_immediately` retornaram, respectivamente, `succeeded` e `requires_payment_method` com falha de pagamento. Nenhum valor real foi cobrado.
 - A conta retornou `charges_enabled=false` e `details_submitted=false`. Tanto `staging` quanto `production` na Railway estão configurados com chave **de teste**; `APP_URL` em ambos aponta para staging. Não se trata de ativação de produção.
 - Transmissão fiscal continua desabilitada: faltam certificado, habilitação do CNPJ e parâmetros contábeis. Nenhuma nota fiscal real foi emitida.

@@ -7,7 +7,7 @@ Data: 06/11/2026. Estado: código integrado em branch de preparação, revisão 
 - Eventos de falha de fatura, falha assíncrona do Checkout, contestação e alerta de fraude geram casos operacionais duráveis. Referências são consultadas na Stripe antes da transação; metadata não decide titularidade. Eventos antigos, duplicados e revisões concorrentes têm proteção explícita.
 - CLI de diagnóstico, listagem e revisão, com auditoria do evento exato conferido e isolamento TEST/LIVE. Os procedimentos estão em [Operação de pagamentos](operacao-pagamentos-producao.md).
 - Portal do Cliente utiliza a configuração explícita do ambiente quando informada. Cancelamento permanece imediato, conforme a confirmação do app. O pedido de reembolso continua registrando solicitação/protocolo; a equipe executa o estorno e revisa acesso e nota fiscal separadamente.
-- Logs do webhook preservam identificador, tipo e modo, sem guardar payload financeiro ou exceção bruta do SDK no log.
+- Logs `billing.webhook.*` preservam identificador, tipo e modo, sem guardar payload financeiro ou exceção bruta do SDK no log.
 - CI inclui os novos testes e cobrança/atendimento/fiscal, com gatilhos para os três destinos do fluxo Git. Nenhum push direto em main foi feito.
 
 ## Configuração externa conferida
@@ -20,7 +20,9 @@ Data: 06/11/2026. Estado: código integrado em branch de preparação, revisão 
 | Pix | disponível na Stripe; variável preparada como `true`, sem deploy novo em produção nesta entrega | variável `true`, aplicar/conferir no deploy de staging |
 | Fiscal | ambiente `producao`, emissão/habilitação desligadas, momento manual | ambiente `homologacao`, emissão/habilitação desligadas, momento manual |
 
-Os portais foram criados/conferidos pela API e duas sessões de Portal foram abertas com clientes sintéticos, depois excluídos. Sessões de checkout Mensal/Passe foram criadas nas duas contas e imediatamente expiradas: Mensal com cartão e teste de 48 horas; Passe com cartão/Pix; cupom permitido e links legais presentes. Nenhuma compra foi concluída.
+As variáveis Railway foram gravadas com `skipDeploys`: staging recebe a configuração no deploy desta entrega; produção aguarda uma futura publicação autorizada. A configuração do Portal na Stripe já está ativa, independentemente de deploy.
+
+Os portais foram criados/conferidos pela API e duas sessões de Portal foram criadas com clientes sintéticos, depois excluídos. Sessões de checkout Mensal/Passe foram criadas nas duas contas e imediatamente expiradas: Mensal com cartão e teste de 48 horas; Passe com cartão/Pix; cupom permitido e links legais presentes. Nenhuma compra foi concluída.
 
 A chave restrita de produção e a chave de teste permitem leitura dos recursos exigidos pelo novo tratamento: disputas, alertas de fraude, InvoicePayments, faturas e assinaturas. A conferência não registrou dados dos clientes.
 
