@@ -205,59 +205,12 @@
   top: 0;
   z-index: 6;
 }
-.workspace-app .casamia-dialog.item-edit-dialog > .item-inline-panel {
-  padding: 4px 16px 0;
-  background: none;
-  border: 0;
-  outline: none;
-}
-/* A janela dá 44px a todo botão; a caixinha de marcar mantém o próprio tamanho. */
-.workspace-app .item-edit-dialog button[role="checkbox"] {
-  min-height: 0;
-}
-.workspace-app .item-edit-dialog .item-inline-actions {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  margin: 0 -16px;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
-  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 41%, #fff);
-  backdrop-filter: none;
-}
-.workspace-app .item-edit-dialog .item-inline-actions .button {
-  flex: 1;
-  min-height: 44px;
-}
 @media (min-width: 768px) {
   .workspace-app .casamia-dialog.item-edit-dialog {
     width: min(760px, calc(100vw - 48px));
     animation-name: item-dialog-pop-in;
     animation-duration: 260ms;
   }
-  .workspace-app .casamia-dialog.item-edit-dialog > .item-inline-panel {
-    padding: 8px 24px 0;
-  }
-  .workspace-app .item-edit-dialog .item-inline-actions {
-    margin: 0 -24px;
-    padding: 14px 24px;
-    justify-content: flex-end;
-  }
-  .workspace-app .item-edit-dialog .item-inline-actions .button {
-    flex: 0 0 auto;
-    min-width: 140px;
-  }
-}
-/* A grade de 12 colunas foi feita para o painel largo de antes; na janela, duas colunas em qualquer tela. */
-.workspace-app .casamia-dialog.item-edit-dialog .item-inline-panel .item-inline-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-}
-.workspace-app .casamia-dialog.item-edit-dialog .item-inline-panel .item-inline-grid > * {
-  grid-column: auto;
-}
-.workspace-app .casamia-dialog.item-edit-dialog .item-inline-panel .item-inline-grid > .item-inline-wide {
-  grid-column: 1 / -1;
 }
 @keyframes item-dialog-sheet-in {
   from {

@@ -2,13 +2,13 @@
 
 > **Objetivo:** Reunir as próximas entregas técnicas e de produto do **Casa Mia**.
 >
-> **Este documento lista só o que falta fazer.** Revisado em **24/10/2026**, considerando o código atual, inclusive alterações locais. A numeração das fases foi preservada para manter as referências entre documentos. Configurações de produção devem ser confirmadas no ambiente antes de serem consideradas pendências.
+> **Este documento lista só o que falta fazer.** Pagamentos revisados em **06/11/2026**; demais áreas mantêm a revisão de 24/10/2026, considerando o código atual, inclusive alterações locais. A numeração das fases foi preservada para manter as referências entre documentos. Configurações de produção devem ser confirmadas no ambiente antes de serem consideradas pendências.
 
 ---
 
 ## 1. O que ainda falta
 
-1. **Pagamentos (produção):** concluir cadastro Stripe, configurar chaves/preços/webhook live e URL de produção, ativar Pix live e validar compra até a liberação de acesso no processo publicado; para a NFS-e (código pronto), obter certificado A1, confirmar habilitação e política contábil e homologar no Emissor Nacional antes de ativar a transmissão (Fases 2 e 5; ver [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md)).
+1. **Pagamentos (produção):** verificar a disponibilidade de Pix live e validar compra até a liberação de acesso no processo publicado; cadastro, chaves, preços, webhook, URLs separadas por ambiente e marca do Checkout já foram configurados. Para a NFS-e (código pronto), obter certificado A1, confirmar habilitação e política contábil e homologar no Emissor Nacional antes de ativar a transmissão (Fases 2 e 5; ver [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md)).
 2. **Produção:** Dockerfile, confirmação de backups, domínio e DNS; e-mails de boas-vindas/presente/resumo, ativação da emissão fiscal e depósito de marca (Fase 5).
 3. **Analytics (configuração nas contas):** o código está pronto; falta configurar Google (Tag Manager, GA4, Ads, Search Console), PostHog (funis, painéis e alertas por versão) e o webhook do Resend com os dados reais, e ligar os e-mails em produção (Fase 7).
 4. **Idiomas e preço por região:** app só em português e reais (Fase 8).
@@ -34,8 +34,7 @@ flowchart LR
 ### FASE 2: Pix em Produção
 
 #### 2.1 Pendências operacionais de lançamento
-* Concluir o cadastro Stripe e habilitar cobranças reais. Os ambientes `staging` e `production` na Railway ainda usam chave de teste e URL de staging.
-* Configurar chave, preços, URL e webhook próprios de produção; ativar Pix na configuração live.
+* Verificar a disponibilidade de Pix na configuração live: em 06/11/2026 a Stripe retornou `available=false`; produção usa cartão até que o meio esteja disponível e seja validado.
 * Publicar o código e validar uma compra real autorizada no Passe em BRL, incluindo confirmação assinada no webhook, liberação única de acesso e tratamento de expiração. Seguir o procedimento de [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md).
 
 ---
@@ -148,7 +147,7 @@ Decisão: não esconder valores para revelá-los só no paywall. Motivos: contra
 
 | Ordem | Entregável | Impacto Principal | Complexidade |
 |:---:|---|---|:---:|
-| **2º** | **Fase 2 (restante):** Cadastro Stripe, configuração live e validação do Pix em produção | Monetização e Negócio | Baixa-Média |
+| **2º** | **Fase 2 (restante):** Disponibilidade e validação do Pix e compra real em produção | Monetização e Negócio | Baixa-Média |
 | **5º** | **Fase 5 (restante):** Dockerfile, validação de infraestrutura e DNS, novos e-mails e ativação fiscal | Escala e Estabilidade | Média |
 | **7º** | **Fase 7 (configuração):** Google, PostHog e Resend com dados reais; ligar os e-mails em produção | Aquisição, Ativação e Retenção | Baixa |
 | **8º** | **Fase 8:** Inglês e espanhol no app inteiro + preço, impostos e conteúdo por região | Novos Mercados e Receita | Alta |

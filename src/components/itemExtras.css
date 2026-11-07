@@ -259,21 +259,6 @@
   }
 }
 
-/* Formulário do item em 12 colunas (product.css, a partir de 1360px): sem um span, cada campo novo ficaria com 1/12
-   da largura. Parcelas e garantia seguem a linha de Valores (4 por linha); a loja fica ao lado da garantia. */
-@media (min-width: 1360px) {
-  .workspace-app .item-inline-grid > .item-field-installments,
-  .workspace-app .item-inline-grid > .item-field-payment,
-  .workspace-app .item-inline-grid > .item-field-installment-value,
-  .workspace-app .item-inline-grid > .item-field-purchased,
-  .workspace-app .item-inline-grid > .item-field-first-installment,
-  .workspace-app .item-inline-grid > .item-field-warranty,
-  .workspace-app .item-inline-grid > .item-field-warranty-until { grid-column: span 3; }
-  .workspace-app .item-inline-grid > .item-field-gift-from,
-  .workspace-app .item-inline-grid > .item-field-thanked,
-  .workspace-app .item-inline-grid > .item-field-store { grid-column: span 6; }
-}
-
 /* "Estou na loja" fica só no celular; no desktop, o modo loja sai do menu do enxoval. */
 .store-mode-entry {
   display: none;
@@ -288,13 +273,6 @@
   display: none;
 }
 
-/* O formulário compacto esconde títulos e dicas; as seções novas e as contas de parcela/garantia continuam à vista. */
-.workspace-app .item-inline-section.is-visible {
-  display: block;
-}
-.workspace-app .item-inline-hint.item-extra-note {
-  display: block;
-}
 .item-doc-list li:has(.receipt-read-button) { grid-template-areas: "icon name remove" "icon meta remove" "read read read"; }
 .receipt-read-button { grid-area: read; justify-self: start; color: var(--cm-primary-dark); font-weight: 700; margin-top: 4px; min-height: 44px; }
 .receipt-review { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--cm-sand); border-radius: 12px; background: var(--cm-bg); }

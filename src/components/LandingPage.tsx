@@ -537,6 +537,8 @@ export function LandingPage({ signedIn, authLoading = false }: { signedIn: boole
           <a href="#planos" onClick={() => trackLandingCta('view_pricing', 'footer')}>Preços</a>
           <a href="/como-o-nino-escolhe">Como o Nino escolhe</a>
           <a href="/privacidade">Privacidade</a>
+          <a href="/termos">Termos de Uso</a>
+          <a href="/reembolso">Cancelamento e reembolso</a>
           {consentRequired() && (
             <a href="/privacidade" onClick={(event) => { event.preventDefault(); openConsentPreferences(); }}>
               Preferências de privacidade

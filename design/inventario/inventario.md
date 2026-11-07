@@ -47,6 +47,9 @@ As capturas finais ficam em `design/inventario/capturas/` (reduzidas e mascarada
 | T21 | Administração | `/admin` | administrador | | | **não verificado**: exige credencial própria da administração, que não foi usada |
 | T22 | Página do Chá de Casa Nova (convidado) | não encontrada | público | | | **não verificado**: a landing e o plano pago prometem a página, mas não há rota nem tela no código. Registrado como lacuna |
 | T23 | Menu Exportar, histórico de preço, abertura do item | `/app` | autenticado | | | **não verificado**: o menu abre abaixo da dobra e não foi capturado |
+| T24 | Checkout hospedado da Stripe | `checkout.stripe.com` (sessão criada pelo app) | usuário do app com plano selecionado | configuração de marca e cupom conferida pela API em 06/11/2026 | | Parâmetros verificados: fundo `#f8f3eb`, botão `#a34c30`, Nunito, Nino oficial e campo de código promocional. Conferência visual em 320, 375 e 425 px **não executada**, por indisponibilidade do navegador. Ver `docs/checkout-stripe-casa-mia.md`. |
+| T25 | Termos de Uso | `/termos` | público | texto, fornecedor, contato e links legais | | Verificado em 06/11/2026 por Playwright em 320, 375 e 425 px, sem rolagem horizontal. Ver `docs/politicas-consumidor.md`. |
+| T26 | Cancelamento e reembolso | `/reembolso` | público; envio pelo app exige sessão | política, solicitação, protocolo e erro de autenticação | | Verificado em 06/11/2026 por Playwright em 320, 375 e 425 px; imagens inspecionadas. Fluxo reutiliza a central de ajuda. Ver `docs/politicas-consumidor.md`. |
 
 Estados mínimos a cobrir por tela: padrão, vazio, carregando, erro, e paywall quando aplicável. Carregando e erro não foram capturados em nenhuma tela (exigiriam simular falha de rede).
 

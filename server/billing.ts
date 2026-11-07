@@ -19,6 +19,7 @@ import { enqueueFiscalEvent } from './fiscal/service.ts';
 import { recordRefundEvent, REFUND_EVENTS } from './billingOperations.ts';
 import { fiscalEnabled } from './fiscal/provider.ts';
 import { registerFiscalRoutes } from './fiscal/routes.ts';
+import { checkoutPolicyText } from '../shared/legal.ts';
 
 type PaidPlan = 'monthly' | 'pass';
 const PAID_PLANS: PaidPlan[] = ['monthly', 'pass'];
@@ -390,7 +391,7 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
     if (!baseUrl) throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
 
     const returnPath = checkoutReturnPath(req.body?.returnTo);
-    const checkoutConfiguration = `card:${fiscalEnabled() ? 'fiscal-v1' : 'standard'}:${returnPath}`;
+    const checkoutConfiguration = `card:${fiscalEnabled() ? 'fiscal-v1' : 'standard'}:legal-v1:${returnPath}`;
     if (plan === 'monthly') {
       const cached = await client.query<{url: string}>('SELECT url FROM billing_checkouts WHERE user_id = $1 AND expires_at > now() AND configuration_key = $2', [user.id, checkoutConfiguration]);
       if (cached.rows[0]) return cached.rows[0].url;
@@ -417,6 +418,9 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
       line_items: [{ price: priceIdFor(plan), quantity: 1 }],
       allow_promotion_codes: true,
       locale: 'pt-BR',
+      custom_text: { submit: { message: checkoutPolicyText(baseUrl, plan === 'monthly'
+        ? (!row.trial_used ? 'Teste completo por 2 dias (48 horas). Após esse período, cobraremos automaticamente o valor mensal no cartão. Cancele no app antes do término para evitar a cobrança. O cancelamento encerra também o acesso dos convidados.' : 'A assinatura será cobrada agora. O teste gratuito só pode ser usado uma vez.')
+        : 'Pagamento único para 12 meses de acesso. Sem renovação automática.') } },
       // Stripe 23 / API 2026-09-30: payment_method_types foi substituído por allowed_payment_method_types.
       allowed_payment_method_types: pix ? ['card', 'pix'] : ['card'],
       ...(pix ? { payment_method_options: { pix: { expires_after_seconds: 3600 } } } : {}),
@@ -432,8 +436,7 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
         subscription_data: {
           metadata: { userId: user.id },
           ...(!row.trial_used ? { trial_period_days: 2, trial_settings: { end_behavior: { missing_payment_method: 'cancel' as const } } } : {})
-        },
-        custom_text: { submit: { message: !row.trial_used ? 'Teste completo por 2 dias (48 horas). Após esse período, cobraremos automaticamente o valor mensal no cartão. Cancele no app antes do término para evitar a cobrança. O cancelamento encerra também o acesso dos convidados.' : 'A assinatura será cobrada agora. O teste gratuito só pode ser usado uma vez.' } }
+        }
       } : {}),
       success_url: `${baseUrl}${returnPath}?assinatura=sucesso&plano=${plan}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}${returnPath}?assinatura=cancelada`

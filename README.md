@@ -36,6 +36,8 @@ Os logs estruturados do backend e o envio completo ao PostHog Logs estão em [do
 | `/convite#token=…` | Aceite de convite para participar de um enxoval |
 | `/esqueci-senha` e `/redefinir-senha` | Recuperação de senha por e-mail |
 | `/privacidade` | Política de privacidade |
+| `/termos` | Termos de Uso, fornecedor e contato |
+| `/reembolso` | Cancelamento, arrependimento em 7 dias e solicitação pelo app |
 | `/admin` | Gestão de usuários (acesso administrativo separado das contas de clientes) |
 
 O produto exige conta e servidor completo, com PostgreSQL: não existe modo de demonstração nem prévia sem banco.

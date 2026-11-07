@@ -158,6 +158,11 @@ test('SEO: metadados por página pública, noindex nas privadas, robots e sitema
   assert.match(robotsTxt('https://casamia.app'), /Disallow: \/app\n[\s\S]*Sitemap: https:\/\/casamia\.app\/sitemap\.xml/);
   assert.match(sitemapXml('https://casamia.app'), /<loc>https:\/\/casamia\.app\/como-o-nino-escolhe<\/loc>/);
   assert.equal(sitemapXml('https://casamia.app').includes('/app<'), false);
+  for (const path of ['/termos', '/reembolso']) {
+    assert.equal(isPrivatePath(path), false);
+    assert.ok(sitemapXml('https://casamia.app').includes(`https://casamia.app${path}`));
+    assert.ok(renderPageHtml(html, path, 'https://casamia.app').includes(`href="https://casamia.app${path}"`));
+  }
 });
 
 test('receita recorrente, painel de efeito, campanhas e rotinas', () => {
