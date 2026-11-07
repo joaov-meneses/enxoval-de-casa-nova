@@ -62,6 +62,14 @@ try {
   await reviewBillingCase('homologacao', kind, 'in_review', 'evt_new', note);
   await reviewBillingCase('homologacao', 'refund', 'ch_review', 'evt_refund', note);
   await assert.rejects(() => reviewBillingCase('homologacao', 'refund', 'ch_review', 'evt_refund', note));
+  const history = (await db.query("SELECT note FROM billing_operation_audit WHERE action='review_billing_case' AND source_id=$1", [`${kind}:in_review`])).rows.map(row => row.note);
+  assert.equal(history.length, 2);
+  assert(history.includes(`[event_id=evt_current] ${note}`), 'auditoria conserva o evento da primeira revisão após a reabertura');
+  assert(history.includes(`[event_id=evt_new] ${note}`), 'auditoria distingue a nova ocorrência revisada');
+  assert.equal((await db.query("SELECT note FROM billing_operation_audit WHERE action='review_refund' AND source_id='ch_review'")).rows[0].note,
+    `[event_id=evt_refund] ${note}`);
+  assert.equal((await db.query("SELECT review_note FROM billing_risk_cases WHERE source_id='in_review'")).rows[0].review_note, note,
+    'nota operacional original permanece separada do identificador histórico');
 
   const fake = {
     accounts: { retrieve: async () => ({ id: 'acct_synthetic', country: 'BR', charges_enabled: true, payouts_enabled: true, details_submitted: true }) },

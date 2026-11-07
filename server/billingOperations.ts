@@ -183,7 +183,7 @@ export async function reviewRefund(environment: string, chargeId: string, eventI
       WHERE environment = $1 AND charge_id = $2 AND last_event_id = $3 AND review_status = 'pending' RETURNING charge_id`, [environment, chargeId, eventId, note.trim()]);
     if (!result.rowCount) throw new Error('Pendência não encontrada ou atualizada por outro evento. Execute novamente a conciliação.');
     await client.query('INSERT INTO billing_operation_audit (id, action, environment, source_id, note) VALUES ($1, $2, $3, $4, $5)',
-      [randomUUID(), 'review_refund', environment, chargeId, note.trim()]);
+      [randomUUID(), 'review_refund', environment, chargeId, `[event_id=${eventId}] ${note.trim()}`]);
     await client.query('COMMIT');
     return { reviewed: chargeId };
   } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }
@@ -222,7 +222,7 @@ export async function reviewBillingCase(environment: string, kind: string, sourc
       AND review_status='pending' RETURNING source_id`, [environment, kind, sourceId, eventId, note.trim()]);
     if (!result.rowCount) throw new Error('Pendência ausente, já revisada ou alterada. Consulte a fila e confira o evento atual antes de repetir.');
     await client.query('INSERT INTO billing_operation_audit (id, action, environment, source_id, note) VALUES ($1,$2,$3,$4,$5)',
-      [randomUUID(), 'review_billing_case', environment, `${kind}:${sourceId}`, note.trim()]);
+      [randomUUID(), 'review_billing_case', environment, `${kind}:${sourceId}`, `[event_id=${eventId}] ${note.trim()}`]);
     await client.query('COMMIT');
     return { environment, kind, reviewed: sourceId, eventId };
   } catch (err) { await client.query('ROLLBACK'); throw err; } finally { client.release(); }

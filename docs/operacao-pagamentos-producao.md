@@ -35,7 +35,7 @@ npm run billing:ops -- list-cases --environment homologacao
 npm run billing:ops -- review-case --environment producao --kind invoice.payment_failed --source in_EXEMPLO --event evt_EXEMPLO --note "Conferido no Stripe; titular orientado pelo canal de suporte."
 ```
 
-Use exatamente o `kind`, `source_id` e `last_event_id` retornados na fila. A revisão usa transação e comparação do evento: só um operador encerra a mesma pendência; eventos posteriores exigem nova conferência. A operação grava auditoria e não cancela assinatura, acesso ou nota, não cobra nem estorna. Para reembolso, `--kind refund --source ch_EXEMPLO` usa a fila de estornos existente.
+Use exatamente o `kind`, `source_id` e `last_event_id` retornados na fila. A revisão usa transação e comparação do evento: só um operador encerra a mesma pendência; eventos posteriores exigem nova conferência. A auditoria conserva o identificador do evento revisado junto da nota, mesmo quando outro evento reabre a pendência. A operação não cancela assinatura, acesso ou nota, não cobra nem estorna. Para reembolso, `--kind refund --source ch_EXEMPLO` usa a fila de estornos existente.
 
 ## Pedido de arrependimento e reembolso
 
