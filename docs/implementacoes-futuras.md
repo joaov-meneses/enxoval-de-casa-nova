@@ -8,7 +8,7 @@
 
 ## 1. O que ainda falta
 
-1. **Pagamentos (produção):** verificar a disponibilidade de Pix live e validar compra até a liberação de acesso no processo publicado; cadastro, chaves, preços, webhook, URLs separadas por ambiente e marca do Checkout já foram configurados. Para a NFS-e (código pronto), obter certificado A1, confirmar habilitação e política contábil e homologar no Emissor Nacional antes de ativar a transmissão (Fases 2 e 5; ver [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md)).
+1. **Pagamentos (ativação em produção):** a entrega de Portal do Cliente, Pix no Passe e revisão auditada de falhas/disputas/fraude está preparada para homologacao, destino solicitado pelo responsável. Depois da validação e de uma futura promoção autorizada, conferir os novos eventos no webhook LIVE e uma compra real até a liberação de acesso. Cadastro, chaves, preços, URLs por ambiente, marca e políticas já estão configurados. Para NFS-e, obter A1 real, habilitação e política contábil e homologar no Emissor Nacional antes de ativar transmissão; fixtures não substituem esses requisitos. Ver [`prontidao-stripe-homologacao.md`](./prontidao-stripe-homologacao.md) e [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md).
 2. **Produção:** Dockerfile, confirmação de backups, domínio e DNS; e-mails de boas-vindas/presente/resumo, ativação da emissão fiscal e depósito de marca (Fase 5).
 3. **Analytics (configuração nas contas):** o código está pronto; falta configurar Google (Tag Manager, GA4, Ads, Search Console), PostHog (funis, painéis e alertas por versão) e o webhook do Resend com os dados reais, e ligar os e-mails em produção (Fase 7).
 4. **Idiomas e preço por região:** app só em português e reais (Fase 8).
