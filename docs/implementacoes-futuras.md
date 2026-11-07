@@ -109,6 +109,15 @@ flowchart LR
 
 ---
 
+### Pendências do redesenho de entrar e criar conta (2026-11-06)
+
+* **Cadastro revela conta existente:** `POST /api/auth/register` ainda responde 409 com "Já existe uma conta com esse e-mail." (`server/routes.ts`). A tela mostra um texto neutro, mas a existência da conta continua visível na resposta de rede. A correção real é no servidor (resposta idêntica e e-mail ao dono da conta).
+* **Aceite dos Termos de Uso sem registro:** o texto legal do cadastro diz "você concorda com os Termos de Uso", mas o servidor não grava aceite nem versão dos termos. Pedir revisão jurídica e registrar versão e data do aceite.
+* **Origem do consentimento de e-mails:** a caixa opcional continua no cadastro (grava `source='cadastro'`). Se for movida para o funil `/comecar`, a rota `PATCH /api/profile/marketing` precisa aceitar a origem `funil` (hoje grava `perfil` fixo; `tests/growth-db.mjs` fixa esse valor) e o funil ganhar uma tela para ela.
+* **Troca de modo em `/app/...`:** o link entre entrar e criar conta faz `replaceState` para `/login` ou `/cadastro` mesmo quando a tela foi aberta sobre um caminho do app. Comportamento antigo, mantido.
+
+---
+
 ### Validação operacional: celulares físicos
 
 As implementações de documentos, OCR local de notas, retorno pelos lembretes de garantia e cache completo do modo loja estão concluídas. O armazenamento pode continuar no PostgreSQL; um bucket S3/R2 é uma opção de escala, não um requisito desta fase.
@@ -124,7 +133,7 @@ Falta executar em Android e iPhone físicos o roteiro de perda de sinal, reabert
 Hoje o teste dura 48 horas, com cartão cadastrado e cobrança automática do Mensal ao final. A mudança é de duração; o modelo (cartão no início, cancelamento no app, bloqueio dos convidados ao cancelar) continua o mesmo.
 
 * **Cobrança:** `server/billing.ts` (linha ~393) usa `trial_period_days: 2`; passar para `3`. Trocar também o texto de `custom_text.submit.message` ("Teste completo por 2 dias (48 horas)").
-* **Textos de interface com "48 horas" ou "2 dias":** `src/components/LandingPage.tsx` (9 ocorrências, incluindo o selo do hero e o FAQ), `PlanSelection.tsx` (8), `SubscriptionAccess.tsx` (2, inclusive "São 48 horas completas"), `AuthPage.tsx` (2), `ProfileDialog.tsx`, `OnboardingFlow.tsx`, `AdminPage.tsx`, e e-mails em `server/mailer.ts` (2). Procurar por `48 horas|48h|2 dias|dois dias`; algumas ocorrências de `24 horas` são do lembrete e não mudam.
+* **Textos de interface com "48 horas" ou "2 dias":** `src/components/LandingPage.tsx` (9 ocorrências, incluindo o selo do hero e o FAQ), `PlanSelection.tsx` (8), `SubscriptionAccess.tsx` (2, inclusive "São 48 horas completas"), `AuthPage.tsx` (1, o aviso "Depois você escolhe: Passe de R$ 99 ou Mensal com 2 dias grátis, com cartão." do cadastro; só o preço do Passe vem de `src/plans.ts`, os "2 dias" são literais), `ProfileDialog.tsx`, `OnboardingFlow.tsx`, `AdminPage.tsx`, e e-mails em `server/mailer.ts` (2). Procurar por `48 horas|48h|2 dias|dois dias`; algumas ocorrências de `24 horas` são do lembrete e não mudam.
 * **Lembrete das últimas 24 horas:** `server/workers/trialNotifications.ts` continua válido; confirmar que ele usa `trial_ends_at` e não uma duração fixa.
 * **Testes:** `tests/billing-db.mjs` (`trial_period_days, 2`, `48 * 3600`, `23 hours`) e `tests/freemium-db.mjs` (`interval '48 hours'`) passam para 72 horas. Rodar `npm run test:billing-db`, `npm run lint`, `npm run build` e `node tests/trial-ui.mjs`.
 * **Documentação:** atualizar a seção "Trial e cobrança" do `README.md` e `docs/analytics.md` se citar a duração.

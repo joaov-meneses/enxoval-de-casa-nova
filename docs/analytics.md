@@ -93,7 +93,7 @@ A seção **Operação** do `/admin` mostra:
 
 | Fluxo | Eventos e propriedades |
 | --- | --- |
-| Visitas | `$pageview` (`route`), incluindo troca de abas de login/cadastro via History API |
+| Visitas | `$pageview` (`route`), incluindo a troca entre login e cadastro via History API |
 | Cadastro e login | `signup_submit`, `signup_success`, `login_success`, `logout` |
 | Onboarding | `onboarding_start` (`resumed`), `step_view` e `step_complete` (`step`, `index`), `onboarding_back` (`step`), `plan_ready` (`items`, `rooms`), `commitment_signed` (pacto assinado), `onboarding_submit`, `onboarding_complete` (respostas em categorias e faixas, abaixo) |
 | Respostas do funil | Em `onboarding_complete` e gravadas na pessoa (`$set`), para quebrar funis, retenção e conversão: `moment`, `housing`, `people_bucket` (`1` a `5+`), `rooms_count`, `items_count`, `no_rooms`, `owned`, `style`, `budget`, `spending_tier`, `has_move_date`, `weeks_to_move_bucket` (`sem_data`, `0-4`, `5-12`, `13-26`, `27+`), `uf`, `has_city`, `worries_count`, `worry_<start/waste/forget/budget/time>`, `worries_none`, `worries_none_reason` (se escreveu um motivo, nunca o texto), `usage_count`, `usage_<buy/spend/links/share>`, `usage_none`, `usage_none_reason`. Nome, data exata, cidade e textos livres não vão (`src/onboarding/metrics.ts`) |

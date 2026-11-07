@@ -1,14 +1,14 @@
 # Funil de onboarding do Casa Mia (`/comecar`)
 
-A pessoa cria a conta primeiro (`/login`, aba "Criar conta") e só depois responde a perguntas curtas para receber um **plano de enxoval de casa nova já montado**. O funil é a etapa pós-cadastro: exige sessão autenticada e termina criando o primeiro enxoval, já com o plano.
+A pessoa cria a conta primeiro (`/cadastro`) e só depois responde a perguntas curtas para receber um **plano de enxoval de casa nova já montado**. O funil é a etapa pós-cadastro: exige sessão autenticada e termina criando o primeiro enxoval, já com o plano.
 
 **Regra de produto: o funil só existe para quem já tem conta e ainda não montou um enxoval.**
 
-- `/comecar` exige sessão: sem conta, redireciona para `/cadastro` (a mesma tela de `/login`, com a aba "Criar conta" já aberta).
+- `/comecar` exige sessão: sem conta, redireciona para `/cadastro` (a mesma tela de `/login`, já no modo de criar conta).
 - Quem já tem ao menos um enxoval (já passou pelo funil, ou criou um enxoval de outro jeito) é redirecionado de `/comecar` para `/app` — o funil não se repete.
-- `/login` tem as duas abas, **Entrar** e **Criar conta**, na mesma tela. Criar conta pede só e-mail, senha e confirmação da senha (o nome é perguntado no funil, no passo `name`); o próximo passo é sempre `/comecar`.
+- `/login` e `/cadastro` são a mesma tela, sem abas: a troca entre **entrar** e **criar conta** é um link de rodapé ("Criar conta" no login, "Entre por aqui" no cadastro), que mantém o e-mail digitado. Criar conta pede só e-mail e senha, sem confirmação da senha (o botão de mostrar senha confere a digitação; o nome é perguntado no funil, no passo `name`); o próximo passo é sempre `/comecar`.
 - O cadastro (`POST /api/auth/register`) cria **só a conta**, sem nenhum enxoval e sem nome (a conta usa o começo do e-mail como nome provisório até o funil terminar). O primeiro enxoval (com o plano do funil, ou com o template padrão) é criado depois, autenticado, em `POST /api/enxovais`.
-- Quem cria a conta e sai no meio do funil pode voltar: ao entrar de novo em `/login` (aba Entrar) com zero enxovais, o login manda para `/comecar` em vez de `/app`.
+- Quem cria a conta e sai no meio do funil pode voltar: ao entrar de novo em `/login` com zero enxovais, o login manda para `/comecar` em vez de `/app`.
 - `POST /api/enxovais` aceita opcionalmente `plan` (ao menos um item) e `profile` (as respostas do funil); com `plan` presente, o perfil é validado por completo e qualquer valor fora do permitido responde 400 sem criar nada. Sem `plan`, segue o fluxo normal de "criar enxoval" (com ou sem o template padrão).
 
 A referência foi um app de enxoval de bebê (29 telas, 12 perguntas, ~3 minutos). Mantivemos a estrutura (boas-vindas → perguntas curtas → telas de respiro → "montando seu plano" → plano pronto → comparação → salvar) e mudamos o que não se sustentava (ver "O que não copiamos").
@@ -130,13 +130,13 @@ O funil ficou mais longo; as três telas não pedem nenhuma resposta. Vale medir
 - **"Entrar com meu convite":** convite por e-mail exige conta; não há link de convite.
 
 ## Integração
-- **Cadastro (`/login`, aba "Criar conta"):** chama `POST /api/auth/register` com e-mail e senha (a confirmação é conferida só na tela). Cria só a conta e a sessão — nenhum enxoval. Em seguida navega para `/comecar`.
-- **Entrar na conta (`/login`, aba "Entrar"):** chama `POST /api/auth/login`. Se a conta ainda não tem nenhum enxoval (cadastro feito, funil não terminado), vai para `/comecar` em vez de `/app`, retomando o funil.
+- **Cadastro (`/cadastro`):** chama `POST /api/auth/register` com e-mail e senha (não há campo de confirmação). Cria só a conta e a sessão — nenhum enxoval. Em seguida navega para `/comecar`.
+- **Entrar na conta (`/login`):** chama `POST /api/auth/login`. Se a conta ainda não tem nenhum enxoval (cadastro feito, funil não terminado), vai para `/comecar` em vez de `/app`, retomando o funil.
 - **Gate do funil:** `/comecar` chama `GET /api/bootstrap` ao montar. Sem sessão, redireciona para `/cadastro`. Com sessão e algum enxoval, redireciona para `/app` (já passou pelo funil). Com sessão e zero enxovais, mostra o funil e pré-preenche a pergunta do nome com `user.name`, exceto quando ele é só o nome provisório (começo do e-mail).
 - **Passo final (`save`):** chama `POST /api/enxovais`, autenticado, com `{ name: enxovalName, plan, profile, userName }`. `userName` (2–40 caracteres; validado quando vem junto do plano) é gravado em `users.name` na mesma transação que cria o enxoval. O servidor valida o plano antes de criar qualquer coisa (até 15 ambientes, 400 itens, nomes de ambiente no limite do app) e cria o enxoval, o membro (dono), os ambientes e os itens numa única transação. A resposta já traz o enxoval criado.
 - **Falha ao criar o plano** (rede, validação): a mensagem aparece na própria tela, a conta permanece e as respostas continuam no aparelho para tentar de novo.
 - **`/signup`:** não existe mais como tela. O endereço antigo redireciona para `/comecar` (que, sem sessão, manda para o cadastro).
-- **Landing:** os CTAs "Começar meu enxoval" levam a `/cadastro` (ou a `/app` para quem já está logado). O link "Entrar" do menu leva a `/login` (aba "Entrar").
+- **Landing:** os CTAs "Começar meu enxoval" levam a `/cadastro` (ou a `/app` para quem já está logado). O link "Entrar" do menu leva a `/login`.
 - **Perfil no banco:** `POST /enxovais`, quando recebe `plan`, exige também `profile` (as respostas) e grava em `enxovais.onboarding_profile` (`jsonb`, nulo para enxovais criados sem o funil). Fica de fora o nome, que já está em `users.name`; campos que não fazem parte do perfil (como `cpf`) são ignorados. A validação é **estrita** (`server/onboarding-profile.ts`): resposta obrigatória ausente (momento, data respondida, estado, moradia, moradores, ao menos um espaço, o que já tem, estilo, orçamento) ou valor fora das listas permitidas recusa o pedido com 400, e nada é descartado em silêncio. O perfil nunca é devolvido pela API. Exemplo de consulta: `SELECT onboarding_profile->>'state', count(*) FROM enxovais GROUP BY 1;`
 - **Verificação no banco:** `npm run test:onboarding-db` registra uma conta (sem plano), monta o enxoval do funil autenticado em `POST /enxovais` e confere, em PostgreSQL, usuário, enxoval, cada ambiente e item (nome, descrição, ordem, sem preço nem marcação) e o perfil; também prova que o cadastro simples (sem plano) cria só a conta e que 11 variações de respostas ou plano inválidos em `POST /enxovais` são recusadas e não deixam enxoval nem itens pela metade. Hoje nenhuma tela lê o perfil: ele fica guardado para uso futuro.
 
