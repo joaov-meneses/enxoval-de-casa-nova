@@ -364,7 +364,8 @@ test.describe("Campos compartilhados e específicos por situação", () => {
       await expect(grid).toBeVisible();
       const labels = await grid.evaluate((node) =>
         [...node.querySelectorAll("label, h4")]
-          .map((el) => (el.getAttribute("aria-label") ?? el.firstChild?.textContent ?? "").replace(/\s+/g, " ").replace(/\d+\/\d+$/, "").trim().slice(0, 28))
+          // Os blocos recolhíveis (h4) trazem um resumo que muda com os dados: só o título vale para comparar.
+          .map((el) => (el.getAttribute("aria-label") ?? el.querySelector(".item-block-title")?.textContent ?? el.firstChild?.textContent ?? "").replace(/\s+/g, " ").replace(/\d+\/\d+$/, "").trim().slice(0, 28))
           .filter(Boolean),
       );
       await page.keyboard.press("Escape");

@@ -601,6 +601,8 @@ for (const reduced of [false, true]) {
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(668);
       return dialog;
     }
+    // No topo da página o botão flutuante cede quando cobriria um controle (useFabYield); desce um pouco para ele voltar.
+    await page.evaluate(() => window.scrollBy(0, 40));
     await page
       .getByRole("button", { name: "Adicionar item ou ambiente" })
       .click();

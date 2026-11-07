@@ -17,7 +17,17 @@ O SDK Stripe 23 usa `allowed_payment_method_types`: Passe em BRL permite `card,p
 
 O Mensal permanece no cartão por decisão do responsável em 22/10/2026. Além do mandato e dos prazos próprios, a [elegibilidade atual da Stripe](https://docs.stripe.com/payments/pix) informa que **Pix Automático não está disponível para contas brasileiras**; a conta consultada é BR. Não há implementação de recorrência Pix pendente no escopo atual.
 
-### Situação verificada em 22/10/2026
+### Produção e staging em 06/11/2026
+
+Produção passou a usar a conta LIVE `acct_1UQc9xIsGJ6k3UsS`, chave restrita, preços LIVE e webhook próprio em `https://enxoval-de-casa-nova-production.up.railway.app/api/billing/webhook`. `APP_URL` aponta para o mesmo domínio de produção. O cadastro retornou pagamentos e repasses habilitados. Pix está indisponível na configuração LIVE consultada, então `STRIPE_PIX_ENABLED=false` mantém cartão nos dois planos.
+
+Staging continua na conta de teste `acct_1UQcAPIzzRKYM0sE`, URL `https://larume-staging.up.railway.app`, preços e webhook de teste, com cartão/Pix para o Passe. Os dois deployments concluíram com sucesso, a saúde HTTP retornou 200 e os webhooks aceitaram o evento sintético assinado com o segredo do respectivo ambiente e rejeitaram a requisição sem assinatura.
+
+O código `BLACKFRIDAY` oferece 30% nos dois planos, apenas na primeira cobrança, até 30/11/2026 inclusive. Existe uma promoção independente em cada conta. Sessões Stripe LIVE e de teste confirmaram Mensal por R$ 20,93 e Passe por R$ 69,30 e foram expiradas sem pagamento. Detalhes, IDs e limites da validação em [Black Friday 2026](black-friday-2026.md).
+
+Nenhuma mudança de configuração fiscal foi realizada. A validação não incluiu uma compra real pelo fluxo completo do app nem emissão fiscal real.
+
+### Histórico: situação verificada em 22/10/2026
 
 - Pix ativado na configuração padrão **de teste** da conta Stripe `acct_1UQcAPIzzRKYM0sE`; consulta posterior retornou `available=true` e preferência `on`.
 - O webhook de teste `https://larume-staging.up.railway.app/api/billing/webhook` foi configurado para receber todos os eventos listados acima, preservando as inscrições anteriores.
@@ -34,7 +44,7 @@ npm run billing:ops -- test-pix
 
 `test-pix` exige `sk_test_`, cria uma sessão sem vínculo com contas do app, expira essa sessão e verifica dois PaymentIntents de R$ 1,00 **simulados**. O comando falha se os estados finais não forem observados. Não executá-lo com preços/chaves de produção.
 
-Para lançar: concluir o cadastro da conta Stripe; configurar chave, preços, webhook e `APP_URL` próprios de produção; ativar Pix também na configuração live e repetir a conferência. Confirmar uma compra real autorizada pelo titular e a entrega assinada do webhook até a liberação do Passe no processo publicado. A validação atual cobre a API Stripe de teste e o handler local; não comprova esse percurso em produção.
+Naquele diagnóstico, ainda era necessário concluir o cadastro da conta Stripe e configurar chave, preços, webhook e `APP_URL` próprios de produção; esses itens foram configurados em 06/11/2026, conforme a seção acima. Pix LIVE continua indisponível na configuração consultada. Continua pendente confirmar uma compra real autorizada pelo titular e a entrega do evento real até a liberação do Passe no processo publicado.
 
 ## NFS-e Nacional direta: decisão e requisitos
 

@@ -47,6 +47,9 @@ As capturas finais ficam em `design/inventario/capturas/` (reduzidas e mascarada
 | T21 | Administração | `/admin` | administrador | | | **não verificado**: exige credencial própria da administração, que não foi usada |
 | T22 | Página do Chá de Casa Nova (convidado) | não encontrada | público | | | **não verificado**: a landing e o plano pago prometem a página, mas não há rota nem tela no código. Registrado como lacuna |
 | T23 | Menu Exportar, histórico de preço, abertura do item | `/app` | autenticado | | | **não verificado**: o menu abre abaixo da dobra e não foi capturado |
+| T24 | Checkout hospedado da Stripe | `checkout.stripe.com` (sessão criada pelo app) | usuário do app com plano selecionado | configuração de marca e cupom conferida pela API em 06/11/2026 | | Parâmetros verificados: fundo `#f8f3eb`, botão `#a34c30`, Nunito, Nino oficial e campo de código promocional. Conferência visual em 320, 375 e 425 px **não executada**, por indisponibilidade do navegador. Ver `docs/checkout-stripe-casa-mia.md`. |
+| T25 | Termos de Uso | `/termos` | público | texto, fornecedor, contato e links legais | | Verificado em 06/11/2026 por Playwright em 320, 375 e 425 px, sem rolagem horizontal. Ver `docs/politicas-consumidor.md`. |
+| T26 | Cancelamento e reembolso | `/reembolso` | público; envio pelo app exige sessão | política, solicitação, protocolo e erro de autenticação | | Verificado em 06/11/2026 por Playwright em 320, 375 e 425 px; imagens inspecionadas. Fluxo reutiliza a central de ajuda. Ver `docs/politicas-consumidor.md`. |
 
 Estados mínimos a cobrir por tela: padrão, vazio, carregando, erro, e paywall quando aplicável. Carregando e erro não foram capturados em nenhuma tela (exigiriam simular falha de rede).
 
@@ -143,7 +146,7 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 | ID | Tela | Problema ou oportunidade | Princípio ou heurística | Proposta | Status |
 |---|---|---|---|---|---|
 | R01 | Início (hero) | Mostrar o app em uso no hero, com estado real da lista | Progresso visual concreto | A home já tem o mockup "Meu Lar" com a porta em arco e o Nino. Reforçado com capturas reais do app no carrossel (seção "Por dentro do Casa Mia") | **aplicada em parte** (hero já existia; carrossel adicionado) |
-| R02 | Lista por categoria | Falta de sinal claro de conclusão por categoria | Progresso visual concreto; celebração de conquistas | Barra, contagem e estado "Completo" por categoria. Dentro do app autenticado; fora do escopo desta rodada | proposta |
+| R02 | Lista por categoria | Falta de sinal claro de conclusão por categoria | Progresso visual concreto; celebração de conquistas | Barra, contagem e estado "Completo" por categoria. Dentro do app autenticado; fora do escopo desta rodada. **Aplicada em parte** em Meu Lar: barra sálvia, check e 10/10 em negrito; barra inferior e resumo a 13px, cartão de item opaco e percentual em Fraunces 40px | aplicada em parte |
 | R03 | Transições gerais | Movimento pode reforçar conquistas | Confetes sutis do Nino (seção 3 da marca) | Aplicado só no carrossel: troca de slide em 0,45 s, barrinha de tempo, e sem movimento para quem pede menos movimento. Confetes não foram implementados | **aplicada em parte** |
 | R04 | Página de chá (convidados) | Presentes repetidos no chá | Página de Chá de Casa Nova (seção 6 da marca) | Lista pública mostrando só o que falta e o que já foi reservado. Não aplicada: a página nem existe ainda (P02) | proposta |
 | R05 | Armário / cadastro | Cadastro manual de cada peça | Inteligência prática (seção 2 da marca) | Cadastro por foto com revisão antes de salvar. Recurso novo; não aplicado. O "Importar por link" já cobre parte da dor e entrou no carrossel | proposta |

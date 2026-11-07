@@ -370,9 +370,9 @@ export function WorkspaceOverview({
         );
   return (
     <>
-      {view === "overview" && onPlanning && items.length > 0 && <section className="pp-card purchase-next-actions">
+      {view === "overview" && onPlanning && items.length > 0 && (!moveDate || dueCount > 0 || opportunityCount > 0 || !!purchasePlan?.budgetConflicts.length) && <section className="pp-card purchase-next-actions">
         <h3>Suas próximas compras</h3>
-        <p>{moveDate ? `${dueCount} ${dueCount === 1 ? 'item precisa' : 'itens precisam'} da sua atenção nesta semana.` : 'Defina a data da mudança para ver suas próximas compras.'}</p>
+        {(!moveDate || dueCount > 0) && <p>{moveDate ? `${dueCount} ${dueCount === 1 ? 'item precisa' : 'itens precisam'} da sua atenção nesta semana.` : 'Defina a data da mudança para ver suas próximas compras.'}</p>}
         {opportunityCount > 0 && <p>{opportunityCount} {opportunityCount === 1 ? 'item com preço abaixo da referência recente.' : 'itens com preços abaixo da referência recente.'}</p>}
         {!!purchasePlan?.budgetConflicts.length && <p>Há compras acima do seu orçamento mensal para revisar.</p>}
         <Button variant="brand" size="brand" className="button button-outline" onClick={onPlanning}>Ver planejamento</Button>
@@ -768,6 +768,9 @@ export function WorkspaceOverview({
                   {room.total > 0 && (
                     <>
                       <small aria-hidden="true">
+                        {room.done && (
+                          <Check size={12} strokeWidth={2.5} aria-hidden="true" />
+                        )}
                         {room.checked}/{room.total}
                       </small>
                       <span className="sr-only">

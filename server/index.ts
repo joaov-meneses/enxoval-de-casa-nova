@@ -72,6 +72,8 @@ if (isProduction) {
     appType: "spa",
     server: {
       middlewareMode: true,
+      // Permite abrir o dev server por túnel (ex.: cloudflared) para testar no celular.
+      allowedHosts: [".trycloudflare.com"],
       hmr: process.env.DISABLE_HMR !== "true",
       watch:
         process.env.DISABLE_HMR === "true"

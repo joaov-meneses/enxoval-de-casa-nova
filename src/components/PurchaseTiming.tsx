@@ -11,6 +11,7 @@ import { Label } from './ui/label';
 import { Select } from './Select';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
+import { TipButton, TipPanel, useTips } from './ItemFormParts';
 
 export type TimingUpdates = Pick<EnxovalItem, 'buyWeek' | 'leadTimeWeeks' | 'researchWeeks' | 'hasTemporarySolution' | 'dependsOnItemId'>;
 export function purchaseDateLabel(week: number, moveDate: string | null) {
@@ -19,11 +20,21 @@ export function purchaseDateLabel(week: number, moveDate: string | null) {
   return `Comprar até ${new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(date)}`;
 }
 
-export function PurchaseTimingFields({ item, items, value, onChange, disabled, showPlanningFields = true }: {
+/** `tips`: as explicações ficam atrás de um "?" (formulário do item); sem ele, aparecem sempre (janela de planejamento). */
+export function PurchaseTimingFields({ item, items, value, onChange, disabled, showPlanningFields = true, tips = false }: {
   item: EnxovalItem; items: EnxovalItem[]; value: SchedulingInput;
-  onChange: (updates: SchedulingInput) => void; disabled?: boolean; showPlanningFields?: boolean;
+  onChange: (updates: SchedulingInput) => void; disabled?: boolean; showPlanningFields?: boolean; tips?: boolean;
 }) {
   const id = useId();
+  const tipState = useTips();
+  // Cabeçalho do campo (rótulo e "?") e a explicação: fixa ou sob demanda, conforme `tips`.
+  const head = (key: string, subject: string, label: ReactNode, htmlFor: string) => tips
+    ? <div className="item-field-head"><Label htmlFor={htmlFor}>{label}</Label>
+        <TipButton subject={subject} open={tipState.isOpen(key)} panelId={`${id}-tip-${key}`} onToggle={() => tipState.toggle(key)} /></div>
+    : <Label htmlFor={htmlFor}>{label}</Label>;
+  const note = (key: string, text: ReactNode) => tips
+    ? <TipPanel id={`${id}-tip-${key}`} open={tipState.isOpen(key)}>{text}</TipPanel>
+    : <small>{text}</small>;
   const lead = purchaseLeadTime(item);
   const candidates = useMemo(() => items.filter(candidate => {
     const seen = new Set([item.id]);
@@ -37,26 +48,26 @@ export function PurchaseTimingFields({ item, items, value, onChange, disabled, s
   }), [item.id, items]);
   return <div className="purchase-timing-fields">
     <div className="pp-field">
-      <Label htmlFor={`${id}-delivery`}>Entrega, montagem e instalação</Label>
+      {head('delivery', 'entrega, montagem e instalação', 'Entrega, montagem e instalação', `${id}-delivery`)}
       <Input id={`${id}-delivery`} type="number" inputMode="numeric" min={0} max={52} step={1}
         placeholder={`${lead.delivery} semanas (estimativa)`} value={value.leadTimeWeeks ?? ''} disabled={disabled}
         onChange={event => onChange({ ...value, leadTimeWeeks: event.target.value === '' ? null : Number(event.target.value) })} />
-      <small>Prazo em semanas. Em branco, usamos a estimativa do catálogo. Zero significa pronta entrega.</small>
+      {note('delivery', 'Prazo em semanas. Em branco, usamos a estimativa do catálogo. Zero significa pronta entrega.')}
     </div>
     {showPlanningFields && <>
       <div className="pp-field">
-        <Label htmlFor={`${id}-research`}>Tempo para pesquisar e escolher</Label>
+        {head('research', 'tempo para pesquisar e escolher', 'Tempo para pesquisar e escolher', `${id}-research`)}
         <Input id={`${id}-research`} type="number" inputMode="numeric" min={0} max={12} step={1}
           placeholder="1 semana (sugestão)" value={value.researchWeeks ?? ''} disabled={disabled}
           onChange={event => onChange({ ...value, researchWeeks: event.target.value === '' ? null : Number(event.target.value) })} />
-        <small>Quantas semanas você precisa para comparar preços e escolher o produto antes de comprar.</small>
+        {note('research', 'Quantas semanas você precisa para comparar preços e escolher o produto antes de comprar.')}
       </div>
       <div className="pp-field purchase-timing-wide">
-        <Label htmlFor={`${id}-dependency`}>Preciso definir outro item antes</Label>
+        {head('dependency', 'item que precisa ser definido antes', 'Preciso definir outro item antes', `${id}-dependency`)}
         <Select id={`${id}-dependency`} ariaLabel="Item que precisa ser definido antes" value={value.dependsOnItemId ?? ''}
           options={[{ value: '', label: 'Nenhum item' }, ...candidates.map(entry => ({ value: entry.id, label: entry.name }))]}
           disabled={disabled} onChange={id => onChange({ ...value, dependsOnItemId: id || null })} />
-        <small>Por exemplo: definir a cama antes do colchão para confirmar as medidas.</small>
+        {note('dependency', 'Por exemplo: definir a cama antes do colchão para confirmar as medidas.')}
       </div>
       <div className="purchase-timing-wide">
         <Label className="purchase-timing-check" htmlFor={`${id}-temporary`}>
@@ -64,7 +75,10 @@ export function PurchaseTimingFields({ item, items, value, onChange, disabled, s
             onCheckedChange={checked => onChange({ ...value, hasTemporarySolution: checked === true })} />
           Já tenho uma solução temporária
         </Label>
-        <p className="pp-hint">A substituição pode chegar a partir do segundo mês. Se houver um prazo específico, escolha a semana manualmente.</p>
+        {tips && <TipButton subject="solução temporária" open={tipState.isOpen('temporary')} panelId={`${id}-tip-temporary`} onToggle={() => tipState.toggle('temporary')} />}
+        {tips
+          ? <TipPanel id={`${id}-tip-temporary`} open={tipState.isOpen('temporary')}>A substituição pode chegar a partir do segundo mês. Se houver um prazo específico, escolha a semana manualmente.</TipPanel>
+          : <p className="pp-hint">A substituição pode chegar a partir do segundo mês. Se houver um prazo específico, escolha a semana manualmente.</p>}
       </div>
     </>}
   </div>;
