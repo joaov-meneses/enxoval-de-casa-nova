@@ -20,6 +20,7 @@ import { recordRefundEvent, REFUND_EVENTS } from './billingOperations.ts';
 import { fiscalEnabled } from './fiscal/provider.ts';
 import { registerFiscalRoutes } from './fiscal/routes.ts';
 import { checkoutPolicyText } from '../shared/legal.ts';
+import { billingRiskEventKey, RISK_EVENTS, resolveBillingRiskEvent, recordBillingRiskEvent } from './billingRisk.ts';
 
 type PaidPlan = 'monthly' | 'pass';
 const PAID_PLANS: PaidPlan[] = ['monthly', 'pass'];
@@ -215,11 +216,16 @@ export async function handleStripeEvent(event: Stripe.Event) {
   const isSubscription = SUBSCRIPTION_EVENTS.has(event.type);
   const isInvoice = event.type === 'invoice.paid';
   const isRefund = REFUND_EVENTS.has(event.type);
-  if (!isSubscription && !CHECKOUT_EVENTS.has(event.type) && !isInvoice && !isRefund) return;
+  const isRisk = RISK_EVENTS.has(event.type);
+  if (!isSubscription && !CHECKOUT_EVENTS.has(event.type) && !isInvoice && !isRefund && !isRisk) return;
+  const eventKey = isRisk ? billingRiskEventKey(event) : event.id;
+  if (isRisk && (await getPool().query('SELECT id FROM stripe_events WHERE id=$1', [eventKey])).rowCount) return;
+  const riskReferences = isRisk ? await resolveBillingRiskEvent(getStripe(), event) : null;
   const monthlyToCancel = await withTransaction(async client => {
     const fresh = await client.query(
-      'INSERT INTO stripe_events (id, type) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING', [event.id, event.type]);
+      'INSERT INTO stripe_events (id, type) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING', [eventKey, event.type]);
     if (fresh.rowCount === 0) return null;
+    if (isRisk && riskReferences) { await recordBillingRiskEvent(client, event, riskReferences); return null; }
     if (isRefund) { await recordRefundEvent(client, event); return null; }
     await enqueueFiscalEvent(client, event);
     if (isInvoice) return null;
@@ -230,6 +236,7 @@ export async function handleStripeEvent(event: Stripe.Event) {
     }
     return null;
   });
+  if (isRisk) return;
   await cancelMonthly(monthlyToCancel);
   if (CHECKOUT_EVENTS.has(event.type)) {
     // Conversão para o Google Ads/GA4 com o valor pago; falha aqui nunca devolve erro à Stripe.
@@ -260,18 +267,22 @@ export function registerBillingWebhook(app: express.Express) {
     try {
       event = getStripe().webhooks.constructEvent(req.body, signature, secret);
     } catch (err) {
-      getLogger().warn({ event: 'billing.webhook.signature_failed', err }, 'Webhook signature validation failed.');
+      getLogger().warn({ event: 'billing.webhook.signature_failed' }, 'Webhook signature validation failed.');
       res.status(400).json({ error: 'Assinatura inválida.' });
       return;
     }
     try {
       await handleStripeEvent(event);
-      getLogger().info({ event: 'billing.webhook.completed', stripeEventId: event.id, stripeEventType: event.type, stripeEvent: event }, 'Evento Stripe processado.');
+      getLogger().info({ event: 'billing.webhook.completed', stripeEventId: event.id, stripeEventType: event.type, livemode: event.livemode === true }, 'Evento Stripe processado.');
       res.json({ received: true });
     } catch (err) {
       // Uma falha nossa devolve 500 para a Stripe tentar o evento de novo (a marca de "já processado" volta atrás junto).
-      res.err = err instanceof Error ? err : new Error('Falha ao processar evento Stripe.');
-      getLogger().error({ event: 'billing.webhook.failed', stripeEventId: event.id, stripeEventType: event.type, err }, 'Stripe: falha ao processar o evento; será solicitada nova tentativa.');
+      // Exceções do SDK podem conter headers, payload financeiro e dados do cliente.
+      res.err = new Error('Falha ao processar evento Stripe.');
+      const failureCode = err instanceof Error && /^BILLING_RISK_[A-Z_]+$/.test(err.message)
+        ? err.message : 'BILLING_EVENT_FAILED';
+      getLogger().error({ event: 'billing.webhook.failed', stripeEventId: event.id, stripeEventType: event.type,
+        livemode: event.livemode === true, failureCode }, 'Stripe: falha ao processar o evento; será solicitada nova tentativa.');
       res.status(500).json({ error: 'Erro ao processar o evento.' });
     }
   };
@@ -467,6 +478,7 @@ export function registerBillingRoutes(router: Router, { requireUser, ensureDefau
     if (!baseUrl) throw new HttpError(503, UNAVAILABLE, 'BILLING_UNAVAILABLE');
     const session = await getStripe().billingPortal.sessions.create({
       customer: row.stripe_customer_id,
+      ...(process.env.STRIPE_PORTAL_CONFIGURATION_ID ? { configuration: process.env.STRIPE_PORTAL_CONFIGURATION_ID } : {}),
       return_url: `${baseUrl}/app`
     });
     res.json({ url: session.url });
