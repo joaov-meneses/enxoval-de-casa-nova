@@ -3,6 +3,7 @@ import type { ErrorRequestHandler } from 'express';
 import { exceptionProperties } from '../shared/errorTracking.ts';
 import { isProduction, serializeError } from './logger.ts';
 import { requestId } from './posthogLogs.ts';
+import { describeBody, redactDeep, redactHeaders, redactQuery, redactUrl } from './logRedaction.ts';
 import { appVersion } from './version.ts';
 
 export function createErrorTracking(env = process.env, production = isProduction) {
@@ -36,8 +37,8 @@ export function errorTrackingHandler(sink: Pick<PostHog, 'captureException'> | n
     try {
       sink?.captureException(error, undefined, {
         ...(id ? { request_id: id } : {}),
-        method: req.method, url: req.originalUrl || req.url,
-        params: req.params, query: req.query, body: req.body, headers: req.headers,
+        method: req.method, url: redactUrl(req.originalUrl || req.url),
+        params: redactDeep(req.params), query: redactQuery(req.query), body: describeBody(req.body), headers: redactHeaders(req.headers),
         original_error: serializeError(error),
       });
     } catch { /* Telemetry never changes the response. */ }

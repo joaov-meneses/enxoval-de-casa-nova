@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import dotenv from 'dotenv';
 import pino, { type DestinationStream, type Logger } from 'pino';
 import { createPosthogLogs } from './posthogLogs.ts';
+import { redactError } from './logRedaction.ts';
 
 dotenv.config({ path: '.env.local', quiet: true });
 dotenv.config({ quiet: true });
@@ -12,9 +13,9 @@ let posthogLogs: ReturnType<typeof createPosthogLogs> = null;
 try { posthogLogs = createPosthogLogs(process.env, isProduction); } catch { /* A configuration failure must not prevent startup. */ }
 export const stopPosthogLogs = async () => { await posthogLogs?.shutdown(); };
 
-// Include original error fields and nested causes without omission or masking.
+// Mensagem, pilha, código e causas ficam; valores sensíveis e campos que ecoam dados de entrada são redigidos.
 export function serializeError(value: unknown) {
-  return value instanceof Error ? pino.stdSerializers.errWithCause(value) : value as any;
+  return value instanceof Error ? redactError(pino.stdSerializers.errWithCause(value)) : value as any;
 }
 
 export function createLogger(destination?: DestinationStream, remote = destination ? null : posthogLogs) {
