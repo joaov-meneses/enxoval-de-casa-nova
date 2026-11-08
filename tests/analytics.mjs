@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 import { allowedProperties, scrubSdkProperties, safeRoute } from '../src/analytics/events.ts';
-import { apiPathTemplate, describeControl, sanitizeOperational, stripUrl } from '../src/analytics/operationalPrivacy.ts';
+import { apiPathTemplate, describeControl, sanitizeErrorContext, sanitizeOperational, stripUrl } from '../src/analytics/operationalPrivacy.ts';
 import { recordApiSuccess } from '../src/analytics/apiEvents.ts';
 import { campaignAllowlist, pageMetadata, readAttribution, trafficType, webVitalsProperties } from '../src/analytics/web.ts';
 
@@ -286,10 +286,63 @@ test('$exception uses an allowlist: URLs lose query and hash, unknown and nested
 test('application events clean $set and $set_once and drop unknown $ keys', async () => {
   const c = await client({}, '/app'); c.api.startAnalytics();
   const out = c.config().before_send({ event: 'application.api.started', properties: { path: '/api/x', $leak: 'SEGREDO', $set: { a: 'SEGREDO' } },
-    $set: { plan: 'free', $initial_current_url: 'https://casamia.test/a?t=SEGREDO#x', obj: { a: 'SEGREDO' } },
+    $set: { plan: 'free', $initial_current_url: 'https://casamia.test/preferencias?t=SEGREDO#x', obj: { a: 'SEGREDO' } },
     $set_once: { $initial_current_url: 'https://casamia.test/a?t=SEGREDO#x', $initial_referrer: 'https://s.test/?q=SEGREDO' } });
   assert.equal(JSON.stringify(out).includes('SEGREDO'), false);
-  assert.deepEqual(out.$set, { plan: 'free', $initial_current_url: 'https://casamia.test/a' });
+  assert.deepEqual(out.$set, { plan: 'free', $initial_current_url: 'https://casamia.test/preferencias' });
+});
+
+test('Chá slugs and other free-text path params become placeholders everywhere', async () => {
+  assert.equal(apiPathTemplate('/api/public/housewarming/maria-e-joao'), '/api/public/housewarming/:slug');
+  assert.equal(apiPathTemplate('/api/public/housewarming/maria-e-joao/reservations?x=1'), '/api/public/housewarming/:slug/reservations');
+  assert.equal(apiPathTemplate('/api/admin/catalog/aliases/Panela%20Tramontina'), '/api/admin/catalog/aliases/:key');
+  assert.equal(apiPathTemplate('/api/items/ab/offers/cd'), '/api/items/:id/offers/:id');
+  const op = sanitizeOperational({ path: '/cha/maria-e-joao', url: 'https://casamia.test/cha/maria-e-joao?x=1', href: '/cha/maria-e-joao#a' }, 'https://casamia.test');
+  assert.deepEqual([op.path, op.url, op.href], ['/cha/:slug', 'https://casamia.test/cha/:slug', '/cha/:slug']);
+  assert.equal(sanitizeOperational({ path: '/api/public/housewarming/maria-e-joao' }).path, '/api/public/housewarming/:slug');
+  assert.equal(JSON.stringify(sanitizeErrorContext({ path: '/api/public/housewarming/maria-e-joao/messages' })).includes('maria'), false);
+  const c = await client({}, '/cha/maria-e-joao'); c.api.startAnalytics();
+  const out = c.config().before_send({ event: '$exception', properties: {
+    $current_url: 'https://casamia.test/cha/maria-e-joao?x=1', $pathname: '/cha/maria-e-joao', $initial_current_url: 'https://casamia.test/cha/maria-e-joao',
+    $exception_list: [{ type: 'ApiError', value: 'ApiError 404 GET /api/public/housewarming/:slug' }],
+  } }).properties;
+  assert.equal(JSON.stringify(out).includes('maria'), false);
+  assert.deepEqual([out.$current_url, out.$pathname], ['https://casamia.test/cha/:slug', '/cha/:slug']);
+});
+
+test('ApiError rejections reaching the SDK get the fixed message, not the server text', async () => {
+  const c = await client({}, '/convite'); c.api.startAnalytics();
+  const shown = 'Este convite é para pessoa@example.test';
+  c.api.rememberApiError(shown, 'ApiError 403 POST /api/invitations/:id');
+  const out = c.config().before_send({ event: '$exception', properties: { $exception_list: [
+    { type: 'ApiError', value: shown, mechanism: { type: 'onunhandledrejection', handled: false, data: { message: 'SEGREDO' } } },
+    { type: 'ApiError', value: 'mensagem nunca registrada com dado@example.test' },
+    { type: 'TypeError', value: 'x is not a function' },
+  ] } }).properties.$exception_list;
+  assert.equal(out[0].value, 'ApiError 403 POST /api/invitations/:id');
+  assert.equal(out[1].value, 'ApiError');
+  assert.equal(out[2].value, 'x is not a function');
+  assert.equal(JSON.stringify(out).includes('example.test'), false);
+  assert.equal(JSON.stringify(out).includes('SEGREDO'), false);
+  assert.deepEqual(out[0].mechanism, { type: 'onunhandledrejection', handled: false, synthetic: undefined });
+});
+
+test('$exception keeps only safe $exception_* keys and the minimal list structure', async () => {
+  const c = await client({}, '/app'); c.api.startAnalytics();
+  const out = c.config().before_send({ event: '$exception', properties: {
+    $exception_level: 'error', $exception_fingerprint: 'fp', $exception_types: ['TypeError'],
+    $exception_values: ['SEGREDO_VALOR'], $exception_steps: [{ message: 'SEGREDO_PASSO' }], $exception_message: 'SEGREDO_MSG', $exception_source: 'SEGREDO_SRC',
+    $initial_utm_term: 'SEGREDO_TERM', $initial_gclid: 'SEGREDO_GCLID', $initial_referrer: 'https://s.test/?q=SEGREDO', $initial_os: 'Windows',
+    $exception_list: [{ type: 'TypeError', value: 'falhou', module: 'SEGREDO_MOD', extra: 'SEGREDO', mechanism: { type: 'generic', handled: true, data: 'SEGREDO' },
+      stacktrace: { type: 'raw', frames: [{ filename: 'https://app.test/a.js?token=SEGREDO#h', function: 'f', lineno: 1, colno: 2, context_line: 'SEGREDO', vars: { a: 'SEGREDO' }, abs_path: 'SEGREDO' }] } }],
+  } }).properties;
+  assert.equal(JSON.stringify(out).includes('SEGREDO'), false);
+  assert.deepEqual(Object.keys(out).filter(key => key.startsWith('$exception')).sort(), ['$exception_fingerprint', '$exception_level', '$exception_list', '$exception_types']);
+  assert.equal(out.$initial_os, 'Windows');
+  assert.deepEqual(Object.keys(out).filter(key => key.startsWith('$initial_')), ['$initial_os']);
+  assert.deepEqual(Object.keys(out.$exception_list[0]).sort(), ['mechanism', 'stacktrace', 'type', 'value']);
+  const frame = out.$exception_list[0].stacktrace.frames[0];
+  assert.deepEqual([frame.filename, frame.function, frame.lineno, frame.colno], ['https://app.test/a.js', 'f', 1, 2]);
 });
 
 test('initialization enables bounded web vitals and reconstructs safe standard page properties', async () => {
@@ -379,8 +432,10 @@ test('exceptions preserve original diagnostics, opt-out and kill switch', async 
   assert.equal(event.properties.$exception_list[0].value, 'PRIVATE_EMAIL');
   assert.equal('password' in event.properties, false, 'propriedade fora da lista de permissão não sai');
   assert.equal(JSON.stringify(event.properties).includes('PRIVATE_PASSWORD'), false);
-  assert.equal(event.properties.$exception_list[0].stacktrace.frames[0].context_line, 'PRIVATE_CODE');
-  assert.equal(event.properties.$exception_list[0].stacktrace.frames[0].lineno, 12);
+  const frame = event.properties.$exception_list[0].stacktrace.frames[0];
+  assert.equal(frame.context_line, undefined, 'código-fonte do frame não sai');
+  assert.equal(frame.filename, 'https://app.test/assets/app.js');
+  assert.equal(frame.lineno, 12);
   c.api.captureError(new Error('PRIVATE_MESSAGE'));
   assert.equal(c.calls.filter(([name]) => name === '$exception').length, 1);
   c.api.setAnalyticsOptOut(true);
