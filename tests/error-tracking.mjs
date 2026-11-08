@@ -99,3 +99,30 @@ test('source maps are removed from public output with upload disabled or missing
     }
   } finally { await rm(fixture, { recursive: true, force: true }); }
 });
+
+test('captureException recebe só metadados: corpo, query, cookie, referer e JSON inválido com senha', async () => {
+  const captured = [];
+  const app = express();
+  app.use(express.json());
+  app.post('/api/auth/login', () => { throw new Error('falha qualquer'); });
+  app.use(errorTrackingHandler({ captureException: (...args) => captured.push(args) }));
+  app.use((error, _req, res, _next) => res.status(error.status || 500).json({ error: 'failed' }));
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const headers = { 'content-type': 'application/json', cookie: 'sid=COOKIE_SECRET', referer: 'https://casamia.example/preferencias?token=REFERER_TOKEN#frag', 'x-forwarded-for': '203.0.113.9', 'user-agent': 'AGENTE_SECRETO' };
+    await fetch(`${base}/api/auth/login?token=QUERY_SECRET&email=a@b.test`, { method: 'POST', headers, body: JSON.stringify({ email: 'maria@example.test', password: 'SENHA_SECRETA' }) });
+    await fetch(`${base}/api/auth/login`, { method: 'POST', headers, body: '{"password":"SENHA_JSON_INVALIDO", oops}' });
+    assert.equal(captured.length, 2);
+    const serialized = JSON.stringify(captured.map(([error, , properties]) => ({ message: error.message, stack: error.stack, properties })));
+    for (const secret of ['COOKIE_SECRET', 'REFERER_TOKEN', 'QUERY_SECRET', 'SENHA_SECRETA', 'SENHA_JSON_INVALIDO', 'maria@example.test', 'a@b.test', '203.0.113.9', 'AGENTE_SECRETO', '#frag']) {
+      assert.equal(serialized.includes(secret), false, secret);
+    }
+    const [, , first] = captured[0];
+    assert.equal(first.headers.cookie, '[redigido]');
+    assert.equal(first.headers.referer, 'https://casamia.example/preferencias');
+    assert.deepEqual(first.body.keys, ['email:string', 'password:string']);
+    assert.equal(captured[1][0].message, 'JSON inválido no corpo da requisição.');
+  } finally { await new Promise(resolve => server.close(resolve)); }
+});

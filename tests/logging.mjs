@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import express from 'express';
-import { createLogger, getLogger, setLogUser } from '../server/logger.ts';
+import { createLogger, getLogger, runWithLogger, setLogUser } from '../server/logger.ts';
 import { createHttpLogging, httpErrorHandler } from '../server/httpLogging.ts';
 import { asyncHandler, HttpError } from '../server/security.ts';
 
@@ -74,9 +74,10 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     const echo = await call('/api/echo/raw-id?email=real@example.test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Real input', password: 'original-password' }) });
     const echoLog = logs.find(log => log.reqId === echo.id && log.res);
     assert.equal(echoLog.req.params.id, 'raw-id');
-    assert.deepEqual(echoLog.req.body.keys, { name: 'string', password: 'string' });
+    assert.deepEqual(echoLog.req.body.keys, ['name:string', 'password:string']);
     assert.equal(echoLog.req.query.email, '[redigido]');
-    assert.deepEqual(echoLog.res.body.keys, { received: 'object' });
+    assert.equal(echoLog.res.body.type, 'string');
+    assert.equal(typeof echoLog.res.body.byteLength, 'number');
     const serializedEcho = JSON.stringify(logs.filter(log => log.reqId === echo.id));
     for (const secret of ['original-password', 'Real input', 'real@example.test']) assert.equal(serializedEcho.includes(secret), false, secret);
     const expected = await call('/expected');
@@ -129,7 +130,7 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     assert.equal(completed.req.headers.authorization, '[redigido]');
     assert.equal(completed.req.headers.cookie, '[redigido]');
     assert.equal(completed.res.headers['set-cookie'], '[redigido]');
-    assert.deepEqual(completed.res.body.keys, { password: 'string' });
+    assert.equal(typeof completed.res.body.byteLength, 'number');
     const malformedLog = logs.find(log => log.reqId === malformed.id && log.res);
     assert.equal(malformedLog.err.body, '[redigido]');
     // Nenhum segredo de nenhum cenário aparece em nenhum registro serializado.
@@ -231,9 +232,70 @@ test('login, cadastro, redefinição de senha e preferências nunca levam segred
     ]) assert.equal(serialized.includes(secret), false, secret);
     const login = logs.find(log => log.req?.url?.startsWith('/api/auth/login?next') && log.res);
     assert.equal(login.req.url, '/api/auth/login?next=[redigido]&token=[redigido]');
-    assert.deepEqual(login.req.body.keys, { password: 'string' });
+    assert.deepEqual(login.req.body.keys, ['password:string']);
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('Referer com query, IP e user-agent não vão para o log; Buffer e EXIF viram tamanho', async () => {
+  const logs = [];
+  const logger = createLogger({ write: line => logs.push(JSON.parse(line)) });
+  const app = express();
+  app.use(createHttpLogging(logger));
+  app.get('/api/ping', (_req, res) => {
+    getLogger().info({ event: 'image.fixture', exif: Buffer.from('GPS-LAT-SECRETA'), nested: { raw: JSON.parse(JSON.stringify(Buffer.from('XMP-SECRETO'))) }, width: 10, stripeSessionId: 'cs_1', documentId: 'doc_1', inputTokens: 5, emailType: 'welcome', pixels: 9, when: new Date('2026-11-08T00:00:00Z') }, 'Imagem processada.');
+    res.json({ ok: true });
+  });
+  app.use(httpErrorHandler);
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    await (await fetch(`http://127.0.0.1:${server.address().port}/api/ping`, {
+      headers: { referer: 'https://x.test/convite?token=REFERER_SECRET#hash_secreto', origin: 'https://x.test?token=ORIGIN_SECRET', 'x-forwarded-for': '198.51.100.7', 'x-real-ip': '198.51.100.8', 'user-agent': 'UA_SECRETO' },
+    })).text();
+    const serialized = JSON.stringify(logs);
+    for (const secret of ['REFERER_SECRET', 'hash_secreto', 'ORIGIN_SECRET', '198.51.100', 'UA_SECRETO', 'GPS-LAT', 'XMP-SECRETO']) assert.equal(serialized.includes(secret), false, secret);
+    const completed = logs.find(log => log.event === 'http.request.completed');
+    assert.equal(completed.req.headers.referer, 'https://x.test/convite');
+    assert.equal(completed.req.headers.origin, 'https://x.test');
+    assert.equal('ip' in completed.req, false);
+    const fixture = logs.find(log => log.event === 'image.fixture');
+    assert.equal(fixture.exif, '[binário 15 bytes]');
+    assert.equal(fixture.nested.raw, '[binário 11 bytes]');
+    assert.equal(fixture.msg, 'Imagem processada.');
+    assert.deepEqual([fixture.stripeSessionId, fixture.documentId, fixture.inputTokens, fixture.emailType, fixture.pixels, fixture.when], ['cs_1', 'doc_1', 5, 'welcome', 9, '2026-11-08T00:00:00.000Z']);
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('sendMail simulado não deixa endereço, assunto, link com token nem cabeçalhos em nenhum log', async () => {
+  const { sendMail } = await import('../server/mailer.ts');
+  const lines = [];
+  const logger = createLogger({ write: line => lines.push(line) });
+  const previousDriver = process.env.MAIL_DRIVER;
+  const previousKey = process.env.RESEND_API_KEY;
+  delete process.env.MAIL_DRIVER;
+  delete process.env.RESEND_API_KEY;
+  try {
+    await new Promise((resolve, reject) => {
+      runWithLogger(logger, () => sendMail({
+        to: 'maria.token@example.test', subject: 'Redefina a senha de Maria',
+        text: 'Abra https://casamia.test/redefinir-senha#token=HASH_TOKEN_SECRET e https://casamia.test/preferencias?token=QUERY_TOKEN_SECRET',
+        html: '<a href="https://casamia.test/convite#token=INVITE_TOKEN_SECRET">convite</a>',
+        headers: { 'List-Unsubscribe': '<https://casamia.test/preferencias?token=UNSUB_TOKEN_SECRET>' },
+      }).then(resolve, reject));
+    });
+    const serialized = lines.join('');
+    assert.ok(lines.length >= 2);
+    for (const secret of ['TOKEN_SECRET', 'maria.token', 'Redefina a senha', 'redefinir-senha', 'List-Unsubscribe']) assert.equal(serialized.includes(secret), false, secret);
+    assert.match(serialized, /example\.test/);
+    assert.ok(lines.some(line => JSON.parse(line).event === 'mail.simulated'));
+  } finally {
+    if (previousDriver === undefined) delete process.env.MAIL_DRIVER; else process.env.MAIL_DRIVER = previousDriver;
+    if (previousKey !== undefined) process.env.RESEND_API_KEY = previousKey;
   }
 });
