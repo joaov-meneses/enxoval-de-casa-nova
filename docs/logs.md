@@ -31,7 +31,7 @@ Consulte [PostHog Logs](https://us.posthog.com/project/665798/logs). Para achar 
 
 ## Navegador
 
-Eventos `application.navigation`, `application.ui.action` e `application.api.started/completed/failed` aparecem nos eventos do PostHog. Incluem URL real, cliques, alteracoes de campos, envios de formularios e chamadas da API com entrada, resultado, status, duracao e ID de requisicao. As rotas administrativas tambem sao cobertas. Os eventos de produto e Web Vitals mantem seus schemas; os dados completos ficam nos eventos operacionais e excecoes.
+Eventos `application.navigation`, `application.ui.action` e `application.api.started/completed/failed` aparecem nos eventos do PostHog. Incluem URL sem query nem hash, cliques, alteracoes e envios de formularios (sem os valores) e chamadas da API com caminho, metodo, status, duracao e ID de requisicao. Nao incluem corpo nem resposta da API. As rotas administrativas nao sao enviadas. Detalhes em [analytics-sem-valores-de-campos.md](analytics-sem-valores-de-campos.md). Os eventos de produto e Web Vitals mantem seus schemas; os dados completos ficam nos eventos operacionais e excecoes.
 
 `VITE_POSTHOG_KEY` configura o projeto e `VITE_POSTHOG_ENABLE_DEV=true` habilita desenvolvimento. O opt-out e Do Not Track continuam sendo respeitados no navegador. Logs do servidor sao independentes dessa preferencia.
 
