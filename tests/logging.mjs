@@ -73,10 +73,12 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     }
     const echo = await call('/api/echo/raw-id?email=real@example.test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Real input', password: 'original-password' }) });
     const echoLog = logs.find(log => log.reqId === echo.id && log.res);
-    assert.equal(echoLog.req.body.password, 'original-password');
     assert.equal(echoLog.req.params.id, 'raw-id');
-    assert.equal(echoLog.req.query.email, 'real@example.test');
-    assert.equal(echoLog.res.body.received.name, 'Real input');
+    assert.deepEqual(echoLog.req.body.keys, { name: 'string', password: 'string' });
+    assert.equal(echoLog.req.query.email, '[redigido]');
+    assert.deepEqual(echoLog.res.body.keys, { received: 'object' });
+    const serializedEcho = JSON.stringify(logs.filter(log => log.reqId === echo.id));
+    for (const secret of ['original-password', 'Real input', 'real@example.test']) assert.equal(serializedEcho.includes(secret), false, secret);
     const expected = await call('/expected');
     assert.equal(expected.response.status, 403);
     assert.deepEqual(JSON.parse(expected.body), { error: 'Acesso negado.', code: 'FORBIDDEN' });
@@ -91,9 +93,10 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     assert.match(failedLog.err.stack, /Banco indisponível/);
     assert.match(failedLog.err.cause.stack, /Conexão encerrada/);
     assert.equal(failedLog.err.code, 'ECONNRESET');
-    assert.equal(failedLog.err.detail, 'PRIVATE_SQL_DETAIL');
-    assert.equal(failedLog.err.query, 'PRIVATE_SQL_QUERY');
-    assert.equal(failedLog.err.password, 'ERROR_PASSWORD_SECRET');
+    assert.equal(failedLog.err.detail, '[redigido]');
+    assert.equal(failedLog.err.query, '[redigido]');
+    assert.equal(failedLog.err.password, '[redigido]');
+    assert.equal(JSON.stringify(failedLog).includes('ERROR_PASSWORD_SECRET'), false);
     const direct = await call('/direct-error');
     assert.equal(logs.find(log => log.reqId === direct.id && log.res).level, 40);
     const malformed = await call('/json', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"password":"MALFORMED_PASSWORD_SECRET", invalid}' });
@@ -121,12 +124,20 @@ test('logs HTTP: cobertura, erros, correlação, privacidade, lentidão e interr
     for (let i = 0; i < 50 && !logs.some(log => log.event === 'http.request.aborted'); i++) await delay(10);
     assert.equal(logs.find(log => log.event === 'http.request.aborted').level, 40);
     const completed = logs.find(log => log.reqId === one.id && log.res);
-    assert.equal(completed.req.query.token, 'QUERY_TOKEN_SECRET');
-    assert.equal(completed.req.headers.authorization, 'Bearer AUTH_SECRET');
-    assert.equal(completed.res.headers['set-cookie'], 'session=RESPONSE_COOKIE_SECRET');
-    assert.equal(completed.res.body.password, 'RESPONSE_BODY_SECRET');
+    assert.equal(completed.req.query.token, '[redigido]');
+    assert.equal(completed.req.url.includes('QUERY_TOKEN_SECRET'), false);
+    assert.equal(completed.req.headers.authorization, '[redigido]');
+    assert.equal(completed.req.headers.cookie, '[redigido]');
+    assert.equal(completed.res.headers['set-cookie'], '[redigido]');
+    assert.deepEqual(completed.res.body.keys, { password: 'string' });
     const malformedLog = logs.find(log => log.reqId === malformed.id && log.res);
-    assert.match(malformedLog.err.body, /MALFORMED_PASSWORD_SECRET/);
+    assert.equal(malformedLog.err.body, '[redigido]');
+    // Nenhum segredo de nenhum cenário aparece em nenhum registro serializado.
+    const everything = JSON.stringify(logs);
+    for (const secret of [
+      'QUERY_TOKEN_SECRET', 'PRIVATE_EMAIL', 'AUTH_SECRET', 'COOKIE_SECRET', 'RESPONSE_COOKIE_SECRET', 'RESPONSE_BODY_SECRET',
+      'MALFORMED_PASSWORD_SECRET', 'LARGE_BODY_SECRET', 'STRIPE_SIGNATURE_SECRET', 'PRIVATE_SQL_DETAIL', 'PRIVATE_SQL_QUERY',
+    ]) assert.equal(everything.includes(secret), false, secret);
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
@@ -180,6 +191,47 @@ test('routine HTTP traffic is quiet while API calls and asset failures remain vi
     assert.equal(scoped[0].event, 'http.request.failed');
     assert.equal(scoped[0].level, 50);
     assert.equal(scoped[0].err.message, 'Module failed');
+  } finally {
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('login, cadastro, redefinição de senha e preferências nunca levam segredos ao log', async () => {
+  const logs = [];
+  const logger = createLogger({ write: line => logs.push(JSON.parse(line)) });
+  const app = express();
+  app.use(createHttpLogging(logger));
+  app.use(express.json());
+  app.all('/api/*splat', (_req, res) => res.json({ token: 'SESSION_TOKEN_RESPONSE', user: { email: 'maria@example.test' } }));
+  app.get('/preferencias', (_req, res) => res.end('ok'));
+  app.get('/pesquisa', (_req, res) => res.end('ok'));
+  app.use(httpErrorHandler);
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const json = body => ({ method: 'POST', headers: { 'content-type': 'application/json', cookie: 'sid=COOKIE_SID_SECRET', authorization: 'Bearer BEARER_SECRET' }, body: JSON.stringify(body) });
+  try {
+    const calls = [
+      ['/api/auth/login', json({ email: 'maria@example.test', password: 'SenhaSecreta#1' })],
+      ['/api/auth/register', json({ name: 'Maria', email: 'maria@example.test', password: 'SenhaSecreta#2', profile: { cpf: '123.456.789-00' } })],
+      ['/api/auth/password-reset/confirm', json({ token: 'RESET_TOKEN_SECRET', newPassword: 'SenhaSecreta#3' })],
+      ['/api/auth/change-password', json({ currentPassword: 'SenhaSecreta#4', newPassword: 'SenhaSecreta#5' })],
+      ['/api/invitations/accept', json({ token: 'INVITE_TOKEN_SECRET', password: 'SenhaSecreta#6' })],
+      ['/preferencias?token=PREFS_TOKEN_SECRET&email=maria@example.test', { headers: { cookie: 'sid=COOKIE_SID_SECRET' } }],
+      ['/pesquisa?token=SURVEY_TOKEN_SECRET', {}],
+      ['/api/auth/login?next=/app&token=QUERY_LOGIN_TOKEN', json({ password: 'SenhaSecreta#7' })],
+    ];
+    for (const [path, options] of calls) await (await fetch(`${base}${path}`, options)).text();
+    assert.ok(logs.length >= calls.length);
+    const serialized = JSON.stringify(logs);
+    for (const secret of [
+      'SenhaSecreta', 'RESET_TOKEN_SECRET', 'INVITE_TOKEN_SECRET', 'PREFS_TOKEN_SECRET', 'SURVEY_TOKEN_SECRET', 'QUERY_LOGIN_TOKEN',
+      'COOKIE_SID_SECRET', 'BEARER_SECRET', 'SESSION_TOKEN_RESPONSE', 'maria@example.test', '123.456.789-00',
+    ]) assert.equal(serialized.includes(secret), false, secret);
+    const login = logs.find(log => log.req?.url?.startsWith('/api/auth/login?next') && log.res);
+    assert.equal(login.req.url, '/api/auth/login?next=[redigido]&token=[redigido]');
+    assert.deepEqual(login.req.body.keys, { password: 'string' });
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));

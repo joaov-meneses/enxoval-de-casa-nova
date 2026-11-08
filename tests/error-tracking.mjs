@@ -51,8 +51,8 @@ test('Express forwards all failures including admin and 4xx, preserves responses
     assert.deepEqual(await failure.json(), { error: 'failed' });
     assert.equal(captured.length, 3);
     assert.equal(captured[0].length, 3);
-    assert.equal(captured[2][2].url, '/failure?token=PRIVATE_TOKEN');
-    assert.equal(captured[2][2].headers.authorization, 'PRIVATE_AUTH');
+    assert.equal(captured[2][2].url, '/failure?token=[redigido]');
+    assert.equal(captured[2][2].headers.authorization, '[redigido]');
     assert.ok(captured[0][0] instanceof Error);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
