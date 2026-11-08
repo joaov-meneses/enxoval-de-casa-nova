@@ -41,6 +41,9 @@ Desde o commit `fab6769` (20/10/2026), presente em `main`, `homologacao` e `deve
 - Falhas da API capturam um erro novo de mensagem fixa, `ApiError <status> <método> <caminho com :id>` (nome `ApiError`), no lugar do original. Falha de rede usa status 0. No `response.parse` o erro operacional leva só o nome (`SyntaxError`). A mensagem real continua na tela da pessoa.
 - `src/main.tsx` passa só `error_source` e `componentStack`.
 - O `before_send` de `$exception` usa lista de permissão (`allowExceptionProperties`): mantém `$exception_*` do SDK, transporte (`token`, `distinct_id`), chaves do SDK (`$session_id`, `$device_id`, `$lib`, `$browser`, `$os`...), `$initial_*` e o contexto permitido. O resto é descartado, só primitivos passam, e `$current_url`, `$pathname`, `$referrer` e `$initial_*` saem sem query nem hash.
+- Slugs: o slug do Chá (`/api/public/housewarming/<slug>`, `/cha/<slug>`) e a chave de alias do catálogo viram `:slug` e `:key`, e ids viram `:id`, em `application.api.*`, `application.navigation`, na mensagem fixa do `ApiError` e em `$pathname`/`$current_url` do `$exception` (rota-modelo, como o `$pageview`). Rotas públicas com texto livre encontradas em `src/`: só o slug do Chá e o alias do catálogo.
+- Rejeição não tratada: o SDK captura sozinho um `ApiError` que ninguém tratou, com o texto do servidor. `request()` registra a mensagem mostrada na tela (`rememberApiError`) e o `before_send` troca o `value` de qualquer item `ApiError` de `$exception_list` pela mensagem fixa (ou por `ApiError`, se não houver registro).
+- Chaves `$exception_*`: só `$exception_list`, `$exception_level`, `$exception_fingerprint` e `$exception_types`. `$exception_values`, `$exception_steps`, `$exception_message` e `$exception_source` (texto livre) saem. Cada item de `$exception_list` mantém `type`, `value`, `mechanism` (`type`, `handled`, `synthetic`) e `stacktrace` com `filename` sem query, `function`, `lineno`, `colno` (mais `in_app`, `platform` e `chunk_id`, que só descrevem o frame). Contexto de código (`context_line`, `vars`) sai. `$initial_*` passa pelo mesmo filtro de `$set` (sem `utm_*`, `gclid` e similares).
 - O que o `$exception` perdeu: `body`, `headers`, `input`, `response`, `response_headers`, qualquer propriedade extra, `$set`, e a mensagem original dos erros de API. Erros que não são de API (por exemplo um `TypeError` do React) ainda levam a própria mensagem.
 
 ## Como validar
@@ -52,7 +55,7 @@ Desde o commit `fab6769` (20/10/2026), presente em `main`, `homologacao` e `deve
 
 ## Texto legal
 
-`src/components/PrivacyPage.tsx` dizia que os registros operacionais preservavam "os dados reais". Foi reescrito para dizer que só saem metadados da interação, sem valores digitados, conteúdo, mensagens nem URL com parâmetros. É texto legal: precisa de revisão do dono antes de ir para produção.
+`src/components/PrivacyPage.tsx` dizia que os registros operacionais preservavam "os dados reais". Foi reescrito para dizer que só saem metadados da interação, sem valores digitados, conteúdo, mensagens do servidor nem URL com parâmetros, e que erros técnicos do navegador que não vêm da API ainda podem levar a mensagem e a pilha de erro do código, sem dados digitados. O parágrafo dos registros do servidor não foi alterado aqui. É texto legal: precisa de revisão do dono antes de ir para produção.
 
 ## Ação do dono do projeto (não feita aqui)
 
