@@ -44,3 +44,7 @@ Cada entrega é documentada em português em `docs/` (data, o que mudou, como va
 ## Cuidados do domínio
 
 Dados pessoais, documentos, pagamentos e notas fiscais pedem revisão de segurança. Respeite `prefers-reduced-motion`. Verifique telas em 320, 375 e 425 px. Cores são `--cm-*` em `src/index.css`; tema Linho Terracota; fontes Fraunces + Nunito.
+
+## Codex
+
+O projeto mantém uma configuração própria para Codex em `.codex/` e skills em `.agents/skills/` (espelho das receitas portáveis de `.claude/skills/`). Para mudanças que toquem mais de um arquivo ou módulo, use `$entregar-mudanca-codex`: delegue exploração, planejamento, implementação e verificação conforme a skill. Em tarefas triviais, trabalhe direto. Subagentes compartilham o checkout; para escrita paralela, exija worktrees Git distintas e escopos sem sobreposição. Perfis e hooks não substituem as regras de `AGENTS.md`.

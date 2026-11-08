@@ -1,0 +1,45 @@
+{
+  "description": "Hooks de segurança e contexto do Casa Mia para Codex.",
+  "hooks": {
+    "SessionStart": [{
+      "hooks": [{
+        "type": "command",
+        "command": "node .codex/hooks/session-start.mjs",
+        "commandWindows": "node .codex/hooks/session-start.mjs",
+        "timeout": 10,
+        "statusMessage": "Carregando contexto do Casa Mia"
+      }]
+    }],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [{
+          "type": "command",
+          "command": "node .codex/hooks/guard-bash.mjs",
+          "commandWindows": "node .codex/hooks/guard-bash.mjs",
+          "timeout": 10,
+          "statusMessage": "Conferindo comando"
+        }]
+      },
+      {
+        "matcher": "^(apply_patch|Edit|Write)$",
+        "hooks": [{
+          "type": "command",
+          "command": "node .codex/hooks/guard-files.mjs",
+          "commandWindows": "node .codex/hooks/guard-files.mjs",
+          "timeout": 10,
+          "statusMessage": "Conferindo arquivos protegidos"
+        }]
+      }
+    ],
+    "Stop": [{
+      "hooks": [{
+        "type": "command",
+        "command": "node .codex/hooks/stop-lint.mjs",
+        "commandWindows": "node .codex/hooks/stop-lint.mjs",
+        "timeout": 180,
+        "statusMessage": "Executando lint TypeScript"
+      }]
+    }]
+  }
+}
