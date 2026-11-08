@@ -32,9 +32,14 @@ Desde o commit `fab6769` (20/10/2026), presente em `main`, `homologacao` e `deve
 - `application.api.started/completed/failed`: `body`, `headers`, `response`, `response_headers` e `input`. Ficam `path`, `method`, `http_status`, `duration_ms`, `request_id`, `phase` e `error` (`name`, `message`, `code`, `stack`, com limite de tamanho). O `path` perde query string.
 - Qualquer `application.*` em rotas `/admin`.
 
-## Fora do escopo (pendente)
+## Terceiro caminho: `$exception` de falhas da API
 
-`captureError` ainda envia o contexto da API (`body`, `response`) em `$exception`, e `docs/analytics.md` descreve que exceções preservam o payload. Avaliar em uma próxima entrega se o contexto de `$exception` também deve ser filtrado.
+`src/api.ts` passava `...input` / `...context` (com `body` da requisição, `response` e `response_headers`) para `captureError`. Todo login com senha errada (401) e toda falha de rede enviava a senha no `$exception`. Os `info` do React também iam inteiros.
+
+- `captureError` filtra o contexto por `ERROR_CONTEXT_ALLOWED`: `path` (sem query), `method`, `http_status`, `request_id`, `phase`, `error_source`, `duration_ms` e `componentStack`. Nenhum chamador consegue enviar `body`, `headers`, `input`, `response` ou `response_headers`.
+- `src/api.ts` passa só esse contexto (`apiErrorContext`); `src/main.tsx` passa só `error_source` e `componentStack`.
+- O `before_send` de `$exception` remove `body`, `headers`, `input`, `response` e `response_headers` e a query de `path`. A mensagem do erro é mantida: mensagens da API vêm do servidor e são genéricas.
+- Ressalva: o `SyntaxError` de um JSON inválido (`phase=response.parse`) pode citar um trecho da resposta na própria mensagem. Não foi tratado aqui.
 
 ## Como validar
 
@@ -47,7 +52,7 @@ Desde o commit `fab6769` (20/10/2026), presente em `main`, `homologacao` e `deve
 
 Nada foi alterado no PostHog. Dados já enviados antes desta correção precisam de decisão do dono:
 
-1. Apagar os eventos `application.ui.action` antigos (e avaliar `application.api.*` e `application.navigation`, que também continham corpo, resposta e query).
+1. Apagar os eventos antigos que continham dados digitados: `application.ui.action`, `application.api.*` (corpo e resposta), `application.navigation` (query e hash) e os `$exception` com `error_source=api`.
 2. Avaliar se há dever de comunicação a titulares e à ANPD conforme a LGPD (credenciais e dados pessoais foram transmitidos a um operador terceiro sem necessidade). Considerar a troca de senhas dos usuários afetados.
 3. Conferir a retenção e a exportação desses eventos (inclusive em destinos conectados ao PostHog).
 
