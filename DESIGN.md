@@ -248,6 +248,7 @@ Sempre em pares de fundo e texto: `preco-caiu-fundo`/`preco-caiu`, `preco-subiu-
 - **Faixas:** o fundo alterna entre linho, cartão quente (Como funciona) e areia suave (Nino), sempre com borda `linha` em cima e embaixo, para a página ter capítulos sem sombras.
 - **Escala de espaço:** 4, 8, 12, 14, 20, 28 e 48px (tokens `spacing`). Gutter de 20px no celular e 48px no desktop do app.
 - **Pontos de quebra observados:** 359/380px (cabeçalho compacto), 400 e 480px (celular), 600–640px, 767/768px, 860/920px (menu vira gaveta, grades viram uma coluna) e 1023/1024px no app.
+- **Arcos de fundo:** `body::before` (`src/index.css`) repete o arco azulejo em todas as rotas, esmaecido para as bordas. Em `/login` e `/cadastro` até 1023px o `.auth-shell` tem fundo opaco de linho e cobre essa camada, porque os arcos apareceriam cortados atrás do cabeçalho; acima disso eles ficam visíveis ao redor da porta.
 - **Cabeçalho da landing:** no topo é transparente e alinhado ao conteúdo; ao rolar vira uma barra de vidro em pílula (desktop) ou faixa (celular).
 
 ## Elevation & Depth
@@ -266,7 +267,7 @@ O sistema é quase plano. A separação vem da borda `linha` de 1px e da altern�
 
 ## Shapes
 
-Cantos macios em toda parte, escalando com o tamanho do objeto: etiqueta de situação 4px, botão do app 7px, linha de item 8px, campos e Select 10px, cartão do Planejamento 11px, diálogos 12px, botão da landing 14px, moldura de imagem 18px, cartão da landing 24px, plano de preço 28px e painel de fechamento 32px. Pílulas (999px) ficam para chips de cômodo, etiquetas de preço, selos e o círculo de conquista. A porta em arco do Nino é a única silhueta de assinatura e aparece na prévia do app e no progresso.
+Cantos macios em toda parte, escalando com o tamanho do objeto: etiqueta de situação 4px, botão do app 7px, linha de item 8px, campos e Select 10px, cartão do Planejamento 11px, diálogos 12px, botão da landing 14px, moldura de imagem 18px, cartão da landing 24px, plano de preço 28px e painel de fechamento 32px. Pílulas (999px) ficam para chips de cômodo, etiquetas de preço, selos e o círculo de conquista. A porta em arco do Nino é a única silhueta de assinatura e aparece na prévia do app, no progresso e na **porta de conta** (`/login` e `/cadastro`): acima de 1023px, um arco em linho tingido (`--cm-sand` a 25% sobre `--cm-bg`) com borda areia de 1,5px, o Nino acenando por cima do cartão do formulário e a frase "Pequenos planos. Grandes começos." em `--auth-muted`. Até 1023px não há porta nem cartão: o formulário fica direto no linho, com o Nino de 72px num pequeno arco no topo (escondido abaixo de 600px de altura).
 
 ### Named Rules
 **The Canto Proporcional Rule.** Quanto maior a superfície, maior o raio; nunca um raio grande em elemento pequeno nem canto vivo em cartão.
@@ -296,6 +297,8 @@ Artesanais e táteis: sobem no hover, encolhem para 98% ao pressionar, nunca bri
 - **Style:** `Input` do shadcn: fundo transparente (herda o cartão ou o linho), borda `areia-escura`, raio 10px, 36px de altura e 12px de respiro lateral. O rótulo fica acima do campo.
 - **Focus:** só a borda passa para terracota profundo, sem anel nem contorno externo (regra global de `src/focus.css`).
 - **Error:** texto e borda em `destrutivo`, sempre com mensagem.
+- **Campo de conta (`/login`, `/cadastro`):** 48px de altura, raio 10px, fundo do cartão e borda `color-mix(areia 60%, texto)` (3,3:1 sobre o linho e 3,5:1 sobre o cartão). Foco só com a borda em terracota profundo; erro com borda e texto em `destrutivo` e mensagem junto do campo. Tudo sob `.auth-shell`, sem mudar o `Input` global.
+- **Divergência registrada:** o `Input` padrão tem 36px de altura, abaixo do alvo mínimo de 44px do `PRODUCT.md`. Só o campo de conta cumpre a medida hoje; o `Input` global não foi alterado e fica como dívida a decidir.
 
 ### Navigation
 - **Landing:** marca à esquerda, links no centro, ação à direita; abaixo de 920px os links vão para uma gaveta e a ação principal continua visível (abaixo de 400px, só o ícone da casa).
