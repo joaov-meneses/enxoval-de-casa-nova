@@ -205,12 +205,20 @@ if (!process.argv.includes('--execute-staging')) {
     paymentIntentId = idOf(paid.payment_intent);
     report.checks.testPaymentCompleted = true;
     phase = 'real-test-webhook';
-    const status = await until(async () => { const s = await api('/api/billing/status'); return s.plan === 'pass' && s.accessAllowed ? s : null; }, 'access-by-webhook');
-    const months = (Date.parse(status.passExpiresAt) - Date.now()) / 86_400_000;
+    // Não consultar status/bootstrap/sync enquanto aguarda: essas rotas podem recuperar
+    // um pagamento direto na Stripe e esconder uma falha de concessão pelo webhook.
+    const granted = await until(async () => (await pool.query(`SELECT u.pass_expires_at
+      FROM users u WHERE u.id=$1 AND u.email=$2 AND u.stripe_customer_id=$3
+      AND u.pass_expires_at > now() AND u.billing_snapshot->'passPayment'->>'sessionId'=$4
+      AND EXISTS (SELECT 1 FROM stripe_events e JOIN fiscal_billing_events f ON f.event_id=e.id
+        WHERE f.environment='homologacao' AND f.event->'data'->'object'->>'id'=$4
+        AND e.type='checkout.session.completed')`, [userId, email, customerId, sessionId])).rows[0], 'access-by-webhook');
+    const months = (new Date(granted.pass_expires_at).getTime() - Date.now()) / 86_400_000;
     assert(months > 360 && months < 370, 'Passe não concedeu doze meses');
-    const webhook = await pool.query(`SELECT e.id FROM stripe_events e JOIN fiscal_billing_events f ON f.event_id=e.id
-      WHERE f.environment='homologacao' AND f.event->'data'->'object'->>'id'=$1 AND e.type='checkout.session.completed'`, [sessionId]);
-    assert.equal(webhook.rowCount, 1, 'liberação não foi confirmada pelo evento real');
+    // Somente depois da prova SQL, confirmar o que a API apresenta ao cliente.
+    const status = await api('/api/billing/status');
+    assert(status.plan === 'pass' && status.accessAllowed);
+    assert.equal(Date.parse(status.passExpiresAt), new Date(granted.pass_expires_at).getTime());
     report.checks.realTestWebhookAndTwelveMonths = true;
     phase = 'portal-and-refund-request';
     const portal = await api('/api/billing/portal', 'POST');
