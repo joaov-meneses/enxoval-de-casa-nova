@@ -71,7 +71,7 @@ A tentativa inicial com Vite de desenvolvimento foi interrompida por problemas d
 
 Duas fixtures estavam defasadas: senhas novas incompatíveis com a política forte e a expectativa de animação em ícones da landing que foram tornados estáticos intencionalmente. Foram corrigidos somente os testes; senhas válidas mantêm o cenário de confirmação divergente, e o contrato Animate UI passou a exercitar o botão real de login. Os 6 cenários admin e os 3 cenários de ícones passaram isoladamente e o diff foi revisado de forma independente. Não houve alteração de produto, política, asserts de segurança ou tolerâncias.
 
-A suíte definitiva de 247 cenários está em execução contra o build de produção servido por preview local, sem banco nem chaves Stripe no ambiente. O resultado final e o complemento de 320/375/425 px serão registrados após a conclusão.
+A suíte definitiva de 247 cenários foi iniciada contra o build de produção servido por preview local, sem banco nem chaves Stripe no ambiente. A execução foi interrompida quando os agentes atingiram o limite de uso. Antes da interrupção, foram observados cenários aprovados e expectativas antigas no onboarding que ainda precisam de correção e nova execução. O resultado completo e o complemento de 320/375/425 px permanecem pendentes.
 
 ## Provedor Stripe TEST e staging publicado
 
