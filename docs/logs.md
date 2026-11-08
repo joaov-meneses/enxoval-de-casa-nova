@@ -31,7 +31,7 @@ Consulte [PostHog Logs](https://us.posthog.com/project/665798/logs). Para achar 
 
 ## Navegador
 
-Eventos `application.navigation`, `application.ui.action` e `application.api.started/completed/failed` aparecem nos eventos do PostHog. Incluem URL real, cliques, alteracoes de campos, envios de formularios e chamadas da API com entrada, resultado, status, duracao e ID de requisicao. As rotas administrativas tambem sao cobertas. Os eventos de produto e Web Vitals mantem seus schemas; os dados completos ficam nos eventos operacionais e excecoes.
+Eventos `application.navigation`, `application.ui.action` e `application.api.started/completed/failed` aparecem nos eventos do PostHog. Incluem URL sem query nem hash, cliques, alteracoes e envios de formularios (sem os valores) e chamadas da API com caminho, metodo, status, duracao e ID de requisicao. Nao incluem corpo nem resposta da API. As rotas administrativas nao sao enviadas. Detalhes em [analytics-sem-valores-de-campos.md](analytics-sem-valores-de-campos.md). Os eventos de produto e Web Vitals mantem seus schemas. Os eventos do navegador nao carregam dados completos: os registros completos ficam so nos logs do servidor.
 
 `VITE_POSTHOG_KEY` configura o projeto e `VITE_POSTHOG_ENABLE_DEV=true` habilita desenvolvimento. O opt-out e Do Not Track continuam sendo respeitados no navegador. Logs do servidor sao independentes dessa preferencia.
 
@@ -44,7 +44,7 @@ Eventos `application.navigation`, `application.ui.action` e `application.api.sta
 - `npm run test:logging`: HTTP real, entrada e resposta completas, erros, causas, parser, correlacao, lentidao e interrupcao.
 - `npm run test:posthog-logs`: formato, todos os eventos/sucessos, transporte OTLP local e falhas do exportador.
 - `npm run test:error-tracking`: payload real do SDK Node e preservacao de mensagem/contexto.
-- `npm run test:analytics` e `npm run test:analytics-browser`: SDK do navegador, excecoes, acoes, dados reais de API e opt-out.
+- `npm run test:analytics` e `npm run test:analytics-browser`: SDK do navegador, excecoes, acoes, ausencia de dados pessoais nos eventos operacionais e opt-out.
 
 Simulacao Postman local, sem enviar dados ao projeto real:
 

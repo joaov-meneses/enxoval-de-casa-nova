@@ -184,8 +184,12 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           PostHog recebe eventos de uso, como etapas do onboarding, criação de
           itens e ativação de planos, associados a um identificador interno, e o
           navegador guarda identificadores de análise para relacionar visitas.
-          Também registramos navegação, cliques, alterações de campos,
-          formulários e chamadas da API com os dados reais usados nessas ações.
+          Também registramos metadados da interação: rota visitada, cliques,
+          formulários enviados e chamadas da API (caminho, status e duração).
+          Não enviamos o que você digita, o conteúdo das telas, mensagens do
+          servidor nem endereços com parâmetros. Erros técnicos do navegador,
+          que não vêm da API, ainda podem levar a mensagem e a pilha de erro do
+          código, sem dados digitados.
           Não gravamos sessões. Respeitamos o sinal Do Not Track do navegador.
         </p>
         <p>
@@ -203,7 +207,8 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           a origem das visitas e o desempenho de carregamento e interação.
           Os eventos de aquisição e desempenho usam rotas conhecidas, fontes e
           códigos de campanha permitidos e medidas numéricas. Os registros
-          operacionais preservam a URL e os dados reais das ações.
+          operacionais guardam só metadados da interação, sem valores digitados,
+          conteúdo, mensagens nem URL com parâmetros.
         </p>
         <p>
           Para operar o aplicativo e investigar falhas, os registros técnicos

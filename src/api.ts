@@ -32,6 +32,7 @@ import { SESSION_AUTHENTICATED_EVENT, SESSION_EXPIRED_EVENT } from './sessionAct
 import * as analytics from './analytics';
 import { recordApiSuccess } from './analytics/apiEvents';
 import { acquisitionPayload } from './analytics/firstTouch';
+import { apiPathTemplate } from "./analytics/operationalPrivacy";
 import type { Answers, PlanPayload } from "./onboarding/types";
 import type { AdminFeedback, FeedbackInput, FeedbackStatus } from "./feedback";
 import {
@@ -89,11 +90,27 @@ function withItemStatus(data: unknown): unknown {
   return data;
 }
 
+/**
+ * Erro enviado ao analytics no lugar do original: mensagem fixa e sem dados (o texto do servidor pode ter dado
+ * pessoal, como o e-mail de um convite). A pessoa continua vendo a mensagem real na tela.
+ */
+function apiFailure(status: number, method: string, path: string) {
+  const failure = new Error(`ApiError ${status} ${method} ${apiPathTemplate(path) ?? '/'}`);
+  failure.name = 'ApiError';
+  return failure;
+}
+
+/** Contexto de erro da API: só o que localiza a falha, nunca corpo, cabeçalhos ou resposta. */
+function apiErrorContext(context: { path: string; method: string; request_id: string | null; http_status: number; duration_ms: number }) {
+  const { path, method, request_id, http_status, duration_ms } = context;
+  return { path, method, request_id, http_status, duration_ms };
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (path === '/api/auth/register') analytics.capture('signup_submit');
   const started = performance.now();
   const input = { path, method: options.method ?? 'GET', body: options.body, headers: options.headers };
-  analytics.captureOperational('application.api.started', input);
+  analytics.captureOperational('application.api.started', { path: input.path, method: input.method });
   let response: Response;
   try {
     response = await fetch(path, {
@@ -105,9 +122,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       },
     });
   } catch (error) {
-    analytics.captureOperational('application.api.failed', { ...input, duration_ms: performance.now() - started, error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error });
+    analytics.captureOperational('application.api.failed', { path: input.path, method: input.method, duration_ms: performance.now() - started, error: { name: error instanceof Error ? error.name : 'Error' } });
     if (error instanceof Error && error.name === 'AbortError') throw error;
-    analytics.captureError(error, { ...input, error_source: 'api' });
+    const failure = apiFailure(0, input.method, path);
+    analytics.rememberApiError(NETWORK_ERROR_MESSAGE, failure.message);
+    analytics.captureError(failure, { path: input.path, method: input.method, duration_ms: performance.now() - started, error_source: 'api' });
     // Sem resposta do servidor (sem internet, servidor fora): a mensagem do navegador vem crua e em inglês.
     throw new ApiError(NETWORK_ERROR_MESSAGE, 0, 'NETWORK');
   }
@@ -117,8 +136,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const readBody = async () => {
     try { return await response.text(); }
     catch (error) {
-      analytics.captureOperational('application.api.failed', { ...context, phase: 'response.read', error: String(error) });
-      if (!(error instanceof Error && error.name === 'AbortError')) analytics.captureError(error, { ...context, error_source: 'api', phase: 'response.read' });
+      analytics.captureOperational('application.api.failed', { ...apiErrorContext(context), phase: 'response.read', error: { name: error instanceof Error ? error.name : 'Error' } });
+      if (!(error instanceof Error && error.name === 'AbortError')) analytics.captureError(apiFailure(context.http_status, context.method, path), { ...apiErrorContext(context), error_source: 'api', phase: 'response.read' });
       throw error;
     }
   };
@@ -144,8 +163,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       response.status,
       body?.code,
     );
-    analytics.captureOperational('application.api.failed', { ...context, response: body ?? rawResponse, error: { name: error.name, message: error.message, stack: error.stack, code: error.code } });
-    analytics.captureError(error, { ...context, response: body ?? rawResponse, error_source: 'api' });
+    analytics.captureOperational('application.api.failed', { ...apiErrorContext(context), error: { name: error.name, code: error.code } });
+    const failure = apiFailure(response.status, context.method, path);
+    // Se o erro original virar rejeição não tratada, o SDK o captura sozinho: o texto do servidor é trocado pelo fixo.
+    analytics.rememberApiError(error.message, failure.message);
+    analytics.captureError(failure, { ...apiErrorContext(context), error_source: 'api' });
     if (body?.code === "SUBSCRIPTION_REQUIRED") window.dispatchEvent(new Event("casamia:subscription-required"));
     if (isLimitCode(body?.code))
       window.dispatchEvent(
@@ -172,11 +194,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     originalData = response.status === 204 ? undefined : JSON.parse(rawResponse);
     data = withItemStatus(originalData);
   } catch (error) {
-    analytics.captureOperational('application.api.failed', { ...context, response: rawResponse, phase: 'response.parse', error: String(error) });
-    analytics.captureError(error, { ...context, response: rawResponse, error_source: 'api', phase: 'response.parse' });
+    analytics.captureOperational('application.api.failed', { ...apiErrorContext(context), phase: 'response.parse', error: { name: error instanceof Error ? error.name : 'Error' } });
+    analytics.captureError(apiFailure(response.status, context.method, path), { ...apiErrorContext(context), error_source: 'api', phase: 'response.parse' });
     throw error;
   }
-  analytics.captureOperational('application.api.completed', { ...context, duration_ms: performance.now() - started, response: originalData });
+  analytics.captureOperational('application.api.completed', { ...apiErrorContext(context), duration_ms: performance.now() - started });
   try {
     const input = typeof options.body === 'string' ? JSON.parse(options.body) : {};
     recordApiSuccess(analytics, path, options.method ?? 'GET', input, data);

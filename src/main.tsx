@@ -54,8 +54,8 @@ const stopSessionActivity = startSessionActivity();
 if (import.meta.hot) import.meta.hot.dispose(stopSessionActivity);
 
 createRoot(document.getElementById('root')!, {
-  onUncaughtError: (error, info) => captureError(error, { error_source: 'react.uncaught', ...info }),
-  onCaughtError: (error, info) => captureError(error, { error_source: 'react.caught', ...info }),
+  onUncaughtError: (error, info) => captureError(error, { error_source: 'react.uncaught', componentStack: info.componentStack }),
+  onCaughtError: (error, info) => captureError(error, { error_source: 'react.caught', componentStack: info.componentStack }),
 }).render(
   <StrictMode>
     <TooltipProvider>
