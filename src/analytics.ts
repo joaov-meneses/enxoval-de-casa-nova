@@ -1,5 +1,6 @@
 import posthog from 'posthog-js';
 import { startActionLogging } from './analytics/operations';
+import { sanitizeOperational, stripUrl } from './analytics/operationalPrivacy';
 import { exceptionProperties } from '../shared/errorTracking';
 import { allowedProperties, EVENT_PROPERTIES, safeRoute, scrubSdkProperties, type AnalyticsEvent, type AnalyticsProperties } from './analytics/events';
 import type { AuthUser } from './types';
@@ -69,7 +70,7 @@ export function trackLandingCta(action: 'start_trial' | 'open_app' | 'login' | '
 }
 
 export function captureOperational(event: `application.${string}`, properties: Record<string, unknown> = {}) {
-  safely(() => posthog.capture(event, { ...properties, url: window.location.href, timestamp: new Date().toISOString() }));
+  safely(() => posthog.capture(event, sanitizeOperational({ ...properties, url: stripUrl(window.location.href), timestamp: new Date().toISOString() }, window.location.origin)));
 }
 
 export function captureError(error: unknown, context?: Record<string, unknown>) {
@@ -177,7 +178,7 @@ export function trackPageview() {
   const location = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (location !== lastOperationalPage) {
     lastOperationalPage = location;
-    captureOperational('application.navigation', { path: window.location.pathname, search: window.location.search, hash: window.location.hash });
+    captureOperational('application.navigation', { path: window.location.pathname });
   }
 }
 
@@ -253,12 +254,16 @@ function startPosthog() {
       save_referrer: false, save_campaign_params: false,
       respect_dnt: true, ip: false,
       before_send: event => {
-        // Operational events keep the real URL in `url`; the SDK page fields get the sanitized route and origin,
-        // so a session that starts with one of them still has an entry page and channel in Web Analytics.
-        if (event?.event.startsWith('application.')) return { ...event, properties: {
-          ...event.properties, ...pageMetadata(window.location.origin, window.location.pathname),
-          ...campaignProperties(), ...trafficProperties(),
-        } };
+        // Eventos operacionais: nunca saem da rota /admin e só levam propriedades permitidas (sem valores digitados,
+        // query, hash, corpo ou resposta da API). Os campos de página do SDK recebem a rota e a origem sanitizadas.
+        if (event?.event.startsWith('application.')) {
+          if (/^\/admin(?:\/|$)/.test(window.location.pathname)) return null;
+          return { ...event, properties: {
+            ...sanitizeOperational({ ...(scrubSdkProperties(event.properties) as Record<string, unknown>), url: event.properties.url }, window.location.origin),
+            ...pageMetadata(window.location.origin, window.location.pathname),
+            ...campaignProperties(), ...trafficProperties(),
+          } };
+        }
         if (/^\/admin(?:\/|$)/.test(window.location.pathname) && event?.event !== '$exception') return null;
         if (event?.event === '$exception') {
           if (env.VITE_POSTHOG_ERROR_TRACKING === 'false') return null;
