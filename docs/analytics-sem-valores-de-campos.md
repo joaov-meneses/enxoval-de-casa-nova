@@ -18,35 +18,41 @@ Desde o commit `fab6769` (20/10/2026), presente em `main`, `homologacao` e `deve
 ## O que mudou
 
 - Novo `src/analytics/operationalPrivacy.ts`, com funções puras:
-  - `describeControl` / `describeField`: nunca coletam valor. Campos viram `{ name, id, type, filled }` (`checked` só em checkbox e radio). `text` só para botões e links, limitado a 80 caracteres; não é coletado de input, textarea, select nem form. `href` sem query nem hash.
-  - `stripUrl`: origem mais caminho, sem query, hash ou credenciais.
-  - `sanitizeOperational`: lista de propriedades permitidas (`OPERATIONAL_ALLOWED`). Propriedade nova não entra sem ser adicionada ali.
+  - `describeControl` / `describeField`: nunca coletam valor, rótulo (`aria-label`) nem texto. Saem só `tag`, `id`, `name` (atributo), `type`, `role`, `data-analytics`, `href` sem query nem hash, `aria-expanded`, `aria-selected` e `checked` (só checkbox e radio). Os campos do formulário viram `{ name, id, type, filled }`. Tudo vem de `getAttribute`, nunca de propriedades como `form.name`, que podem devolver um elemento.
+  - `stripUrl`, `cutQueryAndHash` e `apiPathTemplate`: URL sem query nem hash; caminho da API com ids, tokens e e-mails trocados por `:id`.
+  - `sanitizeOperational`: lista de permissão (`OPERATIONAL_ALLOWED`) que só aceita `string`, `number`, `boolean` ou `null`. Objetos e arrays são descartados (exceto `fields`, reconstruído campo a campo). Chaves `$` só passam se estiverem em `SDK_PROPERTY_KEYS`. O erro vira `error_name` e `error_code`.
 - `captureOperational` envia `url` sem query nem hash e filtra pela lista.
 - `application.navigation` envia só `path`.
-- `before_send`: eventos `application.*` são descartados em `/admin` e passam de novo pela lista, mais `scrubSdkProperties`. Campos de transporte do SDK (`token`, `distinct_id`, `uuid`, `$...`) são preservados.
+- `before_send`: eventos `application.*` são descartados em `/admin` e passam de novo pela lista. `$set` e `$set_once` perdem query e hash de `$initial_current_url` e similares e só levam primitivos.
+- `src/api.ts` e `src/sessionActivity.ts` já não entregam `body`, `headers`, `response` nem mensagem de erro ao `captureOperational`.
 
 ## Dados que o painel operacional deixou de ter
 
-- `application.ui.action`: `value`, `fields[].value`, `text` de campos e formulários, query/hash em `href` e `url`.
+- `application.ui.action`: `value`, `fields[].value`, `label` e `text` (inclusive de botões e links, que podem trazer e-mail de convite, nome de arquivo ou nome de item), query e hash em `href` e `url`. O painel perde o texto do botão clicado; para identificar uma ação, use `id`, `name`, `role` ou o atributo `data-analytics` (ainda não aplicado a nenhum botão).
 - `application.navigation`: `search` e `hash`.
-- `application.api.started/completed/failed`: `body`, `headers`, `response`, `response_headers` e `input`. Ficam `path`, `method`, `http_status`, `duration_ms`, `request_id`, `phase` e `error` (`name`, `message`, `code`, `stack`, com limite de tamanho). O `path` perde query string.
+- `application.api.started/completed/failed`: `body`, `headers`, `response`, `response_headers`, `input`, `error.message` e `error.stack`. Ficam `path` (sem query, com `:id`), `method`, `http_status`, `duration_ms`, `request_id`, `phase`, `error_name` e `error_code`.
 - Qualquer `application.*` em rotas `/admin`.
 
-## Terceiro caminho: `$exception` de falhas da API
+## `$exception`
 
-`src/api.ts` passava `...input` / `...context` (com `body` da requisição, `response` e `response_headers`) para `captureError`. Todo login com senha errada (401) e toda falha de rede enviava a senha no `$exception`. Os `info` do React também iam inteiros.
+`src/api.ts` passava `...input` / `...context` (com `body` da requisição, `response` e `response_headers`) para `captureError`. Todo login com senha errada (401) e toda falha de rede enviava a senha no `$exception`. Os `info` do React também iam inteiros. Além disso, a mensagem do servidor (por exemplo "Este convite é para <e-mail>") ia no `$exception`.
 
-- `captureError` filtra o contexto por `ERROR_CONTEXT_ALLOWED`: `path` (sem query), `method`, `http_status`, `request_id`, `phase`, `error_source`, `duration_ms` e `componentStack`. Nenhum chamador consegue enviar `body`, `headers`, `input`, `response` ou `response_headers`.
-- `src/api.ts` passa só esse contexto (`apiErrorContext`); `src/main.tsx` passa só `error_source` e `componentStack`.
-- O `before_send` de `$exception` remove `body`, `headers`, `input`, `response` e `response_headers` e a query de `path`. A mensagem do erro é mantida: mensagens da API vêm do servidor e são genéricas.
-- Ressalva: o `SyntaxError` de um JSON inválido (`phase=response.parse`) pode citar um trecho da resposta na própria mensagem. Não foi tratado aqui.
+- `captureError` filtra o contexto por `ERROR_CONTEXT_ALLOWED`: `path` (com `:id`), `method`, `http_status`, `request_id`, `phase`, `error_source`, `duration_ms` e `componentStack`.
+- Falhas da API capturam um erro novo de mensagem fixa, `ApiError <status> <método> <caminho com :id>` (nome `ApiError`), no lugar do original. Falha de rede usa status 0. No `response.parse` o erro operacional leva só o nome (`SyntaxError`). A mensagem real continua na tela da pessoa.
+- `src/main.tsx` passa só `error_source` e `componentStack`.
+- O `before_send` de `$exception` usa lista de permissão (`allowExceptionProperties`): mantém `$exception_*` do SDK, transporte (`token`, `distinct_id`), chaves do SDK (`$session_id`, `$device_id`, `$lib`, `$browser`, `$os`...), `$initial_*` e o contexto permitido. O resto é descartado, só primitivos passam, e `$current_url`, `$pathname`, `$referrer` e `$initial_*` saem sem query nem hash.
+- O que o `$exception` perdeu: `body`, `headers`, `input`, `response`, `response_headers`, qualquer propriedade extra, `$set`, e a mensagem original dos erros de API. Erros que não são de API (por exemplo um `TypeError` do React) ainda levam a própria mensagem.
 
 ## Como validar
 
 - `npm run lint`, `npm run build`
-- `npm run test:analytics` (cobre `describeControl` com senha, e-mail, Pix, checkbox e textarea, `stripUrl`, `sanitizeOperational`, e o descarte em `/admin`)
-- `npm run test:logging`, `npm run test:posthog-logs`
-- `npm run test:analytics-browser` (Playwright; espera que `RAW_FORM_VALUE` e `PRIVATE_*` não apareçam em `application.*`). Não foi executado nesta entrega.
+- `npm run test:analytics` (cobre `describeControl` com senha, e-mail, Pix, checkbox, textarea, `aria-label` com e-mail e `form.name` sombreado por um elemento; `sanitizeOperational`; `$exception` por lista de permissão; `$set`; e o descarte em `/admin`). Entra no CI (`.github/workflows/ci.yml`).
+- `npm run test:error-tracking`, `npm run test:logging`, `npm run test:posthog-logs`
+- `npm run test:analytics-browser` (SDK real no Edge/Chromium; o servidor Vite usa porta livre e HMR desligado). Não entra no CI, que não instala navegador.
+
+## Texto legal
+
+`src/components/PrivacyPage.tsx` dizia que os registros operacionais preservavam "os dados reais". Foi reescrito para dizer que só saem metadados da interação, sem valores digitados, conteúdo, mensagens nem URL com parâmetros. É texto legal: precisa de revisão do dono antes de ir para produção.
 
 ## Ação do dono do projeto (não feita aqui)
 
