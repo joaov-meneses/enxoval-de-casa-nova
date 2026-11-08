@@ -94,3 +94,30 @@ export function sanitizeOperational(properties: Record<string, unknown>, base?: 
   }
   return out;
 }
+
+/** Contexto permitido em `$exception`. Nenhum chamador consegue enviar corpo, cabeçalhos ou resposta. */
+export const ERROR_CONTEXT_ALLOWED = new Set([
+  'path', 'method', 'http_status', 'request_id', 'phase', 'error_source', 'duration_ms', 'componentStack',
+]);
+
+/** Chaves que carregam dados de entrada ou saída da API e nunca podem ir em `$exception`. */
+const ERROR_BLOCKED = ['body', 'headers', 'input', 'response', 'response_headers'];
+
+export function sanitizeErrorContext(context: Record<string, unknown> = {}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(context)) {
+    if (!ERROR_CONTEXT_ALLOWED.has(key) || value === undefined || value === null) continue;
+    if (key === 'path') out[key] = stripUrl(value);
+    else if (key === 'componentStack') out[key] = typeof value === 'string' ? value.slice(0, 4000) : undefined;
+    else if (typeof value === 'string' || typeof value === 'number') out[key] = value;
+  }
+  return out;
+}
+
+/** Remove de um `$exception` já montado as propriedades de corpo, cabeçalhos e resposta. */
+export function stripErrorPayload(properties: Record<string, any>): Record<string, any> {
+  const out = { ...properties };
+  for (const key of ERROR_BLOCKED) delete out[key];
+  if (typeof out.path === 'string') out.path = stripUrl(out.path);
+  return out;
+}
