@@ -57,10 +57,26 @@ export function canDeliverMail() {
   return mailDriver() !== "console" || !isProductionServer();
 }
 
+/**
+ * O que um log de e-mail pode conter: domínio do destinatário e tamanhos. Nunca endereço, assunto, corpo nem
+ * cabeçalhos, que carregam links com token (redefinição, convite, verificação, preferências, cancelar inscrição).
+ */
+export function mailMetadata(message: MailMessage) {
+  const domain = message.to.includes('@') ? message.to.slice(message.to.lastIndexOf('@') + 1).toLowerCase() : undefined;
+  return {
+    toDomain: domain,
+    subjectLength: message.subject.length,
+    textBytes: Buffer.byteLength(message.text ?? ''),
+    htmlBytes: Buffer.byteLength(message.html ?? ''),
+    headerCount: Object.keys(message.headers ?? {}).length,
+    customFrom: Boolean(message.from),
+  };
+}
+
 /** Envia e devolve o id da mensagem no provedor (liga os webhooks de entrega e clique à mensagem enviada). */
 export async function sendMail(message: MailMessage): Promise<{ providerMessageId: string | null }> {
   const started = Date.now();
-  const log = getLogger().child({ mail: message, driver: mailDriver() });
+  const log = getLogger().child({ mail: mailMetadata(message), driver: mailDriver() });
   log.info({ event: 'mail.started' }, 'Preparing transactional email.');
   try {
     const providerMessageId = await deliverMail(message);
@@ -95,18 +111,19 @@ async function deliverMail(message: MailMessage): Promise<string | null> {
       }),
     });
     const detail = await response.text();
-    getLogger().info({ event: 'mail.provider.response', status: response.status, body: detail, to: message.to }, 'Email provider response.');
-    if (!response.ok) {
-      throw new Error(`O provedor de e-mail respondeu ${response.status}. ${detail}`);
-    }
+    // A resposta do provedor pode repetir o endereço ou o texto enviado: só o id e o status vão para o log.
+    let id: string | null = null;
     try {
-      const id = (JSON.parse(detail) as { id?: unknown }).id;
-      return typeof id === "string" ? id : null;
-    } catch {
-      return null;
+      const parsed = (JSON.parse(detail) as { id?: unknown }).id;
+      id = typeof parsed === "string" ? parsed : null;
+    } catch { /* Resposta sem JSON. */ }
+    getLogger().info({ event: 'mail.provider.response', status: response.status, providerMessageId: id, responseBytes: Buffer.byteLength(detail) }, 'Email provider response.');
+    if (!response.ok) {
+      throw new Error(`O provedor de e-mail respondeu ${response.status}.`);
     }
+    return id;
   }
-  getLogger().warn({ event: 'mail.simulated', mail: message, production: isProductionServer() }, 'Email provider is not configured.');
+  getLogger().warn({ event: 'mail.simulated', mail: mailMetadata(message), production: isProductionServer() }, 'Email provider is not configured.');
   return null;
 }
 

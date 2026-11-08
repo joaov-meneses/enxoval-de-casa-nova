@@ -80,7 +80,7 @@ export async function sendWarrantyReminders(now = new Date()) {
         summary.emails += 1;
       });
     } catch (err) {
-      logger.error({ event: 'warranty.reminder.failed', email, err }, 'Warranty reminder failed; will retry next run.');
+      logger.error({ event: 'warranty.reminder.failed', userId: allowed.get(email) ?? null, err }, 'Warranty reminder failed; will retry next run.');
     }
   }
   return summary;

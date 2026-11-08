@@ -44,8 +44,9 @@ export function createHttpLogging(baseLogger: Logger = logger): RequestHandler {
       req: (req: Request) => ({
         id: req.id, method: req.method, url: pathname(req), path: req.path,
         params: redactDeep(req.res?.locals.logParams ?? req.params), query: redactQuery(req.query),
-        body: isDocumentRequest(req) ? { redacted: 'document' } : describeBody(req.body),
-        headers: logHeaders(req, req.headers), ip: req.ip, ips: req.ips,
+        body: isDocumentRequest(req) ? { redacted: 'document' } : describeBody(req.body, Number(req.headers['content-length']) || undefined),
+        // Sem IP nem user-agent: o IP segue valendo para limitar tentativas, só não vai para o log.
+        headers: logHeaders(req, req.headers),
       }),
       res: (res: Response) => ({ statusCode: res.statusCode, headers: logHeaders(res.req, res.getHeaders()), body: res.locals.logBody }),
       err: serializeError,
@@ -69,12 +70,9 @@ export function createHttpLogging(baseLogger: Logger = logger): RequestHandler {
     res.send = function (body) {
       res.locals.logParams = { ...req.params };
       if (/^\/api(?:\/|$)/.test(req.originalUrl || req.url)) {
-        // Só metadados da resposta (chaves, tipos, tamanho); os valores nunca vão para o log.
-        let parsed: unknown = body;
-        if (typeof body === 'string' && String(res.getHeader('content-type')).includes('application/json')) {
-          try { parsed = JSON.parse(body); } catch { /* Texto não JSON: só o tamanho. */ }
-        }
-        res.locals.logBody = isDocumentRequest(req) ? { redacted: 'document' } : describeBody(parsed);
+        // Da resposta só o tipo e o tamanho em bytes, sem ler o conteúdo.
+        const byteLength = typeof body === 'string' ? Buffer.byteLength(body) : Buffer.isBuffer(body) ? body.length : body === undefined || body === null ? 0 : undefined;
+        res.locals.logBody = isDocumentRequest(req) ? { redacted: 'document' } : { type: Buffer.isBuffer(body) ? 'buffer' : typeof body, ...(byteLength === undefined ? {} : { byteLength }) };
       }
       return send.call(this, body);
     };

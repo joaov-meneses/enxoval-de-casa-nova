@@ -3,7 +3,7 @@ import type { ErrorRequestHandler } from 'express';
 import { exceptionProperties } from '../shared/errorTracking.ts';
 import { isProduction, serializeError } from './logger.ts';
 import { requestId } from './posthogLogs.ts';
-import { describeBody, redactDeep, redactHeaders, redactQuery, redactUrl } from './logRedaction.ts';
+import { INVALID_JSON_MESSAGE, describeBody,redactDeep, redactHeaders, redactQuery, redactUrl } from './logRedaction.ts';
 import { appVersion } from './version.ts';
 
 export function createErrorTracking(env = process.env, production = isProduction) {
@@ -31,11 +31,18 @@ export async function stopErrorTracking() {
   try { await client?.shutdown(2000); } catch { /* Best effort on shutdown. */ }
 }
 
+/** JSON inválido cita um trecho do corpo (pode ter senha) na mensagem e em `body`: vai um erro com a mensagem fixa. */
+export function safeException(error: unknown) {
+  const parser = error as { type?: string } | null;
+  if (parser?.type !== 'entity.parse.failed') return error;
+  return Object.assign(new SyntaxError(INVALID_JSON_MESSAGE), { type: 'entity.parse.failed', status: 400 });
+}
+
 export function errorTrackingHandler(sink: Pick<PostHog, 'captureException'> | null): ErrorRequestHandler {
   return (error, req, _res, next) => {
     const id = requestId(req.id);
     try {
-      sink?.captureException(error, undefined, {
+      sink?.captureException(safeException(error), undefined, {
         ...(id ? { request_id: id } : {}),
         method: req.method, url: redactUrl(req.originalUrl || req.url),
         params: redactDeep(req.params), query: redactQuery(req.query), body: describeBody(req.body), headers: redactHeaders(req.headers),

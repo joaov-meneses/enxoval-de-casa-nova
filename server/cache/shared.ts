@@ -104,7 +104,7 @@ export async function sharedGet(key: string): Promise<string | null> {
   if (!redis) return null;
   try {
     const value = await redis.get(prefix() + key);
-    getLogger().info({ event: 'cache.get.completed', key, value, hit: value !== null }, 'Shared cache read.');
+    getLogger().info({ event: 'cache.get.completed', key, hit: value !== null }, 'Shared cache read.');
     return typeof value === 'string' ? value : null;
   } catch (err) {
     warn('Leitura no Redis falhou.', err);
@@ -117,7 +117,7 @@ export async function sharedSet(key: string, value: string, ttlSeconds: number) 
   if (!redis) return false;
   try {
     await redis.set(prefix() + key, value, { EX: ttlSeconds });
-    getLogger().info({ event: 'cache.set.completed', key, value, ttlSeconds }, 'Shared cache write.');
+    getLogger().info({ event: 'cache.set.completed', key, bytes: Buffer.byteLength(value), ttlSeconds }, 'Shared cache write.');
     return true;
   } catch (err) {
     warn('Gravação no Redis falhou.', err);
@@ -146,7 +146,7 @@ export async function publish(channel: string, message: string) {
   if (!redis) return;
   try {
     await redis.publish(prefix() + channel, message);
-    getLogger().info({ event: 'cache.publish.completed', channel, message }, 'Shared cache notification published.');
+    getLogger().info({ event: 'cache.publish.completed', channel, bytes: Buffer.byteLength(message) }, 'Shared cache notification published.');
   } catch (err) {
     warn('Aviso pelo Redis falhou.', err);
   }

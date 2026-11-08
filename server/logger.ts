@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import dotenv from 'dotenv';
 import pino, { type DestinationStream, type Logger } from 'pino';
 import { createPosthogLogs } from './posthogLogs.ts';
-import { redactError } from './logRedaction.ts';
+import { redactDeep, redactError } from './logRedaction.ts';
 
 dotenv.config({ path: '.env.local', quiet: true });
 dotenv.config({ quiet: true });
@@ -15,7 +15,11 @@ export const stopPosthogLogs = async () => { await posthogLogs?.shutdown(); };
 
 // Mensagem, pilha, código e causas ficam; valores sensíveis e campos que ecoam dados de entrada são redigidos.
 export function serializeError(value: unknown) {
-  return value instanceof Error ? redactError(pino.stdSerializers.errWithCause(value)) : value as any;
+  return value instanceof Error ? redactError(pino.stdSerializers.errWithCause(value)) : redactDeep(value) as any;
+}
+
+function redactLine(line: string) {
+  try { return `${JSON.stringify(redactDeep(JSON.parse(line)))}\n`; } catch { return line; }
 }
 
 export function createLogger(destination?: DestinationStream, remote = destination ? null : posthogLogs) {
@@ -24,7 +28,8 @@ export function createLogger(destination?: DestinationStream, remote = destinati
     base: { service: 'casamia', environment: isProduction ? 'production' : 'development', pid: process.pid },
     timestamp: pino.stdTimeFunctions.isoTime,
     serializers: { err: serializeError },
-    hooks: { streamWrite: line => { try { remote?.write(line); } catch { /* Preserve local logging. */ } return line; } },
+    // Toda linha (stdout e PostHog) passa pela redação aqui, então nenhum log manual sai sem ela.
+    hooks: { streamWrite: line => { const safe = redactLine(line); try { remote?.write(safe); } catch { /* Preserve local logging. */ } return safe; } },
     ...(!destination && (process.env.LOG_FORMAT === 'pretty' || (!isProduction && process.env.LOG_FORMAT !== 'json')) ? {
       transport: { target: 'pino-pretty', options: { colorize: process.stdout.isTTY === true, translateTime: 'SYS:standard', errorLikeObjectKeys: ['err'], ignore: 'pid,hostname' } },
     } : {}),
