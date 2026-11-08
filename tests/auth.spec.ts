@@ -28,6 +28,42 @@ async function open(page: Page, path: string, size: { width: number; height: num
   await expect(page.locator("h1")).toBeVisible();
 }
 
+/*
+ * Primeiro acesso, sem consentimento semeado. O aviso de cookies só existe em builds com VITE_POSTHOG_KEY ou
+ * VITE_GTM_ID (consentRequired); no build comum o teste pula. Para rodar: VITE_POSTHOG_KEY=phc_local npm run build.
+ * Registra onde o aviso e o botão de envio ficam. Limitação conhecida: em celular o aviso fixo cobre o botão
+ * até a pessoa decidir (ver o doc do redesenho).
+ */
+test.describe("primeiro acesso com o aviso de cookies", () => {
+  for (const path of ["/login", "/cadastro"]) {
+    for (const size of [SIZES[1], SIZES[0]]) {
+      test(`${path} em ${size.width}x${size.height}: posições do aviso e do botão`, async ({ page }) => {
+        await page.setViewportSize(size);
+        await page.route("**/api/bootstrap**", (route) => route.fulfill({ status: 401, json: { error: "Faça login." } }));
+        await page.goto(path);
+        await page.evaluate(() => document.fonts.ready);
+        await expect(page.locator("h1")).toBeVisible();
+        test.skip((await page.locator(".consent-banner").count()) === 0, "build sem chave de análise: o aviso não aparece");
+        const m = await page.evaluate(() => {
+          const banner = document.querySelector(".consent-banner")!.getBoundingClientRect();
+          const button = document.querySelector("form button[type=submit]")!.getBoundingClientRect();
+          const hit = document.elementFromPoint(button.left + button.width / 2, button.top + button.height / 2);
+          return {
+            banner: { top: Math.round(banner.top), bottom: Math.round(banner.bottom) },
+            button: { top: Math.round(button.top), bottom: Math.round(button.bottom) },
+            covered: Boolean(hit?.closest(".consent-banner")),
+          };
+        });
+        test.info().annotations.push({ type: "medida", description: JSON.stringify(m) });
+        expect(m.banner.bottom).toBeLessThanOrEqual(size.height);
+        expect(m.banner.top).toBeGreaterThanOrEqual(0);
+        // Limitação documentada: o aviso cobre o botão no primeiro acesso, nos dois tamanhos.
+        expect(m.covered).toBe(true);
+      });
+    }
+  }
+});
+
 /** Segura a resposta do pedido até `release()`, para observar o estado de envio. */
 function holdRequest(page: Page, url: string) {
   let release: () => void = () => {};

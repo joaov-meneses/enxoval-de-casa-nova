@@ -586,6 +586,18 @@ test.describe("funil /comecar", () => {
     await expect(page.getByRole("button", { name: "Entrar no meu enxoval" })).toHaveCount(0);
   });
 
+  test("/signup com sessão e sem enxovais leva a /comecar", async ({ page }) => {
+    const session = {
+      user: { id: "u1", name: "Jeoston", email: "j@e.com" },
+      enxovais: [], activeEnxoval: null, members: [], categories: [], items: [],
+    };
+    await page.route("**/api/bootstrap**", (route) => route.fulfill({ status: 200, json: session }));
+    await page.goto("/signup");
+    // src/main.tsx troca /signup por /comecar; com sessão e sem enxovais, o funil continua em /comecar.
+    await expect(page).toHaveURL(/\/comecar$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Crie sua conta." })).toHaveCount(0);
+  });
+
   test.describe("roleta de estados", () => {
     test.use({ timezoneId: "America/Sao_Paulo" });
 
