@@ -182,6 +182,21 @@ test.describe("troca entre entrar e criar conta", () => {
 });
 
 test.describe("teclado e alvos de toque", () => {
+  test("ao trocar de modo pelo teclado, o título focado não ganha linha de foco", async ({ page }) => {
+    await open(page, "/login", { width: 1366, height: 768 });
+    const link = page.getByRole("link", { name: "Criar conta", exact: true });
+    await link.focus();
+    await page.keyboard.press("Enter");
+    const heading = page.getByRole("heading", { level: 1, name: "Crie sua conta." });
+    await expect(heading).toBeFocused();
+    const style = await heading.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { shadow: s.boxShadow, outlineStyle: s.outlineStyle, outlineWidth: s.outlineWidth };
+    });
+    expect(style.shadow).toBe("none");
+    expect(style.outlineStyle === "none" || style.outlineWidth === "0px").toBe(true);
+  });
+
   test("a ordem do Tab segue e-mail, senha, mostrar senha, esqueci minha senha, entrar", async ({ page }) => {
     await open(page, "/login");
     await page.locator("#auth-email").focus();
@@ -271,6 +286,25 @@ test.describe("validação dentro da interface", () => {
     await expect(password).toBeFocused();
     await expect(password).toHaveAttribute("aria-invalid", "true");
     expect(requests).toBe(0);
+  });
+
+  test("a mensagem do campo é uma região viva, mesmo com o campo já focado (Enter)", async ({ page }) => {
+    await open(page, "/login");
+    const email = page.getByLabel("Seu e-mail");
+    const alertBox = page.locator("#auth-email-error");
+    // Sempre montada e vazia antes do envio; vazia não ocupa espaço nem é lida.
+    await expect(alertBox).toHaveAttribute("role", "alert");
+    await expect(alertBox).toBeEmpty();
+    await expect(alertBox).toBeHidden();
+    await email.fill("nome");
+    await email.focus();
+    await page.keyboard.press("Enter");
+    // O campo já tinha o foco, então focus() não anuncia nada: quem anuncia é a região viva.
+    await expect(page.getByRole("alert").filter({ hasText: "Confira o e-mail" })).toBeVisible();
+    await expect(alertBox).toHaveText("Confira o e-mail: use o formato nome@exemplo.com.");
+    await expect(email).toBeFocused();
+    await expect(email).toHaveAttribute("aria-describedby", "auth-email-error");
+    await expect(email).toHaveAttribute("aria-invalid", "true");
   });
 
   test("login aceita e-mail sem ponto no domínio; o cadastro recusa", async ({ page }) => {
@@ -441,6 +475,20 @@ test.describe("cadastro", () => {
     await expect(optin).toBeChecked();
   });
 
+  test("a caixa de e-mails mostra foco visível ao chegar pelo Tab", async ({ page }) => {
+    await open(page, "/cadastro");
+    const box = page.locator(".auth-optin");
+    const shadow = () => box.evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(await shadow()).toBe("none");
+    await page.locator("#register-password").focus();
+    await page.keyboard.press("Tab"); // mostrar senha
+    await page.keyboard.press("Tab"); // caixa de e-mails
+    await expect(page.getByRole("checkbox")).toBeFocused();
+    // Linha interna de 2px em terracota profundo, sem anel afastado.
+    expect(await shadow()).toBe("rgb(163, 76, 48) 0px 0px 0px 2px inset");
+    expect(await box.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("none");
+  });
+
   for (const marketing of [false, true]) {
     test(`o pedido leva emailMarketing=${marketing}`, async ({ page }) => {
       await open(page, "/cadastro");
@@ -566,6 +614,10 @@ test.describe("contraste", () => {
       await page.locator("#auth-email").focus();
       await page.keyboard.press("Tab");
       await page.keyboard.press("Shift+Tab");
+      // A borda transita em 0,2s: espera o terracota profundo final antes de medir.
+      await expect
+        .poll(() => page.locator("#auth-email").evaluate((el) => getComputedStyle(el).borderTopColor))
+        .toBe("rgb(163, 76, 48)");
       const focused = await border(page, "#auth-email");
       expect(focused.onParent).toBeGreaterThanOrEqual(3);
 
@@ -630,6 +682,38 @@ test.describe("telas que compartilham .auth-form", () => {
         return { height: el.getBoundingClientRect().height, radius: s.borderTopLeftRadius };
       });
       expect(box, path).toEqual({ height: 49, radius: "7px" });
+      // A cor da borda no foco também não muda (a transição de 0,2s termina antes de medir).
+      await input.focus();
+      await expect
+        .poll(() => input.evaluate((el) => getComputedStyle(el).borderTopColor), { message: path })
+        .toBe("rgb(163, 76, 48)");
     }
+  });
+
+  test("/preferencias (API simulada) mantém as caixas de e-mail como antes", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.addInitScript(() =>
+      localStorage.setItem(
+        "casamia:consent",
+        JSON.stringify({ analytics: false, marketing: false, version: "2026-10", decidedAt: new Date().toISOString() }),
+      ),
+    );
+    await page.route("**/api/bootstrap**", (route) => route.fulfill({ status: 401, json: { error: "Faça login." } }));
+    await page.route("**/api/preferences**", (route) =>
+      route.fulfill({ json: { email: "ana@example.invalid", subscribed: true, reminders: true, tips: false, pausedUntil: null } }),
+    );
+    await page.goto("/preferencias?token=teste");
+    const boxes = page.locator(".auth-optin");
+    await expect(boxes).toHaveCount(2);
+    const read = () =>
+      boxes.first().evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { shadow: s.boxShadow, margin: s.margin, padding: s.padding };
+      });
+    const before = await read();
+    await page.locator(".auth-optin input").first().focus();
+    // Fora de .auth-shell, a regra de foco do cadastro não vale: o rótulo não muda.
+    expect(await read()).toEqual(before);
+    expect(before.margin).toBe("0px");
   });
 });
