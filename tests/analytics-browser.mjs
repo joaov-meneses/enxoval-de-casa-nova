@@ -122,8 +122,8 @@ try {
   const findPrivate = (value, path = '') => Object.entries(value).flatMap(([key, child]) => child && typeof child === 'object' ? findPrivate(child, `${path}.${key}`) : String(child).includes('PRIVATE_') ? [`${path}.${key}: ${child}`] : []);
   assert.deepEqual(findPrivate(batches.filter(event => event.event !== '$exception' && !event.event.startsWith('application.'))), []);
   assert.equal(exception.properties.$exception_list[0].value, 'PRIVATE_EXCEPTION PRIVATE_EMAIL');
-  assert.ok(batches.some(event => event.event === 'application.api.started' && event.properties.path === '/api/auth/login' && event.properties.body.includes('PRIVATE_PASSWORD')));
-  assert.ok(batches.some(event => event.event === 'application.api.completed' && event.properties.response?.user?.email === 'PRIVATE_EMAIL'));
+  assert.ok(batches.some(event => event.event === 'application.api.started' && event.properties.path === '/api/auth/login' && event.properties.body === undefined));
+  assert.deepEqual(findPrivate(batches.filter(event => event.event.startsWith('application.'))), []);
   await page.evaluate(() => {
     const form = document.createElement('form');
     form.innerHTML = '<input name="diagnostic" value="RAW_FORM_VALUE"><button type="button">Diagnostic action</button>';
@@ -135,8 +135,9 @@ try {
   });
   await page.waitForTimeout(3500);
   for (const action of ['click', 'change', 'submit']) {
-    assert.ok(batches.some(event => event.event === 'application.ui.action' && event.properties.action === action && event.properties.fields?.some(field => field.value === 'RAW_FORM_VALUE')));
+    assert.ok(batches.some(event => event.event === 'application.ui.action' && event.properties.action === action));
   }
+  assert.equal(JSON.stringify(batches.filter(event => event.event === 'application.ui.action')).includes('RAW_FORM_VALUE'), false);
   assert.deepEqual(errors, []);
   await page.getByRole('button', { name: 'Mudar preferências' }).click();
   await banner.getByRole('button', { name: 'Recusar' }).click();

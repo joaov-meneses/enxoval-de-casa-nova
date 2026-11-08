@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 import { allowedProperties, scrubSdkProperties, safeRoute } from '../src/analytics/events.ts';
+import { describeControl, sanitizeOperational, stripUrl } from '../src/analytics/operationalPrivacy.ts';
 import { recordApiSuccess } from '../src/analytics/apiEvents.ts';
 import { campaignAllowlist, pageMetadata, readAttribution, trafficType, webVitalsProperties } from '../src/analytics/web.ts';
 
@@ -163,14 +164,74 @@ test('missing key and development default never initialize the SDK', async () =>
   }
 });
 
-test('admin exceptions and operational diagnostics preserve real data', async () => {
+test('admin operational events are dropped; exceptions are kept', async () => {
   const c = await client({}, '/admin/catalog'); c.api.startAnalytics();
   assert.ok(c.config());
-  const properties = { body: { password: 'raw-password' }, response: { email: 'real@example.test' } };
-  assert.deepEqual(c.config().before_send({ event: 'application.api.completed', properties }).properties.body, properties.body);
-  c.api.captureOperational('application.api.completed', properties);
-  assert.equal(c.calls.at(-1)[0], 'application.api.completed');
+  const properties = { body: { password: 'raw-password' }, response: { email: 'real@example.test' }, path: '/api/admin/x' };
+  assert.equal(c.config().before_send({ event: 'application.api.completed', properties }), null);
+  assert.equal(c.config().before_send({ event: 'application.ui.action', properties: { action: 'click' } }), null);
   assert.equal(c.config().before_send({ event: '$exception', properties: { $exception_list: [{ type: 'Error', value: 'Original admin failure' }] } }).properties.$exception_list[0].value, 'Original admin failure');
+});
+
+const fakeControl = (tagName, props = {}) => ({
+  tagName, id: '', name: '', type: '', value: '', checked: false, textContent: '',
+  getAttribute: name => props.attrs?.[name] ?? null, ...props, attrs: undefined,
+});
+
+test('ui action descriptions never contain typed values', () => {
+  const password = fakeControl('INPUT', { name: 'password', type: 'password', value: 'SEGREDO_SENHA', textContent: 'SEGREDO_TEXTO' });
+  const email = fakeControl('INPUT', { name: 'email', type: 'email', value: 'pessoa@example.test' });
+  const pix = fakeControl('INPUT', { name: 'pix', type: 'text', value: '123.456.789-00' });
+  const terms = fakeControl('INPUT', { name: 'terms', type: 'checkbox', checked: true });
+  const area = fakeControl('TEXTAREA', { name: 'nota', value: 'texto privado', textContent: 'texto privado' });
+  const button = fakeControl('BUTTON', { type: 'submit', textContent: `  Entrar ${'x'.repeat(200)} `, attrs: { 'aria-label': 'Entrar' } });
+  const form = { querySelectorAll: () => [password, email, pix, terms, area] };
+  const link = fakeControl('A', { textContent: 'Preferências', attrs: { href: '/preferencias?token=SEGREDO_TOKEN#hash=SEGREDO_HASH' } });
+  const events = [
+    describeControl(password, form), describeControl(email, form), describeControl(button, form),
+    describeControl(area, form), describeControl(terms, form), describeControl(link, null),
+  ];
+  const text = JSON.stringify(events);
+  for (const secret of ['SEGREDO', 'pessoa@example.test', '123.456', 'texto privado', 'token=', 'hash=']) assert.equal(text.includes(secret), false, secret);
+  assert.equal('value' in events[0], false);
+  assert.deepEqual(events[0].fields[0], { name: 'password', id: undefined, type: 'password', filled: true });
+  assert.deepEqual(events[0].fields[3], { name: 'terms', id: undefined, type: 'checkbox', filled: true, checked: true });
+  assert.equal(events[0].text, undefined);
+  assert.equal(events[2].text.length, 80);
+  assert.equal(events[4].checked, true);
+  assert.equal(events[5].href, '/preferencias');
+  assert.equal(events[5].text, 'Preferências');
+});
+
+test('operational filter drops unknown properties, bodies and URL query/hash', () => {
+  assert.equal(stripUrl('https://casamia.test/preferencias?token=x#y'), 'https://casamia.test/preferencias');
+  assert.equal(stripUrl('/a/b?c=1', 'https://casamia.test'), '/a/b');
+  const clean = sanitizeOperational({
+    action: 'submit', url: 'https://casamia.test/preferencias?token=SEGREDO', value: 'SEGREDO_VALOR', novoCampo: 'SEGREDO_NOVO',
+    body: '{"password":"SEGREDO"}', headers: { authorization: 'SEGREDO' }, response: { email: 'SEGREDO' }, response_headers: { a: 'SEGREDO' },
+    path: '/api/auth/login', method: 'POST', http_status: 401, duration_ms: 12, request_id: 'r1',
+    fields: [{ name: 'senha', type: 'password', value: 'SEGREDO', filled: true }],
+    error: { name: 'ApiError', message: 'Falhou', code: 'X', extra: 'SEGREDO' }, $session_id: 's', token: 'phc',
+  });
+  assert.equal(JSON.stringify(clean).includes('SEGREDO'), false);
+  assert.equal(clean.url, 'https://casamia.test/preferencias');
+  assert.deepEqual([clean.path, clean.method, clean.http_status, clean.request_id, clean.$session_id, clean.token], ['/api/auth/login', 'POST', 401, 'r1', 's', 'phc']);
+  assert.deepEqual(clean.fields, [{ name: 'senha', id: undefined, type: 'password', filled: true }]);
+});
+
+test('operational events leave the browser without typed values, query or hash', async () => {
+  const c = await client({}, '/preferencias'); c.api.startAnalytics();
+  globalThis.window.location.href = 'https://casamia.test/preferencias?token=SEGREDO#h=SEGREDO';
+  c.api.captureOperational('application.ui.action', { action: 'click', value: 'SEGREDO_SENHA', fields: [{ type: 'password', value: 'SEGREDO_SENHA', filled: true }] });
+  const sent = c.calls.filter(([event]) => event === 'application.ui.action').at(-1)[1];
+  assert.equal(JSON.stringify(sent).includes('SEGREDO'), false);
+  assert.equal(sent.url, 'https://casamia.test/preferencias');
+  const nav = c.calls.filter(([event]) => event === 'application.navigation').at(-1)[1];
+  assert.deepEqual(Object.keys(nav).filter(key => ['search', 'hash'].includes(key)), []);
+  const viaSdk = c.config().before_send({ event: 'application.api.started', properties: { path: '/api/auth/login', method: 'POST', body: '{"password":"SEGREDO"}', headers: {}, extra: 'SEGREDO', token: 'phc', distinct_id: 'd' } }).properties;
+  assert.equal(JSON.stringify(viaSdk).includes('SEGREDO'), false);
+  assert.equal(viaSdk.path, '/api/auth/login');
+  assert.equal(viaSdk.token, 'phc');
 });
 
 test('initialization enables bounded web vitals and reconstructs safe standard page properties', async () => {
