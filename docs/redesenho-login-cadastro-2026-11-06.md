@@ -47,6 +47,26 @@ Tamanhos verificados em `tests/auth.spec.ts`: 320x568, 375x667, 425x800 e 1366x7
 - `tests/admin-ui.spec.ts`, "temporary password requires a new password" (320, 390 e 1440px): falha porque a senha de teste `SenhaPessoalTeste123` tem a sequência "123", recusada pela política de senha; é a tela de troca obrigatória, que esta entrega não alterou.
 - Capturas do inventário (`T02-login*.webp`, `T03-cadastro*.webp`) estão defasadas e precisam ser refeitas.
 
+### Primeiro acesso: aviso de cookies e dobra (medido em 2026-11-08)
+
+As medidas acima têm o consentimento já semeado. O aviso (`.consent-banner`, `position: fixed`, rodapé) só existe em builds com `VITE_POSTHOG_KEY` ou `VITE_GTM_ID`; medido com `VITE_POSTHOG_KEY=phc_medicao_local npm run build`, sem consentimento, em px a partir do topo da janela:
+
+| Tela | Janela | Aviso (topo-base) | Botão de envio (topo-base) |
+| --- | --- | --- | --- |
+| `/login` | 375x667 | 272-651 | 462-513 |
+| `/login` | 320x568 | 128-552 | 381-431 |
+| `/cadastro` | 375x667 | 272-651 | 594-644 |
+| `/cadastro` | 320x568 | 128-552 | 509-560 |
+
+**Limitação conhecida:** no primeiro acesso o aviso cobre o botão de envio nos quatro casos (o ponto central do botão cai dentro do aviso) até a pessoa escolher uma opção do aviso. Em 320x568 o aviso ocupa 424px dos 568px. O aviso e o funil não foram alterados; a medida fica registrada em `tests/auth.spec.ts` ("primeiro acesso com o aviso de cookies"), que pula em builds sem chave de análise.
+
+## Correções da revisão (2026-11-08)
+
+- **Erro de campo anunciado:** a mensagem do campo fica sempre montada com `role="alert"` e só recebe texto no envio; vazia, some (`:empty`). Anuncia mesmo com o campo já focado (digitar "nome" no e-mail e apertar Enter). `aria-invalid` e `aria-describedby` continuam.
+- **Título focado sem linha de foco:** seletor `.auth-shell .auth-heading h1[tabindex="-1"]:focus-visible`, com especificidade para vencer `focus.css`, sem `!important`.
+- **Foco da caixa de e-mails no cadastro:** o rótulo ganha a linha interna de 2px em terracota profundo via `:has(input:focus-visible)`, só dentro de `.auth-shell .auth-form`; o respiro de 6px 8px é compensado por margem negativa e não muda a dobra. `/preferencias` não é afetada.
+- **Testes:** `/signup` com sessão e sem enxovais termina em `/comecar` (`tests/onboarding.spec.ts`), além do caso sem sessão que leva a `/cadastro`; cor do foco do campo (`rgb(163, 76, 48)`) após a transição de 0,2s, também em `/esqueci-senha` e `/admin/login`; `/preferencias` com API simulada.
+
 ## Pendências
 
 Registradas em `docs/implementacoes-futuras.md`: 409 do cadastro ainda revela conta existente na resposta de rede (correção é no servidor); aceite dos Termos de Uso não é gravado; origem do consentimento caso o opt-in vá ao funil. Também: "Começar grátis" em `HousewarmingPage.tsx` ficou como está; `FeatureCarousel.tsx` continua órfão; a troca de modo em `/app/...` faz `replaceState` para `/login` ou `/cadastro`, como antes.
