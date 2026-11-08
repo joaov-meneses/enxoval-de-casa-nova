@@ -124,7 +124,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   } catch (error) {
     analytics.captureOperational('application.api.failed', { path: input.path, method: input.method, duration_ms: performance.now() - started, error: { name: error instanceof Error ? error.name : 'Error' } });
     if (error instanceof Error && error.name === 'AbortError') throw error;
-    analytics.captureError(apiFailure(0, input.method, path), { path: input.path, method: input.method, duration_ms: performance.now() - started, error_source: 'api' });
+    const failure = apiFailure(0, input.method, path);
+    analytics.rememberApiError(NETWORK_ERROR_MESSAGE, failure.message);
+    analytics.captureError(failure, { path: input.path, method: input.method, duration_ms: performance.now() - started, error_source: 'api' });
     // Sem resposta do servidor (sem internet, servidor fora): a mensagem do navegador vem crua e em inglês.
     throw new ApiError(NETWORK_ERROR_MESSAGE, 0, 'NETWORK');
   }
@@ -162,7 +164,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       body?.code,
     );
     analytics.captureOperational('application.api.failed', { ...apiErrorContext(context), error: { name: error.name, code: error.code } });
-    analytics.captureError(apiFailure(response.status, context.method, path), { ...apiErrorContext(context), error_source: 'api' });
+    const failure = apiFailure(response.status, context.method, path);
+    // Se o erro original virar rejeição não tratada, o SDK o captura sozinho: o texto do servidor é trocado pelo fixo.
+    analytics.rememberApiError(error.message, failure.message);
+    analytics.captureError(failure, { ...apiErrorContext(context), error_source: 'api' });
     if (body?.code === "SUBSCRIPTION_REQUIRED") window.dispatchEvent(new Event("casamia:subscription-required"));
     if (isLimitCode(body?.code))
       window.dispatchEvent(

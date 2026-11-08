@@ -187,7 +187,9 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           Também registramos metadados da interação: rota visitada, cliques,
           formulários enviados e chamadas da API (caminho, status e duração).
           Não enviamos o que você digita, o conteúdo das telas, mensagens do
-          sistema nem endereços com parâmetros.
+          servidor nem endereços com parâmetros. Erros técnicos do navegador,
+          que não vêm da API, ainda podem levar a mensagem e a pilha de erro do
+          código, sem dados digitados.
           Não gravamos sessões. Respeitamos o sinal Do Not Track do navegador.
         </p>
         <p>

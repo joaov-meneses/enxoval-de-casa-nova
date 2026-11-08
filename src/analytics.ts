@@ -73,6 +73,8 @@ export function captureOperational(event: `application.${string}`, properties: R
   safely(() => posthog.capture(event, sanitizeOperational({ ...properties, url: stripUrl(window.location.href), timestamp: new Date().toISOString() }, window.location.origin)));
 }
 
+export { rememberApiError } from './analytics/operationalPrivacy';
+
 export function captureError(error: unknown, context?: Record<string, unknown>) {
   if (import.meta.env.VITE_POSTHOG_ERROR_TRACKING === 'false') return;
   safely(() => posthog.captureException(error, sanitizeErrorContext(context)));
