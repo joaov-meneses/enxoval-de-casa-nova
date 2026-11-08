@@ -60,6 +60,7 @@ jobs:
       - run: npm run test:fiscal-provider
       - run: npm run test:feedback-db
       - run: npm run test:logging
+      - run: npm run test:analytics
       - run: npm run test:admin-api
       - run: npm run test:onboarding-db
       - run: npm run test:item-status-db

@@ -11,7 +11,8 @@ process.env.VITE_POSTHOG_HOST = 'https://analytics.example.test';
 process.env.VITE_POSTHOG_ENABLE_DEV = 'true';
 process.env.VITE_POSTHOG_ERROR_TRACKING = 'true';
 process.env.VITE_POSTHOG_WEB_VITALS = 'true';
-const server = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
+// HMR desligado: o teste não precisa dele e a porta padrão (24678) pode estar em uso por outro servidor de desenvolvimento.
+const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false }, logLevel: 'error' });
 let browser;
 try {
   await server.listen();
@@ -124,6 +125,10 @@ try {
   assert.equal(exception.properties.$exception_list[0].value, 'PRIVATE_EXCEPTION PRIVATE_EMAIL');
   assert.ok(batches.some(event => event.event === 'application.api.started' && event.properties.path === '/api/auth/login' && event.properties.body === undefined));
   assert.deepEqual(findPrivate(batches.filter(event => event.event.startsWith('application.'))), []);
+  const apiExceptions = batches.filter(event => event.event === '$exception' && event.properties.error_source === 'api');
+  assert.ok(apiExceptions.length);
+  assert.deepEqual(findPrivate(apiExceptions), []);
+  assert.ok(apiExceptions.every(event => /^ApiError \d+ [A-Z]+ \//.test(event.properties.$exception_list[0].value)), 'exceção de API tem mensagem fixa');
   await page.evaluate(() => {
     const form = document.createElement('form');
     form.innerHTML = '<input name="diagnostic" value="RAW_FORM_VALUE"><button type="button">Diagnostic action</button>';
@@ -167,7 +172,7 @@ try {
   assert.ok(batches.some(event => event.event === '$pageleave' && event.properties.$pathname === '/privacidade'));
   assert.deepEqual(findPrivate(batches.filter(event => event.event !== '$exception' && !event.event.startsWith('application.'))), []);
   assert.equal(exception.properties.$exception_list[0].value, 'PRIVATE_EXCEPTION PRIVATE_EMAIL');
-  console.log('Browser smoke passed: real SDK, complete exceptions, raw API diagnostics, UI actions, product events, Web Vitals and consent before capture and persistent refusal.');
+  console.log('Browser smoke passed: real SDK, exceptions with fixed API messages, API diagnostics and UI actions without personal data, product events, Web Vitals and consent before capture and persistent refusal.');
 } finally {
   await browser?.close();
   await server.close();

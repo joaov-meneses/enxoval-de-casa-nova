@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
 import { allowedProperties, scrubSdkProperties, safeRoute } from '../src/analytics/events.ts';
-import { describeControl, sanitizeOperational, stripUrl } from '../src/analytics/operationalPrivacy.ts';
+import { apiPathTemplate, describeControl, sanitizeOperational, stripUrl } from '../src/analytics/operationalPrivacy.ts';
 import { recordApiSuccess } from '../src/analytics/apiEvents.ts';
 import { campaignAllowlist, pageMetadata, readAttribution, trafficType, webVitalsProperties } from '../src/analytics/web.ts';
 
@@ -173,34 +173,42 @@ test('admin operational events are dropped; exceptions are kept', async () => {
   assert.equal(c.config().before_send({ event: '$exception', properties: { $exception_list: [{ type: 'Error', value: 'Original admin failure' }] } }).properties.$exception_list[0].value, 'Original admin failure');
 });
 
-const fakeControl = (tagName, props = {}) => ({
-  tagName, id: '', name: '', type: '', value: '', checked: false, textContent: '',
-  getAttribute: name => props.attrs?.[name] ?? null, ...props, attrs: undefined,
+const fakeControl = (tagName, attrs = {}, props = {}) => ({
+  tagName, value: '', checked: false, textContent: '', ...props,
+  getAttribute: name => attrs[name] ?? null,
 });
 
-test('ui action descriptions never contain typed values', () => {
-  const password = fakeControl('INPUT', { name: 'password', type: 'password', value: 'SEGREDO_SENHA', textContent: 'SEGREDO_TEXTO' });
-  const email = fakeControl('INPUT', { name: 'email', type: 'email', value: 'pessoa@example.test' });
-  const pix = fakeControl('INPUT', { name: 'pix', type: 'text', value: '123.456.789-00' });
-  const terms = fakeControl('INPUT', { name: 'terms', type: 'checkbox', checked: true });
-  const area = fakeControl('TEXTAREA', { name: 'nota', value: 'texto privado', textContent: 'texto privado' });
-  const button = fakeControl('BUTTON', { type: 'submit', textContent: `  Entrar ${'x'.repeat(200)} `, attrs: { 'aria-label': 'Entrar' } });
+test('ui action descriptions never contain typed values, labels or text', () => {
+  const password = fakeControl('INPUT', { name: 'password', type: 'password' }, { value: 'SEGREDO_SENHA', textContent: 'SEGREDO_TEXTO' });
+  const email = fakeControl('INPUT', { name: 'email', type: 'email' }, { value: 'pessoa@example.test' });
+  const pix = fakeControl('INPUT', { name: 'pix', type: 'text' }, { value: '123.456.789-00' });
+  const terms = fakeControl('INPUT', { name: 'terms', type: 'checkbox' }, { checked: true });
+  const area = fakeControl('TEXTAREA', { name: 'nota' }, { value: 'texto privado', textContent: 'texto privado' });
+  const button = fakeControl('BUTTON', { type: 'submit', 'aria-label': 'Reenviar para convidado@example.test', 'data-analytics': 'invite_resend' }, { textContent: 'Reenviar para convidado@example.test' });
   const form = { querySelectorAll: () => [password, email, pix, terms, area] };
-  const link = fakeControl('A', { textContent: 'Preferências', attrs: { href: '/preferencias?token=SEGREDO_TOKEN#hash=SEGREDO_HASH' } });
+  const link = fakeControl('A', { href: '/preferencias?token=SEGREDO_TOKEN#hash=SEGREDO_HASH' }, { textContent: 'Preferências de pessoa@example.test' });
   const events = [
     describeControl(password, form), describeControl(email, form), describeControl(button, form),
     describeControl(area, form), describeControl(terms, form), describeControl(link, null),
   ];
   const text = JSON.stringify(events);
-  for (const secret of ['SEGREDO', 'pessoa@example.test', '123.456', 'texto privado', 'token=', 'hash=']) assert.equal(text.includes(secret), false, secret);
-  assert.equal('value' in events[0], false);
+  for (const secret of ['SEGREDO', 'pessoa@example.test', 'convidado@example.test', '123.456', 'texto privado', 'token=', 'hash=']) assert.equal(text.includes(secret), false, secret);
+  for (const event of events) for (const key of ['value', 'text', 'label']) assert.equal(key in event, false, key);
   assert.deepEqual(events[0].fields[0], { name: 'password', id: undefined, type: 'password', filled: true });
   assert.deepEqual(events[0].fields[3], { name: 'terms', id: undefined, type: 'checkbox', filled: true, checked: true });
-  assert.equal(events[0].text, undefined);
-  assert.equal(events[2].text.length, 80);
+  assert.equal(events[2].data_analytics, 'invite_resend');
   assert.equal(events[4].checked, true);
   assert.equal(events[5].href, '/preferencias');
-  assert.equal(events[5].text, 'Preferências');
+});
+
+test('form.name or form.checked shadowed by a child element never leaks an object', () => {
+  const child = { nodeName: 'INPUT', value: 'SEGREDO_FILHO' };
+  const form = fakeControl('FORM', { name: 'login', id: 'f' }, { name: child, id: child, checked: child, value: child });
+  const described = describeControl(form, { querySelectorAll: () => [fakeControl('INPUT', { name: 'q', type: 'checkbox' }, { checked: child, value: child })] });
+  assert.deepEqual([described.name, described.id], ['login', 'f']);
+  assert.equal(JSON.stringify(described).includes('SEGREDO'), false);
+  assert.deepEqual(described.fields, [{ name: 'q', id: undefined, type: 'checkbox', filled: false, checked: false }]);
+  for (const [key, value] of Object.entries(described)) if (key !== 'fields') assert.notEqual(typeof value, 'object', key);
 });
 
 test('operational filter drops unknown properties, bodies and URL query/hash', () => {
@@ -211,11 +219,15 @@ test('operational filter drops unknown properties, bodies and URL query/hash', (
     body: '{"password":"SEGREDO"}', headers: { authorization: 'SEGREDO' }, response: { email: 'SEGREDO' }, response_headers: { a: 'SEGREDO' },
     path: '/api/auth/login', method: 'POST', http_status: 401, duration_ms: 12, request_id: 'r1',
     fields: [{ name: 'senha', type: 'password', value: 'SEGREDO', filled: true }],
-    error: { name: 'ApiError', message: 'Falhou', code: 'X', extra: 'SEGREDO' }, $session_id: 's', token: 'phc',
+    error: { name: 'ApiError', message: 'Este convite é para SEGREDO@example.test', stack: 'SEGREDO', code: 'X', extra: 'SEGREDO' },
+    label: 'SEGREDO', text: 'SEGREDO', $session_id: 's', token: 'phc', $leak: 'SEGREDO', objeto: { a: 1 }, lista: ['SEGREDO'], $set: { email: 'SEGREDO' },
   });
   assert.equal(JSON.stringify(clean).includes('SEGREDO'), false);
   assert.equal(clean.url, 'https://casamia.test/preferencias');
   assert.deepEqual([clean.path, clean.method, clean.http_status, clean.request_id, clean.$session_id, clean.token], ['/api/auth/login', 'POST', 401, 'r1', 's', 'phc']);
+  assert.deepEqual([clean.error_name, clean.error_code, 'error' in clean, '$leak' in clean], ['ApiError', 'X', false, false]);
+  assert.equal(sanitizeOperational({ path: '/api/invitations/3f2a9c1e-aaaa-bbbb-cccc-123456789012?token=T' }).path, '/api/invitations/:id');
+  assert.equal(apiPathTemplate('/api/enxovais/abc123/itens'), '/api/enxovais/:id/itens');
   assert.deepEqual(clean.fields, [{ name: 'senha', id: undefined, type: 'password', filled: true }]);
 });
 
@@ -249,9 +261,35 @@ test('exceptions from failed API calls never carry the request body, headers or 
   assert.deepEqual(sent[0], { path: '/api/auth/login', method: 'POST', request_id: 'r1', http_status: 401, duration_ms: 9, error_source: 'api' });
   assert.deepEqual(sent[2], { error_source: 'react.caught', componentStack: '\n at App' });
   // before_send remove o que ainda sobrar em um $exception, mantendo a mensagem do erro.
-  const out = c.config().before_send({ event: '$exception', properties: { body: 'SEGREDO', headers: {}, input: 'SEGREDO', response: 'SEGREDO', response_headers: {}, path: '/api/x?q=SEGREDO', $exception_list: [{ type: 'Error', value: 'E-mail ou senha inválidos' }] } }).properties;
+  const out = c.config().before_send({ event: '$exception', properties: { body: 'SEGREDO', headers: {}, input: 'SEGREDO', response: 'SEGREDO', response_headers: {}, path: '/api/x?q=SEGREDO', $exception_list: [{ type: 'Error', value: 'ApiError 401 POST /api/auth/login' }] } }).properties;
   assert.equal(JSON.stringify(out).includes('SEGREDO'), false);
-  assert.equal(out.$exception_list[0].value, 'E-mail ou senha inválidos');
+  assert.equal(out.$exception_list[0].value, 'ApiError 401 POST /api/auth/login');
+});
+
+test('$exception uses an allowlist: URLs lose query and hash, unknown and nested properties are dropped', async () => {
+  const c = await client({}, '/preferencias'); c.api.startAnalytics();
+  const out = c.config().before_send({ event: '$exception', properties: {
+    token: 'phc', distinct_id: 'd', $session_id: 's', $device_id: 'dev', $lib: 'web', $browser: 'Edge', $os: 'Windows',
+    $current_url: 'https://casamia.test/preferencias?token=T_SEGREDO', $pathname: '/preferencias?token=T_SEGREDO#h_SEGREDO',
+    $referrer: 'https://site.test/x?q=R_SEGREDO', $initial_current_url: 'https://casamia.test/a?i=I_SEGREDO', $initial_referrer: 'https://s.test/?r=R_SEGREDO',
+    $set: { email: 'E_SEGREDO' }, $leak: 'L_SEGREDO', password: 'P_SEGREDO', email: 'E_SEGREDO', objeto: { a: 'O_SEGREDO' },
+    http_status: 401, error_source: 'api', $exception_list: [{ type: 'ApiError', value: 'ApiError 401 POST /api/auth/login' }],
+  } }).properties;
+  assert.equal(JSON.stringify(out).includes('SEGREDO'), false);
+  for (const key of ['password', 'email', '$leak', '$set', 'objeto']) assert.equal(key in out, false, key);
+  assert.deepEqual([out.token, out.distinct_id, out.$session_id, out.$device_id, out.$lib, out.$browser, out.$os, out.http_status, out.error_source],
+    ['phc', 'd', 's', 'dev', 'web', 'Edge', 'Windows', 401, 'api']);
+  assert.equal(out.$exception_list[0].type, 'ApiError');
+  assert.equal(out.$current_url, 'https://casamia.test/preferencias');
+});
+
+test('application events clean $set and $set_once and drop unknown $ keys', async () => {
+  const c = await client({}, '/app'); c.api.startAnalytics();
+  const out = c.config().before_send({ event: 'application.api.started', properties: { path: '/api/x', $leak: 'SEGREDO', $set: { a: 'SEGREDO' } },
+    $set: { plan: 'free', $initial_current_url: 'https://casamia.test/a?t=SEGREDO#x', obj: { a: 'SEGREDO' } },
+    $set_once: { $initial_current_url: 'https://casamia.test/a?t=SEGREDO#x', $initial_referrer: 'https://s.test/?q=SEGREDO' } });
+  assert.equal(JSON.stringify(out).includes('SEGREDO'), false);
+  assert.deepEqual(out.$set, { plan: 'free', $initial_current_url: 'https://casamia.test/a' });
 });
 
 test('initialization enables bounded web vitals and reconstructs safe standard page properties', async () => {
@@ -339,7 +377,8 @@ test('exceptions preserve original diagnostics, opt-out and kill switch', async 
     $exception_list: [{ type: 'TypeError', value: 'PRIVATE_EMAIL', stacktrace: { frames: [{ filename: 'https://app.test/assets/app.js?token=PRIVATE_TOKEN', lineno: 12, colno: 8, context_line: 'PRIVATE_CODE' }] } }],
   } });
   assert.equal(event.properties.$exception_list[0].value, 'PRIVATE_EMAIL');
-  assert.equal(event.properties.password, 'PRIVATE_PASSWORD');
+  assert.equal('password' in event.properties, false, 'propriedade fora da lista de permissão não sai');
+  assert.equal(JSON.stringify(event.properties).includes('PRIVATE_PASSWORD'), false);
   assert.equal(event.properties.$exception_list[0].stacktrace.frames[0].context_line, 'PRIVATE_CODE');
   assert.equal(event.properties.$exception_list[0].stacktrace.frames[0].lineno, 12);
   c.api.captureError(new Error('PRIVATE_MESSAGE'));
