@@ -69,6 +69,8 @@ Para automatizar, disponibilize A1/cadeia e chave privada por armazenamento segu
 
 ## Validação financeira real
 
+Em 08/11/2026, a validação remota do Passe em **staging/Stripe TEST** passou, incluindo checkout criado pelo app, webhook real TEST, acesso, protocolo e estorno. O comando protegido é `node scripts/validate-staging-billing.mjs --execute-staging`; ele cria e remove somente suas fixtures, conserva o histórico financeiro TEST e recusa produção. Evidências e limites em [Prontidão em homologacao](prontidao-stripe-homologacao.md). Isso não substitui a validação financeira LIVE abaixo.
+
 Os testes automatizados usam Stripe simulada ou modo TEST, banco descartável e certificados sintéticos. Não comprovam cobrança, repasse bancário nem emissão fiscal real.
 
 Para a validação final de produção, o titular precisa disponibilizar um meio de pagamento real autorizado e concluir a autenticação exigida pelo banco. Não usar cartão de cliente, dados fictícios ou um pagamento salvo sem autorização. Confira compra, webhook, acesso e cancelamento/estorno previstos, e acompanhe confirmação financeira. Não há no repositório um meio de pagamento real autorizado para essa execução. As sessões de validação LIVE criadas anteriormente foram expiradas sem pagamento.
