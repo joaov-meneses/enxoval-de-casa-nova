@@ -234,6 +234,26 @@ test('operational events leave the browser without typed values, query or hash',
   assert.equal(viaSdk.token, 'phc');
 });
 
+test('exceptions from failed API calls never carry the request body, headers or response', async () => {
+  const c = await client({}, '/login'); c.api.startAnalytics();
+  const login = { path: '/api/auth/login?email=SEGREDO_EMAIL', method: 'POST', body: '{"email":"a@b.test","password":"SEGREDO_SENHA"}', headers: { authorization: 'SEGREDO' } };
+  // 401: o contexto antigo (body + response) é filtrado em captureError.
+  c.api.captureError(new Error('E-mail ou senha inválidos'), { ...login, request_id: 'r1', http_status: 401, duration_ms: 9, response: { error: 'SEGREDO_RESPOSTA' }, response_headers: { a: 'SEGREDO' }, error_source: 'api' });
+  // Falha de rede.
+  c.api.captureError(new TypeError('Failed to fetch'), { ...login, error_source: 'api' });
+  // React: só componentStack e error_source.
+  c.api.captureError(new Error('boom'), { error_source: 'react.caught', componentStack: '\n at App', digest: 'SEGREDO_DIGEST', props: { senha: 'SEGREDO' } });
+  const sent = c.calls.filter(([event]) => event === '$exception').map(([, props]) => props);
+  assert.equal(sent.length, 3);
+  assert.equal(JSON.stringify(sent).includes('SEGREDO'), false);
+  assert.deepEqual(sent[0], { path: '/api/auth/login', method: 'POST', request_id: 'r1', http_status: 401, duration_ms: 9, error_source: 'api' });
+  assert.deepEqual(sent[2], { error_source: 'react.caught', componentStack: '\n at App' });
+  // before_send remove o que ainda sobrar em um $exception, mantendo a mensagem do erro.
+  const out = c.config().before_send({ event: '$exception', properties: { body: 'SEGREDO', headers: {}, input: 'SEGREDO', response: 'SEGREDO', response_headers: {}, path: '/api/x?q=SEGREDO', $exception_list: [{ type: 'Error', value: 'E-mail ou senha inválidos' }] } }).properties;
+  assert.equal(JSON.stringify(out).includes('SEGREDO'), false);
+  assert.equal(out.$exception_list[0].value, 'E-mail ou senha inválidos');
+});
+
 test('initialization enables bounded web vitals and reconstructs safe standard page properties', async () => {
   const c = await client({ DEV: true, VITE_POSTHOG_ENABLE_DEV: 'true' }, '/convite');
   const stop = c.api.startAnalytics();
