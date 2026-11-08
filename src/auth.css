@@ -145,7 +145,7 @@
   text-wrap: balance;
 }
 /* O título recebe foco ao trocar de modo; não é interativo, então sem a linha de foco dos controles. */
-.auth-shell h1:focus-visible {
+.auth-shell .auth-heading h1[tabindex="-1"]:focus-visible {
   box-shadow: none;
   outline: none;
 }
@@ -241,6 +241,10 @@
 .auth-hint.is-error {
   color: var(--destructive);
   font-weight: 600;
+}
+/* A região viva da mensagem fica montada; vazia, não ocupa espaço. */
+.auth-hint.is-error:empty {
+  display: none;
 }
 .auth-shell .password-rules {
   color: var(--auth-muted);
@@ -478,6 +482,7 @@
 
 /* Dentro do formulário, vence as regras genéricas de label e input do cadastro. */
 .auth-form .auth-optin {
+  border-radius: 10px;
   display: grid;
   grid-template-columns: 20px 1fr;
   gap: 10px;
@@ -493,4 +498,15 @@
   min-height: 0;
   padding: 0;
   border-radius: 4px;
+}
+
+/* Foco da caixa de consentimento: o input de 18px não mostra a linha de foco (focus.css zera o contorno),
+   então o rótulo ganha a linha interna de 2px em terracota profundo, sem anel afastado. O respiro interno
+   é compensado pela margem negativa para não mexer na dobra. */
+.auth-shell .auth-form .auth-optin {
+  margin: -6px -8px;
+  padding: 6px 8px;
+}
+.auth-shell .auth-form .auth-optin:has(input:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--cm-primary-dark);
 }

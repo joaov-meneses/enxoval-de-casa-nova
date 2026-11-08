@@ -154,12 +154,14 @@ function PasswordToggle({
   );
 }
 
-/** Mensagem junto do campo. O foco e o aria-describedby já a anunciam, por isso sem role. */
+/**
+ * Mensagem junto do campo. O elemento fica sempre montado e só recebe texto no envio: a região viva
+ * (role="alert") anuncia a mensagem mesmo quando o campo já está focado e o focus() não dispara nada.
+ */
 function FieldError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
   return (
-    <p id={id} className="auth-hint is-error">
-      {message}
+    <p id={id} role="alert" className="auth-hint is-error">
+      {message ?? ""}
     </p>
   );
 }
