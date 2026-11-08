@@ -12,6 +12,12 @@ O log HTTP do servidor (`server/httpLogging.ts`) gravava o corpo da requisição
 - o corpo das respostas (inclusive o que o servidor devolve de dados pessoais);
 - campos de erros (`detail` e `query` do Postgres, `body` do parser de JSON, que contém o corpo bruto).
 
+Também iam para o log, sem passar pelo log HTTP:
+
+- **E-mails transacionais** (`server/mailer.ts`): cada envio e o modo simulado registravam `to`, `subject`, `text`, `html` e `headers`. Isso levava ao PostHog Logs o endereço de e-mail, o nome da pessoa e os links com token: redefinição de senha (`/redefinir-senha#token`), convite (`/convite#token`), verificação de e-mail, `/preferencias?token=`, `List-Unsubscribe` e o texto da central de ajuda. A resposta do provedor (que pode repetir o endereço) também era gravada.
+- **Endereços IP e user-agent** (`req.ip`, `req.ips`, `x-forwarded-for`, `x-real-ip`, `user-agent`) e `referer`/`origin` com query.
+- Metadados de imagem de perfil (`exif`, `xmp`, `iptc`, Buffers) e alguns logs manuais com objetos inteiros (alertas de preço com e-mail e itens, lembretes de garantia com e-mail, perguntas e respostas da IA, valores do cache compartilhado).
+
 O captador de exceções (`server/errorTracking.ts`) enviava ao PostHog `query`, `body` e `headers` da requisição pelo mesmo motivo.
 
 O teste `tests/logging.mjs` exigia esse comportamento (`assert.equal(echoLog.req.body.password, 'original-password')`).
@@ -31,6 +37,19 @@ O teste `tests/logging.mjs` exigia esse comportamento (`assert.equal(echoLog.req
 - Em qualquer profundidade, chaves sensíveis viram `[redigido]` (password, senha, token, secret, authorization, cookie, pix, cpf, cnpj, document, card, email, telefone, endereço e similares). No envio ao PostHog isso é reaplicado em todo registro, como última barreira.
 - Erros mantêm mensagem, pilha, código e causas, mas `detail`, `query`, `parameters`, `body` e afins viram `[redigido]`. A mensagem do erro de JSON inválido (que cita um trecho do corpo) é trocada por texto fixo.
 - Testes atualizados: `tests/logging.mjs` (agora exige o contrário, com cenários de login, cadastro, redefinição de senha, aceite de convite e `/preferencias?token=`), `tests/posthog-logs.mjs` e `tests/error-tracking.mjs`.
+
+### Segunda rodada (revisão)
+
+- A redação agora roda em todo registro, no próprio logger (`hooks.streamWrite` em `server/logger.ts`), antes do stdout e do PostHog. Nenhum log manual sai sem ela.
+- A lista de chaves sensíveis passou a comparar o nome inteiro ou o último segmento do nome (camelCase, snake_case), sem substring. Entraram `name`, `nome`, `to`, `from`, `replyTo`, `subject`, `text`, `html`, `message`, `note`, `recado`, `comment`, `cep`, `rua`, `endereco`, `address`, `bairro`, `cidade`, `location`, `phone`, `telefone`, `chave`, `pixKey`, `ip`, `ips` e `userAgent`. Identificadores (`id`, `*Id`, `*_id`) e nomes como `stripeSessionId`, `documentId`, `inputTokens`, `emailType`, `pixels` e `cardinality` continuam visíveis. O `msg` do log e o `message`, `name` e `type` de um erro (texto do código) não são apagados.
+- E-mail: o log leva só o domínio do destinatário, o tamanho do assunto, do texto e do HTML (bytes), a contagem de cabeçalhos e o id do provedor. O erro do provedor deixou de repetir o corpo da resposta.
+- `x-forwarded-for`, `x-real-ip`, `user-agent`, `req.ip` e `req.ips` não são mais registrados (o IP continua sendo usado para limitar tentativas). `referer` e `origin` saem sem query e sem hash.
+- Buffers (inclusive `{type:'Buffer', data}`) viram `[binário N bytes]`; `Date` vira ISO; a imagem de perfil registra só largura, altura, formato e tamanho.
+- Erro de JSON inválido vai ao `captureException` como um erro novo com a mensagem fixa, sem o trecho do corpo.
+- Query com nome de parâmetro que pareça valor (`@`, mais de 24 caracteres, só dígitos) é registrada só como contagem.
+- O corpo da resposta passou a registrar só tipo e tamanho (sem ler o conteúdo).
+- O servidor agora envia `Referrer-Policy: strict-origin-when-cross-origin` (feito em `server/index.ts`), para a query de `/preferencias` e `/pesquisa` não vazar no `Referer` para outros domínios.
+- Logs manuais reduzidos a ids e contagens: alertas de preço, lembretes de garantia, IA (Jev), cache compartilhado, resposta do provedor do scraper e busca de título do catálogo.
 
 ## O que se perde
 
@@ -59,5 +78,6 @@ Em produção, depois do deploy: faça um login com senha de teste e procure no 
 
 1. Apagar no PostHog Logs (e, se houver, no armazenamento de exceções do PostHog) os registros antigos desde 2026-10-18.
 2. Incluir este incidente na avaliação da LGPD (dados pessoais e credenciais em logs de terceiro, sem consentimento).
-3. Considerar a troca das senhas e a invalidação dos tokens de redefinição, convite e preferências que ainda estejam válidos.
-4. Atualizar o texto da página de privacidade (`src/components/PrivacyPage.tsx`), hoje com a frase que admite senhas e tokens nos registros, e `docs/logs.md` e `docs/analytics.md`, em outra branch.
+3. Invalidar os tokens de redefinição de senha e de convite emitidos desde 18/10 que ainda estejam válidos (recomendado: os links completos, com token, ficaram no PostHog Logs). Considere também os tokens de verificação de e-mail, preferências e pesquisa, e a troca de senhas digitadas em login desde 18/10.
+4. Registrar na avaliação da LGPD que também foram para o PostHog Logs endereços de e-mail, nomes e IPs.
+5. Atualizar o texto da página de privacidade (`src/components/PrivacyPage.tsx`), hoje com a frase que admite senhas e tokens nos registros, e `docs/logs.md` e `docs/analytics.md`, em outra branch.
