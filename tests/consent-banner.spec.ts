@@ -101,6 +101,91 @@ test("Recusar e Aceitar tudo têm o mesmo peso", async ({ page }) => {
   for (const b of info.all) expect(b.h).toBeGreaterThanOrEqual(44);
 });
 
+for (const zoom of [130, 200]) {
+  test(`fonte da raiz em ${zoom}% em 320x568: botões sem transbordo e inteiros na área visível do aviso`, async ({ page }) => {
+    await visit(page, "/login", PHONES[0]);
+    test.skip(!(await hasBanner(page)), "build sem chave de análise");
+    await page.addStyleTag({ content: `html{font-size:${zoom}%}` });
+    await page.evaluate(() => document.fonts.ready);
+    for (const customizing of [false, true]) {
+      if (customizing) await page.getByRole("button", { name: "Personalizar" }).click();
+      const info = await page.evaluate(() => {
+        const banner = document.querySelector(".consent-banner")!.getBoundingClientRect();
+        const scroll = document.querySelector(".consent-scroll")!;
+        return {
+          banner: { top: banner.top, bottom: banner.bottom },
+          viewport: window.innerHeight,
+          scrollable: scroll.scrollHeight > scroll.clientHeight,
+          buttons: [...document.querySelectorAll<HTMLElement>(".consent-button")].map((b) => {
+            const r = b.getBoundingClientRect();
+            return { label: b.textContent, top: r.top, bottom: r.bottom, h: r.height, over: b.scrollWidth - b.clientWidth };
+          }),
+        };
+      });
+      expect(info.buttons).toHaveLength(3);
+      for (const b of info.buttons) {
+        expect(b.over, `${b.label} transborda`).toBeLessThanOrEqual(0);
+        expect(b.h).toBeGreaterThanOrEqual(44);
+        expect(b.top).toBeGreaterThanOrEqual(info.banner.top);
+        expect(b.bottom).toBeLessThanOrEqual(info.banner.bottom + 0.5);
+        expect(b.bottom).toBeLessThanOrEqual(info.viewport + 0.5);
+      }
+      await expect(page.locator(".consent-banner")).toBeVisible();
+    }
+  });
+}
+
+test("bottom sheet do /app com o aviso aberto: ação principal não fica coberta", async ({ page }) => {
+  await page.setViewportSize(PHONES[0]);
+  const home = {
+    id: "home", name: "Nossa casa", ownerId: "owner", role: "owner", discountCents: 0, moveDate: null,
+    state: "BA", city: null, spendingTier: "equilibrado",
+  };
+  const items = ["Cama", "Colchão"].map((name, index) => ({
+    id: `item-${index}`, name, categoryId: "bedroom", category: "Quarto", checked: false, status: "researching",
+    link: "", description: "", priceCents: null, quantity: 1, discountCents: 0, sortOrder: index, buyWeek: -4,
+    priceCategory: null, priority: null, timing: null, createdAt: "2026-10-18T12:00:00Z", updatedAt: "2026-10-18T12:00:00Z",
+  }));
+  await page.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/, (route) => route.abort());
+  await page.route("**/api/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/bootstrap")
+      return route.fulfill({
+        json: {
+          user: { id: "owner", name: "Ana", email: "ana@example.invalid", plan: "monthly", isGuest: false, onboardingCompleted: true },
+          enxovais: [home], activeEnxoval: home, members: [],
+          categories: [{ id: "bedroom", name: "Quarto", sortOrder: 0 }], items,
+        },
+      });
+    if (path === "/api/billing/status")
+      return route.fulfill({
+        json: { available: true, plan: "monthly", status: "active", accessAllowed: true, isOwner: true, trialUsed: true, trialNotice: null },
+      });
+    return route.fulfill({ json: {} });
+  });
+  await page.goto("/app");
+  test.skip(!(await hasBanner(page)), "build sem chave de análise");
+  await page.locator(".mobile-bottom-nav").getByRole("button", { name: /^Meu enxoval/ }).click();
+  await expect(page.locator(".item-row")).toHaveCount(2);
+  await page.locator('[data-item-id="item-0"]').getByRole("checkbox").click();
+  const dialog = page.getByRole("dialog", { name: "Como você conseguiu?", exact: true });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("radio", { name: /^Comprado/ }).click();
+  const confirm = dialog.getByRole("button", { name: "Confirmar situação" });
+  await expect(confirm).toBeEnabled();
+  const hit = await confirm.evaluate((el) => {
+    el.scrollIntoView({ block: "nearest", behavior: "instant" });
+    const r = el.getBoundingClientRect();
+    const banner = document.querySelector(".consent-banner")!.getBoundingClientRect();
+    const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { onTarget: Boolean(at && (el === at || el.contains(at))), above: r.bottom <= banner.top + 0.5 };
+  });
+  expect(hit.onTarget).toBe(true);
+  expect(hit.above).toBe(true);
+  // Com o aviso aberto, a barra inferior também fica acima dele.
+  await page.keyboard.press("Escape");
+});
+
 test("Recusar grava a escolha, libera o espaço e não volta ao recarregar", async ({ page }) => {
   await visit(page, "/login", PHONES[1]);
   test.skip(!(await hasBanner(page)), "build sem chave de análise");
