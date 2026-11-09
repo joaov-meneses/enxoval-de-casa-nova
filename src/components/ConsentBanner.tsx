@@ -62,6 +62,7 @@ export function ConsentBanner() {
   return (
     <section ref={bannerRef} className={`consent-banner${customizing ? " is-customizing" : ""}`} role="region" aria-labelledby={titleId}>
       <h2 id={titleId} className="consent-title">Sua privacidade</h2>
+      <div className="consent-scroll">
       <p className="consent-text">
         Cookies essenciais mantêm você conectado. Com sua permissão, também medimos o uso do app (PostHog e Google
         Analytics) e a origem de visitas de anúncios (Google Ads). Mude quando quiser na{" "}
@@ -90,6 +91,7 @@ export function ConsentBanner() {
           </label>
         </fieldset>
       )}
+      </div>
       <div className="consent-actions">
         <button type="button" className="consent-button" onClick={() => decide({ analytics: false, marketing: false })}>
           Recusar

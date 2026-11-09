@@ -14,6 +14,7 @@
   color: var(--cm-text);
   box-shadow: 0 -10px 24px -18px color-mix(in oklab, var(--cm-text) 40%, transparent);
   font-family: var(--font-sans);
+  container: consent / inline-size;
 }
 
 .consent-title {
@@ -105,7 +106,7 @@ html[data-consent-open] body {
   padding-bottom: var(--consent-banner-space, 0px);
 }
 
-/* Celular: faixa compacta presa ao rodapé. */
+/* Celular: faixa compacta presa ao rodapé. Só o texto (e as categorias) rola; título e botões ficam sempre à vista. */
 @media (max-width: 767px) {
   .consent-banner {
     left: 0;
@@ -116,9 +117,11 @@ html[data-consent-open] body {
     padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
     border-width: 1px 0 0;
     border-radius: 16px 16px 0 0;
-    max-height: 40dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    /* 40dvh com a fonte padrão; com fonte grande o teto cresce (rem) para os botões e algum texto caberem. */
+    max-height: min(max(40dvh, 15rem), calc(100dvh - 16px));
+    overflow: hidden;
   }
 
   .consent-banner.is-customizing {
@@ -126,8 +129,16 @@ html[data-consent-open] body {
   }
 
   .consent-title {
+    flex: none;
     margin: 0 0 4px;
     font-size: 1rem;
+  }
+
+  .consent-scroll {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .consent-text {
@@ -136,14 +147,52 @@ html[data-consent-open] body {
   }
 
   .consent-actions {
+    flex: none;
     gap: 6px;
     margin-top: 10px;
+    font-size: 0.875rem;
   }
 
   .consent-button {
     padding: 4px 6px;
     font-size: 0.875rem;
     line-height: 1.15;
+  }
+}
+
+/* Quando os três botões não cabem lado a lado (fonte grande), cada um ocupa uma linha inteira. */
+@container consent (max-width: calc(17.4rem + 12px)) {
+  .consent-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Celular: o que fica fixo no rodapé sobe acima da faixa, para as ações não ficarem cobertas. */
+@media (max-width: 767px) {
+  html[data-consent-open] .casamia-dialog {
+    bottom: var(--consent-banner-space, 0px);
+    max-height: calc(100dvh - 16px - var(--consent-banner-space, 0px));
+    padding-bottom: 0;
+  }
+
+  html[data-consent-open] .workspace-menu-panel {
+    height: calc(100dvh - var(--consent-banner-space, 0px));
+  }
+
+  html[data-consent-open] .mobile-bottom-nav {
+    bottom: var(--consent-banner-space, 0px);
+  }
+
+  html[data-consent-open] .mobile-fab-add {
+    bottom: calc(var(--consent-banner-space, 0px) + var(--mobile-nav-h, 65px) + 4px + env(safe-area-inset-bottom));
+  }
+
+  html[data-consent-open] .undo-toast-region {
+    bottom: calc(var(--consent-banner-space, 0px) + 24px + env(safe-area-inset-bottom));
+  }
+
+  html[data-consent-open] .subscription-connection-notice {
+    bottom: calc(var(--consent-banner-space, 0px) + 24px);
   }
 }
 
