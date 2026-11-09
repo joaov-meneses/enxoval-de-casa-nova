@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { CONSENT_OPEN_EVENT, consentRequired, readConsent, saveConsent } from "../analytics/consent";
 import "../consent.css";
 
@@ -15,6 +15,29 @@ export function ConsentBanner() {
   const [analytics, setAnalytics] = useState(() => Boolean(readConsent()?.analytics));
   const [marketing, setMarketing] = useState(() => Boolean(readConsent()?.marketing));
   const titleId = useId();
+  const bannerRef = useRef<HTMLElement>(null);
+
+  // Reserva no fim da página o espaço que o aviso ocupa, para que todo o conteúdo possa rolar para cima dele.
+  useLayoutEffect(() => {
+    const banner = bannerRef.current;
+    if (!open || !banner) return;
+    const root = document.documentElement;
+    const measure = () => {
+      const space = Math.ceil(Math.max(0, window.innerHeight - banner.getBoundingClientRect().top));
+      root.style.setProperty("--consent-banner-space", `${space}px`);
+    };
+    root.dataset.consentOpen = "";
+    measure();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    observer?.observe(banner);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      root.style.removeProperty("--consent-banner-space");
+      delete root.dataset.consentOpen;
+    };
+  }, [open]);
 
   useEffect(() => {
     const reopen = () => {
@@ -37,12 +60,12 @@ export function ConsentBanner() {
   };
 
   return (
-    <section className="consent-banner" role="region" aria-labelledby={titleId}>
+    <section ref={bannerRef} className={`consent-banner${customizing ? " is-customizing" : ""}`} role="region" aria-labelledby={titleId}>
       <h2 id={titleId} className="consent-title">Sua privacidade</h2>
       <p className="consent-text">
-        Usamos cookies essenciais para manter você conectado. Com a sua permissão, também medimos o uso do app
-        (PostHog e Google Analytics) e a origem das visitas de anúncios (Google Ads). Você pode mudar isso quando
-        quiser na <a href="/privacidade">política de privacidade</a>.
+        Cookies essenciais mantêm você conectado. Com sua permissão, também medimos o uso do app (PostHog e Google
+        Analytics) e a origem de visitas de anúncios (Google Ads). Mude quando quiser na{" "}
+        <a href="/privacidade">política de privacidade</a>.
       </p>
       {customizing && (
         <fieldset className="consent-options">
