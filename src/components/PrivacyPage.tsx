@@ -3,9 +3,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { consentRequired, onConsentChange, openConsentPreferences, readConsent } from '../analytics/consent';
 import { ArrowLeft } from "@/src/components/icons";
 import { Brand } from "./Brand";
-import { SUPPORT_EMAIL, LEGAL_UPDATED } from '../../shared/legal';
+import { SUPPORT_EMAIL, PRIVACY_UPDATED, MERCHANT } from '../../shared/legal';
 
-const UPDATED = LEGAL_UPDATED;
+const UPDATED = PRIVACY_UPDATED;
 
 /**
  * Canal oficial informado pelo responsável pelo serviço.
@@ -148,8 +148,8 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         <li>
           Entender o uso do Casa Mia e melhorar o produto. Quando a análise está
           ativa, usamos um identificador interno da conta para medir ações e
-          retornos ao longo do tempo. Os registros operacionais podem incluir
-          nome, e-mail e os dados usados nas ações.
+          retornos ao longo do tempo. Os registros operacionais guardam só
+          metadados das ações, sem nome, e-mail nem o que você digita.
         </li>
         <li>Proteger as contas e prevenir abusos.</li>
       </ul>
@@ -250,8 +250,8 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         encerrados, seis meses depois do fim. Os aparelhos ligados à conta são
         mantidos enquanto ela existir. Os dados da conta e as listas são mantidos
         enquanto a conta existir. Se ela for desativada, as listas são preservadas
-        até que você peça a exclusão dos dados.
-
+        até que você peça a exclusão dos dados. Os registros técnicos do
+        servidor enviados ao PostHog são apagados automaticamente após 14 dias.
       </p>
     ),
   },
@@ -287,7 +287,9 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
     title: "Contato",
     body: (
       <p>
-        Para exercer os seus direitos ou tirar dúvidas, escreva para{" "}
+        O controlador dos dados é a {MERCHANT.name}, CNPJ {MERCHANT.cnpj},{" "}
+        {MERCHANT.address}. Para exercer os seus direitos ou tirar dúvidas,
+        escreva para{" "}
         <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a>.
       </p>
     ),

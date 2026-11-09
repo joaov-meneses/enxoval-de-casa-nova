@@ -1,5 +1,7 @@
 export const SUPPORT_EMAIL = 'contato@devspot.com.br';
 export const LEGAL_UPDATED = '6 de novembro de 2026';
+/** A política de privacidade mudou depois dos termos (registros técnicos e analytics sem dados digitados). */
+export const PRIVACY_UPDATED = '8 de novembro de 2026';
 export const MERCHANT = {
   name: 'DEVSPOT TECNOLOGIA LTDA',
   cnpj: '62.429.185/0001-01',
