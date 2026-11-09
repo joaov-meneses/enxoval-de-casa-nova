@@ -8,12 +8,13 @@
   max-width: 560px;
   margin: 0 auto;
   padding: 20px;
-  border: 1px solid var(--cm-sand, #d8c9b3);
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 70%, var(--cm-bg));
   border-radius: 16px;
-  background: #fffaf1;
-  color: var(--cm-text, #2f2a26);
-  box-shadow: 0 12px 32px rgb(47 42 38 / 0.16);
+  background: var(--cm-bg);
+  color: var(--cm-text);
+  box-shadow: 0 -10px 24px -18px color-mix(in oklab, var(--cm-text) 40%, transparent);
   font-family: var(--font-sans);
+  container: consent / inline-size;
 }
 
 .consent-title {
@@ -30,7 +31,7 @@
 }
 
 .consent-text a {
-  color: var(--cm-primary-dark, #a34c30);
+  color: var(--cm-primary-dark);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -57,7 +58,7 @@
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
-  accent-color: var(--cm-action, #a34c30);
+  accent-color: var(--cm-action);
 }
 
 .consent-option input:disabled {
@@ -80,10 +81,10 @@
 .consent-button {
   min-height: 44px;
   padding: 0 12px;
-  border: 1.5px solid var(--cm-action, #a34c30);
+  border: 1.5px solid var(--cm-action);
   border-radius: 999px;
   background: transparent;
-  color: var(--cm-action, #a34c30);
+  color: var(--cm-action);
   font: inherit;
   font-size: 0.9375rem;
   font-weight: 700;
@@ -92,13 +93,106 @@
 }
 
 .consent-button:hover {
-  background: var(--cm-action, #a34c30);
-  color: #fff;
+  background: var(--cm-action);
+  color: var(--cm-bg);
 }
 
-@media (max-width: 420px) {
+/* Reserva: enquanto o aviso está aberto, o fim da página (e o foco) ganham o espaço dele. */
+html[data-consent-open] {
+  scroll-padding-bottom: var(--consent-banner-space, 0px);
+}
+
+html[data-consent-open] body {
+  padding-bottom: var(--consent-banner-space, 0px);
+}
+
+/* Celular: faixa compacta presa ao rodapé. Só o texto (e as categorias) rola; título e botões ficam sempre à vista. */
+@media (max-width: 767px) {
+  .consent-banner {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-width: none;
+    margin: 0;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    flex-direction: column;
+    /* 40dvh com a fonte padrão; com fonte grande o teto cresce (rem) para os botões e algum texto caberem. */
+    max-height: min(max(40dvh, 15rem), calc(100dvh - 16px));
+    overflow: hidden;
+  }
+
+  .consent-banner.is-customizing {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .consent-title {
+    flex: none;
+    margin: 0 0 4px;
+    font-size: 1rem;
+  }
+
+  .consent-scroll {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .consent-text {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
   .consent-actions {
-    grid-template-columns: 1fr;
+    flex: none;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 0.875rem;
+  }
+
+  .consent-button {
+    padding: 4px 6px;
+    font-size: 0.875rem;
+    line-height: 1.15;
+  }
+}
+
+/* Quando os três botões não cabem lado a lado (fonte grande), cada um ocupa uma linha inteira. */
+@container consent (max-width: calc(17.4rem + 12px)) {
+  .consent-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Celular: o que fica fixo no rodapé sobe acima da faixa, para as ações não ficarem cobertas. */
+@media (max-width: 767px) {
+  html[data-consent-open] .casamia-dialog {
+    bottom: var(--consent-banner-space, 0px);
+    max-height: calc(100dvh - 16px - var(--consent-banner-space, 0px));
+    padding-bottom: 0;
+  }
+
+  html[data-consent-open] .workspace-menu-panel {
+    height: calc(100dvh - var(--consent-banner-space, 0px));
+  }
+
+  html[data-consent-open] .mobile-bottom-nav {
+    bottom: var(--consent-banner-space, 0px);
+  }
+
+  html[data-consent-open] .mobile-fab-add {
+    bottom: calc(var(--consent-banner-space, 0px) + var(--mobile-nav-h, 65px) + 4px + env(safe-area-inset-bottom));
+  }
+
+  html[data-consent-open] .undo-toast-region {
+    bottom: calc(var(--consent-banner-space, 0px) + 24px + env(safe-area-inset-bottom));
+  }
+
+  html[data-consent-open] .subscription-connection-notice {
+    bottom: calc(var(--consent-banner-space, 0px) + 24px);
   }
 }
 

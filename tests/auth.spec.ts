@@ -30,35 +30,55 @@ async function open(page: Page, path: string, size: { width: number; height: num
 
 /*
  * Primeiro acesso, sem consentimento semeado. O aviso de cookies só existe em builds com VITE_POSTHOG_KEY ou
- * VITE_GTM_ID (consentRequired); no build comum o teste pula. Para rodar: VITE_POSTHOG_KEY=phc_local npm run build.
- * Registra onde o aviso e o botão de envio ficam. Limitação conhecida: em celular o aviso fixo cobre o botão
- * até a pessoa decidir (ver o doc do redesenho).
+ * VITE_GTM_ID (consentRequired); no build comum o teste pula. Para rodar: VITE_POSTHOG_KEY=phc_medicao_local npm run build.
+ * No celular o aviso é uma faixa compacta que reserva espaço no fim da página: o botão de envio precisa ficar
+ * visível e clicável, sem ser coberto, depois de rolar se preciso.
  */
 test.describe("primeiro acesso com o aviso de cookies", () => {
   for (const path of ["/login", "/cadastro"]) {
     for (const size of [SIZES[1], SIZES[0]]) {
-      test(`${path} em ${size.width}x${size.height}: posições do aviso e do botão`, async ({ page }) => {
+      test(`${path} em ${size.width}x${size.height}: o aviso não cobre o botão de envio`, async ({ page }) => {
         await page.setViewportSize(size);
         await page.route("**/api/bootstrap**", (route) => route.fulfill({ status: 401, json: { error: "Faça login." } }));
         await page.goto(path);
         await page.evaluate(() => document.fonts.ready);
         await expect(page.locator("h1")).toBeVisible();
         test.skip((await page.locator(".consent-banner").count()) === 0, "build sem chave de análise: o aviso não aparece");
-        const m = await page.evaluate(() => {
-          const banner = document.querySelector(".consent-banner")!.getBoundingClientRect();
-          const button = document.querySelector("form button[type=submit]")!.getBoundingClientRect();
-          const hit = document.elementFromPoint(button.left + button.width / 2, button.top + button.height / 2);
+        // behavior instant: product.css usa scroll-behavior: smooth.
+        const m = await page.locator("form button[type=submit]").evaluate((el) => {
+          const banner = document.querySelector(".consent-banner")!;
+          const bannerTop = () => banner.getBoundingClientRect().top;
+          el.scrollIntoView({ block: "center", behavior: "instant" });
+          const rect = el.getBoundingClientRect();
+          if (rect.bottom > bannerTop() - 4) window.scrollBy({ top: rect.bottom - bannerTop() + 8, behavior: "instant" });
+          const b = banner.getBoundingClientRect();
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const hit = document.elementFromPoint(cx, cy);
+          const actions = [...banner.querySelectorAll(".consent-button")].map((x) => x.getBoundingClientRect());
           return {
-            banner: { top: Math.round(banner.top), bottom: Math.round(banner.bottom) },
-            button: { top: Math.round(button.top), bottom: Math.round(button.bottom) },
+            banner: { top: Math.round(b.top), bottom: Math.round(b.bottom), height: Math.round(b.height) },
+            button: { top: Math.round(r.top), bottom: Math.round(r.bottom) },
+            cx,
+            cy,
+            onButton: Boolean(hit && (el === hit || el.contains(hit))),
             covered: Boolean(hit?.closest(".consent-banner")),
+            actionsInside: actions.length === 3 && actions.every((a) => a.top >= b.top && a.bottom <= b.bottom + 0.5),
           };
         });
         test.info().annotations.push({ type: "medida", description: JSON.stringify(m) });
+        console.log(`medida ${path} ${size.width}x${size.height}`, JSON.stringify(m));
+        expect(m.covered).toBe(false);
+        expect(m.onButton).toBe(true);
+        expect(m.button.bottom).toBeLessThanOrEqual(m.banner.top);
+        expect(m.banner.height).toBeLessThanOrEqual(0.4 * size.height);
         expect(m.banner.bottom).toBeLessThanOrEqual(size.height);
-        expect(m.banner.top).toBeGreaterThanOrEqual(0);
-        // Limitação documentada: o aviso cobre o botão no primeiro acesso, nos dois tamanhos.
-        expect(m.covered).toBe(true);
+        expect(m.actionsInside).toBe(true);
+        // Clique real no centro medido: chega ao botão (validação do formulário) e não decide o consentimento.
+        await page.mouse.click(m.cx, m.cy);
+        await expect(page.getByText("Digite seu e-mail.")).toBeVisible();
+        await expect(page.locator(".consent-banner")).toBeVisible();
       });
     }
   }

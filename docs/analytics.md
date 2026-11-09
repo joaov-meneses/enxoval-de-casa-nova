@@ -11,7 +11,7 @@ Sem token, o SDK não é inicializado e nenhum evento é enviado. Com token, **n
 
 ## Consentimento (LGPD)
 
-O aviso `src/components/ConsentBanner.tsx` aparece em todas as páginas (menos `/admin`) enquanto a pessoa não decide, sempre que o build tem PostHog ou Tag Manager configurado. **Recusar**, **Personalizar** e **Aceitar tudo** têm o mesmo peso visual. A escolha fica em `localStorage` (`casamia:consent`, com versão; mudar `CONSENT_VERSION` em `src/analytics/consent.ts` pede a escolha de novo) e pode ser revista pelo botão **Mudar preferências** em `/privacidade` ou pelo link **Preferências de privacidade** no rodapé da landing.
+O aviso `src/components/ConsentBanner.tsx` aparece em todas as páginas (menos `/admin`) enquanto a pessoa não decide, sempre que o build tem PostHog ou Tag Manager configurado. **Recusar**, **Personalizar** e **Aceitar tudo** têm o mesmo peso visual. A escolha fica em `localStorage` (`casamia:consent`, com versão; mudar `CONSENT_VERSION` em `src/analytics/consent.ts` pede a escolha de novo) e pode ser revista pelo botão **Mudar preferências** em `/privacidade` ou pelo link **Preferências de privacidade** no rodapé da landing. No celular (até 767px) o aviso é uma faixa compacta no rodapé que não bloqueia a página e reserva espaço no fim dela; **Recusar** e **Aceitar tudo** têm o mesmo tamanho e estilo (ver `docs/aviso-cookies-celular-2026-11-08.md`). A gravação da escolha, a versão e o carregamento dos scripts não mudaram.
 
 | Categoria | Cobre | Padrão |
 | --- | --- | --- |
