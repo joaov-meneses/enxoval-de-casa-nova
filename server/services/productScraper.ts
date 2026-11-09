@@ -427,7 +427,7 @@ async function fetchViaUnlocker(target: URL): Promise<RawResponse | null> {
   });
   if (response.status !== 200) {
 
-    getLogger().warn({ event: 'scraper.provider.failed', provider: settings.name, url: target.href, status: response.status, body: response.body }, 'Scraper provider failed.');
+    getLogger().warn({ event: 'scraper.provider.failed', provider: settings.name, url: target.href, status: response.status, bodyBytes: Buffer.byteLength(String(response.body ?? '')) }, 'Scraper provider failed.');
     if (response.status === 404 || response.status === 410) return { ...response, url: target };
     return null;
   }

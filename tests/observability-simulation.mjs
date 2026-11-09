@@ -36,15 +36,16 @@ try {
   const logs = records.map(record => JSON.parse(record.body.stringValue));
   assert.equal(logs.length, 4);
   const success = logs.find(log => log.event === 'http.request.completed');
-  assert.equal(success.req.body.password, 'raw fixture');
+  assert.deepEqual(success.req.body.keys, ['name:string', 'password:string']);
   assert.equal(success.req.params.id, 'real-id');
-  assert.equal(success.req.query.filter, 'real-value');
-  assert.equal(success.req.headers.authorization, 'local-fixture');
-  assert.equal(success.res.body.saved.name, 'Real input fixture');
+  assert.equal(success.req.query.filter, '[redigido]');
+  assert.equal(success.req.headers.authorization, '[redigido]');
+  assert.equal(success.res.body.type, 'string');
+  for (const secret of ['raw fixture', 'Real input fixture', 'local-fixture', 'real-value', 'original detail']) assert.equal(JSON.stringify(logs).includes(secret), false, secret);
   assert.equal(success.reqId, response.headers.get('x-request-id'));
   const failure = logs.find(log => log.event === 'http.request.failed');
   assert.equal(failure.err.message, 'Raw diagnostic message');
-  assert.equal(failure.err.detail, 'original detail');
+  assert.equal(failure.err.detail, '[redigido]');
   assert.match(failure.err.stack, /TypeError: Raw diagnostic message/);
   console.log('Passed: real Express/Pino/OTLP pipeline delivered all four complete records to the local Postman simulation.');
 } finally {

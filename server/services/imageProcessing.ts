@@ -40,7 +40,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
       .resize({ width: MAX_IMAGE_SIDE, height: MAX_IMAGE_SIDE, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: WEBP_QUALITY })
       .toBuffer({ resolveWithObject: true });
-    getLogger().info({ event: 'image.processing.completed', inputBytes: input.length, outputBytes: data.length, metadata: meta, output: info }, 'Profile image processed.');
+    getLogger().info({ event: 'image.processing.completed', inputBytes: input.length, outputBytes: data.length, input: { width: meta.width, height: meta.height, format: meta.format, size: meta.size }, output: { width: info.width, height: info.height, format: info.format, size: info.size } }, 'Profile image processed.');
     return { data, width: info.width, height: info.height, sha256: createHash('sha256').update(data).digest('hex') };
   } catch (error) {
     getLogger().warn({ event: 'image.processing.failed', inputBytes: input.length, err: error }, 'Image processing failed.');
