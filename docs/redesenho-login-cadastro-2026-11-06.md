@@ -58,7 +58,16 @@ As medidas acima têm o consentimento já semeado. O aviso (`.consent-banner`, `
 | `/cadastro` | 375x667 | 272-651 | 594-644 |
 | `/cadastro` | 320x568 | 128-552 | 509-560 |
 
-**Limitação conhecida:** no primeiro acesso o aviso cobre o botão de envio nos quatro casos (o ponto central do botão cai dentro do aviso) até a pessoa escolher uma opção do aviso. Em 320x568 o aviso ocupa 424px dos 568px. O aviso e o funil não foram alterados; a medida fica registrada em `tests/auth.spec.ts` ("primeiro acesso com o aviso de cookies"), que pula em builds sem chave de análise.
+**Resolvida em 2026-11-08.** No celular o aviso virou uma faixa compacta no rodapé que reserva espaço no fim da página; o botão de envio fica visível e descoberto depois de rolar. Novas medidas (build com `VITE_POSTHOG_KEY=phc_medicao_local`, sem consentimento, botão depois de rolar):
+
+| Tela | Janela | Aviso (topo-base) | Altura do aviso | Botão de envio (topo-base) |
+| --- | --- | --- | --- | --- |
+| `/login` | 375x667 | 462-667 | 205px (31%) | 257-308 |
+| `/login` | 320x568 | 363-568 | 205px (36%) | 208-258 |
+| `/cadastro` | 375x667 | 462-667 | 205px (31%) | 312-362 |
+| `/cadastro` | 320x568 | 363-568 | 205px (36%) | 213-264 |
+
+Detalhes, texto antes/depois e como validar em [`aviso-cookies-celular-2026-11-08.md`](aviso-cookies-celular-2026-11-08.md). O teste "primeiro acesso com o aviso de cookies" de `tests/auth.spec.ts` agora exige botão descoberto e aviso de no máximo 40% da altura.
 
 ## Correções da revisão (2026-11-08)
 
