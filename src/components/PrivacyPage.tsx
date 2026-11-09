@@ -212,11 +212,12 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         </p>
         <p>
           Para operar o aplicativo e investigar falhas, os registros técnicos
-          preservam mensagens de erro, stack traces, dados de requisições e
-          respostas e informações da conta. Esses registros podem conter dados
-          pessoais, conteúdo das listas, respostas do onboarding, URLs, senhas e
-          tokens presentes na operação. Os registros do servidor são independentes
-          da preferência de análise do navegador e podem ser enviados ao PostHog.
+          guardam mensagens de erro, stack traces e metadados das requisições,
+          como método, rota, status, duração, tamanho e nomes de campos. Eles não
+          guardam corpos de requisições e respostas, senhas, tokens, cookies,
+          valores de parâmetros de URL, endereços IP nem o conteúdo dos e-mails
+          enviados. Os registros do servidor são independentes da preferência de
+          análise do navegador e podem ser enviados ao PostHog.
         </p>
         <p>
           Os serviços que sustentam o aplicativo (hospedagem e banco de dados)

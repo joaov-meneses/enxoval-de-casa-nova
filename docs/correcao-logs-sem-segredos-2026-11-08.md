@@ -80,4 +80,21 @@ Em produção, depois do deploy: faça um login com senha de teste e procure no 
 2. Incluir este incidente na avaliação da LGPD (dados pessoais e credenciais em logs de terceiro, sem consentimento).
 3. Invalidar os tokens de redefinição de senha e de convite emitidos desde 18/10 que ainda estejam válidos (recomendado: os links completos, com token, ficaram no PostHog Logs). Considere também os tokens de verificação de e-mail, preferências e pesquisa, e a troca de senhas digitadas em login desde 18/10.
 4. Registrar na avaliação da LGPD que também foram para o PostHog Logs endereços de e-mail, nomes e IPs.
-5. Atualizar o texto da página de privacidade (`src/components/PrivacyPage.tsx`), hoje com a frase que admite senhas e tokens nos registros, e `docs/logs.md` e `docs/analytics.md`, em outra branch.
+5. Revisar o novo 4º parágrafo da página de privacidade (`src/components/PrivacyPage.tsx`), atualizado no merge em homologacao para descrever os registros técnicos sem corpos, senhas, tokens, cookies, valores de query, IPs nem conteúdo de e-mail. É texto legal.
+
+## Estado
+
+Integrado em `homologacao` em 2026-11-08, depois de duas rodadas de revisão. A segunda revisão confirmou resolvidos os vazamentos concretos (e-mail com token, Referer, IP, user-agent, EXIF, JSON inválido no `captureException`) e não encontrou chamada atual que vaze dado real com frequência.
+
+## Pendências conhecidas (revisão de 2026-11-08)
+
+- **`tax_id` e CPF:** a regra que preserva chaves terminadas em `id` deixa passar `tax_id`/`taxId`, e `tax_ids[].value` também passa. Um erro de pagamento da Stripe com `billing_details.tax_id` levaria o CPF ao log. Gravidade baixa a média.
+- **Nomes de chave e texto livre:** a busca pelo último segmento do nome deixa passar compostos e plurais. Passam:
+  - compostos como `phoneNumber`, `cardNumber`, `passwordHash`, `tokenHash`, `secretKey`, `privateKey`, `zipCode`, `postalCode`, `nomeCompleto`, `enderecoCompleto`, `whatsapp`, `session` e `sid`;
+  - plurais como `emails`, `messages`, `tokens` e `passwords`;
+  - links fora de `*url`/`*href`, como `resetLink`.
+
+  O texto de `msg` e as strings em arrays não são redigidos: `priceTrackerWorker.ts:195` registra a URL do produto com query, e `productScraper.ts:1033/1037` registra o `trail` de URLs. Avaliar uma lista de permissão por evento e a redação de URLs dentro de strings. Gravidade média para o objetivo.
+- **Custo:** a redação roda de forma síncrona em toda linha e é refeita em `formatLog` quando o PostHog está ligado (cerca de 80 µs por linha HTTP e cerca de 3 ms em objetos grandes). Remover a segunda passagem e o cálculo duplicado de `segments()`. Gravidade baixa.
+- **Falsos positivos novos:** `name`, `from`, `to`, `text` e `location` no último segmento redigem `itemName`, `storeName`, `fileName`, `eventName` e o booleano `customFrom`. `catalog.resolve.failed` perdeu o nome do item que serve para depurar. Gravidade baixa.
+- O `tests/observability-simulation.mjs` foi atualizado, mas só rodou com um coletor falso, porque o simulador do Postman (porta 4900) não estava disponível.

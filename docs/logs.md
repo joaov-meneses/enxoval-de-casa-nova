@@ -6,15 +6,15 @@ Carregamentos bem-sucedidos de paginas, arquivos estaticos e modulos de desenvol
 
 ## Dados registrados
 
-O registro preserva os dados reais: URL com query, parametros, corpo recebido, headers, IP, conta quando identificada, status, headers e corpo de resposta da API, duracao e contexto personalizado. Binarios da API sao representados integralmente em base64, com tamanho. Corpos de arquivos estaticos nao sao duplicados nos logs. O `reqId` gerado pelo servidor aparece no header `X-Request-Id`, nos logs e no `request_id` das excecoes e das chamadas do navegador.
+O registro guarda metadados: metodo, rota, nomes dos parametros de query (valores como `[redigido]`), nomes e tipos dos campos do corpo e tamanho, status, duracao, conta quando identificada e contexto personalizado. Nao guarda valores do corpo nem da resposta, cookies, `Authorization`, IP, user-agent nem a query do `Referer`. A redacao central (`server/logRedaction.ts`) roda em toda linha do logger, antes do stdout e do PostHog, e redige chaves sensiveis (senha, token, e-mail, nome, endereco, telefone, Pix, documento e similares) em qualquer profundidade. Binarios viram `[binario N bytes]`. O `reqId` gerado pelo servidor aparece no header `X-Request-Id`, nos logs e no `request_id` das excecoes e das chamadas do navegador.
 
-Erros preservam tipo, mensagem, stack, causas, erros agregados e propriedades adicionais. Nao ha substituicao de mensagens, lista de campos permitidos ou mascaramento de senhas/tokens nos registros de diagnostico. Erros do parser preservam o diagnostico original; a resposta publica continua com a mensagem existente.
+Erros preservam tipo, mensagem, stack, codigo e causas. Campos com valores do banco (`detail`, `query`, `parameters`, `body`) sao redigidos, e o erro de JSON invalido usa mensagem fixa. Detalhes, historico e pendencias em [correcao-logs-sem-segredos-2026-11-08.md](correcao-logs-sem-segredos-2026-11-08.md).
 
-Tambem ha registros estruturados de e-mails (conteudo, destinatario, resultado e falha do provedor), cache, chamadas e respostas do Jev, scraping e fallbacks, transacoes, precos por produto, alertas, catalogo, notificacoes do trial, retencao de IPs e encerramento. Os scripts de migracao, catalogo e precos usam o mesmo logger e esvaziam o envio ao terminar.
+Tambem ha registros estruturados de e-mails (so dominio do destinatario, tamanhos e resultado do provedor), cache, Jev (contagens), scraping e fallbacks, transacoes, precos por produto, alertas, catalogo, notificacoes do trial, retencao de IPs e encerramento. Os scripts de migracao, catalogo e precos usam o mesmo logger e esvaziam o envio ao terminar.
 
 ## PostHog Logs
 
-Com `POSTHOG_KEY` ou `VITE_POSTHOG_KEY` contendo `phc_...`, o backend envia OTLP HTTP para `/i/v1/logs`. O corpo de cada registro e o JSON completo indentado. Atributos indexaveis incluem `event.name`, `request.id`, `user.id`, metodo, rota, status, duracao, `exception.message` e `exception.stacktrace`.
+Com `POSTHOG_KEY` ou `VITE_POSTHOG_KEY` contendo `phc_...`, o backend envia OTLP HTTP para `/i/v1/logs`. O corpo de cada registro e o JSON ja redigido, indentado. Atributos indexaveis incluem `event.name`, `request.id`, `user.id`, metodo, rota, status, duracao, `exception.message` e `exception.stacktrace`.
 
 Todos os eventos emitidos pelo logger sao encaminhados: sucessos, avisos, erros e nomes novos. Nao existe amostragem por sucesso nem teto por minuto na aplicacao. `POSTHOG_LOGS_MAX_PER_MINUTE` nao e mais utilizado. O nivel do Pino continua determinando o que e emitido.
 
@@ -27,11 +27,11 @@ Todos os eventos emitidos pelo logger sao encaminhados: sucessos, avisos, erros 
 | `POSTHOG_HOST` | `https://us.i.posthog.com` | Host de ingestao; alternativa `VITE_POSTHOG_HOST` |
 | `POSTHOG_ENABLE_DEV` | `false` | `true` habilita telemetria do servidor em desenvolvimento |
 
-Consulte [PostHog Logs](https://us.posthog.com/project/665798/logs). Para achar uma acao, filtre por `request.id`, `user.id` ou `event.name` e abra o corpo JSON. Erros tambem aparecem no Error Tracking com mensagem e stack originais.
+Consulte [PostHog Logs](https://us.posthog.com/project/665798/logs). Para achar uma acao, filtre por `request.id`, `user.id` ou `event.name` e abra o corpo JSON. Erros tambem aparecem no Error Tracking com mensagem e stack, sem corpo, query nem cabecalhos da requisicao.
 
 ## Navegador
 
-Eventos `application.navigation`, `application.ui.action` e `application.api.started/completed/failed` aparecem nos eventos do PostHog. Incluem URL sem query nem hash, cliques, alteracoes e envios de formularios (sem os valores) e chamadas da API com caminho, metodo, status, duracao e ID de requisicao. Nao incluem corpo nem resposta da API. As rotas administrativas nao sao enviadas. Detalhes em [analytics-sem-valores-de-campos.md](analytics-sem-valores-de-campos.md). Os eventos de produto e Web Vitals mantem seus schemas. Os eventos do navegador nao carregam dados completos: os registros completos ficam so nos logs do servidor.
+Eventos `application.navigation`, `application.ui.action` e `application.api.started/completed/failed` aparecem nos eventos do PostHog. Incluem URL sem query nem hash, cliques, alteracoes e envios de formularios (sem os valores) e chamadas da API com caminho, metodo, status, duracao e ID de requisicao. Nao incluem corpo nem resposta da API. As rotas administrativas nao sao enviadas. Detalhes em [analytics-sem-valores-de-campos.md](analytics-sem-valores-de-campos.md). Os eventos de produto e Web Vitals mantem seus schemas. Nem os eventos do navegador nem os logs do servidor carregam valores digitados.
 
 `VITE_POSTHOG_KEY` configura o projeto e `VITE_POSTHOG_ENABLE_DEV=true` habilita desenvolvimento. O opt-out e Do Not Track continuam sendo respeitados no navegador. Logs do servidor sao independentes dessa preferencia.
 
