@@ -2,7 +2,9 @@ import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor, LoggerProvider, type LogRecordExporter } from '@opentelemetry/sdk-logs';
 
-const object = (value: unknown): Record<string, any> => value && typeof value === 'object' ? value as Record<string, any> : {};
+import { redactDeep } from './logRedaction.ts';
+
+const object =(value: unknown): Record<string, any> => value && typeof value === 'object' ? value as Record<string, any> : {};
 export const requestId = (value: unknown) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value : undefined;
 
 export function formatLog(input: unknown) {
@@ -25,7 +27,8 @@ export function formatLog(input: unknown) {
   }
   return {
     // JSON remains parseable while the UI shows a readable, indented record.
-    body: JSON.stringify(log, null, 2),
+    // Última barreira: chaves sensíveis (senha, token, cookie, e-mail...) nunca seguem para o PostHog.
+    body: JSON.stringify(redactDeep(log), null, 2),
     severityNumber: ({ 10: 1, 20: 5, 30: 9, 40: 13, 50: 17, 60: 21 })[level] as number,
     severityText: ({ 10: 'trace', 20: 'debug', 30: 'info', 40: 'warn', 50: 'error', 60: 'fatal' })[level] as string,
     attributes,

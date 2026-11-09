@@ -189,6 +189,11 @@ try {
 
   assert.equal(calls.checkouts[0].subscription_data.trial_period_days, 2);
   assert.equal(calls.checkouts[0].payment_method_collection, "always");
+  assert.match(calls.checkouts[0].custom_text.submit.message, /48 horas/);
+  for (const path of ['termos', 'privacidade', 'reembolso']) {
+    assert.ok(calls.checkouts[0].custom_text.submit.message.includes(`https://casamia.test/${path}`), `política ${path} disponível antes de pagar`);
+  }
+  assert.match(calls.checkouts[0].custom_text.submit.message, /contato@devspot\.com\.br/);
   assert.equal(Object.hasOwn(calls.checkouts[0], 'payment_method_types'), false, 'a API atual exige métodos dinâmicos do Dashboard');
   // Passe: pagamento único, sem dados de assinatura, com o preço do Passe.
   const pass = await owner("/billing/checkout", "POST", { plan: "pass" });
@@ -197,6 +202,9 @@ try {
   assert.equal(calls.checkouts[1].line_items[0].price, "price_passe");
   assert.equal(calls.checkouts[1].metadata.plan, "pass");
   assert.equal(calls.checkouts[1].subscription_data, undefined, "o Passe não é assinatura");
+  assert.match(calls.checkouts[1].custom_text.submit.message, /Pagamento único para 12 meses/);
+  assert.match(calls.checkouts[1].custom_text.submit.message, /7 dias/);
+  assert.ok(calls.checkouts[1].custom_text.submit.message.includes('https://casamia.test/reembolso'));
   assert.equal(calls.customers.length, 1, "o cliente da Stripe é reaproveitado");
   assert.equal(await planOf("dona@example.invalid"), "free", "abrir o checkout não muda o plano");
 

@@ -2,13 +2,13 @@
 
 > **Objetivo:** Reunir as próximas entregas técnicas e de produto do **Casa Mia**.
 >
-> **Este documento lista só o que falta fazer.** Revisado em **24/10/2026**, considerando o código atual, inclusive alterações locais. A numeração das fases foi preservada para manter as referências entre documentos. Configurações de produção devem ser confirmadas no ambiente antes de serem consideradas pendências.
+> **Este documento lista só o que falta fazer.** Pagamentos revisados em **06/11/2026**; demais áreas mantêm a revisão de 24/10/2026, considerando o código atual, inclusive alterações locais. A numeração das fases foi preservada para manter as referências entre documentos. Configurações de produção devem ser confirmadas no ambiente antes de serem consideradas pendências.
 
 ---
 
 ## 1. O que ainda falta
 
-1. **Pagamentos (produção):** concluir cadastro Stripe, configurar chaves/preços/webhook live e URL de produção, ativar Pix live e validar compra até a liberação de acesso no processo publicado; para a NFS-e (código pronto), obter certificado A1, confirmar habilitação e política contábil e homologar no Emissor Nacional antes de ativar a transmissão (Fases 2 e 5; ver [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md)).
+1. **Pagamentos (ativação em produção):** a entrega de Portal do Cliente, Pix no Passe e revisão auditada de falhas/disputas/fraude está preparada para homologacao, destino solicitado pelo responsável. Depois da validação e de uma futura promoção autorizada, conferir os novos eventos no webhook LIVE e uma compra real até a liberação de acesso. Cadastro, chaves, preços, URLs por ambiente, marca e políticas já estão configurados. Para NFS-e, obter A1 real, habilitação e política contábil e homologar no Emissor Nacional antes de ativar transmissão; fixtures não substituem esses requisitos. Ver [`prontidao-stripe-homologacao.md`](./prontidao-stripe-homologacao.md) e [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md).
 2. **Produção:** Dockerfile, confirmação de backups, domínio e DNS; e-mails de boas-vindas/presente/resumo, ativação da emissão fiscal e depósito de marca (Fase 5).
 3. **Analytics (configuração nas contas):** o código está pronto; falta configurar Google (Tag Manager, GA4, Ads, Search Console), PostHog (funis, painéis e alertas por versão) e o webhook do Resend com os dados reais, e ligar os e-mails em produção (Fase 7).
 4. **Idiomas e preço por região:** app só em português e reais (Fase 8).
@@ -34,8 +34,7 @@ flowchart LR
 ### FASE 2: Pix em Produção
 
 #### 2.1 Pendências operacionais de lançamento
-* Concluir o cadastro Stripe e habilitar cobranças reais. Os ambientes `staging` e `production` na Railway ainda usam chave de teste e URL de staging.
-* Configurar chave, preços, URL e webhook próprios de produção; ativar Pix na configuração live.
+* Verificar a disponibilidade de Pix na configuração live: em 06/11/2026 a Stripe retornou `available=false`; produção usa cartão até que o meio esteja disponível e seja validado.
 * Publicar o código e validar uma compra real autorizada no Passe em BRL, incluindo confirmação assinada no webhook, liberação única de acesso e tratamento de expiração. Seguir o procedimento de [`pagamentos-e-notas-fiscais.md`](./pagamentos-e-notas-fiscais.md).
 
 ---
@@ -110,6 +109,15 @@ flowchart LR
 
 ---
 
+### Pendências do redesenho de entrar e criar conta (2026-11-06)
+
+* **Cadastro revela conta existente:** `POST /api/auth/register` ainda responde 409 com "Já existe uma conta com esse e-mail." (`server/routes.ts`). A tela mostra um texto neutro, mas a existência da conta continua visível na resposta de rede. A correção real é no servidor (resposta idêntica e e-mail ao dono da conta).
+* **Aceite dos Termos de Uso sem registro:** o texto legal do cadastro diz "você concorda com os Termos de Uso", mas o servidor não grava aceite nem versão dos termos. Pedir revisão jurídica e registrar versão e data do aceite.
+* **Origem do consentimento de e-mails:** a caixa opcional continua no cadastro (grava `source='cadastro'`). Se for movida para o funil `/comecar`, a rota `PATCH /api/profile/marketing` precisa aceitar a origem `funil` (hoje grava `perfil` fixo; `tests/growth-db.mjs` fixa esse valor) e o funil ganhar uma tela para ela.
+* **Troca de modo em `/app/...`:** o link entre entrar e criar conta faz `replaceState` para `/login` ou `/cadastro` mesmo quando a tela foi aberta sobre um caminho do app. Comportamento antigo, mantido.
+
+---
+
 ### Validação operacional: celulares físicos
 
 As implementações de documentos, OCR local de notas, retorno pelos lembretes de garantia e cache completo do modo loja estão concluídas. O armazenamento pode continuar no PostgreSQL; um bucket S3/R2 é uma opção de escala, não um requisito desta fase.
@@ -125,7 +133,7 @@ Falta executar em Android e iPhone físicos o roteiro de perda de sinal, reabert
 Hoje o teste dura 48 horas, com cartão cadastrado e cobrança automática do Mensal ao final. A mudança é de duração; o modelo (cartão no início, cancelamento no app, bloqueio dos convidados ao cancelar) continua o mesmo.
 
 * **Cobrança:** `server/billing.ts` (linha ~393) usa `trial_period_days: 2`; passar para `3`. Trocar também o texto de `custom_text.submit.message` ("Teste completo por 2 dias (48 horas)").
-* **Textos de interface com "48 horas" ou "2 dias":** `src/components/LandingPage.tsx` (9 ocorrências, incluindo o selo do hero e o FAQ), `PlanSelection.tsx` (8), `SubscriptionAccess.tsx` (2, inclusive "São 48 horas completas"), `AuthPage.tsx` (2), `ProfileDialog.tsx`, `OnboardingFlow.tsx`, `AdminPage.tsx`, e e-mails em `server/mailer.ts` (2). Procurar por `48 horas|48h|2 dias|dois dias`; algumas ocorrências de `24 horas` são do lembrete e não mudam.
+* **Textos de interface com "48 horas" ou "2 dias":** `src/components/LandingPage.tsx` (9 ocorrências, incluindo o selo do hero e o FAQ), `PlanSelection.tsx` (8), `SubscriptionAccess.tsx` (2, inclusive "São 48 horas completas"), `AuthPage.tsx` (1, o aviso "Depois você escolhe: Passe de R$ 99 ou Mensal com 2 dias grátis, com cartão." do cadastro; só o preço do Passe vem de `src/plans.ts`, os "2 dias" são literais), `ProfileDialog.tsx`, `OnboardingFlow.tsx`, `AdminPage.tsx`, e e-mails em `server/mailer.ts` (2). Procurar por `48 horas|48h|2 dias|dois dias`; algumas ocorrências de `24 horas` são do lembrete e não mudam.
 * **Lembrete das últimas 24 horas:** `server/workers/trialNotifications.ts` continua válido; confirmar que ele usa `trial_ends_at` e não uma duração fixa.
 * **Testes:** `tests/billing-db.mjs` (`trial_period_days, 2`, `48 * 3600`, `23 hours`) e `tests/freemium-db.mjs` (`interval '48 hours'`) passam para 72 horas. Rodar `npm run test:billing-db`, `npm run lint`, `npm run build` e `node tests/trial-ui.mjs`.
 * **Documentação:** atualizar a seção "Trial e cobrança" do `README.md` e `docs/analytics.md` se citar a duração.
@@ -148,7 +156,7 @@ Decisão: não esconder valores para revelá-los só no paywall. Motivos: contra
 
 | Ordem | Entregável | Impacto Principal | Complexidade |
 |:---:|---|---|:---:|
-| **2º** | **Fase 2 (restante):** Cadastro Stripe, configuração live e validação do Pix em produção | Monetização e Negócio | Baixa-Média |
+| **2º** | **Fase 2 (restante):** Disponibilidade e validação do Pix e compra real em produção | Monetização e Negócio | Baixa-Média |
 | **5º** | **Fase 5 (restante):** Dockerfile, validação de infraestrutura e DNS, novos e-mails e ativação fiscal | Escala e Estabilidade | Média |
 | **7º** | **Fase 7 (configuração):** Google, PostHog e Resend com dados reais; ligar os e-mails em produção | Aquisição, Ativação e Retenção | Baixa |
 | **8º** | **Fase 8:** Inglês e espanhol no app inteiro + preço, impostos e conteúdo por região | Novos Mercados e Receita | Alta |
@@ -156,3 +164,6 @@ Decisão: não esconder valores para revelá-los só no paywall. Motivos: contra
 | **11º** | **Validação física:** Modo loja offline e Wake Lock em Android/iPhone reais | Confiabilidade na loja | Baixa |
 
 > **A ordem acima é de menor risco de produto, não de valor.** A validação em produção da Fase 7 (antes de comprar anúncios) e a Fase 9 devem ser **antecipadas**; a infraestrutura de idiomas da Fase 8 (nenhum texto novo fixo no código) também deve começar já, porque o custo de extração cresce a cada tela nova. Tabelas de região e preço da Fase 8 e o antifraude da Fase 9 são pré-requisitos da cobrança em outros países.
+
+- **Teste Playwright permanente de layout mobile:** fonte de 13px nos rótulos, cor sálvia das barras e botão flutuante sem sobreposição (ficou fora por restrição de edição em `tests/`).
+- **Chave antiga `cm_consent_v1` em `tests/housewarming.spec.ts`:** o spec semeia a chave antiga, então o aviso aparece em `/cha` no build com chave de análise. Trocar por `casamia:consent`.

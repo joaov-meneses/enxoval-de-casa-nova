@@ -27,7 +27,7 @@ async function recordActivity() {
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
   } catch (error) {
-    captureOperational('application.api.failed', { path: '/api/auth/activity', method: 'POST', error: error instanceof Error ? { message: error.message, stack: error.stack } : error });
+    captureOperational('application.api.failed', { path: '/api/auth/activity', method: 'POST', error: { name: error instanceof Error ? error.name : 'Error' } });
   }
   finally { pending = false; }
 }

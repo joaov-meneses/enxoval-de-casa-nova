@@ -1,0 +1,592 @@
+/* ───────── Formulário de edição do item (janela .item-edit-dialog) ─────────
+   Celular primeiro. Um cartão para o essencial (nome, situação, ambiente) e outro para os valores; o resto vive em
+   blocos recolhíveis com um resumo de uma linha. A barra Cancelar / Salvar é fixa no rodapé da janela.
+   Tudo usa os tokens --cm-*: o rótulo é secundário (13px), o valor digitado é forte (16px, sem zoom no iOS). */
+
+.item-edit-dialog {
+  --item-ink: var(--cm-text);
+  --item-label: color-mix(in oklab, var(--cm-bg) 28%, var(--cm-text));
+  --item-card: color-mix(in oklab, var(--cm-bg) 62%, #fff);
+  --item-line: color-mix(in oklab, var(--cm-sand) 50%, #fff);
+  --item-field-line: color-mix(in oklab, var(--cm-sand) 78%, #fff);
+  /* Situação: azulejo enquanto se pesquisa, sálvia quando já está resolvido (as mesmas cores da lista). */
+  --item-accent: var(--cm-accent);
+  --item-accent-ink: var(--cm-accent);
+}
+.item-edit-dialog.is-done {
+  --item-accent: var(--cm-success);
+  --item-accent-ink: color-mix(in oklab, var(--cm-success) 86%, #000);
+}
+
+/* ---- janela: cabeçalho enxuto com a cor da situação, e rolagem que respeita as barras fixas ---- */
+.casamia-dialog.item-edit-dialog {
+  padding-bottom: 0;
+  scroll-padding-block: 84px 112px;
+}
+.casamia-dialog.item-edit-dialog .dialog-heading {
+  padding: 10px 12px 10px 18px;
+  border-bottom: 3px solid color-mix(in oklab, var(--item-accent) 62%, #fff);
+}
+.casamia-dialog.item-edit-dialog .dialog-heading h2 {
+  font-size: 22px;
+}
+.casamia-dialog.item-edit-dialog > .item-inline-panel {
+  padding: 12px 10px 0;
+  background: none;
+  border: 0;
+  outline: none;
+}
+.item-edit-dialog .item-inline-form {
+  display: block;
+}
+.item-edit-dialog .item-inline-grid {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+/* ---- cartões e blocos ---- */
+.item-edit-dialog .item-card,
+.item-edit-dialog .item-block {
+  min-width: 0;
+  border: 1px solid var(--item-line);
+  border-radius: 16px;
+  background: var(--item-card);
+}
+.item-edit-dialog .item-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px 12px;
+}
+.item-edit-dialog .item-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--item-ink);
+}
+/* Colar o link é a entrada mais rápida: o cartão ganha o tom da marca. */
+.item-edit-dialog .item-link-card {
+  gap: 0;
+  padding: 12px 14px 14px;
+  border-color: color-mix(in oklab, var(--cm-primary) 28%, #fff);
+  background: color-mix(in oklab, var(--cm-primary) 6%, #fff);
+}
+.item-edit-dialog .item-link-label {
+  gap: 6px;
+  font-weight: 700;
+  color: var(--cm-primary-dark);
+}
+.item-edit-dialog .item-link-import {
+  margin: 0;
+}
+
+/* ---- campos ---- */
+.item-edit-dialog .item-field,
+.item-edit-dialog .pp-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  align-content: start;
+}
+.item-edit-dialog .item-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+.item-edit-dialog .item-field-head > label,
+.item-edit-dialog .item-field-label {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--item-label);
+}
+.item-edit-dialog .item-field input:not([type="checkbox"]):not([type="radio"]),
+.item-edit-dialog .item-field textarea,
+.item-edit-dialog .pp-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--item-field-line);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--item-ink);
+}
+.item-edit-dialog .item-field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.item-edit-dialog button.casamia-select-trigger {
+  min-height: 48px;
+  padding: 10px 10px 10px 14px;
+  border-color: var(--item-field-line);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--item-ink);
+}
+.item-edit-dialog button.casamia-select-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-edit-dialog .item-field input:disabled,
+.item-edit-dialog .item-field textarea:disabled {
+  background: color-mix(in oklab, var(--cm-bg) 55%, #fff);
+}
+.item-edit-dialog .item-field input::placeholder,
+.item-edit-dialog .item-field textarea::placeholder {
+  font-weight: 400;
+}
+.item-edit-dialog .item-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.item-edit-dialog .item-block-fields {
+  display: grid;
+  gap: 14px;
+}
+.item-edit-dialog .item-field-note,
+.item-edit-dialog .item-block-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--item-label);
+}
+.item-edit-dialog .item-field-row > .item-field-note,
+.item-edit-dialog .item-field-row > .item-tip-panel {
+  grid-column: 1 / -1;
+}
+.item-edit-dialog .item-block-body .item-block-note + .item-block-note {
+  margin-top: 8px;
+}
+
+/* Quantidade: [−] número [+] na largura de uma coluna, com alvos de 44px. */
+.item-edit-dialog .quantity-stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 4px;
+}
+.item-edit-dialog .quantity-stepper-buttons {
+  display: contents;
+}
+.item-edit-dialog .quantity-stepper-buttons button:first-child {
+  order: 0;
+}
+.item-edit-dialog .quantity-stepper input {
+  order: 1;
+  padding-inline: 2px;
+  text-align: center;
+}
+.item-edit-dialog .quantity-stepper-buttons button:last-child {
+  order: 2;
+}
+.item-edit-dialog .quantity-stepper button {
+  width: 44px;
+  min-height: 48px;
+  border-radius: 12px;
+}
+
+/* Caixas de marcar: linha inteira tocável. */
+.item-edit-dialog .item-inline-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--item-ink);
+}
+.item-edit-dialog button[role="checkbox"] {
+  min-height: 0;
+}
+.item-edit-dialog .item-block-fields > .item-inline-check {
+  padding-block: 2px;
+}
+
+/* Contador do nome: discreto, ao lado do rótulo. */
+.item-edit-dialog .name-counter {
+  font-size: 12px;
+}
+
+/* ---- situação: seletor segmentado ---- */
+.item-edit-dialog .item-status-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.item-edit-dialog .item-status-option {
+  --chip: var(--cm-accent);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 0 4px;
+  border: 1.5px solid var(--item-field-line);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--item-label);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.item-edit-dialog .item-status-option[data-family="done"] {
+  --chip: color-mix(in oklab, var(--cm-success) 86%, #000);
+}
+.item-edit-dialog .item-status-option[data-selected] {
+  border-color: var(--chip);
+  background: color-mix(in oklab, var(--chip) 10%, #fff);
+  color: var(--chip);
+  box-shadow: inset 0 0 0 1px var(--chip);
+}
+.item-edit-dialog .item-status-option[data-disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* O check é um selo no canto: confirma a escolha sem depender só da cor e sem empurrar o texto. */
+.item-edit-dialog .item-status-option > svg {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  box-sizing: content-box;
+  width: 12px;
+  height: 12px;
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--chip);
+  color: #fff;
+}
+/* O rádio nativo cobre o botão (toque e teclado), mas não aparece. */
+.item-edit-dialog .item-status-option input[type="radio"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.item-edit-dialog .item-status-option:has(input:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--cm-primary-dark);
+}
+@media (hover: hover) {
+  .item-edit-dialog .item-status-option:not([data-selected]):not([data-disabled]):hover {
+    background: color-mix(in oklab, var(--cm-bg) 55%, #fff);
+    color: var(--item-ink);
+  }
+}
+
+/* ---- valor final: o número de destaque ---- */
+.item-edit-dialog .item-total {
+  display: grid;
+  gap: 2px;
+  padding: 12px 16px 14px;
+  border: 1px solid color-mix(in oklab, var(--item-accent) 24%, #fff);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--item-accent) 8%, #fff);
+}
+.item-edit-dialog .item-total-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 20px;
+}
+.item-edit-dialog .item-total-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--item-label);
+}
+.item-edit-dialog .item-total-value {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--item-ink);
+}
+.item-edit-dialog .item-total-note {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--item-label);
+}
+
+/* ---- dicas sob demanda ("?") ---- */
+.item-edit-dialog .item-tip-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  /* O alvo de toque é de 44px, o desenho de 20px: as margens negativas devolvem a altura da linha. */
+  margin: -12px -12px -12px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cm-accent);
+  cursor: pointer;
+}
+.item-edit-dialog .item-tip-button > span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+.item-edit-dialog .item-tip-button[aria-expanded="true"] > span {
+  background: var(--cm-accent);
+  border-color: var(--cm-accent);
+  color: #fff;
+}
+.item-edit-dialog .item-tip-panel {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--cm-accent);
+  border-radius: 4px 10px 10px 4px;
+  background: color-mix(in oklab, var(--cm-accent) 7%, #fff);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--item-ink);
+}
+.item-edit-dialog .item-tip-panel[hidden] {
+  display: none;
+}
+
+/* ---- blocos recolhíveis ---- */
+.item-edit-dialog .item-block-heading {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.item-edit-dialog .item-block-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 16px;
+  border-radius: 16px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.item-edit-dialog .item-block-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.item-edit-dialog .item-block-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--item-ink);
+}
+.item-edit-dialog .item-block-summary {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--item-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-edit-dialog .item-block-chevron {
+  flex: none;
+  color: var(--cm-primary-dark);
+  transition: transform 0.22s ease;
+}
+.item-edit-dialog .item-block-toggle[aria-expanded="true"] .item-block-chevron {
+  transform: rotate(180deg);
+}
+/* Abrir e fechar: a linha da grade vai de 0fr a 1fr. O conteúdo recolhido fica invisível e inerte. */
+.item-edit-dialog .item-block-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 0.24s ease, visibility 0s linear 0.24s;
+}
+.item-edit-dialog .item-block[data-open] .item-block-panel {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows 0.24s ease, visibility 0s;
+}
+.item-edit-dialog .item-block-body {
+  min-height: 0;
+  overflow: hidden;
+}
+.item-edit-dialog .item-block-inner {
+  display: grid;
+  gap: 12px;
+  padding: 2px 16px 16px;
+}
+
+/* Lojas e documentos dentro dos blocos */
+.item-edit-dialog .item-offers,
+.item-edit-dialog .item-docs {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.item-edit-dialog .item-docs {
+  margin-top: 4px;
+}
+
+/* Planejamento de compra (campos do PurchaseTimingFields) */
+.item-edit-dialog .purchase-timing-fields {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.item-edit-dialog .purchase-timing-fields .pp-field > label,
+.item-edit-dialog .purchase-timing-fields .pp-field > .item-field-head > label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--item-label);
+}
+.item-edit-dialog .purchase-timing-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 8px;
+}
+.item-edit-dialog .purchase-timing-wide > .item-tip-panel {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+}
+.item-edit-dialog .purchase-timing-check {
+  font-size: 14px;
+  color: var(--item-ink);
+}
+
+/* ---- rodapé do conteúdo: data e "Tirar da lista" (destrutivo, longe de Salvar) ---- */
+.item-edit-dialog .item-inline-footnote {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  margin-top: 6px;
+}
+.item-edit-dialog .item-inline-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--item-label);
+}
+.item-edit-dialog .item-remove-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--destructive, #b42318);
+}
+@media (hover: hover) {
+  .item-edit-dialog .item-remove-button:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--destructive, #b42318) 8%, #fff);
+    color: color-mix(in oklab, var(--destructive, #b42318) 90%, #000);
+  }
+}
+
+/* ---- barra Cancelar / Salvar: fixa no rodapé, acima da área segura do aparelho ---- */
+.item-edit-dialog .item-inline-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  margin: 0 -10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--item-line);
+  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
+  box-shadow: 0 -10px 18px -14px color-mix(in oklab, var(--cm-text) 40%, transparent);
+}
+.item-edit-dialog .item-inline-actions .form-error {
+  margin: 0;
+}
+.item-edit-dialog .item-inline-actions-buttons {
+  display: flex;
+  gap: 10px;
+}
+.item-edit-dialog .item-inline-actions-buttons .button {
+  flex: 1;
+  min-height: 48px;
+  font-size: 15px;
+}
+.item-edit-dialog .item-inline-actions-buttons .button-outline {
+  flex: 0 0 34%;
+}
+
+/* ---- telas maiores: o diálogo é central; situação em uma linha só e botões à direita ---- */
+@media (min-width: 360px) {
+  .item-edit-dialog .item-status-group {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+/* Em 360 a 430px cada opção tem cerca de 75px: a fonte desce um ponto para "Pesquisando" caber sem tocar a borda. */
+@media (min-width: 360px) and (max-width: 430px) {
+  .item-edit-dialog .item-status-option {
+    font-size: 12px;
+    letter-spacing: -0.01em;
+  }
+}
+@media (min-width: 768px) {
+  .casamia-dialog.item-edit-dialog > .item-inline-panel {
+    padding: 18px 24px 0;
+  }
+  .item-edit-dialog .item-card {
+    padding: 18px 20px;
+  }
+  .item-edit-dialog .item-inline-actions {
+    margin: 0 -24px;
+    padding: 14px 24px;
+  }
+  .item-edit-dialog .item-inline-actions-buttons {
+    justify-content: flex-end;
+  }
+  .item-edit-dialog .item-inline-actions-buttons .button,
+  .item-edit-dialog .item-inline-actions-buttons .button-outline {
+    flex: 0 0 auto;
+    min-width: 150px;
+  }
+  .item-edit-dialog .item-block-inner {
+    padding-inline: 20px;
+  }
+  .item-edit-dialog .item-block-toggle {
+    padding-inline: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item-edit-dialog .item-block-panel,
+  .item-edit-dialog .item-block[data-open] .item-block-panel,
+  .item-edit-dialog .item-block-chevron,
+  .item-edit-dialog .item-status-option {
+    transition: none;
+  }
+}

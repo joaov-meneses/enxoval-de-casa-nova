@@ -25,8 +25,8 @@ As capturas finais ficam em `design/inventario/capturas/` (reduzidas e mascarada
 | ID | Nome | Rota | Perfil necessário | Estados capturados | Captura final | Status |
 |---|---|---|---|---|---|---|
 | T01 | Home (landing) | `/` | público | padrão (topo); seção do carrossel (depois da alteração); celular só por emulação em iframe de 390 px | `T01-landing-topo.webp`, `T01-landing-carrossel-depois.webp` | verificada (desktop); celular verificado por iframe |
-| T02 | Entrar | `/login` | público | padrão, antes e depois do carrossel | `T02-login.webp`, `T02-login-depois.webp` | verificada. Erro e carregando: **não verificado** |
-| T03 | Criar conta | `/cadastro` | público | padrão, antes e depois do carrossel | `T03-cadastro.webp`, `T03-cadastro-depois.webp` | verificada. Erro e carregando: **não verificado** |
+| T02 | Entrar | `/login` | público | padrão; validação no campo; enviando ("Entrando…"); falha técnica ("Ops, tropeçamos aqui…"); credencial recusada | redesenho de 2026-11-06 (porta em linho no desktop, formulário direto no celular; sem abas, sem carrossel). As capturas antigas `T02-login*.webp` ficam defasadas: refazer | verificada por `tests/auth.spec.ts` em 320, 375, 425 e 1366 px |
+| T03 | Criar conta | `/cadastro` | público | padrão (dica da senha); regras da senha ao focar ou digitar; validação no campo; enviando ("Criando sua conta…"); falha técnica; conta já existente (texto neutro) | redesenho de 2026-11-06: sem campo de confirmar senha, aviso de cobrança no lugar do subtítulo, texto legal com links para Termos e Privacidade, caixa de e-mails opcional e desmarcada. As capturas antigas `T03-cadastro*.webp` ficam defasadas: refazer | verificada por `tests/auth.spec.ts` em 320, 375, 425 e 1366 px |
 | T04 | Visão geral | `/app` | autenticado (gratuito) | 0% com poucos dados; 8% com 14 itens conquistados e desconto registrado | `T04-app-visao-geral.webp`, `T04-visao-geral-conta-antiga.webp` | verificada |
 | T05 | Lista de um ambiente | `/app` (clique em um ambiente da barra lateral) | autenticado | não capturado | | **não verificado** (priorizei as telas de maior valor) |
 | T06 | Meu enxoval (lista de itens) | `/app` | autenticado | com itens conquistados e itens "Sem preço" | `T06-app-meu-enxoval.webp` | verificada. Vazio e item expandido: **não verificado** |
@@ -47,6 +47,9 @@ As capturas finais ficam em `design/inventario/capturas/` (reduzidas e mascarada
 | T21 | Administração | `/admin` | administrador | | | **não verificado**: exige credencial própria da administração, que não foi usada |
 | T22 | Página do Chá de Casa Nova (convidado) | não encontrada | público | | | **não verificado**: a landing e o plano pago prometem a página, mas não há rota nem tela no código. Registrado como lacuna |
 | T23 | Menu Exportar, histórico de preço, abertura do item | `/app` | autenticado | | | **não verificado**: o menu abre abaixo da dobra e não foi capturado |
+| T24 | Checkout hospedado da Stripe | `checkout.stripe.com` (sessão criada pelo app) | usuário do app com plano selecionado | configuração de marca e cupom conferida pela API em 06/11/2026 | | Parâmetros verificados: fundo `#f8f3eb`, botão `#a34c30`, Nunito, Nino oficial e campo de código promocional. Conferência visual em 320, 375 e 425 px **não executada**, por indisponibilidade do navegador. Ver `docs/checkout-stripe-casa-mia.md`. |
+| T25 | Termos de Uso | `/termos` | público | texto, fornecedor, contato e links legais | | Verificado em 06/11/2026 por Playwright em 320, 375 e 425 px, sem rolagem horizontal. Ver `docs/politicas-consumidor.md`. |
+| T26 | Cancelamento e reembolso | `/reembolso` | público; envio pelo app exige sessão | política, solicitação, protocolo e erro de autenticação | | Verificado em 06/11/2026 por Playwright em 320, 375 e 425 px; imagens inspecionadas. Fluxo reutiliza a central de ajuda. Ver `docs/politicas-consumidor.md`. |
 
 Estados mínimos a cobrir por tela: padrão, vazio, carregando, erro, e paywall quando aplicável. Carregando e erro não foram capturados em nenhuma tela (exigiriam simular falha de rede).
 
@@ -54,12 +57,13 @@ Estados mínimos a cobrir por tela: padrão, vazio, carregando, erro, e paywall 
 
 | Componente | Variantes observadas | Telas onde aparece | Observações |
 |---|---|---|---|
-| Botão primário | terracota cheio (`.cm-btn-primary` na home, `.button-dark` no login/cadastro e `Adicionar item` no app); secundário com borda; fantasma | T01 a T15 | Todos usam `--cm-action` (`#b5532f`), um terracota mais escuro que o oficial, para dar contraste AA com texto branco |
+| Botão primário | terracota cheio (`.cm-btn-primary` na home, `.button-dark` no login/cadastro e `Adicionar item` no app); secundário com borda; fantasma | T01 a T15 | Todos usam `--cm-action` (`#a34c30`), um terracota mais escuro que o oficial, para dar contraste AA com texto branco |
 | Card de item | linha com círculo de conquista, etiquetas de ambiente e semana, preço e situação | T06 | Itens conquistados ficam riscados, em oliva |
-| Campo de formulário | campo com rótulo acima, ícone de mostrar senha | T02, T03, T10, T11, T16 | |
+| Campo de formulário | campo com rótulo acima, ícone de mostrar senha | T02, T03, T10, T11, T16 | Em T02 e T03 o campo tem 48px e raio 10px (`.auth-shell`); nas demais telas o campo compartilhado de `.auth-form` segue com 49px e raio 7px |
 | Navegação | barra lateral (Visão geral, Planejamento, Meu enxoval, ambientes); barra superior com ações; menu de vidro na home | T01, T04 a T07 | Em telas estreitas, a home usa menu recolhido |
 | Mascote Nino | pose "wave" (acenando) e "think" (com a pranchetinha) | T01, T07, T08, T15 e agora no carrossel (slide do Nino) | |
-| Carrossel de funcionalidades (novo) | tom claro (home) e tom escuro (login e cadastro) | T01, T02, T03 | Componente `src/components/FeatureCarousel.tsx` |
+| Aviso de cookies | cartão de 560px no desktop; faixa compacta no rodapé até 767px, com `Recusar`, `Personalizar` e `Aceitar tudo` de mesmo tamanho e estilo | Telas públicas e `/app` (menos `/admin`), só em build com chave de análise | Componente `src/components/ConsentBanner.tsx`. Não bloqueia a página: reserva espaço no fim dela (`--consent-banner-space`, `data-consent-open` no `<html>`), então o botão principal da página fica sempre alcançável rolando. Os botões do aviso quebram em linhas de largura total quando a fonte é grande e nunca saem da área visível (só o texto rola). No celular, bottom sheets, menu lateral, barra inferior, botão flutuante e avisos de rodapé sobem acima da faixa enquanto ela está aberta. Ver `docs/aviso-cookies-celular-2026-11-08.md`. |
+| Carrossel de funcionalidades (novo) | tom claro (home) | T01 | Componente `src/components/FeatureCarousel.tsx`. Não aparece mais em T02 e T03 e hoje não é importado por nenhuma tela (órfão) |
 
 ## 5. Tokens visuais
 
@@ -69,11 +73,11 @@ Estados mínimos a cobrir por tela: padrão, vazio, carregando, erro, e paywall 
 |---|---|---|---|
 | Fundo geral | `#fbf3e6` (`--cm-bg`, `--color-brand-cream`) | `#FBF3E6` | nenhuma |
 | Texto e títulos | `#3b2a20` (`--cm-text`) | `#3B2A20` | nenhuma |
-| Primária / ação | `#c2603f` (`--cm-primary`); botões usam `#b5532f` (`--cm-action`); texto e hover usam `#a34c30` | `#C2603F` | **Intencional e já documentada no CSS**: o terracota oficial dá 4,2:1 com texto branco (abaixo de AA); os tons mais escuros dão 4,9:1 ou mais. Mantido. Recomendo registrar a exceção no manual de marca |
+| Primária / ação | `#c2603f` (`--cm-primary`); botões usam `#a34c30` (`--cm-action`); texto e hover usam `#a34c30` | `#C2603F` | **Intencional e já documentada no CSS**: o terracota oficial dá 4,2:1 com texto branco (abaixo de AA); os tons mais escuros dão 4,9:1 ou mais. Mantido. Recomendo registrar a exceção no manual de marca |
 | Apoio / sucesso | `#5c6643` (`--cm-success`); barras e itens riscados usam tons de oliva mais claros | `#5C6643` | tons claros de oliva e de azul/verde nos cartões do Planejamento não constam na paleta oficial (são variações de superfície). Não alterado |
 | Acento / informação | `#244b66` (`--cm-accent`) | `#244B66` | nenhuma |
 
-Nenhuma cor nova foi criada nesta rodada. O carrossel usa apenas `--cm-bg`, `--cm-text`, `--cm-primary`, `--cm-primary-dark`, `--cm-accent` e os neutros já definidos em `.cm-page` (`--cm-card`, `--cm-line`, `--cm-muted`). No tom escuro, usa o creme `#fbf3e6` com transparência e `#e0c2a1`, que já aparecia em `.auth-story-copy h2 em`.
+Nenhuma cor nova foi criada nesta rodada. O carrossel usa apenas `--cm-bg`, `--cm-text`, `--cm-primary`, `--cm-primary-dark`, `--cm-accent` e os neutros já definidos em `.cm-page` (`--cm-card`, `--cm-line`, `--cm-muted`). No tom escuro, usa o creme `#fbf3e6` com transparência e `#e0c2a1`. A coluna `.auth-story` de login e cadastro já foi removida (redesenho de 2026-11-06).
 
 ### Tipografia
 
@@ -111,7 +115,7 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 
 - T05, T18 a T23 e estados de carregando e erro: ver tabela da seção 3.
 - **Celular no app autenticado:** não verificado (o redimensionamento da janela não funcionou, a largura permaneceu em 1536 px). A home, o login e o cadastro foram conferidos em 390 px por meio de um iframe na mesma origem, que aplica as media queries de verdade; isso é uma emulação, não um aparelho.
-- **Carrossel no celular nas telas de login e cadastro:** por design existente, a coluna da foto (`.auth-story`) some abaixo de 600 px. O carrossel some junto. Não alterei esse comportamento.
+- **Carrossel nas telas de login e cadastro:** a coluna da foto (`.auth-story`) e o carrossel não existem mais nessas telas desde o redesenho de 2026-11-06. Registro histórico.
 - **Busca por link (T10):** o resultado não foi capturado, pois exigiria acessar loja de terceiros.
 - **Funil `/comecar`:** as etapas de estado, clima, tipo de casa, número de pessoas, espaços, itens que já tem e estilo foram percorridas pelo script, sem captura.
 - **Limite do plano gratuito:** na conta de teste criada, o funil gerou 165 itens em 7 ambientes sem que o paywall aparecesse, apesar da tela de salvar dizer que "entram os 2 primeiros ambientes com até 10 itens cada". Não investiguei; vale conferir se o limite é aplicado no servidor.
@@ -135,7 +139,7 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 | P02 | Home e planos | O Chá de Casa Nova é prometido (home, FAQ, plano pago), mas não existe tela para o convidado | Não prometer o que não existe | Marcar como "em breve" ou priorizar a página pública (ver R04) | proposta |
 | P03 | App (lista e visão geral) | Vocabulário de cobrança: "Atrasado", "Mais atrasado", "Comprar" | Glossário da marca (seção 5) | Trocar pelos termos da tabela da seção 6 | proposta |
 | P04 | Todo o app | DM Sans não é usada; números sem figuras tabulares | Tipografia oficial (seção 7 da marca) | Decidir entre adotar DM Sans ou atualizar o manual para Nunito; aplicar `font-variant-numeric: tabular-nums` nos valores | proposta |
-| P05 | Login e cadastro | No celular a coluna com a foto some, e o carrossel some junto | Mostrar valor antes do cadastro | Avaliar uma versão compacta do carrossel abaixo do formulário no celular | proposta |
+| P05 | Login e cadastro | Desde o redesenho de 2026-11-06 a coluna com a foto e o carrossel não existem mais nessas telas | Mostrar valor antes do cadastro | Decidir se o valor do produto volta por outro caminho (o aviso de cobrança já explica o que vem depois) | superada pelo redesenho |
 | P06 | Home | A seção "Como funciona" e o carrossel repetem parte do conteúdo (plano, lista, lista a dois) | Clareza e economia de rolagem | Se o carrossel ficar, enxugar os passos de "Como funciona" ou trocar os slides repetidos | proposta |
 
 ### Ideias de referências (origem: `referencias/enxovaly.md`)
@@ -143,7 +147,7 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 | ID | Tela | Problema ou oportunidade | Princípio ou heurística | Proposta | Status |
 |---|---|---|---|---|---|
 | R01 | Início (hero) | Mostrar o app em uso no hero, com estado real da lista | Progresso visual concreto | A home já tem o mockup "Meu Lar" com a porta em arco e o Nino. Reforçado com capturas reais do app no carrossel (seção "Por dentro do Casa Mia") | **aplicada em parte** (hero já existia; carrossel adicionado) |
-| R02 | Lista por categoria | Falta de sinal claro de conclusão por categoria | Progresso visual concreto; celebração de conquistas | Barra, contagem e estado "Completo" por categoria. Dentro do app autenticado; fora do escopo desta rodada | proposta |
+| R02 | Lista por categoria | Falta de sinal claro de conclusão por categoria | Progresso visual concreto; celebração de conquistas | Barra, contagem e estado "Completo" por categoria. Dentro do app autenticado; fora do escopo desta rodada. **Aplicada em parte** em Meu Lar: barra sálvia, check e 10/10 em negrito; barra inferior e resumo a 13px, cartão de item opaco e percentual em Fraunces 40px | aplicada em parte |
 | R03 | Transições gerais | Movimento pode reforçar conquistas | Confetes sutis do Nino (seção 3 da marca) | Aplicado só no carrossel: troca de slide em 0,45 s, barrinha de tempo, e sem movimento para quem pede menos movimento. Confetes não foram implementados | **aplicada em parte** |
 | R04 | Página de chá (convidados) | Presentes repetidos no chá | Página de Chá de Casa Nova (seção 6 da marca) | Lista pública mostrando só o que falta e o que já foi reservado. Não aplicada: a página nem existe ainda (P02) | proposta |
 | R05 | Armário / cadastro | Cadastro manual de cada peça | Inteligência prática (seção 2 da marca) | Cadastro por foto com revisão antes de salvar. Recurso novo; não aplicado. O "Importar por link" já cobre parte da dor e entrou no carrossel | proposta |
@@ -164,7 +168,7 @@ Textos novos do carrossel seguem o glossário: usam "conquistou", "conquista", "
 
 ## 9. Carrossel de funcionalidades
 
-Componente `src/components/FeatureCarousel.tsx`, usado na home (seção `#por-dentro`, depois de "Como funciona") e na coluna da foto de login e cadastro. Avança sozinho a cada 6,5 s, um slide por vez; pausa com o mouse ou o foco; tem setas, pontos com barrinha de tempo e botão de pausa; não avança sozinho com `prefers-reduced-motion`.
+Componente `src/components/FeatureCarousel.tsx`. Hoje nenhuma tela o importa (órfão); antes era usado na home e na coluna da foto de login e cadastro. Avança sozinho a cada 6,5 s, um slide por vez; pausa com o mouse ou o foco; tem setas, pontos com barrinha de tempo e botão de pausa; não avança sozinho com `prefers-reduced-motion`.
 
 | Ordem | Funcionalidade | Captura | Por que entrou |
 |---|---|---|---|

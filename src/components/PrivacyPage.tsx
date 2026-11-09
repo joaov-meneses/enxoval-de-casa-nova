@@ -3,14 +3,14 @@ import { useEffect, useState, type ReactNode } from "react";
 import { consentRequired, onConsentChange, openConsentPreferences, readConsent } from '../analytics/consent';
 import { ArrowLeft } from "@/src/components/icons";
 import { Brand } from "./Brand";
+import { SUPPORT_EMAIL, PRIVACY_UPDATED, MERCHANT } from '../../shared/legal';
 
-const UPDATED = "22 de outubro de 2026";
+const UPDATED = PRIVACY_UPDATED;
 
 /**
- * Contato do responsável pelo tratamento dos dados. Preencher antes do lançamento
- * (e-mail ou formulário); enquanto estiver vazio, a página avisa que ele será informado.
+ * Canal oficial informado pelo responsável pelo serviço.
  */
-const PRIVACY_CONTACT: string | null = null;
+const PRIVACY_CONTACT = SUPPORT_EMAIL;
 
 const SECTIONS: { title: string; body: ReactNode }[] = [
   {
@@ -31,6 +31,12 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         <li>
           <strong>Conta:</strong> nome, e-mail e senha. A senha não é guardada em
           texto: só uma versão protegida (hash).
+        </li>
+        <li>
+          <strong>Atendimento:</strong> nome e e-mail da conta, texto e protocolo
+          das solicitações enviadas pelo app, incluindo pedidos de cancelamento
+          e reembolso. Usamos esses registros para responder, acompanhar a demanda
+          e comprovar seu recebimento, sem vinculá-los a consentimento de marketing.
         </li>
         <li>
           <strong>Segurança:</strong> o endereço IP e a identificação do
@@ -142,8 +148,8 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         <li>
           Entender o uso do Casa Mia e melhorar o produto. Quando a análise está
           ativa, usamos um identificador interno da conta para medir ações e
-          retornos ao longo do tempo. Os registros operacionais podem incluir
-          nome, e-mail e os dados usados nas ações.
+          retornos ao longo do tempo. Os registros operacionais guardam só
+          metadados das ações, sem nome, e-mail nem o que você digita.
         </li>
         <li>Proteger as contas e prevenir abusos.</li>
       </ul>
@@ -178,8 +184,12 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           PostHog recebe eventos de uso, como etapas do onboarding, criação de
           itens e ativação de planos, associados a um identificador interno, e o
           navegador guarda identificadores de análise para relacionar visitas.
-          Também registramos navegação, cliques, alterações de campos,
-          formulários e chamadas da API com os dados reais usados nessas ações.
+          Também registramos metadados da interação: rota visitada, cliques,
+          formulários enviados e chamadas da API (caminho, status e duração).
+          Não enviamos o que você digita, o conteúdo das telas, mensagens do
+          servidor nem endereços com parâmetros. Erros técnicos do navegador,
+          que não vêm da API, ainda podem levar a mensagem e a pilha de erro do
+          código, sem dados digitados.
           Não gravamos sessões. Respeitamos o sinal Do Not Track do navegador.
         </p>
         <p>
@@ -197,15 +207,17 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
           a origem das visitas e o desempenho de carregamento e interação.
           Os eventos de aquisição e desempenho usam rotas conhecidas, fontes e
           códigos de campanha permitidos e medidas numéricas. Os registros
-          operacionais preservam a URL e os dados reais das ações.
+          operacionais guardam só metadados da interação, sem valores digitados,
+          conteúdo, mensagens nem URL com parâmetros.
         </p>
         <p>
           Para operar o aplicativo e investigar falhas, os registros técnicos
-          preservam mensagens de erro, stack traces, dados de requisições e
-          respostas e informações da conta. Esses registros podem conter dados
-          pessoais, conteúdo das listas, respostas do onboarding, URLs, senhas e
-          tokens presentes na operação. Os registros do servidor são independentes
-          da preferência de análise do navegador e podem ser enviados ao PostHog.
+          guardam mensagens de erro, stack traces e metadados das requisições,
+          como método, rota, status, duração, tamanho e nomes de campos. Eles não
+          guardam corpos de requisições e respostas, senhas, tokens, cookies,
+          valores de parâmetros de URL, endereços IP nem o conteúdo dos e-mails
+          enviados. Os registros do servidor são independentes da preferência de
+          análise do navegador e podem ser enviados ao PostHog.
         </p>
         <p>
           Os serviços que sustentam o aplicativo (hospedagem e banco de dados)
@@ -238,8 +250,8 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
         encerrados, seis meses depois do fim. Os aparelhos ligados à conta são
         mantidos enquanto ela existir. Os dados da conta e as listas são mantidos
         enquanto a conta existir. Se ela for desativada, as listas são preservadas
-        até que você peça a exclusão dos dados.
-
+        até que você peça a exclusão dos dados. Os registros técnicos do
+        servidor enviados ao PostHog são apagados automaticamente após 14 dias.
       </p>
     ),
   },
@@ -273,15 +285,12 @@ const SECTIONS: { title: string; body: ReactNode }[] = [
   },
   {
     title: "Contato",
-    body: PRIVACY_CONTACT ? (
+    body: (
       <p>
-        Para exercer os seus direitos ou tirar dúvidas, escreva para{" "}
+        O controlador dos dados é a {MERCHANT.name}, CNPJ {MERCHANT.cnpj},{" "}
+        {MERCHANT.address}. Para exercer os seus direitos ou tirar dúvidas,
+        escreva para{" "}
         <a href={`mailto:${PRIVACY_CONTACT}`}>{PRIVACY_CONTACT}</a>.
-      </p>
-    ) : (
-      <p>
-        O Casa Mia ainda não foi lançado. O canal de contato do responsável pelo
-        tratamento dos dados será informado aqui antes do lançamento.
       </p>
     ),
   },
@@ -337,6 +346,9 @@ export function PrivacyPage() {
             {section.body}
           </section>
         ))}
+        <nav className="legal-links" aria-label="Políticas do Casa Mia">
+          <a href="/termos">Termos de Uso</a><a href="/reembolso">Cancelamento e reembolso</a>
+        </nav>
       </article>
     </main>
   );

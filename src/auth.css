@@ -1,19 +1,25 @@
 /*
  * Entrar e criar conta (/login e /cadastro).
  *
- * Desktop: a tela é uma porta em arco, em azul Azulejo Noturno, com o Nino espiando por cima do cartão do
- * formulário. Os arcos pequenos no fundo repetem o azulejo e somem para as bordas.
- * Celular e tablet (até 959px): a mesma porta; no lugar do Nino, as telas do app (AuthShowcase) sobem por
- * trás do cartão, dentro da cúpula.
- * Só tokens oficiais (--cm-*). Os estilos de .auth-form, .password-field e .form-error são compartilhados
- * com as outras telas de conta (esqueci a senha, convite, troca de senha) e ficam no product.css.
+ * Desktop (acima de 1023px): a tela é uma porta em arco, em linho tingido com borda de areia, com o Nino
+ * acenando por cima do cartão do formulário. Os arcos do fundo (body::before, em index.css) aparecem ao redor.
+ * Celular e tablet (até 1023px): sem porta e sem cartão. O formulário fica direto no linho, com o Nino num
+ * pequeno arco no topo; o fundo opaco do .auth-shell esconde os arcos do fundo só nesta tela.
+ * Só tokens oficiais (--cm-*) e color-mix. Os estilos de .auth-form, .password-field e .form-error são
+ * compartilhados com as outras telas de conta (esqueci a senha, convite, troca de senha) e ficam no
+ * product.css; tudo daqui começa em .auth-shell para não vazar para elas.
  */
 .auth-shell {
-  --auth-door: var(--cm-accent);
-  --auth-card: color-mix(in oklab, var(--cm-bg) 48%, #fff);
+  --auth-door: color-mix(in oklab, var(--cm-sand) 25%, var(--cm-bg));
+  --auth-card: color-mix(in oklab, var(--cm-bg) 48%, white);
   --auth-muted: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text));
-  --auth-field-line: color-mix(in oklab, var(--cm-sand) 66%, var(--cm-text));
+  --auth-field-line: color-mix(in oklab, var(--cm-sand) 60%, var(--cm-text));
   --auth-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Respiro de cartão (DESIGN.md) e sombra do botão principal */
+  --auth-shadow-card:
+    0 1px 2px color-mix(in oklab, var(--cm-text) 5%, transparent),
+    0 10px 24px -18px color-mix(in oklab, var(--cm-text) 25%, transparent);
+  --auth-shadow-button: 0 2px 6px color-mix(in oklab, var(--cm-action-hover) 15%, transparent);
   position: relative;
   isolation: isolate;
   display: flex;
@@ -33,9 +39,6 @@
 }
 
 /* Topo: marca e volta */
-.auth-hero {
-  width: 100%;
-}
 .auth-topbar {
   position: absolute;
   inset: 0 0 auto;
@@ -51,6 +54,7 @@
   align-items: center;
   gap: 8px;
   min-height: 44px;
+  min-width: 44px;
   padding-inline: 4px;
   font-size: 14px;
   font-weight: 700;
@@ -68,14 +72,17 @@
   transform: translateX(-3px);
 }
 
-/* A porta */
+/* A porta (desktop) */
 .auth-door {
   position: relative;
   z-index: 1;
+  flex: 1 0 auto;
   width: min(584px, calc(100% - 32px));
-  margin-top: auto;
+  margin-top: clamp(16px, 4dvh, 40px);
   padding: 156px 56px 22px;
   background: var(--auth-door);
+  border: 1.5px solid var(--cm-sand);
+  border-bottom: 0;
   border-radius: 999px 999px 0 0;
   text-align: center;
 }
@@ -84,10 +91,13 @@
   content: "";
   position: absolute;
   inset: 14px 14px 0;
-  border: 1.5px solid rgba(251, 243, 230, 0.24);
+  border: 1.5px solid color-mix(in oklab, var(--cm-sand) 55%, var(--auth-door));
   border-bottom: 0;
   border-radius: 999px 999px 0 0;
   pointer-events: none;
+}
+.auth-nino-arch {
+  display: contents;
 }
 .auth-nino {
   position: absolute;
@@ -104,8 +114,9 @@
   z-index: 1;
   padding: 28px 32px 26px;
   background: var(--auth-card);
+  border: 1px solid color-mix(in oklab, var(--cm-sand) 45%, var(--cm-bg));
   border-radius: 24px;
-  box-shadow: 0 30px 40px -26px rgba(8, 20, 30, 0.75);
+  box-shadow: var(--auth-shadow-card);
   text-align: left;
 }
 .auth-footnote {
@@ -116,77 +127,54 @@
   margin: 0;
   padding-top: 18px;
   font-size: 13px;
-  color: color-mix(in oklab, var(--cm-sand) 50%, #fff);
-}
-
-/* Entrar | Criar conta */
-.auth-tabs {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 4px;
-  background: color-mix(in oklab, var(--cm-sand) 22%, var(--cm-bg));
-  border-radius: 14px;
-}
-.auth-tabs::before {
-  content: "";
-  position: absolute;
-  inset: 4px auto 4px 4px;
-  width: calc(50% - 4px);
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(59, 42, 32, 0.16);
-  transition: transform 0.3s var(--auth-ease);
-}
-.auth-tabs[data-mode="register"]::before {
-  transform: translateX(100%);
-}
-.auth-tab {
-  position: relative;
-  z-index: 1;
-  min-height: 44px;
-  padding: 10px 12px;
-  font-size: 15px;
-  font-weight: 700;
   color: var(--auth-muted);
-  text-align: center;
-  background: none;
-  border: 0;
-  border-radius: 10px;
-  transition: color 0.2s;
-}
-.auth-tab[aria-selected="true"] {
-  background: none;
-  box-shadow: none;
-  color: var(--cm-text);
 }
 
 /* Título */
 .auth-heading {
-  margin: 26px 0 22px;
+  margin: 0 0 20px;
   text-align: center;
 }
 .auth-shell .auth-heading h1 {
   margin: 0 0 8px;
   font-family: var(--serif);
-  font-size: clamp(28px, 3vw, 34px);
-  font-weight: 500;
+  font-size: clamp(26px, 3vw, 32px);
+  font-weight: 600;
   line-height: 1.15;
   letter-spacing: -0.02em;
   text-wrap: balance;
+}
+/* O título recebe foco ao trocar de modo; não é interativo, então sem a linha de foco dos controles. */
+.auth-shell .auth-heading h1[tabindex="-1"]:focus-visible {
+  box-shadow: none;
+  outline: none;
 }
 .auth-shell .auth-heading p {
   max-width: 40ch;
   margin: 0 auto;
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--auth-muted);
   text-wrap: balance;
+}
+/* Aviso de cobrança no lugar do subtítulo do cadastro */
+.auth-shell .auth-heading .auth-billing {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  text-align: left;
+}
+.auth-shell .auth-billing svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--cm-primary-dark);
 }
 
 /* Campos */
 .auth-shell .auth-fields {
-  gap: 18px;
+  gap: 16px;
   margin: 0;
 }
 .auth-field label {
@@ -196,63 +184,45 @@
   font-weight: 700;
   color: var(--cm-text);
 }
-.auth-field-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-.auth-shell .auth-field-head .auth-forgot {
-  align-self: auto;
-  margin: 0;
-  padding: 4px 0;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--cm-accent);
-  text-decoration: underline;
-  text-decoration-color: rgba(36, 75, 102, 0.4);
-  text-underline-offset: 3px;
-}
-.auth-shell .auth-field-head .auth-forgot:hover {
-  text-decoration-color: currentColor;
-}
-.auth-shell .auth-form input {
-  min-height: 52px;
-  padding: 13px 16px;
+/* Campo de conta: 48px de altura e raio 10 (o Input padrão tem 36px; ver DESIGN.md). */
+.auth-shell .auth-field input {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
   font-size: 16px;
   color: var(--cm-text);
-  background: #fff;
+  background: var(--auth-card);
   border: 1px solid var(--auth-field-line);
-  border-radius: 12px;
-  outline: 2px solid transparent;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+  border-radius: 10px;
+  box-shadow: none;
+  outline: none;
+  transition: border-color 0.2s;
 }
-.auth-shell .auth-form input::placeholder {
+.auth-shell .auth-field input::placeholder {
   font-size: 15px;
   color: color-mix(in oklab, var(--cm-bg) 36%, var(--cm-text));
 }
-.auth-shell .auth-form input:hover {
+.auth-shell .auth-field input:hover {
   border-color: var(--cm-text);
 }
-.auth-shell .auth-form input:focus-visible {
-  border-color: var(--cm-accent);
-  box-shadow: 0 0 0 4px rgba(36, 75, 102, 0.18);
-}
-.auth-shell .auth-form input[aria-invalid="true"] {
+.auth-shell .auth-field input:focus-visible {
   border-color: var(--cm-primary-dark);
+  box-shadow: none;
+}
+.auth-shell .auth-field input[aria-invalid="true"],
+.auth-shell .auth-field input[aria-invalid="true"]:focus-visible {
+  border-color: var(--destructive);
 }
 .auth-shell .password-field input {
   padding-right: 52px;
 }
 .auth-shell .password-field button {
   top: 50%;
-  right: 4px;
+  right: 2px;
   width: 44px;
   height: 44px;
   color: var(--auth-muted);
-  border-radius: 9px;
+  border-radius: 8px;
   transform: translateY(-50%);
   transition:
     background 0.2s,
@@ -269,108 +239,108 @@
   color: var(--auth-muted);
 }
 .auth-hint.is-error {
-  color: color-mix(in oklab, var(--cm-primary-dark) 84%, var(--cm-text));
+  color: var(--destructive);
   font-weight: 600;
+}
+/* A região viva da mensagem fica montada; vazia, não ocupa espaço. */
+.auth-hint.is-error:empty {
+  display: none;
+}
+.auth-shell .password-rules {
+  color: var(--auth-muted);
+}
+.auth-shell .auth-forgot,
+.auth-shell .auth-switch-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cm-primary-dark);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--cm-primary-dark) 40%, transparent);
+  text-underline-offset: 3px;
+  border-radius: 6px;
+}
+.auth-shell .auth-forgot {
+  margin-top: 2px;
+}
+.auth-shell .auth-forgot:hover,
+.auth-shell .auth-switch-link:hover {
+  text-decoration-color: currentColor;
 }
 .auth-shell .form-error {
   padding: 12px 14px;
   font-size: 14px;
-  color: color-mix(in oklab, var(--cm-primary-dark) 64%, var(--cm-text));
+  color: var(--destructive);
+  border-color: color-mix(in oklab, var(--destructive) 40%, var(--cm-bg));
+  background: color-mix(in oklab, var(--destructive) 6%, var(--cm-bg));
   border-radius: 12px;
 }
 .auth-shell .auth-form > .button {
   width: 100%;
-  min-height: 54px;
-  margin-top: 4px;
+  min-height: 50px;
+  margin-top: 0;
   font-size: 16px;
   font-weight: 700;
   border-radius: 14px;
+}
+.auth-shell .auth-form > .button {
+  box-shadow: var(--auth-shadow-button);
+}
+.auth-shell .auth-form > .button[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.85;
 }
 .auth-shell .auth-form > .button > svg {
   flex-shrink: 0;
 }
 
+/* Texto legal, colado ao botão de criar conta */
+.auth-shell .auth-legal {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--auth-muted);
+}
+.auth-shell .auth-legal a {
+  font-weight: 700;
+  color: var(--cm-primary-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Depois do botão */
 .auth-shell .auth-switch {
-  margin: 14px 0 0;
+  margin: 8px 0 0;
   font-size: 14.5px;
   line-height: 1.5;
   text-align: center;
   color: var(--auth-muted);
 }
 .auth-shell .auth-switch-link {
-  padding: 10px 2px;
-  font-weight: 700;
-  color: var(--cm-accent);
-  text-decoration: underline;
-  text-decoration-color: rgba(36, 75, 102, 0.4);
-  text-underline-offset: 3px;
-}
-.auth-shell .auth-switch-link:hover {
-  text-decoration-color: currentColor;
-}
-.auth-shell .auth-privacy {
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  text-align: center;
-  color: var(--auth-muted);
-}
-.auth-shell .auth-privacy a {
-  font-weight: 700;
-  color: var(--cm-accent);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.auth-shell .auth-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin: 12px 0 0;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--auth-muted);
-}
-.auth-shell .auth-note svg {
-  flex: none;
-  color: var(--cm-success);
+  margin-left: 2px;
 }
 
-/* Desktop baixo (ex.: notebook 1366×768, tablet na horizontal): a porta encolhe um pouco para caber */
-@media (min-width: 960px) and (max-height: 820px) {
+@media (prefers-reduced-motion: reduce) {
+  .auth-shell,
+  .auth-shell * {
+    transition: none !important;
+  }
+  .auth-shell .animate-spin {
+    animation: none;
+  }
+}
+
+/* Desktop baixo (ex.: notebook 1366x768): a porta encolhe para o botão caber na dobra */
+@media (min-width: 1024px) and (max-height: 820px) {
   .auth-door {
-    padding-top: 138px;
+    padding-top: 124px;
   }
   .auth-door::before {
     inset-inline: 12px;
-  }
-  .auth-nino {
-    top: 30px;
-    width: 92px;
-    margin-left: -46px;
-  }
-  .auth-card {
-    padding: 22px 28px 20px;
-  }
-  .auth-heading {
-    margin: 20px 0 18px;
-  }
-  .auth-shell .auth-heading h1 {
-    font-size: 29px;
-  }
-  .auth-shell .auth-fields {
-    gap: 14px;
-  }
-  .auth-shell .auth-switch {
-    margin-top: 8px;
-  }
-}
-
-/* Notebook de tela baixa (ex.: 1366×768 com a barra do navegador): mais um aperto */
-@media (min-width: 960px) and (max-height: 780px) {
-  .auth-door {
-    padding-top: 124px;
   }
   .auth-nino {
     top: 24px;
@@ -378,240 +348,101 @@
     margin-left: -42px;
   }
   .auth-card {
-    padding: 18px 26px 16px;
+    padding: 18px 28px 16px;
   }
   .auth-heading {
-    margin: 16px 0 14px;
+    margin-bottom: 14px;
   }
   .auth-shell .auth-heading h1 {
     margin-bottom: 4px;
     font-size: 27px;
   }
   .auth-shell .auth-fields {
-    gap: 12px;
+    gap: 10px;
   }
   .auth-field label {
     margin-bottom: 6px;
   }
-  .auth-shell .auth-form input {
+  .auth-shell .auth-form > .button {
     min-height: 48px;
   }
-  .auth-shell .auth-form > .button {
-    min-height: 50px;
+  .auth-shell .auth-forgot {
+    margin-top: 0;
   }
   .auth-shell .auth-switch {
-    margin-top: 4px;
+    margin-top: 0;
   }
-  .auth-shell .auth-note {
-    margin-top: 6px;
+  .auth-footnote {
+    padding-top: 10px;
+  }
+}
+
+/* Celular e tablet: formulário direto no linho, sem caixa e sem cartão */
+@media (max-width: 1023px) {
+  .auth-shell {
+    padding: 0 20px;
+    /* Fundo opaco: cobre os arcos do fundo (index.css), que aqui apareceriam cortados atrás do cabeçalho. */
+    background: var(--cm-bg);
+  }
+  .auth-topbar {
+    position: static;
+    align-self: stretch;
+    padding: max(12px, env(safe-area-inset-top)) 0 8px;
+  }
+  .auth-door {
+    flex: 0 0 auto;
+    width: min(100%, 520px);
+    margin-top: 0;
+    padding: 0 0 max(16px, env(safe-area-inset-bottom));
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+  .auth-door::before {
+    display: none;
+  }
+  /* Nino num pequeno arco no topo */
+  .auth-nino-arch {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 96px;
+    height: 92px;
+    margin: 0 auto 12px;
+    overflow: hidden;
+    background: var(--auth-door);
+    border: 1.5px solid var(--cm-sand);
+    border-bottom: 0;
+    border-radius: 999px 999px 0 0;
+  }
+  .auth-nino {
+    position: static;
+    width: 72px;
+    margin: 0;
+  }
+  .auth-card {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .auth-field input {
+    background: var(--auth-card);
+  }
+  .auth-heading {
+    margin-bottom: 16px;
   }
   .auth-footnote {
     padding-top: 12px;
   }
 }
 
-/* Celular e tablet: a porta continua, e as telas do app sobem por trás do cartão, dentro da cúpula */
-/* Ocupa a porta inteira só para o recorte em arco coincidir com o dela; só a cúpula tem conteúdo */
-.auth-showcase {
-  --auth-phone: 128px;
-  --auth-dome-h: calc(var(--auth-dome) + 12px);
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  border-radius: 999px 999px 0 0;
-  pointer-events: none;
-}
-/* As telas se dissolvem no azul antes de chegar ao cartão; os pontos ficam sobre essa dissolvência */
-.auth-showcase::after {
-  content: "";
-  position: absolute;
-  inset: calc(var(--auth-dome-h) - 48px) 0 auto;
-  height: 48px;
-  background: linear-gradient(to top, var(--auth-door) 12px, transparent);
-  pointer-events: none;
-}
-.auth-showcase-track {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  height: var(--auth-dome-h);
-  margin: 0;
-  pointer-events: auto;
-  padding: 22px calc((100% - var(--auth-phone)) / 2) 0;
-  list-style: none;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
-}
-.auth-showcase-track::-webkit-scrollbar {
-  display: none;
-}
-.auth-showcase-slide {
-  flex: 0 0 var(--auth-phone);
-  scroll-snap-align: center;
-  opacity: 0.5;
-  transform: scale(0.92);
-  transform-origin: top center;
-  transition:
-    opacity 0.4s var(--auth-ease),
-    transform 0.4s var(--auth-ease);
-}
-.auth-showcase-slide.is-active {
-  opacity: 1;
-  transform: none;
-}
-/* Mesma moldura de celular do "Como funciona" da home */
-.auth-showcase-phone {
-  padding: 5px;
-  background: var(--cm-text);
-  border-radius: 24px;
-  box-shadow:
-    0 18px 28px -14px rgba(6, 18, 28, 0.7),
-    inset 0 0 0 1.5px #5a4638;
-}
-.auth-showcase-phone img {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 390 / 844;
-  background: var(--cm-bg);
-  border-radius: 19px;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-.auth-showcase-dots {
-  position: absolute;
-  inset: calc(var(--auth-dome) - 34px) 0 auto;
-  z-index: 2;
-  pointer-events: auto;
-  display: flex;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.auth-showcase-dot {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 28px;
-  padding: 0;
-  background: none;
-  border: 0;
-  border-radius: 8px;
-}
-.auth-showcase-dot span {
-  display: block;
-  width: 6px;
-  height: 6px;
-  background: rgba(251, 243, 230, 0.5);
-  border-radius: 999px;
-  transition:
-    width 0.3s var(--auth-ease),
-    background 0.3s;
-}
-.auth-showcase-dot.is-active span {
-  width: 20px;
-  background: var(--cm-bg);
-}
-
-@media (max-width: 959px) {
-  .auth-shell {
-    padding-top: 0;
-  }
-  .auth-topbar {
-    position: static;
-    padding: max(12px, env(safe-area-inset-top)) 18px 10px;
-  }
-  .auth-door {
-    --auth-dome: 190px;
-    padding: var(--auth-dome) 56px max(14px, env(safe-area-inset-bottom));
-  }
-  .auth-showcase {
-    --auth-phone: 150px;
-  }
-}
-/* Celular: a porta ocupa quase a largura toda */
-@media (max-width: 599px) {
-  .auth-door {
-    --auth-dome: 184px;
-    width: calc(100% - 24px);
-    padding-inline: 14px;
-  }
-  .auth-door::before {
-    inset: 10px 10px auto;
-    height: var(--auth-dome);
-  }
-  .auth-showcase {
-    --auth-phone: 134px;
-  }
-  .auth-card {
-    padding: 20px 18px 18px;
-  }
-  .auth-heading {
-    margin: 20px 0 18px;
-  }
-}
-/* Celular baixo: cúpula e telas menores para o botão aparecer sem rolar demais */
-@media (max-width: 599px) and (max-height: 740px) {
-  .auth-door {
-    --auth-dome: 146px;
-  }
-  .auth-showcase {
-    --auth-phone: 108px;
-  }
-  .auth-showcase-track {
-    padding-top: 20px;
-  }
-  .auth-heading {
-    margin: 16px 0 14px;
-  }
-}
-/* Celular deitado: não há altura para a vitrine, a porta vira só o cartão com o topo arredondado */
-@media (max-width: 959px) and (max-height: 520px) {
-  .auth-showcase {
+/* Tela muito baixa: sem o arco do Nino, para o botão continuar visível */
+@media (max-width: 1023px) and (max-height: 600px) {
+  .auth-nino-arch {
     display: none;
   }
-  .auth-door {
-    --auth-dome: 24px;
-    border-radius: 32px 32px 0 0;
-  }
-  .auth-door::before {
-    display: none;
-  }
-}
-@media (max-width: 359px) {
-  .auth-door {
-    padding-inline: 10px;
-  }
-  .auth-card {
-    padding-inline: 14px;
-  }
-  .auth-shell .auth-heading h1 {
-    font-size: 26px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .auth-tabs::before,
-  .auth-showcase-slide,
-  .auth-showcase-dot span {
-    transition: none;
-  }
-}
-
-/* Mobile e tablet: o formul?rio ocupa o espa?o da antiga vitrine. */
-@media (max-width: 1023px) {
-  .auth-door {
-    --auth-dome: 24px;
-    padding-top: 24px;
-    border-radius: 32px 32px 0 0;
-  }
-  .auth-door::before { display: none; }
 }
 
 /* Consentimento de e-mails de lembretes e dicas: opcional, desmarcado por padrão. */
@@ -622,7 +453,7 @@
   align-items: start;
   font-size: 0.875rem;
   line-height: 1.45;
-  color: var(--cm-text, #2f2a26);
+  color: var(--cm-text);
   cursor: pointer;
 }
 
@@ -630,7 +461,7 @@
   width: 18px;
   height: 18px;
   margin: 1px 0 0;
-  accent-color: var(--cm-action, #a34c30);
+  accent-color: var(--cm-action);
   cursor: pointer;
 }
 
@@ -651,6 +482,7 @@
 
 /* Dentro do formulário, vence as regras genéricas de label e input do cadastro. */
 .auth-form .auth-optin {
+  border-radius: 10px;
   display: grid;
   grid-template-columns: 20px 1fr;
   gap: 10px;
@@ -666,4 +498,15 @@
   min-height: 0;
   padding: 0;
   border-radius: 4px;
+}
+
+/* Foco da caixa de consentimento: o input de 18px não mostra a linha de foco (focus.css zera o contorno),
+   então o rótulo ganha a linha interna de 2px em terracota profundo, sem anel afastado. O respiro interno
+   é compensado pela margem negativa para não mexer na dobra. */
+.auth-shell .auth-form .auth-optin {
+  margin: -6px -8px;
+  padding: 6px 8px;
+}
+.auth-shell .auth-form .auth-optin:has(input:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--cm-primary-dark);
 }

@@ -1,6 +1,8 @@
+import { describeControl } from './operationalPrivacy';
+
 type Sink = (event: `application.${string}`, properties: Record<string, unknown>) => void;
 
-/** Log delegated UI actions, including controls added later by dialogs and routes. */
+/** Log delegated UI actions, including controls added later by dialogs and routes. Never captures typed values. */
 export function startActionLogging(capture: Sink) {
   const action = (event: Event) => {
     try {
@@ -8,19 +10,8 @@ export function startActionLogging(capture: Sink) {
       if (!(target instanceof Element)) return;
       const element = target.closest('button,a,input,select,textarea,form,[role="button"],[role="checkbox"],[role="switch"],[role="tab"],[role="menuitem"],[role="option"]');
       if (!element) return;
-      const control = element as HTMLInputElement;
-      const form = element.closest('form');
-      const fields = form ? Array.from(form.querySelectorAll('input,select,textarea')).map(field => {
-        const input = field as HTMLInputElement;
-        return { name: input.name, id: input.id, type: input.type, value: input.value, checked: input.checked };
-      }) : undefined;
       capture('application.ui.action', {
-        action: event.type, tag: element.tagName.toLowerCase(), id: element.id,
-        name: control.name, type: control.type, value: control.value, checked: control.checked,
-        label: element.getAttribute('aria-label'), text: element.textContent?.trim(),
-        href: element.getAttribute('href'), role: element.getAttribute('role'),
-        expanded: element.getAttribute('aria-expanded'), selected: element.getAttribute('aria-selected'),
-        fields, trusted: event.isTrusted,
+        action: event.type, ...describeControl(element as HTMLInputElement, element.closest('form')), trusted: event.isTrusted,
       });
     } catch { /* Diagnostics never interrupt an interaction. */ }
   };

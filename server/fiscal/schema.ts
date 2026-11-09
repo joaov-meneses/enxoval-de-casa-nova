@@ -91,5 +91,28 @@ export async function migrateFiscal(pool: Pool) {
       note text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    ALTER TABLE billing_operation_audit DROP CONSTRAINT IF EXISTS billing_operation_audit_action_check;
+    ALTER TABLE billing_operation_audit ADD CONSTRAINT billing_operation_audit_action_check
+      CHECK (action IN ('enqueue_fiscal', 'review_refund', 'review_billing_case'));
+    CREATE TABLE IF NOT EXISTS billing_risk_cases (
+      environment text NOT NULL CHECK (environment IN ('homologacao', 'producao')),
+      kind text NOT NULL CHECK (kind IN ('invoice.payment_failed', 'charge.dispute.created',
+        'radar.early_fraud_warning.created', 'checkout.session.async_payment_failed')),
+      source_id text NOT NULL,
+      last_event_id text NOT NULL,
+      last_event_created bigint NOT NULL,
+      customer_id text,
+      subscription_id text,
+      payment_intent_id text,
+      charge_id text,
+      review_status text NOT NULL DEFAULT 'pending' CHECK (review_status IN ('pending', 'reviewed')),
+      review_note text,
+      reviewed_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (environment, kind, source_id)
+    );
+    CREATE INDEX IF NOT EXISTS billing_risk_cases_pending_idx
+      ON billing_risk_cases (environment, updated_at) WHERE review_status='pending';
   `);
 }

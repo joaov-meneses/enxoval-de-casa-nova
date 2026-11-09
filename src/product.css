@@ -705,7 +705,7 @@ input[type="search"]:focus-visible {
 .item-row {
   border: 1px solid color-mix(in oklab, var(--cm-sand) 41%, #fff);
   border-radius: 8px;
-  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
+  background: color-mix(in oklab, var(--cm-bg) 55%, #fff);
   margin-bottom: 9px;
   box-shadow: none;
   transition:
@@ -938,7 +938,24 @@ input[type="search"]:focus-visible {
   background: color-mix(in oklab, var(--cm-olive-soft) 55%, var(--cm-success));
 }
 .overview-room.is-done .progress-track > [data-slot="progress-indicator"] {
-  background: var(--cm-primary);
+  background: var(--cm-success);
+}
+.overview-room.is-done small {
+  color: var(--cm-success);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+.overview-room.is-done > .feature-icon {
+  color: var(--cm-success);
+  background: color-mix(in oklab, var(--cm-olive-soft) 22%, #fff);
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-track > [data-slot="progress-indicator"] {
+    transition: none;
+  }
 }
 .overview-room-meta {
   display: block;
@@ -2492,67 +2509,6 @@ button.reorder-handle:disabled {
   min-width: 32px;
   min-height: 40px;
 }
-.item-inline-panel {
-  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 41%, #fff);
-  padding: 20px;
-  background: color-mix(in oklab, var(--cm-bg) 48%, #fff);
-  border-radius: 0 0 8px 8px;
-}
-.item-inline-panel[hidden] {
-  display: none;
-}
-.item-inline-form {
-  display: grid;
-  gap: 16px;
-}
-.item-inline-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: 16px;
-}
-.item-inline-grid > label {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--cm-success) 94%, #000);
-}
-.item-inline-grid input,
-.item-inline-grid textarea {
-  min-width: 0;
-  width: 100%;
-  background: color-mix(in oklab, var(--cm-bg) 28%, #fff);
-  border: 1px solid color-mix(in oklab, var(--cm-sand) 38%, var(--cm-bg));
-  border-radius: 12px;
-  padding: 12px 14px;
-  min-height: 46px;
-  font-size: 14px;
-  line-height: 1.5;
-  font-weight: 400;
-  color: color-mix(in oklab, var(--cm-primary-dark) 9%, var(--cm-text));
-}
-.item-inline-grid textarea {
-  resize: vertical;
-}
-.item-inline-grid .item-inline-wide {
-  grid-column: 1 / -1;
-}
-.item-inline-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-.item-inline-actions .button {
-  min-height: 44px;
-  font-size: 14px;
-}
-.item-inline-note {
-  font-size: 13px;
-  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
-}
 @media (min-width: 1024px) {
   .workspace-menu-switcher,
   .workspace-menu-environments {
@@ -2560,9 +2516,7 @@ button.reorder-handle:disabled {
   }
 }
 @media (max-width: 767px) {
-  button.casamia-select-trigger,
-  .item-inline-grid input,
-  .item-inline-grid textarea {
+  button.casamia-select-trigger {
     font-size: 16px;
   }
   .item-row-inner {
@@ -2608,17 +2562,6 @@ button.reorder-handle:disabled {
     width: 28px;
     min-width: 28px;
     min-height: 44px;
-  }
-  .item-inline-panel {
-    padding: 16px 14px;
-  }
-  .item-inline-grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-  .item-inline-actions .button {
-    flex: 1;
-    padding: 12px 10px;
   }
   .list-section-heading > div:first-child {
     flex-wrap: wrap;
@@ -3054,14 +2997,6 @@ button.reorder-handle:disabled {
 .item-row.inactive .item-price {
   opacity: 0.6;
 }
-.item-inline-hint {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  font-weight: 400;
-  color: color-mix(in oklab, var(--cm-bg) 24%, var(--cm-text));
-  line-height: 1.4;
-}
 @media (max-width: 767px) {
   .item-status-tag {
     display: inline-block;
@@ -3133,43 +3068,6 @@ button.reorder-handle:disabled {
   .quantity-stepper button:active:not(:disabled) {
     transform: none;
   }
-}
-
-.item-inline-section {
-  margin: 6px 0 -4px;
-  padding-top: 14px;
-  border-top: 1px solid color-mix(in oklab, var(--cm-sand) 37%, #fff);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
-}
-.item-inline-grid > .item-inline-section:first-child {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
-.item-inline-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px dashed color-mix(in oklab, var(--cm-sand) 71%, #fff);
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--cm-accent) 1%, var(--cm-bg));
-}
-.item-inline-summary-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: color-mix(in oklab, var(--cm-success) 94%, #000);
-}
-.item-inline-summary strong {
-  font-size: 20px;
-  font-weight: 500;
-  letter-spacing: -0.5px;
-  color: color-mix(in oklab, var(--cm-success) 99%, var(--cm-text));
 }
 
 /* Resumo do enxoval: progresso lidera, dinheiro vira uma conta legível e a economia mostra de onde vem */
@@ -3854,7 +3752,11 @@ button.reorder-handle:disabled {
 }
 @media (max-width: 1023px) {
   .workspace-app {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    /* Fonte única da folga inferior: barra inferior + botão flutuante + respiros. */
+    --mobile-nav-h: 65px;
+    --fab-size: 48px;
+    --fab-gap: 12px;
+    padding-bottom: calc(var(--mobile-nav-h) + var(--fab-size) + 2 * var(--fab-gap) + env(safe-area-inset-bottom));
   }
   .workspace-app .mobile-app-brand {
     padding: 8px 14px;
@@ -4257,19 +4159,19 @@ button.reorder-handle:disabled {
   .mobile-fab-add {
     position: fixed;
     right: 16px;
-    bottom: calc(68px + env(safe-area-inset-bottom));
+    bottom: calc(var(--mobile-nav-h, 65px) + 4px + env(safe-area-inset-bottom));
     z-index: 31;
     display: grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
+    width: var(--fab-size, 48px);
+    height: var(--fab-size, 48px);
     padding: 0;
     color: #fff;
     /* Terracota Certo: ícone branco só sobre o terracota profundo. */
     background: var(--cm-action);
     border-radius: 50%;
     box-shadow: 0 8px 20px #422d2447;
-    transition: transform 0.15s;
+    transition: transform 0.15s, opacity 0.18s, visibility 0.18s, translate 0.18s;
     /* Quica de leve, como uma bola, e descansa; usa `translate` para não brigar com o scale do toque. */
     animation: fab-add-bounce 3.6s ease-in-out 1.2s infinite;
   }
@@ -4287,6 +4189,15 @@ button.reorder-handle:disabled {
   /* Estado no próprio botão: não invalida os estilos de todos os itens ao abrir a edição. */
   .mobile-fab-add[data-item-expanded] {
     display: none;
+  }
+  /* Cede o lugar no topo da página quando cobriria um controle (ver useFabYield). */
+  /* Sem deslocamento (translate): o rect do botão não muda ao ceder, o que mantém a medição estável. Foco visível
+     nunca esconde o botão. */
+  .mobile-fab-add[data-yield]:not(:focus-visible):not(:focus-within) {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    animation: none;
   }
 }
 @keyframes fab-add-bounce {
@@ -4312,6 +4223,7 @@ button.reorder-handle:disabled {
 @media (prefers-reduced-motion: reduce) {
   .mobile-fab-add {
     animation: none;
+    transition: none;
   }
 }
 
@@ -4372,203 +4284,6 @@ button.reorder-handle:disabled {
   background: var(--cm-primary-dark);
 }
 
-/* ───────── Formulário de edição do item, compacto (celular, tablet e desktop estreito) ─────────
-   Duas colunas, sem títulos de seção nem textos de ajuda (a explicação fica no title do campo),
-   campos de 38px e, no celular, a barra "Cancelar / Salvar alterações" sempre à vista acima da navegação.
-   Vale em qualquer largura; a partir de 1360px a grade larga (bloco logo abaixo) reorganiza as colunas. */
-@media screen {
-  .workspace-app .item-inline-panel {
-    padding: 10px 10px 0;
-  }
-  .workspace-app .item-inline-form {
-    gap: 8px;
-  }
-  .workspace-app .item-inline-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .workspace-app .item-inline-section,
-  .workspace-app .item-inline-hint {
-    display: none;
-  }
-  .workspace-app .item-inline-grid > label {
-    gap: 3px;
-    font-size: 12px;
-    line-height: 1.2;
-  }
-  .workspace-app .item-inline-grid input,
-  .workspace-app .item-inline-grid textarea {
-    min-height: 38px;
-    padding: 6px 10px;
-    border-radius: 10px;
-    font-size: 16px;
-    line-height: 1.3;
-  }
-  .workspace-app .item-inline-grid textarea {
-    min-height: 52px;
-  }
-  .workspace-app .item-inline-grid button.casamia-select-trigger {
-    min-height: 38px;
-    padding: 6px 8px 6px 10px;
-    border-radius: 10px;
-    font-size: 13px;
-  }
-  .workspace-app .item-inline-summary {
-    min-height: 38px;
-    justify-content: center;
-    gap: 0;
-    padding: 4px 10px;
-    border-radius: 10px;
-  }
-  .workspace-app .item-inline-summary-label {
-    font-size: 12px;
-    line-height: 1.2;
-  }
-  .workspace-app .item-inline-summary strong {
-    font-size: 16px;
-    line-height: 1.2;
-  }
-  /* Quantidade: [−] [número] [+] na largura de uma coluna */
-  .workspace-app .item-inline-grid .quantity-stepper {
-    gap: 4px;
-  }
-  .workspace-app .item-inline-grid .quantity-stepper-buttons {
-    display: contents;
-  }
-  .workspace-app .item-inline-grid .quantity-stepper-buttons button:first-child {
-    order: 0;
-  }
-  .workspace-app .item-inline-grid .quantity-stepper input {
-    order: 1;
-    padding-inline: 4px;
-  }
-  .workspace-app .item-inline-grid .quantity-stepper-buttons button:last-child {
-    order: 2;
-  }
-  .workspace-app .item-inline-grid .quantity-stepper button {
-    width: 38px;
-    min-height: 38px;
-    border-radius: 10px;
-  }
-  .workspace-app .item-inline-grid .quantity-stepper button svg {
-    width: 16px;
-    height: 16px;
-  }
-  .workspace-app .item-inline-note {
-    font-size: 12px;
-  }
-  .workspace-app .item-inline-actions {
-    position: sticky;
-    bottom: calc(64px + env(safe-area-inset-bottom));
-    z-index: 5;
-    gap: 8px;
-    margin: 0 -10px;
-    padding: 8px 10px;
-    background: #fcf9f4f5;
-    border-top: 1px solid color-mix(in oklab, var(--cm-sand) 41%, #fff);
-    backdrop-filter: blur(6px);
-  }
-  .workspace-app .item-inline-actions .button {
-    flex: 1;
-    min-height: 40px;
-    padding: 8px 10px;
-    font-size: 14px;
-  }
-}
-
-/* ───────── Formulário de edição do item no desktop ─────────
-   Sem navegação inferior: a barra de ações volta ao fluxo normal, alinhada à direita. */
-@media (min-width: 1024px) {
-  .workspace-app .item-inline-panel {
-    padding: 12px 14px;
-  }
-  .workspace-app .item-inline-actions {
-    position: static;
-    margin: 0;
-    padding: 0;
-    background: none;
-    border-top: 0;
-    backdrop-filter: none;
-  }
-  .workspace-app .item-inline-actions .button {
-    flex: 0 0 auto;
-    min-width: 128px;
-    min-height: 38px;
-  }
-}
-
-/* Grade de 12 colunas: tudo cabe em 3 a 4 linhas, sem rolar.
-     linha 1  Nome · Ambiente · Situação (· Quando comprar, se houver plano)
-     linha 2  Preço · Desconto · Quantidade · Valor final
-     linha 3  Link · Observações   (com preço acompanhado: Avise abaixo de · E-mail · Link, e Observações na linha 4) */
-@media (min-width: 1360px) {
-  .workspace-app .item-inline-form {
-    gap: 10px;
-  }
-  .workspace-app .item-inline-grid {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    gap: 10px 12px;
-    align-items: end;
-  }
-  .workspace-app .item-inline-grid > label {
-    gap: 4px;
-    font-size: 12px;
-  }
-  .workspace-app .item-inline-grid input,
-  .workspace-app .item-inline-grid textarea {
-    font-size: 14px;
-    padding: 7px 11px;
-  }
-  .workspace-app .item-inline-grid button.casamia-select-trigger {
-    font-size: 14px;
-  }
-
-  .workspace-app .item-inline-grid > .item-field-name { grid-column: span 6; }
-  .workspace-app .item-inline-grid > .item-field-env,
-  .workspace-app .item-inline-grid > .item-field-status { grid-column: span 3; }
-  .workspace-app .item-inline-grid:has(> .item-field-week) > .item-field-name { grid-column: span 4; }
-  .workspace-app .item-inline-grid:has(> .item-field-week) > .item-field-env { grid-column: span 2; }
-  .workspace-app .item-inline-grid > .item-field-week { grid-column: span 3; }
-
-  .workspace-app .item-inline-grid > .item-field-price,
-  .workspace-app .item-inline-grid > .item-field-discount,
-  .workspace-app .item-inline-grid > .item-field-qty,
-  .workspace-app .item-inline-grid > .item-field-total { grid-column: span 3; }
-
-  .workspace-app .item-inline-grid > .item-field-target,
-  .workspace-app .item-inline-grid > .item-field-alert { grid-column: span 3; }
-  .workspace-app .item-inline-grid > .item-field-link { grid-column: span 6; }
-  .workspace-app .item-inline-grid > .item-field-notes { grid-column: span 6; }
-  .workspace-app .item-inline-grid:has(> .item-field-target) > .item-field-notes { grid-column: 1 / -1; }
-
-  /* O valor final fica na altura dos campos, em uma linha só. */
-  .workspace-app .item-inline-grid > .item-field-total {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 4px 12px;
-  }
-  .workspace-app .item-inline-grid > label.item-inline-check {
-    min-height: 38px;
-    line-height: 1.25;
-  }
-
-  /* Observações: uma linha que cresce conforme o texto (e o usuário ainda pode puxar a borda). */
-  .workspace-app .item-inline-grid .item-field-notes textarea {
-    height: 38px;
-    min-height: 38px;
-    max-height: 120px;
-    resize: vertical;
-  }
-  @supports (field-sizing: content) {
-    .workspace-app .item-inline-grid .item-field-notes textarea {
-      height: auto;
-      field-sizing: content;
-    }
-  }
-}
-
 /* Lixeiras em vermelho suave (ícone legível, sem gritar); mais forte só ao passar o mouse/tocar */
 .item-actions button.item-delete,
 .environment-row button.environment-delete,
@@ -4599,12 +4314,6 @@ button.reorder-handle:disabled {
 .name-counter.is-full {
   color: #a8463c;
 }
-.item-inline-label-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
 
 /* Barra de progresso de rolagem dos ambientes (só no mobile) */
 .scroll-indicator {
@@ -4619,7 +4328,7 @@ button.reorder-handle:disabled {
   position: absolute;
   top: 0;
   height: 100%;
-  background: var(--cm-primary);
+  background: color-mix(in oklab, var(--cm-olive-soft) 55%, var(--cm-success));
   border-radius: 2px;
   transition: left 0.08s linear;
 }
@@ -5067,21 +4776,6 @@ button.price-badge:hover {
 .price-badge.is-out {
   background: color-mix(in oklab, var(--cm-accent) 6%, var(--cm-bg));
   color: color-mix(in oklab, var(--cm-sand) 34%, var(--cm-text));
-}
-.item-inline-grid > label.item-inline-check {
-  flex-direction: row;
-  align-items: center;
-  align-self: end;
-  gap: 10px;
-  min-height: 46px;
-}
-.item-inline-grid > label.item-inline-check input {
-  width: 18px;
-  height: 18px;
-  min-height: 0;
-  flex-shrink: 0;
-  padding: 0;
-  accent-color: color-mix(in oklab, var(--cm-success) 99%, var(--cm-text));
 }
 
 .price-history {
@@ -5717,9 +5411,16 @@ button.price-badge:hover {
     align-items: baseline;
     gap: 12px;
     padding: 8px 14px;
+    /* Mesmo destaque do Valor final da edição: fundo sólido em vez de tracejado e número forte. */
+    border-style: solid;
+    border-color: color-mix(in oklab, var(--cm-accent) 24%, #fff);
+    background: color-mix(in oklab, var(--cm-accent) 8%, #fff);
   }
   .add-item-final strong {
-    font-size: 18px;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
   .add-item-final span:last-child {
     margin-left: auto;
@@ -5892,7 +5593,7 @@ button.price-badge:hover {
   .stats-compact-detail { font-size: 11px; }
   .stats-compact-toggle { font-size: 11px; min-height: 36px; }
   .stats-compact-grid { gap: 5px; }
-  .stats-compact-grid dt { font-size: 10px; }
+  .stats-compact-grid dt { font-size: 13px; }
   .stats-compact-grid dd { font-size: 11px; white-space: normal; overflow-wrap: normal; }
   .stats-compact-grid .money { display: inline-block; white-space: nowrap; }
   .stats-insights:not([hidden]) { grid-template-columns: minmax(0, 1fr); gap: 8px; }
@@ -5900,7 +5601,7 @@ button.price-badge:hover {
   .stats-insight > strong { font-size: 18px; }
   .stats-insight > strong > small { display: inline; margin-left: 4px; }
   .workspace-app .mobile-bottom-nav { padding-inline: 6px; gap: 2px; }
-  .workspace-app .mobile-bottom-nav button { padding-inline: 2px; font-size: 10px; white-space: nowrap; }
+  .workspace-app .mobile-bottom-nav button { padding-inline: 0; font-size: 13px; white-space: nowrap; }
   .workspace-app .environment-chips .environment-select { font-size: 13px; }
   .workspace-app .list-section-heading { gap: 6px; flex-wrap: wrap; }
   .workspace-app .list-section-heading h2 { font-size: 18px; }

@@ -590,7 +590,7 @@
 
 /* Pending purchases lead the visual hierarchy; completed items stay readable and quieter. */
 .workspace-app .item-row:not(.checked):not(.inactive) {
-  --item-surface: color-mix(in oklab, var(--cm-sand) 4%, var(--cm-bg));
+  --item-surface: color-mix(in oklab, var(--cm-bg) 55%, #fff);
   background: var(--item-surface);
   border-color: color-mix(in oklab, var(--cm-primary) 32%, var(--cm-sand));
   /* Sem faixa lateral: a fila se distingue pela borda quente e pelo peso do nome, não por uma tarja em cada item. */
@@ -677,6 +677,17 @@
 .workspace-app .stats-compact-percent small {
   font-size: 15px;
 }
+/* Meu Lar (visão geral): o percentual é o número-herói; a lista mantém o compacto. */
+.workspace-app.workspace-view-overview .stats-compact-percent {
+  font-family: var(--font-serif);
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.workspace-app.workspace-view-overview .stats-compact-percent small {
+  font-size: 20px;
+}
 .workspace-app .stats-compact-detail {
   font-size: 13px;
   font-weight: 600;
@@ -689,7 +700,7 @@
   color: var(--cm-action-hover);
 }
 .workspace-app .stats-compact-grid dt {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.35;
   color: color-mix(in oklab, var(--cm-sand) 17%, var(--cm-text));
@@ -774,51 +785,9 @@
   }
 }
 
-/* The edit surface is a lighter continuation of each item's current state. */
-.workspace-app .item-row .item-inline-panel {
-  background: color-mix(in srgb, var(--item-surface) 55%, white);
-  border-top-color: color-mix(in srgb, var(--item-surface) 75%, color-mix(in oklab, var(--cm-sand) 53%, var(--cm-text)));
-  border-radius: 0;
-}
 .workspace-app .item-row.expanded .item-footer {
   background: var(--item-surface);
   border-radius: 0 0 8px 8px;
-}
-.workspace-app .item-field-link > label {
-  justify-content: center;
-  text-align: center;
-}
-/* The sticky wrapper stays clear; only the floating buttons have a glass surface. */
-.workspace-app .item-row .item-inline-actions {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  gap: 10px;
-}
-.workspace-app .item-row .item-inline-actions .button {
-  min-height: 44px;
-  border: 1px solid #9d7756;
-  border-radius: 12px;
-  background: #ffffff80;
-  color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text));
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  box-shadow: 0 5px 16px #5b3b2514;
-}
-.workspace-app .item-row .item-inline-actions .button-dark {
-  background: linear-gradient(135deg, #b5532fe6, #9a4529eb);
-  border: 2px solid color-mix(in oklab, var(--cm-primary-dark) 87%, #000);
-  color: #fff;
-}
-@media (hover: hover) and (pointer: fine) {
-  .workspace-app .item-row .item-inline-actions .button-outline:hover {
-    background: #ffffffb3;
-  }
-  .workspace-app .item-row .item-inline-actions .button-dark:hover {
-    background: #9a4529ed;
-  }
 }
 /* The square visual keeps the existing checkbox semantics and animated check. */
 .workspace-app .item-row-controls .item-check {
@@ -881,39 +850,10 @@
   min-height: 44px;
 }
 
-/* "Tirar da lista" dentro do item aberto: ação discreta à esquerda, com a nota de data ao lado. */
-.workspace-app .item-inline-footnote {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 16px;
-  margin-top: 4px;
-}
-.workspace-app .item-inline-footnote .item-inline-note {
-  margin: 0;
-}
-.workspace-app .item-remove-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 12px;
-  margin-inline: -12px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 650;
-  color: color-mix(in oklab, var(--cm-primary-dark) 80%, var(--cm-text));
-}
-.workspace-app .item-remove-button:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--cm-sand) 28%, #fff);
-  color: var(--cm-action-hover);
-}
-
 /* O último item da lista rola para cima do botão de adicionar, em vez de ficar escondido atrás dele. */
 @media (max-width: 1023px) {
   .workspace-app .workspace-main {
-    padding-bottom: 88px;
+    padding-bottom: 0;
   }
 }
 
@@ -1592,63 +1532,6 @@
 }
 
 
-/* Formulário do item: rótulos à esquerda, alinhados ao campo, e dicas sempre abaixo sem empurrar o vizinho.
-   O Label base usa items-center, que centralizava o texto numa coluna; aqui a coluna estica e o texto começa na borda. */
-.workspace-app .item-inline-grid > label,
-.workspace-app .item-inline-grid > .item-field-link > label {
-  align-items: stretch;
-  justify-content: flex-start;
-  text-align: left;
-  line-height: 1.3;
-}
-.workspace-app .item-inline-grid > label.item-inline-check {
-  align-items: center;
-  flex-direction: row;
-}
-.workspace-app .item-inline-grid .item-inline-hint {
-  text-align: left;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.4;
-}
-.workspace-app .item-inline-grid > .item-field-link {
-  gap: 8px;
-}
-.workspace-app .item-inline-grid .item-inline-section {
-  text-align: left;
-}
-@media (min-width: 1360px) {
-  /* "end" alinhava a base dos campos e subia o rótulo de quem tinha dica; "start" alinha rótulo com rótulo. */
-  .workspace-app .item-inline-grid {
-    align-items: start;
-  }
-  .workspace-app .item-inline-grid > .item-field-link {
-    gap: 4px;
-  }
-  .workspace-app .item-inline-grid > .item-field-link > label {
-    font-size: 12px;
-  }
-  .workspace-app .item-inline-grid > .item-field-total {
-    align-self: end;
-    min-height: 46px;
-  }
-}
-@media (max-width: 1359px) {
-  .workspace-app .item-inline-grid {
-    align-items: start;
-  }
-}
-
-/* Legenda ao lado do título da seção: menor e mais discreta que o título. */
-.workspace-app .item-inline-section .item-inline-caption {
-  margin-left: 10px;
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: color-mix(in oklab, var(--cm-bg) 25%, var(--cm-text));
-}
-
 /* Chips de ambiente no celular: "conquistados/total" ao lado do nome, no tom do chip, sem a pílula de fundo. */
 .workspace-app .environment-chips .environment-select > small.environment-chip-count,
 .workspace-app .environment-chips-row > .environment-row.environment-all small.environment-chip-count {
@@ -1920,22 +1803,15 @@
   -webkit-backdrop-filter: none;
   background: #33221b80;
 }
-.workspace-app .item-inline-actions,
-.workspace-app .item-row .item-inline-actions .button {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-.workspace-app .item-row .item-inline-actions .button {
-  background: #fffffff2;
-}
 
 /* Barra inferior do celular: quatro destinos de largura igual, ícone sobre rótulo de uma linha e o destino atual
    marcado por uma pílula atrás do ícone (e não por um cartão inteiro), como nos apps de uso diário. */
 @media (max-width: 1023px) {
   .workspace-app .mobile-bottom-nav {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(max-content, 1fr));
     gap: 0;
+    column-gap: 2px;
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     background: #fdfcf8;
     border-top: 1px solid color-mix(in oklab, var(--cm-sand) 45%, var(--cm-bg));
@@ -1945,17 +1821,29 @@
     position: relative;
     max-width: none;
     min-height: 52px;
-    padding: 2px 2px 0;
+    padding: 2px 0 0;
     gap: 3px;
     background: transparent;
     box-shadow: none;
     border-radius: 12px;
-    font-size: 11.5px;
+    font-size: 13px;
     font-weight: 600;
     line-height: 1.1;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     color: color-mix(in oklab, var(--cm-bg) 30%, var(--cm-text));
     -webkit-tap-highlight-color: transparent;
+  }
+  /* Telas muito estreitas: as colunas podem encolher e o rótulo ganha reticência. */
+  @media (max-width: 300px) {
+    .workspace-app .mobile-bottom-nav {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      padding-inline: 4px;
+      column-gap: 0;
+    }
+    .workspace-app .mobile-bottom-nav button {
+      min-width: 0;
+      overflow: hidden;
+    }
   }
   .workspace-app .mobile-bottom-nav button > span {
     display: block;
@@ -2012,7 +1900,7 @@
 }
 @media (max-width: 359px) {
   .workspace-app .mobile-bottom-nav { padding-inline: 4px; }
-  .workspace-app .mobile-bottom-nav button { font-size: 10.5px; }
+  .workspace-app .mobile-bottom-nav button { font-size: 13px; }
   .workspace-app .mobile-bottom-nav button::before { width: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {

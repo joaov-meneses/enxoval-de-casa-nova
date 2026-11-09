@@ -27,7 +27,8 @@ test('export preserves complete logs as formatted JSON with searchable error att
     custom: 'PRIVATE_CUSTOM', service: 'PRIVATE_SERVICE', environment: 'PRIVATE_ENV',
   });
   assert.equal(JSON.parse(log.body).msg, 'PRIVATE_MESSAGE');
-  assert.equal(JSON.parse(log.body).req.headers.cookie, 'PRIVATE_COOKIE');
+  assert.equal(JSON.parse(log.body).req.headers.cookie, '[redigido]');
+  assert.equal(JSON.parse(log.body).res.headers.authorization, '[redigido]');
   assert.equal(JSON.parse(log.body).custom, 'PRIVATE_CUSTOM');
   assert.ok(log.body.includes('\n  '));
   assert.equal(log.attributes['exception.message'], 'PRIVATE_EMAIL');
@@ -137,8 +138,8 @@ test('exporter failures never interrupt local logs or propagate from flush/shutd
   await remote.shutdown();
   assert.equal(local.length, 1);
   assert.equal(local[0].event, 'database.pool.error');
-  assert.equal(local[0].err.detail, 'ORIGINAL_DETAIL');
-  assert.equal(local[0].err.token, 'ORIGINAL_TOKEN');
+  assert.equal(local[0].err.detail, '[redigido]');
+  assert.equal(local[0].err.token, '[redigido]');
   assert.equal(local[0].err.cause.message, 'ORIGINAL_CAUSE');
   const broken = createLogger({ write: line => local.push(JSON.parse(line)) }, { write: () => { throw new Error('broken'); } });
   assert.doesNotThrow(() => broken.error('still local'));

@@ -29,7 +29,7 @@ As semanas sugeridas continuam calculadas, sem gravar datas automáticas. Os aju
 ### Onde ajustar
 
 - **Planejamento:** orçamento mensal, alertas e “Por que esta semana? Ajustar” em cada item. O diálogo mostra uma prévia da data antes de salvar.
-- **Lista:** o botão “Comprar até…” abre os detalhes do item com semana, prazos, dependência e solução temporária.
+- **Lista:** o chip “Comprar até dd/mm” tem destaque próprio (terracota escuro em negrito); “Semana sugerida já passou” mantém o tom neutro com texto terracota escuro. O botão “Comprar até…” abre os detalhes do item com semana, prazos, dependência e solução temporária.
 - **Nino:** ordem e data do calendário, com o motivo da sugestão.
 - **Meu Lar:** próximas compras, referências favoráveis de preço e acesso ao Planejamento.
 

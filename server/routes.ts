@@ -2130,7 +2130,7 @@ export function registerApiRoutes(app: Express) {
       // Resultado parcial (só o nome tirado do link) não é um dado confiável da loja: não vira produto acompanhado.
       if (!preview.partial) rememberPreview(preview);
       // O catálogo sabe o cômodo de quase todo item; o regex de `suggestCategory` fica só como reserva.
-      const catalogItem = preview.title ? await findItemInTitle(preview.title).catch(err => { getLogger().warn({ event: 'catalog.title.failed', title: preview.title, err }, 'Catalog title lookup failed.'); return null; }) : null;
+      const catalogItem = preview.title ? await findItemInTitle(preview.title).catch(err => { getLogger().warn({ event: 'catalog.title.failed', titleLength: preview.title?.length, err }, 'Catalog title lookup failed.'); return null; }) : null;
       res.json({ ...preview, suggestedRoom: catalogItem?.room ?? null });
     } catch (err) {
       if (err instanceof ScrapeError) throw new HttpError(err.code === 'invalid_url' ? 400 : 422, err.message);

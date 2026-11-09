@@ -1,5 +1,6 @@
 import { getStripe } from '../billing.ts';
-import { checkBilling, reconcileBilling, reviewRefund, validateTestPix, enqueueMissingFiscal, syncFiscalInvoice } from '../billingOperations.ts';
+import { checkBilling, reconcileBilling, reviewRefund, validateTestPix, enqueueMissingFiscal, syncFiscalInvoice,
+  listBillingCases, reviewBillingCase } from '../billingOperations.ts';
 import { getPool } from '../database.ts';
 import { stopPosthogLogs } from '../logger.ts';
 
@@ -22,13 +23,17 @@ try {
   } else if (command === 'review-refund') {
     for (const name of ['--environment', '--charge', '--event', '--note']) if (!args.includes(name)) throw new Error(`Faltou ${name}.`);
     result = await reviewRefund(value('--environment'), value('--charge'), value('--event'), value('--note'));
+  } else if (command === 'list-cases') {
+    result = await listBillingCases(value('--environment'), args.includes('--kind') ? value('--kind') : undefined);
+  } else if (command === 'review-case') {
+    result = await reviewBillingCase(value('--environment'), value('--kind'), value('--source'), value('--event'), value('--note'));
   } else if (command === 'enqueue-fiscal') {
     for (const name of ['--source', '--reason']) if (!args.includes(name)) throw new Error(`Faltou ${name}.`);
     result = await enqueueMissingFiscal(getStripe(), value('--source'), value('--reason'), args.includes('--paid-at') ? Date.parse(value('--paid-at')) / 1000 : undefined);
   } else if (command === 'sync-fiscal') {
     if (!args.includes('--invoice')) throw new Error('Informe --invoice com o UUID da nota.');
     result = await syncFiscalInvoice(value('--invoice'));
-  } else throw new Error('Use check, test-pix, reconcile --since <ISO> [--until <ISO>] [--refresh-fiscal], review-refund, enqueue-fiscal ou sync-fiscal.');
+  } else throw new Error('Use check, test-pix, reconcile, list-cases --environment <ambiente> [--kind <tipo>], review-case --environment <ambiente> --kind <tipo> --source <id> --event <evt_id> --note <motivo>, review-refund, enqueue-fiscal ou sync-fiscal.');
   console.log(JSON.stringify(result, null, 2));
 } catch (err) {
   // SDKs podem anexar headers e chaves à exceção. Não imprimir o objeto de erro.

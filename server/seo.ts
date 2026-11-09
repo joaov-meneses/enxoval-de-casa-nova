@@ -32,6 +32,16 @@ export const PUBLIC_PAGES: PublicPage[] = [
     description: 'Como o Casa Mia trata seus dados pessoais, quais ferramentas usa e como mudar suas preferências.',
     priority: '0.3', changefreq: 'yearly',
   },
+  {
+    path: '/termos', title: 'Termos de Uso | Casa Mia',
+    description: 'Planos, cobrança, cancelamento, direitos do consumidor e contato do Casa Mia.',
+    priority: '0.3', changefreq: 'yearly',
+  },
+  {
+    path: '/reembolso', title: 'Cancelamento e reembolso | Casa Mia',
+    description: 'Direito de arrependimento de 7 dias e como solicitar cancelamento e reembolso no Casa Mia.',
+    priority: '0.3', changefreq: 'yearly',
+  },
 ];
 
 /** Prefixos que nunca devem aparecer em buscadores: conta, gestão e links que chegam por e-mail. */

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, homologacao, main]
   pull_request:
-    branches: [develop]
+    branches: [develop, homologacao, main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -54,6 +54,13 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - run: npm run test:billing-db
+      - run: node --import tsx tests/billing-risk-db.mjs
+      - run: node --import tsx tests/billing-operations-db.mjs
+      - run: npm run test:fiscal-provider
+      - run: npm run test:feedback-db
+      - run: npm run test:logging
+      - run: npm run test:analytics
       - run: npm run test:admin-api
       - run: npm run test:onboarding-db
       - run: npm run test:item-status-db

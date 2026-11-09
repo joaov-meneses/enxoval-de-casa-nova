@@ -570,16 +570,32 @@ test.describe("funil /comecar", () => {
     expect(await page.evaluate(() => localStorage.getItem("casamia.onboarding.v1"))).not.toBeNull();
   });
 
-  test("o login não oferece criar conta; /signup e o link levam ao funil", async ({ page }) => {
+  test("o login oferece criar conta só pelo link de rodapé; /signup sem sessão leva ao cadastro", async ({ page }) => {
     await page.goto("/login");
+    await expect(page.getByRole("tab")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Criar conta", exact: true })).toHaveCount(0);
     await expect(page.getByLabel("Como podemos te chamar?")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Entrar no meu enxoval" })).toBeVisible();
-    await page.getByRole("link", { name: /Monte seu plano de casa nova/ }).click();
-    await expect(page).toHaveURL(/\/comecar$/);
+    await page.getByRole("link", { name: "Criar conta", exact: true }).click();
+    await expect(page).toHaveURL(/\/cadastro$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Crie sua conta." })).toBeVisible();
     await page.goto("/signup");
-    await expect(page).toHaveURL(/\/comecar$/);
+    // /signup vira /comecar, que exige sessão: sem ela, a pessoa cai no cadastro.
+    await expect(page).toHaveURL(/\/cadastro$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Crie sua conta." })).toBeVisible();
     await expect(page.getByRole("button", { name: "Entrar no meu enxoval" })).toHaveCount(0);
+  });
+
+  test("/signup com sessão e sem enxovais leva a /comecar", async ({ page }) => {
+    const session = {
+      user: { id: "u1", name: "Jeoston", email: "j@e.com" },
+      enxovais: [], activeEnxoval: null, members: [], categories: [], items: [],
+    };
+    await page.route("**/api/bootstrap**", (route) => route.fulfill({ status: 200, json: session }));
+    await page.goto("/signup");
+    // src/main.tsx troca /signup por /comecar; com sessão e sem enxovais, o funil continua em /comecar.
+    await expect(page).toHaveURL(/\/comecar$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Crie sua conta." })).toHaveCount(0);
   });
 
   test.describe("roleta de estados", () => {

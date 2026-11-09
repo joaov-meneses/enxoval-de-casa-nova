@@ -10,17 +10,31 @@ A Stripe gera faturas e recibos. A NFS-e brasileira será emitida no backend pel
 
 1. Configure `STRIPE_SECRET_KEY`, os dois preços e `STRIPE_WEBHOOK_SECRET`.
 2. Ative Pix no [Dashboard da Stripe](https://dashboard.stripe.com/settings/payment_methods). O preço do Passe deve estar em BRL. `STRIPE_PIX_ENABLED=false` desativa a oferta no app.
-3. No webhook `/api/billing/webhook`, habilite `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, **`invoice.paid`**, `charge.refunded`, `refund.created`, `refund.updated` e `refund.failed`.
+3. No webhook `/api/billing/webhook`, habilite `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, **`invoice.paid`**, `invoice.payment_failed`, `charge.dispute.created`, `radar.early_fraud_warning.created`, `charge.refunded`, `refund.created`, `refund.updated` e `refund.failed`.
 4. Teste o Pix no ambiente de testes da Stripe, confirmando e expirando o pagamento. O código expira uma hora após a confirmação do PaymentIntent. O Passe só é liberado quando `payment_status=paid`; eventos repetidos não estendem o acesso duas vezes.
 
 O SDK Stripe 23 usa `allowed_payment_method_types`: Passe em BRL permite `card,pix`, e Mensal permite `card`. Não envie o parâmetro removido `payment_method_types`. O Dashboard e a elegibilidade da conta continuam determinando os meios disponíveis. Fontes: [Pix no Checkout](https://docs.stripe.com/payments/pix/accept-a-payment?payment-ui=checkout) e [migração dos meios de pagamento](https://support.stripe.com/questions/fix-the-payment-method-types-error).
 
 O Mensal permanece no cartão por decisão do responsável em 22/10/2026. Além do mandato e dos prazos próprios, a [elegibilidade atual da Stripe](https://docs.stripe.com/payments/pix) informa que **Pix Automático não está disponível para contas brasileiras**; a conta consultada é BR. Não há implementação de recorrência Pix pendente no escopo atual.
 
-### Situação verificada em 22/10/2026
+### Operação e prontidão em 06/11/2026
+
+Produção usa a conta LIVE `acct_1UQc9xIsGJ6k3UsS`, chave restrita, preços LIVE e webhook próprio em `https://enxoval-de-casa-nova-production.up.railway.app/api/billing/webhook`. O cadastro retornou pagamentos e repasses habilitados, sem requisitos pendentes. Staging mantém a conta TEST `acct_1UQcAPIzzRKYM0sE`. A consulta posterior de 06/11 retornou Pix LIVE disponível e preferência `on`; a entrega de prontidão prepara sua ativação no Passe. Conferir o deployment e `billing:ops check` antes de afirmar que já aparece no app.
+
+A entrega acrescenta fila de falhas de cobrança, contestação, alerta de fraude e falha assíncrona, com revisão humana auditada e proteção contra evento antigo/revisão concorrente. Consulte [Operação de pagamentos em produção](operacao-pagamentos-producao.md) para atendimento, reembolso e limites externos.
+
+`billing:ops check` confere também Portal do Cliente, modo de chave/preços, ambiente fiscal e presença de certificado/configuração/referência contábil sem revelar conteúdo. `list-cases --environment producao` lista pendências; `review-case` somente registra revisão, sem movimentar dinheiro ou alterar acesso.
+
+O diagnóstico encontrou todas as variáveis fiscais ausentes nos dois ambientes. A configuração manual segura usa ambiente `producao` em production e `homologacao` em staging, com transmissão e habilitação desligadas. Isso permite processar a fila correta, sem emitir notas. Faltam A1 real, habilitação e parâmetros aprovados pela contabilidade; os certificados no repositório são apenas sintéticos. A decisão versionada pela SEFIN não equivale a um procedimento fiscal operacional já aprovado. Não foi concluída compra nem emissão fiscal real nesta auditoria.
+
+Na configuração anterior de [Black Friday](black-friday-2026.md), staging permaneceu na conta de teste `acct_1UQcAPIzzRKYM0sE`, URL `https://larume-staging.up.railway.app`, preços e webhook de teste, com cartão/Pix para o Passe. Aqueles dois deployments concluíram com sucesso, a saúde HTTP retornou 200 e os webhooks aceitaram o evento sintético assinado com o segredo do respectivo ambiente e rejeitaram a requisição sem assinatura. Isso não representa publicação da entrega atual de riscos operacionais.
+
+O código `BLACKFRIDAY` oferece 30% nos dois planos, apenas na primeira cobrança, até 30/11/2026 inclusive. Existe uma promoção independente em cada conta. Sessões Stripe LIVE e de teste confirmaram Mensal por R$ 20,93 e Passe por R$ 69,30 e foram expiradas sem pagamento. Detalhes, IDs e limites da validação em [Black Friday 2026](black-friday-2026.md).
+
+### Histórico: situação verificada em 22/10/2026
 
 - Pix ativado na configuração padrão **de teste** da conta Stripe `acct_1UQcAPIzzRKYM0sE`; consulta posterior retornou `available=true` e preferência `on`.
-- O webhook de teste `https://larume-staging.up.railway.app/api/billing/webhook` foi configurado para receber todos os eventos listados acima, preservando as inscrições anteriores.
+- O webhook de teste `https://larume-staging.up.railway.app/api/billing/webhook` foi configurado para os eventos vigentes naquele diagnóstico, preservando as inscrições anteriores. Os três eventos adicionais de falha de fatura, disputa e fraude pertencem à entrega posterior de prontidão.
 - Checkout de teste com o preço real do Passe aceitou Pix/cartão e foi expirado após a verificação. Os cenários oficiais `succeed_immediately` e `expire_immediately` retornaram, respectivamente, `succeeded` e `requires_payment_method` com falha de pagamento. Nenhum valor real foi cobrado.
 - A conta retornou `charges_enabled=false` e `details_submitted=false`. Tanto `staging` quanto `production` na Railway estão configurados com chave **de teste**; `APP_URL` em ambos aponta para staging. Não se trata de ativação de produção.
 - Transmissão fiscal continua desabilitada: faltam certificado, habilitação do CNPJ e parâmetros contábeis. Nenhuma nota fiscal real foi emitida.
@@ -34,7 +48,7 @@ npm run billing:ops -- test-pix
 
 `test-pix` exige `sk_test_`, cria uma sessão sem vínculo com contas do app, expira essa sessão e verifica dois PaymentIntents de R$ 1,00 **simulados**. O comando falha se os estados finais não forem observados. Não executá-lo com preços/chaves de produção.
 
-Para lançar: concluir o cadastro da conta Stripe; configurar chave, preços, webhook e `APP_URL` próprios de produção; ativar Pix também na configuração live e repetir a conferência. Confirmar uma compra real autorizada pelo titular e a entrega assinada do webhook até a liberação do Passe no processo publicado. A validação atual cobre a API Stripe de teste e o handler local; não comprova esse percurso em produção.
+Naquele diagnóstico faltavam cadastro, chave, preços, webhook e `APP_URL` de produção. Esses itens foram configurados posteriormente, conforme a seção de 06/11 acima. Continua pendente confirmar uma compra real autorizada pelo titular e a entrega assinada do webhook até a liberação do Passe no processo publicado. Sessões criadas e expiradas sem pagamento não comprovam esse percurso financeiro real.
 
 ## NFS-e Nacional direta: decisão e requisitos
 

@@ -29,13 +29,15 @@ Os logs estruturados do backend e o envio completo ao PostHog Logs estão em [do
 | Rota | O que é |
 |---|---|
 | `/` | Landing page com recursos, planos e perguntas frequentes |
-| `/login` e `/cadastro` | A mesma tela, com as abas "Entrar" e "Criar conta" (`/cadastro` abre na segunda). `/login?cadastro=1` vai para `/cadastro` e `/signup` vai para `/comecar` |
+| `/login` e `/cadastro` | A mesma tela, sem abas: a troca entre entrar e criar conta é um link de rodapé (`/cadastro` abre em criar conta). `/login?cadastro=1` vai para `/cadastro` e `/signup` vai para `/comecar` |
 | `/comecar` | Funil pós-cadastro: exige conta e nenhum enxoval ainda. Pergunta o nome e algumas perguntas curtas, monta o plano e cria o primeiro enxoval já com ele. Detalhes em [docs/onboarding-funil.md](docs/onboarding-funil.md) |
 | `/app` | Aplicativo conectado à conta |
 | `/app/:enxovalId`, `/app/:enxovalId/itens/:ambienteId`, `/app/:enxovalId/meu-lar` e `/app/:enxovalId/plano` | Enxoval e tela definidos na URL; links antigos continuam funcionando. Detalhes em [docs/rotas-do-app.md](docs/rotas-do-app.md) |
 | `/convite#token=…` | Aceite de convite para participar de um enxoval |
 | `/esqueci-senha` e `/redefinir-senha` | Recuperação de senha por e-mail |
 | `/privacidade` | Política de privacidade |
+| `/termos` | Termos de Uso, fornecedor e contato |
+| `/reembolso` | Cancelamento, arrependimento em 7 dias e solicitação pelo app |
 | `/admin` | Gestão de usuários (acesso administrativo separado das contas de clientes) |
 
 O produto exige conta e servidor completo, com PostgreSQL: não existe modo de demonstração nem prévia sem banco.

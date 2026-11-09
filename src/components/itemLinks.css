@@ -6,8 +6,6 @@
 .add-link-button:disabled { opacity: .4; cursor: default; }
 .add-link-feedback { display: block; margin-top: 6px; font-size: 12px; line-height: 1.5; color: color-mix(in oklab, var(--cm-primary-dark) 84%, var(--cm-text)); }
 .item-link-import { display: grid; gap: 12px; padding: 16px; border: 1px solid color-mix(in oklab, var(--cm-sand) 53%, var(--cm-bg)); background: var(--cm-bg); border-radius: 12px; }
-.item-field-link { display: grid; gap: 8px; min-width: 0; }
-.item-field-link > label { font-size: 13px; font-weight: 500; color: color-mix(in oklab, var(--cm-success) 94%, #000); }
 .item-link-import h5 { margin: 0; font-size: 15px; font-weight: 800; color: color-mix(in oklab, var(--cm-primary-dark) 17%, var(--cm-text)); }
 .item-link-import p { margin: 0; font-size: 14px; line-height: 1.6; color: color-mix(in oklab, var(--cm-sand) 43%, var(--cm-text)); }
 .item-link-import-actions { display: flex; flex-wrap: wrap; gap: 10px; }

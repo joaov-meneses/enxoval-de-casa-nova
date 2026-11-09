@@ -30,6 +30,8 @@ startErrorTracking();
 
 app.set("trust proxy", 1);
 app.use(createHttpLogging());
+// Páginas com token na URL (/preferencias, /pesquisa) não vazam a query no Referer para outros domínios.
+app.use((_req, res, next) => { res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin"); next(); });
 // O webhook da Stripe confere a assinatura sobre o corpo cru, então vem antes do parser de JSON.
 registerBillingWebhook(app);
 // O proxy do PostHog repassa o corpo cru (às vezes comprimido), então também vem antes do parser de JSON.
@@ -72,6 +74,8 @@ if (isProduction) {
     appType: "spa",
     server: {
       middlewareMode: true,
+      // Permite abrir o dev server por túnel (ex.: cloudflared) para testar no celular.
+      allowedHosts: [".trycloudflare.com"],
       hmr: process.env.DISABLE_HMR !== "true",
       watch:
         process.env.DISABLE_HMR === "true"
