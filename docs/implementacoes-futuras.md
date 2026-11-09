@@ -166,5 +166,4 @@ Decisão: não esconder valores para revelá-los só no paywall. Motivos: contra
 > **A ordem acima é de menor risco de produto, não de valor.** A validação em produção da Fase 7 (antes de comprar anúncios) e a Fase 9 devem ser **antecipadas**; a infraestrutura de idiomas da Fase 8 (nenhum texto novo fixo no código) também deve começar já, porque o custo de extração cresce a cada tela nova. Tabelas de região e preço da Fase 8 e o antifraude da Fase 9 são pré-requisitos da cobrança em outros países.
 
 - **Teste Playwright permanente de layout mobile:** fonte de 13px nos rótulos, cor sálvia das barras e botão flutuante sem sobreposição (ficou fora por restrição de edição em `tests/`).
-- **Barra inferior do `/app` coberta pelo aviso de cookies no celular:** a reserva de espaço vale para a rolagem da página; a barra fixa do `/app` (`src/product.css`) continua sob o aviso até a pessoa decidir.
 - **Chave antiga `cm_consent_v1` em `tests/housewarming.spec.ts`:** o spec semeia a chave antiga, então o aviso aparece em `/cha` no build com chave de análise. Trocar por `casamia:consent`.

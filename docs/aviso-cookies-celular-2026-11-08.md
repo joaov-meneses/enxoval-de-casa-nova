@@ -37,13 +37,35 @@ Antes: aviso de 272-651 (375x667) e 128-552 (320x568), cobrindo o botão. Em 136
 3. Build comum: `npm run build` e o mesmo comando (os testes do aviso pulam; o último confere que não há reserva de espaço).
 4. `npm run test:analytics`.
 
+## Correções da revisão (2026-11-08)
+
+- Botões: `.consent-actions` vira coluna única, com botões de largura total, quando a faixa não comporta os três lado a lado (`@container consent`, limite em `rem`). Com fonte padrão continuam em três colunas. Nenhum botão transborda em 320 px com a raiz em 130% e 200%, e Recusar e Aceitar seguem iguais (mesma largura, 44px ou mais).
+- Ações sempre à vista: a faixa é uma coluna flex, e só `.consent-scroll` (texto e categorias, novo `div` em `ConsentBanner.tsx`) rola. Título e botões ficam fixos. O teto é `min(max(40dvh, 15rem), 100dvh - 16px)`: 40dvh com a fonte padrão e mais alto com fonte grande, para os botões caberem.
+- Painéis fixos do `/app`: enquanto `html[data-consent-open]` está ativo até 767px, `.casamia-dialog` (bottom sheets, inclusive o rodapé sticky do formulário de item), `.workspace-menu-panel`, `.mobile-bottom-nav`, `.mobile-fab-add`, `.undo-toast-region` e `.subscription-connection-notice` sobem `var(--consent-banner-space)`. O z-index do aviso não mudou. Entre 768 e 1023 px (cartão de 560px) a barra inferior do `/app` ainda pode ficar parcialmente sob o cartão.
+- Testes novos em `tests/consent-banner.spec.ts`: fonte em 130% e 200% (320x568) e bottom sheet do `/app` com o aviso aberto.
+
+### Medidas depois das correções (`/login`, build com chave)
+
+| Janela | Fonte | Topo do aviso | Altura | % da janela | Botão de envio (topo-base, rolado) |
+| --- | --- | --- | --- | --- | --- |
+| 320x568 | padrão | 363 | 205px | 36% | 313-363 |
+| 320x568 | 130% | 256 | 312px | 55% | 206-256 |
+| 375x667 | padrão | 462 | 205px | 31% | 411-462 |
+| 375x667 | 130% | 355 | 312px | 47% | 304-355 |
+
+Modo personalizar: 320x568 ocupa 79% (padrão) e 97% (130%); 375x667, 61% e 98%. Em todos, `scrollWidth - clientWidth` dos botões é 0 e o último botão termina dentro do aviso.
+
+### Teste WCAG a 390 px: baseline
+
+`WCAG accessibility checks on public pages at 390px` é instável e não vem desta branch. Em `homologacao` (`73fd54d`, build com chave) ele falhou na execução completa de `product.spec.ts` e passou 6 de 6 isolado. Nesta branch (build com chave) falhou na execução completa e passou 6 de 6 isolado; no build comum passou na execução completa. Conclusão: falha só sob carga (provavelmente a animação de entrada da landing no axe), com o mesmo comportamento na linha de base. Não foi corrigido aqui.
+
 ## Estado
 
 - `npm run lint`: passou. `npm run test:analytics`: 37 passaram.
 - Build com chave: `auth`, `consent-banner` e `legal-pages` passaram. Em `product.spec.ts` falhou só `landing navigation, FAQ and entry routes work`, já falho antes (o FAQ mudou).
-- Build comum: 60 passaram, 15 pularam (os do aviso). Falharam `landing navigation, FAQ and entry routes work` (pré-existente) e `WCAG accessibility checks on public pages at 390px` (contraste de `.cm-how-step` na landing, sem aviso neste build; no build com chave passou, então parece depender da animação de entrada da landing; não foi comparado com a linha de base).
+- Build comum: 60 passaram, 15 pularam (os do aviso). Falharam `landing navigation, FAQ and entry routes work` (pré-existente) e `WCAG accessibility checks on public pages at 390px` (contraste de `.cm-how-step` na landing; instável, ver "Teste WCAG a 390 px: baseline" acima).
 - Movimento reduzido: a regra global deixa a transição em 0,00001s, na prática desligada.
 
 ## Fica para depois
 
-Barra inferior do `/app` e chave antiga `cm_consent_v1` em `tests/housewarming.spec.ts` (ver `docs/implementacoes-futuras.md`).
+Barra inferior entre 768 e 1023 px e chave antiga `cm_consent_v1` em `tests/housewarming.spec.ts` (ver `docs/implementacoes-futuras.md`).
