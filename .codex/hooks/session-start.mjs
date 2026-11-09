@@ -8,5 +8,5 @@ const worktree = git('rev-parse', '--git-dir') !== git('rev-parse', '--git-commo
 const lines = [`Casa Mia — branch ${branch}${worktree ? ' (worktree)' : ''}, ${changes} arquivo(s) com mudanças locais.`]
 if (!existsSync('node_modules')) lines.push('node_modules ausente: rode npm ci antes de lint, build ou testes.')
 if (['main', 'master'].includes(branch)) lines.push('Você está em main. Trabalhe em branch derivada de develop.')
-lines.push('Fluxo para mudanças multi-arquivo: skill $entregar-mudanca-codex; consulte AGENTS.md.')
+lines.push('Fluxo proporcional ao risco: consulte AGENTS.md e a skill $entregar-mudanca-codex.')
 process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: lines.join('\n') } }))

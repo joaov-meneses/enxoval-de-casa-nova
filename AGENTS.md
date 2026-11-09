@@ -25,9 +25,9 @@ App de enxoval de casa nova. React/Vite em `src/`, API e workers em `server/`, t
 | Senhas e login | `npm run test:password-policy`, `npm run test:password-reset-db` |
 | Documentos e logs | `npm run test:logging`, `npm run documents:check` |
 
-Área fora da tabela: procure em `tests/` e `grep test: package.json`. Scripts `*-db` precisam de Postgres (`npm run db:up` antes, `db:down` depois se você subiu). Rode-os em série.
+Consulte `.github/workflows/ci.yml` para selecionar os testes pertinentes; a tabela não é exaustiva. Procure também em `tests/` e `package.json`. Scripts `*-db` precisam de Postgres (`npm run db:up` antes, `db:down` depois se você subiu). Rode-os em série.
 
-Relate cada comando com passou/falhou e a saída relevante dos que falharam. Não diga "verificado" sem ter rodado.
+Relate cada comando com passou/falhou e a saída relevante dos que falharam. Distinga validações locais das pendentes no CI; não presuma que o CI passou. Não diga "verificado" sem ter rodado.
 
 ## Git
 
@@ -43,8 +43,8 @@ Cada entrega é documentada em português em `docs/` (data, o que mudou, como va
 
 ## Cuidados do domínio
 
-Dados pessoais, documentos, pagamentos e notas fiscais pedem revisão de segurança. Respeite `prefers-reduced-motion`. Verifique telas em 320, 375 e 425 px. Cores são `--cm-*` em `src/index.css`; tema Linho Terracota; fontes Fraunces + Nunito.
+Dados pessoais, documentos, pagamentos e notas fiscais pedem revisão de segurança. Respeite `prefers-reduced-motion`. Em mudanças de interface, verifique as telas afetadas em 320, 375 e 425 px e execute os testes Playwright existentes aplicáveis; relate limitações e verificações não executadas. Cores são `--cm-*` em `src/index.css`; tema Linho Terracota; fontes Fraunces + Nunito.
 
 ## Codex
 
-O projeto mantém uma configuração própria para Codex em `.codex/` e skills em `.agents/skills/` (espelho das receitas portáveis de `.claude/skills/`). Para mudanças que toquem mais de um arquivo ou módulo, use `$entregar-mudanca-codex`: delegue exploração, planejamento, implementação e verificação conforme a skill. Em tarefas triviais, trabalhe direto. Subagentes compartilham o checkout; para escrita paralela, exija worktrees Git distintas e escopos sem sobreposição. Perfis e hooks não substituem as regras de `AGENTS.md`.
+O projeto mantém uma configuração própria para Codex em `.codex/` e skills em `.agents/skills/` (espelho das receitas portáveis de `.claude/skills/`). Para mudanças que toquem mais de um arquivo ou módulo, use `$entregar-mudanca-codex`: delegue exploração, planejamento, implementação e verificação conforme a skill. Mudanças simples e de baixo risco, inclusive em mais de um arquivo, podem ser feitas diretamente, com validação proporcional. Mudanças em autenticação, dados pessoais, pagamentos, banco ou fluxos de interface seguem o fluxo completo, com revisão e testes pertinentes. Subagentes compartilham o checkout; para escrita paralela, exija worktrees Git distintas e escopos sem sobreposição. Os perfis em `.codex/agents/` definem modelos e esforços. Hooks são proteções auxiliares, dependem do cliente e não cobrem todas as ferramentas ou comandos; cumpra estas regras mesmo quando não forem executados.
